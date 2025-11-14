@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
 
     const data = (await resp.json()) as DeepseekResponse;
     const content = data.choices?.[0]?.message?.content ?? "";
+    console.log(content)
     const part = coerceToScenePart(content);
 
     return NextResponse.json({

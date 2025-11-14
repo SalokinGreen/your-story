@@ -1,6 +1,7 @@
 'use client';
 import { useState } from "react";
-import { Choices, StoryData } from "../misc/structs";
+import { Choice, Choices, StoryData } from "../misc/structs";
+import { outputToScenePart } from "../misc/ai";
 
 
 export default function Story(storyData: StoryData) {
@@ -13,7 +14,7 @@ export default function Story(storyData: StoryData) {
             imageUrl: "",
             user: false,
             role: "assistant",
-            choices: ["Start Story"],
+            choices: [{ text: "Start Story" }],
         });
     }
     if (!started) {
@@ -24,12 +25,54 @@ export default function Story(storyData: StoryData) {
 
 
     async function handleChoice(key: number) {
+        const choice = choices.choices[key];
+        // Roll dice against difficulty
+        let dice_roll = Math.floor(Math.random() * 100) + 1;
+        // extra info
+        let extra = "" 
+        let text = "> " + choices.choices[key].text;
+
+
+        // advantage if item used
+        if (choice.item_used) {
+            extra += `; item used (${choice.item_used})`
+            const second_roll = Math.floor(Math.random() * 100) + 1;
+            if (second_roll > dice_roll) {
+                dice_roll = second_roll;
+            }
+            // use item if loss
+            if (choice.item_loss) {
+                // TODO: Implement item loss
+            }
+        }
+        // TODO: Implement how disadvantage works
+
+        // Do the skill check
+        if (choice.skill_used) {
+        // Now we add the stat 
+        dice_roll += storyData.stats.find(stat => stat.name === choice.skill_used)?.value || 0;
+        // Check success or failure
+        const dc = choice.skill_dc || 0;
+        const dc_passed = dice_roll >= dc;
+        if (dc_passed) {
+            text += " <Success" + extra + ">";
+        } else {
+            text += " <Failure" + extra + ">";
+        }
+    } else {
+        text += " <No Skill Used" + extra + ">";
+    }
+        // Add memory to story if exists
+        for (const mem of storyData.memory) {
+            storyData.memory.push(mem)
+        }
         storyData.scene.parts.push({
-            content: `> ${choices.choices[key]}`,
+            content: text,
             imageUrl: "",
             user: true,
             role: "user",
-            choices: [...choices.choices]
+            choices: [...choices.choices],
+            memoryEntries: storyData.memory
         });
         
         setChoices({
@@ -47,8 +90,10 @@ export default function Story(storyData: StoryData) {
             })
         }).then(async (res) => {
             const data = await res.json();
-            setStoryText(data.storyText);
-            setChoices(data.choices);
+            console.log(data)
+            storyData.scene.parts.push(data.part);
+            setStoryText(data.part.content);
+            setChoices({ choices: data.part.choices || [] });
         });
         
         
@@ -57,17 +102,14 @@ export default function Story(storyData: StoryData) {
 
     }
     return (
-        <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-            {storyData.scene.parts.length <= 0 ? storyData.starting_content : storyData.scene.parts[storyData.scene.parts.length - 1].content}
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-            <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-                <h2 className="max-w-xs text-2xl font-semibold leading-9 tracking-tight text-black dark:text-zinc-50">
-                    {storyText}
-                </h2>
-                <div className="flex flex-col items-center gap-4 text-center sm:items-start sm:text-left">
+        <div className="flex min-h-screen items-start justify-center bg-zinc-50 font-sans dark:bg-black">
+        <div className="flex flex-col items-start gap-6 text-center sm:items-start sm:text-left">
+            <div className="flex flex-col items-start gap-3 text-center sm:items-start sm:text-left">
+                {prettify(storyText)}
+                <div className="flex flex-col items-start gap-4 text-center sm:items-start sm:text-left">
                     {choices && choices.choices.map((choice, index) => (
-                        <button key={index} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700" onClick={() => handleChoice(index)}>
-                            {choice}
+                        <button key={index} className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-800 hover:cursor-pointer" onClick={() => handleChoice(index)}>
+                            {convert_choice_to_text(choice)}
                         </button>
                     ))}
                 </div>
@@ -75,4 +117,30 @@ export default function Story(storyData: StoryData) {
         </div>
     </div>
     );
+}
+
+const prettify = (text: string) => {
+    const parts = text.split("\n")
+    return (
+        parts.map((part, index) => <div key={index}><p>{part}</p></div>)
+    )
+}
+const choice_button_factory = (choice: Choice, index: number, onClick: () => void) => {
+
+}
+const convert_choice_to_text = (choice: Choice) => {
+    let extra = "";
+    if (choice.skill_used) {
+        extra += `; use skill (${choice.skill_used}${choice.skill_dc ? ` (DC ${choice.skill_dc})` : ""})`;
+    }
+    if (choice.item_used) {
+        extra += `; use (${choice.item_used})`;
+    }
+    if (choice.resource_used) {
+        extra += `; use resource (${choice.resource_used})`;
+    }
+    if (choice.risked_resource) {
+        extra += `; risk resource (${choice.risked_resource})`;
+    }
+    return `${choice.text}` + extra;
 }

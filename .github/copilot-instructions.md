@@ -1,14 +1,16 @@
 # Copilot instructions for this repo (your-story)
 
-This project is a Next.js 16 app-router project written in TypeScript using React 19 and Tailwind CSS v4. It renders an interactive, choice-driven story from strongly-typed data models. There is no backend/API yet; all state is in-memory on the client.
+This project is a Next.js 16 app-router project written in TypeScript using React 19 and Tailwind CSS v4. It renders an interactive, choice-driven story from strongly-typed data models. A DeepSeek-powered API route generates story continuations on-demand.
 
 ## Architecture and data flow
 
 - app/page.tsx: Landing page (static UI).
 - app/story/page.tsx: Story shell. Picks a StoryData (from app/misc/starter_stories.ts), defines a page-local view state enum, and renders <Story />.
 - app/story/story.tsx: Presentational story component. Receives a full StoryData object via spread props and renders the latest ScenePart or starting_content plus a fixed Choices list. Choice handling currently logs to console only.
-- app/misc/structs.ts: Canonical TypeScript interfaces (StoryData, Scene, ScenePart, Chapter, Stat, Resource, InventoryItem, Achievement, StoryLore, Choices, etc.). Treat this as the single source of truth for shapes.
+- app/misc/structs.ts: Canonical TypeScript interfaces (StoryData, Scene, ScenePart, Chapter, Stat, Resource, InventoryItem, Achievement, StoryLore, Choices, etc.). Treat this as the single source of truth for shapes. ScenePart includes optional `choices?: string[]` and `memoryEntries?: string[]` fields.
 - app/misc/starter_stories.ts: Example datasets (kids_on_machines, goblin_layer). Used by story/page.tsx to feed the UI.
+- app/misc/ai.ts: AI prompt builder and response parser. `buildMessages` constructs chat history from StoryData; `outputToScenePart` parses LLM output (XML-like tags: <story>, <memory>, <choices>) into a typed ScenePart.
+- app/api/story/next/route.ts: POST endpoint that calls DeepSeek Chat Completions API, returns { part: ScenePart, meta: { model, usage } }.
 - next.config.ts: Default Next config. No custom webpack/routing.
 
 Key pattern: StoryData is spread into the Story component (e.g., <Story {...storyData} />). The component signature is Story(storyData: StoryData), so props are the StoryData fields directly, not nested under a prop name.
@@ -18,7 +20,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - TypeScript strict mode is enabled; keep interfaces in app/misc/structs.ts and reuse them across components.
 - Path alias @/\* maps to repo root via tsconfig.json. Prefer absolute imports like import { StoryData } from "@/app/misc/structs".
 - Tailwind utility-first styling via globals.css; keep UI minimal and semantic.
-- No persistence, server routes, or external API calls yet. Any “AI/LLM” mentions in README are aspirational; do not assume a backend.
+- DeepSeek API: app/api/story/next/route.ts is a POST endpoint that accepts { storyData, userChoice? } and returns { part: ScenePart, meta }. Requires DEEPSEEK_API_KEY in env.
 - Keep UI components server-safe for Next 16 app router; mark client components only when needed ("use client").
 
 ## Developer workflows
@@ -26,7 +28,9 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Dev: npm run dev (Next dev server).
 - Build: npm run build; Start: npm run start.
 - Lint: npm run lint (eslint-config-next). Prefer fixing with eslint --fix when safe.
+- Test: npm run test (Vitest). Unit tests are in tests/. postcss.config.mjs skips plugins during test runs (NODE_ENV=test) to avoid optional dep requirements.
 - Node: Use an LTS Node >= 18 compatible with Next 16 and React 19.
+- Environment: Create .env.local with DEEPSEEK_API_KEY=<your_key> and optional DEEPSEEK_MODEL=deepseek-chat.
 
 ## Working with story state
 
@@ -44,6 +48,8 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Data model reference: app/misc/structs.ts
 - Sample dataset used on the story page: app/misc/starter_stories.ts (goblin_layer)
 - Rendering the current scene vs starting_content: app/story/story.tsx
+- AI prompt construction and parsing: app/misc/ai.ts (buildMessages, outputToScenePart)
+- DeepSeek API integration: app/api/story/next/route.ts
 
 ## Guardrails for AI edits
 

@@ -53,8 +53,19 @@ export interface ScenePart {
     imageUrl: string;
     user: boolean;
     role: "system" | "user" | "assistant";
-    choices?: string[];
+    choices?: Choice[];
     memoryEntries?: string[];
+    endChapter?: boolean;
+}
+export interface Choice {
+    text: string;
+    item_used?: string;
+    item_loss?: boolean;
+    skill_used?: string;
+    skill_dc?: number;
+    resource_used?: string;
+    risked_resource?: string;
+
 }
 export interface Scene {
     parts: ScenePart[];
@@ -64,7 +75,7 @@ export interface PlotBeat {
     targetChapter: number;
 } 
 export interface Choices {
-    choices: string[];
+    choices: Choice[];
 }
 export interface StoryData {
     story_name: string;

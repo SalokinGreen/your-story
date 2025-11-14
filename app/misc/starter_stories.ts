@@ -23,7 +23,7 @@ const goblin_layer: StoryData = {
     premise: "In a dark fantasy world, a lone adventurer delves into a goblin-infested dungeon to retrieve a stolen artifact and lay with the goblins!",
     player_name: "Eldrin",
     player_summary: "You are a skilled rogue with a mysterious past, driven by a desire for justice and treasure.",
-    starting_content: "",
+    starting_content: "You find yourself at the entrance of a dark cave, the rumored goblin lair. The air is thick with the scent of damp earth and something more sinister. What do you do?",
     plot_beats: [
         {
             content: "Prologue: Eldrin receives a quest from a village elder to retrieve a stolen artifact from a goblin lair.",
