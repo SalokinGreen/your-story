@@ -36,7 +36,7 @@ Example:
 - You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 50); use_item: Stamina Potion; item_loss: true>
 
 Guidelines:
-- Always provide at least three choices.
+- Always provide at least six choices.
 - Choices should be distinct and lead to different outcomes.
 - Incorporate the player's stats, resources, inventory, and achievements into the story and choices.
 - Adapt the story based on the player's previous choices and current state.

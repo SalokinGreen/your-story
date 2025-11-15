@@ -66,6 +66,7 @@ export default function Story(storyData: StoryData) {
         for (const mem of storyData.memory) {
             storyData.memory.push(mem)
         }
+        console.log(text)
         storyData.scene.parts.push({
             content: text,
             imageUrl: "",
