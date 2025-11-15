@@ -19,7 +19,7 @@ Output Format:
 Story prose here.
 </story>
 
-<memory>
+<memory> (Optional)
 - New Memory Entry 1
 - New Memory Entry 2
 </memory>
@@ -28,7 +28,14 @@ Story prose here.
 - Choice 1
 - Choice 2
 </choices>
+
+<commands> (Optional)
+/command1
+/command2
+</commands>
 !!! END CHAPTER !!! (Optional to end the current chapter)
+!!! END STORY !!! (Optional to end the story)
+!!! GAME OVER !!! (Optional to indicate game over)
 
 Choice Syntax:
 - ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; risk_resource: resource name or none; use_item: item name or none; item_loss: true or false>
@@ -37,10 +44,22 @@ Example:
 
 Guidelines:
 - Always provide at least six choices.
+- You can use items that are not in the inventory, but the player rolls at a disadvantage.
+- You can use markdown formatting for more immersive experience. But only in the story section.
 - Choices should be distinct and lead to different outcomes.
 - Incorporate the player's stats, resources, inventory, and achievements into the story and choices.
 - Adapt the story based on the player's previous choices and current state.
-- DC 1 is extremely easy, shouldn't be a DC at all, DC 100 is hard, and DC 200 is almost impossible.`
+- DC 1 is extremely easy, shouldn't be a DC at all, and DC 100 is very hard.
+
+Commands:
+- /modify_item: item name(amount) - Adds amount (can be negative for removal) to the quantity of an item in the player's inventory. Remove the item if quantity reaches zero.
+- /modify_stat: stat name(amount) - Adds amount (can be negative for removal) to a player's stat by the given amount.
+- /modify_resource: resource name(amount) - Modifies a player's resource by the given amount.
+- /add_achievement: achievement title - Adds an achievement to the player's profile.
+- /mark_beat: beat index - Marks a story beat as fulfilled.
+- /edit_beat: edited text (index) - Edits the text of a story beat at the given index.
+- /add_beat: beat text (targetChapter) - Adds a new story beat for the target chapter.
+- /remove_beat: beat index - Removes a story beat at the given index.`
   const recentScene = storyData.scene.parts.at(-1)?.content ?? storyData.starting_content;
 
   
@@ -68,22 +87,44 @@ export function storyDataToString(storyData: StoryData): string {
 
   result += `## Player: ${storyData.player_name}\n`;
   result += `${storyData.player_summary}\n\n`;
+  result += `### Stats & Resources & Inventory:\n`;
   result += storyData.stats.map(stat => `- ${stat.name}: ${stat.value}% (${stat.description})`).join("\n") + "\n\n";
   result += storyData.resources.map(resource => `- ${resource.name}: ${resource.value}/${resource.maxValue} (${resource.description})`).join("\n") + "\n\n";
+  result += storyData.inventory.map(item => `- ${item.name} x${item.quantity}: ${item.description}`).join("\n") + "\n\n";
+  
   result += `## Story Beats:\n`;
+  let foundBeat = false;
   storyData.plot_beats.forEach((beat, index) => {
-    result += `${index + 1}. ${beat.content} (Around Chapter ${beat.targetChapter})\n`;
-  });
-  result += `\n## Current Chapter:\n`;
-  const currentChapter = storyData.chapters[storyData.currentChapter];
-    if (currentChapter) {
-    result += `### Chapter ${storyData.currentChapter}: ${currentChapter.title}\n`;
-    result += `${currentChapter.summary}\n\n`;
-  }
+    if (beat.fulfilled) {
+    result += `${index + 1}. ~~${beat.content} (done)~~\n`;
+    }
+    else {
+      if (!foundBeat) {
+        result += `${index + 1}. **${beat.content} (Current Beat)**\n`;
+        foundBeat = true;
+      } else {
+    result += `${index + 1}. ${beat.content} (for Chapter ${beat.targetChapter})\n`;
+    }}{
+    
+  }});
+ 
   result += `## Memory:\n`;
   storyData.memory.forEach((mem, index) => {
     result += `- ${mem}\n`;
   });
+  result += `\n## Author Notes (AI instructions from the author of the story):\n`;
+  if (storyData.author_notes) {
+    result += `${storyData.author_notes}\n\n`;
+  }
+  result += `## Player Notes (Notes added by the player during the story):\n`;
+  if (storyData.player_notes) {
+    result += `${storyData.player_notes}\n\n`;
+  }
+   const currentChapter = storyData.chapters[storyData.currentChapter];
+    if (currentChapter) {
+    result += `### Chapter ${storyData.currentChapter}\n\n`;
+    // result += `${currentChapter.summary}\n\n`;
+    }
   return result;
 
 }
@@ -190,13 +231,17 @@ export function outputToScenePart(text: string): ScenePart {
     const story = extractBlock("story", text);
     const memoryBlock = extractBlock("memory", text);
     const choicesBlock = extractBlock("choices", text);
+    const commandsBlock = extractBlock("commands", text);
 
     const content = (story ?? text).trim();
     const memoryEntries = blockToList(memoryBlock);
     const choices = blockToChoiceList(choicesBlock);
+    const commands = blockToList(commandsBlock);
     
-    // Check for end chapter marker
+    // Check for markers
     const endChapter = /!!!\s*END\s+CHAPTER\s*!!!/i.test(text);
+    const endStory = /!!!\s*END\s+STORY\s*!!!/i.test(text);
+    const gameOver = /!!!\s*GAME\s+OVER\s*!!!/i.test(text);
 
     const part: ScenePart = {
       content: content,
@@ -205,7 +250,10 @@ export function outputToScenePart(text: string): ScenePart {
       role: "assistant",
       ...(memoryEntries.length ? { memoryEntries } : {}),
       ...(choices.length ? { choices } : {}),
-      ...(endChapter ? { endChapter: true } : {})
+      ...(commands.length ? { commands } : {}),
+      ...(endChapter ? { endChapter: true } : {}),
+      ...(endStory ? { endStory: true } : {}),
+      ...(gameOver ? { gameOver: true } : {})
     };
 
     return part;

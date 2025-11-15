@@ -71,3 +71,26 @@ export async function getSession() {
 
   return { session, error: null };
 }
+
+export async function isAdmin(userId?: string): Promise<boolean> {
+  try {
+    // Get current user data
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error || !user) {
+      return false;
+    }
+
+    // If checking a different user, we can't determine their admin status client-side
+    if (userId && userId !== user.id) {
+      console.warn("Cannot check admin status for different user client-side");
+      return false;
+    }
+
+    // Check both user_metadata and app_metadata for role
+    return user.user_metadata?.role === 'admin' || user.app_metadata?.role === 'admin';
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    return false;
+  }
+}

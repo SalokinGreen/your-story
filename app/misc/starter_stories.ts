@@ -23,15 +23,15 @@ const goblin_layer: StoryData = {
     premise: "In a dark fantasy world, a lone adventurer delves into a goblin-infested dungeon to retrieve a stolen artifact and lay with the goblins!",
     player_name: "Eldrin",
     player_summary: "You are a skilled rogue with a mysterious past, driven by a desire for justice and treasure.",
-    starting_content: "You find yourself at the entrance of a dark cave, the rumored goblin lair. The air is thick with the scent of damp earth and something more sinister. What do you do?",
+    starting_content: "You find yourself at the entrance of a rancid village. You see it has been looted and partly burned. The villagers look at you with a mix of fear and hope, whispering about the goblin lair that lies ahead.",
     plot_beats: [
         {
             content: "Prologue: Eldrin receives a quest from a village elder to retrieve a stolen artifact from a goblin lair.",
-            targetChapter: 0
+            targetChapter: 1
         },
         {
             content: "Opening Image: Eldrin approaches the entrance of a dark cave, the rumored goblin lair.",
-            targetChapter: 2
+            targetChapter: 4
         },
         {
             content: "First Plot Point: Eldrin encounters the first wave of goblin guards and must use stealth or combat to proceed.",
@@ -50,15 +50,17 @@ const goblin_layer: StoryData = {
     ],
     scene: { parts: [] },
     stats: [
-        { name: "Stealth", value: 25, description: "Your ability to move unseen and unheard." },
-        { name: "Combat", value: 22, description: "Your skill in fighting and defending yourself." },
-        { name: "Perception", value: 18, description: "Your awareness of your surroundings." },
-        { name: "Sex Appeal", value: 30, description: "Your attractiveness and charm and ability in the sheets." }
+        { name: "Stealth", value: 25, description: "Your ability to move unseen and unheard.", symbol: "🌘" },
+        { name: "Combat", value: 22, description: "Your skill in fighting and defending yourself.", symbol: "⚔️" },
+        { name: "Perception", value: 18, description: "Your awareness of your surroundings.", symbol: "👁️" },
+        { name: "Sex Appeal", value: 30, description: "Your attractiveness and charm and ability in the sheets.", symbol: "💋" }
     ],
-    resources: [{ name: "Health", value: 100, maxValue: 100, description: "Your overall health and vitality." }, { name: "Stamina", value: 80, maxValue: 100, description: "Your energy levels for physical activities." }, { name: "Mana", value: 50, maxValue: 100, description: "Your magical energy for casting spells." }],
-    inventory: [],
-    achievements: [{ title: "Goblin Slayer", description: "Defeat your first goblin in the lair.", dateAchieved: null, points: 10 }, { title: "Stealth Master", description: "Successfully sneak past 10 goblin guards without being detected.", dateAchieved: null, points: 20 }],
-    lore: []
+    resources: [{ name: "Health", value: 100, maxValue: 100, description: "Your overall health and vitality.", symbol: "❤️" }, { name: "Stamina", value: 80, maxValue: 100, description: "Your energy levels for physical activities.", symbol: "⚡" }, { name: "Mana", value: 50, maxValue: 100, description: "Your magical energy for casting spells.", symbol: "🔮" }],
+    inventory: [{name: "Gold Coins", description: "Currency used for trading and purchasing items.", quantity: 150, symbol: "🪙"}, {name: "Dagger", description: "A small, sharp blade useful for close combat and stealth attacks.", quantity: 1, symbol: "🗡️"}, {name: "Dick Potion", description: "A potion that increases your dick size and stamina.", quantity: 3, symbol: "🧪"}],
+    achievements: [{ title: "Goblin Slayer", description: "Defeat your first goblin in the lair.", symbol: "🗡️", dateAchieved: null, points: 10 }, { title: "Stealth Master", description: "Successfully sneak past 10 goblin guards without being detected.", symbol: "🕵️‍♂️", dateAchieved: null, points: 20 }],
+    lore: [],
+    author_notes: "Mind the Layer in Goblin Layer. The player doesn't only kill but he also lays with monsters! Sex baby!",
+    player_notes: ""
 };
 
 export { kids_on_machines, goblin_layer };

@@ -1,6 +1,10 @@
+﻿"use client";
+
 import { goblin_layer } from "../misc/starter_stories";
 import { Scene, StoryData } from "../misc/structs";
 import Story from "./story";
+import StatsPage from "./stats";
+import { useState } from "react";
 
 let story_name = "Goblin Layer";
 enum StoryState {
@@ -20,35 +24,66 @@ let scene: Scene = {
 }
 const storyData: StoryData = goblin_layer;
 export default function StoryPage() {
+    const [currentState, setCurrentState] = useState<StoryState>(StoryState.STORY);
+
     return (
-        <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-            <main className="flex min-h-screen gap-6 w-full max-w-3xl flex-col items-center justify-start py-32 px-16 bg-white dark:bg-black sm:items-start">
+        <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
+            <main className="flex gap-6 w-full max-w-4xl mx-auto flex-col">
             {/* Story Header */}
-                <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-                    {story_name}
-                </h1>
-                {/* Buttons for navigation and pages */}
-                {current_state === StoryState.STORY && (
-                    <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-                <div className="flex flex-row items-center gap-6 text-center sm:items-start sm:text-left">
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 hover:cursor-pointer">
-                        Stats
-                    </button>
-                    <button className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 hover:cursor-pointer">
-                        Inventory
-                    </button>
-                    <button className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 hover:cursor-pointer">
-                        Lore
-                    </button>
-                    <button className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 hover:cursor-pointer">
-                        Achievements
-                    </button>
-                    <button className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 hover:cursor-pointer">
-                        Menu
-                    </button>
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+                    <h1 className="text-3xl sm:text-4xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent text-center sm:text-left">
+                        {story_name}
+                    </h1>
                 </div>
-            </div>)}
-             <Story {...storyData} />
+                {/* Buttons for navigation and pages */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+                    <div className="flex flex-row flex-wrap items-center justify-center sm:justify-start gap-3">
+                        <button 
+                            onClick={() => setCurrentState(StoryState.STORY)}
+                            className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md ${
+                                currentState === StoryState.STORY 
+                                    ? "bg-linear-to-r from-gray-700 to-gray-900 text-white ring-2 ring-gray-400 shadow-lg" 
+                                    : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
+                            }`}
+                        >
+                            📖 Story
+                        </button>
+                        <button 
+                            onClick={() => setCurrentState(StoryState.STATS)}
+                            className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md ${
+                                currentState === StoryState.STATS 
+                                    ? "bg-linear-to-r from-blue-600 to-blue-800 text-white ring-2 ring-blue-400 shadow-lg" 
+                                    : "bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                            }`}
+                        >
+                            📊 Stats
+                        </button>
+                        <button 
+                            onClick={() => setCurrentState(StoryState.LORE)}
+                            className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md ${
+                                currentState === StoryState.LORE 
+                                    ? "bg-linear-to-r from-purple-600 to-purple-800 text-white ring-2 ring-purple-400 shadow-lg" 
+                                    : "bg-purple-50 dark:bg-purple-900/30 text-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900/50"
+                            }`}
+                        >
+                            📜 Lore
+                        </button>
+                        <button 
+                            onClick={() => setCurrentState(StoryState.MENU)}
+                            className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md ${
+                                currentState === StoryState.MENU 
+                                    ? "bg-linear-to-r from-green-600 to-green-800 text-white ring-2 ring-green-400 shadow-lg" 
+                                    : "bg-green-50 dark:bg-green-900/30 text-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900/50"
+                            }`}
+                        >
+                            ⚙️ Menu
+                        </button>
+                    </div>
+                </div>
+
+                {/* Render current page */}
+                {currentState === StoryState.STORY && <Story {...storyData} />}
+                {currentState === StoryState.STATS && <StatsPage {...storyData} />}
 
             </main>
         </div>

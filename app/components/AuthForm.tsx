@@ -32,19 +32,24 @@ export default function AuthForm() {
 
   return (
     <div className="w-full max-w-md">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 bg-white dark:bg-zinc-900 p-8 rounded-lg shadow-lg">
-        <h2 className="text-2xl font-semibold text-center text-black dark:text-white">
-          {isSignUp ? "Sign Up" : "Sign In"}
-        </h2>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5 bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+        <div className="text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+            {isSignUp ? "Join Your Story" : "Welcome Back"}
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {isSignUp ? "Create an account to start your adventure" : "Sign in to continue your journey"}
+          </p>
+        </div>
 
         {error && (
-          <div className="p-3 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded">
+          <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-lg text-sm">
             {error}
           </div>
         )}
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="email" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="email" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
             Email
           </label>
           <input
@@ -53,13 +58,13 @@ export default function AuthForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-black dark:text-white"
+            className="px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-colors"
             placeholder="you@example.com"
           />
         </div>
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="password" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="password" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
             Password
           </label>
           <input
@@ -69,23 +74,26 @@ export default function AuthForm() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
-            className="px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-black dark:text-white"
+            className="px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-colors"
             placeholder="••••••••"
           />
+          {isSignUp && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">Minimum 6 characters</p>
+          )}
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded font-medium transition-colors"
+          className="px-6 py-3 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed"
         >
-          {loading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
+          {loading ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
         </button>
 
         <button
           type="button"
           onClick={() => setIsSignUp(!isSignUp)}
-          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
         >
           {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
         </button>

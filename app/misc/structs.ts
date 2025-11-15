@@ -12,6 +12,8 @@ export interface Stat {
     name: string;
     value: number;
     description: string;
+    symbol: string;
+    custom_symbol_url?: string;
 }
 
 export interface Resource {
@@ -19,15 +21,19 @@ export interface Resource {
     value: number;
     maxValue: number;
     description: string;
+    symbol: string;
+    custom_symbol_url?: string;
 }
 
 export interface InventoryItem {
     name: string;
     quantity: number;
     description: string;
-    type: string;
-    stat: string;
-    resource: string;
+    type?: string;
+    stat?: string;
+    resource?: string;
+    symbol: string;
+    custom_symbol_url?: string;
 }
 
 export interface Achievement {
@@ -35,12 +41,16 @@ export interface Achievement {
     description: string;
     dateAchieved: Date | null;
     points: number;
+    symbol: string;
+    custom_symbol_url?: string;
 }
 export interface StoryLore {
     title: string;
     content: string;
     relatedCharacters: string[];
     relatedLocations: string[];
+    secrtet: boolean;
+    keys: string[];
 }
 export interface Chapter {
     title: string;
@@ -55,7 +65,10 @@ export interface ScenePart {
     role: "system" | "user" | "assistant";
     choices?: Choice[];
     memoryEntries?: string[];
+    commands?: string[];
     endChapter?: boolean;
+    endStory?: boolean;
+    gameOver?: boolean;
 }
 export interface Choice {
     text: string;
@@ -73,6 +86,7 @@ export interface Scene {
 export interface PlotBeat {
     content: string;
     targetChapter: number;
+    fulfilled?: boolean;
 } 
 export interface Choices {
     choices: Choice[];
@@ -94,4 +108,35 @@ export interface StoryData {
     inventory: InventoryItem[];
     achievements: Achievement[];
     lore: StoryLore[];
+    author_notes?: string;
+    player_notes?: string;
+}
+
+export interface Adventure {
+    id: string;
+    title: string;
+    description: string;
+    shortDescription: string;
+    author: string;
+    authorId?: string;
+    thumbnailUrl?: string;
+    bannerUrl?: string;
+    tags: string[];
+    difficulty: "Easy" | "Medium" | "Hard" | "Expert";
+    estimatedDuration: string; // e.g., "2-3 hours"
+    popularity: number; // For sorting/ranking
+    rating?: number; // 0-5
+    playCount: number;
+    createdAt: Date;
+    updatedAt: Date;
+    isPublished: boolean;
+    isFeatured: boolean;
+    storyTemplate: Partial<StoryData>; // The actual story data
+}
+
+export interface AdventureFilter {
+    searchQuery?: string;
+    tags?: string[];
+    difficulty?: ("Easy" | "Medium" | "Hard" | "Expert")[];
+    sortBy?: "popularity" | "newest" | "rating" | "title";
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StoryData } from "@/app/misc/structs";
 import { buildMessages, coerceToScenePart, ChatMessage } from "@/app/misc/ai";
+import { createClient } from "@supabase/supabase-js";
+import { hasEnoughTokens, deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 
 export const runtime = "nodejs";
 
@@ -31,6 +33,66 @@ interface DeepseekResponse {
 }
 
 export async function POST(req: NextRequest) {
+  // Create Supabase client for server-side authentication
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
+    return NextResponse.json(
+      { error: "Server not configured: missing Supabase credentials" },
+      { status: 500 }
+    );
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
+
+  // Get authentication token from request headers
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader) {
+    return NextResponse.json(
+      { error: "Authentication required", code: "AUTH_REQUIRED" },
+      { status: 401 }
+    );
+  }
+
+  // Verify the user's session
+  const { data: { user }, error: authError } = await supabase.auth.getUser(
+    authHeader.replace('Bearer ', '')
+  );
+
+  if (authError || !user) {
+    return NextResponse.json(
+      { error: "Invalid or expired session", code: "AUTH_INVALID" },
+      { status: 401 }
+    );
+  }
+
+  const userId = user.id;
+
+  // Check token balance (requires 5 tokens)
+  const REQUIRED_TOKENS = 3;
+  const hasTokens = await hasEnoughTokens(userId, REQUIRED_TOKENS, supabaseAdmin);
+  
+  if (!hasTokens) {
+    const balance = await getUserTokenBalance(userId, supabaseAdmin);
+    return NextResponse.json(
+      { 
+        error: `Insufficient tokens. You need ${REQUIRED_TOKENS} tokens to generate a story continuation.`,
+        code: "INSUFFICIENT_TOKENS",
+        balance: balance,
+        required: REQUIRED_TOKENS
+      },
+      { status: 402 } // 402 Payment Required
+    );
+  }
+
   let body: RequestBody;
   try {
     body = (await req.json()) as RequestBody;
@@ -72,7 +134,7 @@ export async function POST(req: NextRequest) {
         model,
         messages,
         temperature: 0.7,
-        max_tokens: 500,
+        max_tokens: 2000,
         stream: false,
       }),
     });
@@ -90,9 +152,24 @@ export async function POST(req: NextRequest) {
     console.log(content)
     const part = coerceToScenePart(content);
 
+    // Deduct tokens after successful generation
+    const deductResult = await deductTokens(userId, REQUIRED_TOKENS, supabaseAdmin);
+    if (!deductResult.success) {
+      console.error('Failed to deduct tokens:', deductResult.error);
+      // Log error but don't fail the request since generation succeeded
+    }
+
+    // Get updated balance
+    const updatedBalance = await getUserTokenBalance(userId, supabaseAdmin);
+
     return NextResponse.json({
       part,
-      meta: { model: data.model, usage: data.usage }
+      meta: { 
+        model: data.model, 
+        usage: data.usage,
+        tokensDeducted: REQUIRED_TOKENS,
+        remainingBalance: updatedBalance
+      }
     });
   } catch (err) {
     return NextResponse.json(
