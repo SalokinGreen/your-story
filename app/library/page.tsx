@@ -590,7 +590,7 @@ export default function LibraryPage() {
                   className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
                 >
                   <div className="p-6">
-                    <div className="flex flex-col items-start justify-between gap-2">
+                    <div className="flex flex-col items-start justify-between gap-2G">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-xl font-bold text-gray-900 dark:text-white truncate">

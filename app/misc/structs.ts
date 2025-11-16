@@ -108,9 +108,23 @@ export interface StoryData {
     inventory: InventoryItem[];
     achievements: Achievement[];
     lore: StoryLore[];
+    momentum: number;
+    maxMomentum: number;
+    points: number;
+    earnedPointsFromBeats: number[];
+    earnedPointsFromChapters: number[];
     author_notes?: string;
     player_notes?: string;
 }
+
+// Point system costs
+export const UPGRADE_COSTS = {
+    STAT_INCREASE: 10,        // 10 points to increase a stat by 1
+    RESOURCE_MAX_INCREASE: 15, // 15 points to increase max resource by 10
+    ADD_ITEM: 20,             // 20 points to add a new item
+    CHAPTER_REWARD: 50,       // Points earned for completing a chapter
+    BEAT_REWARD: 25,          // Points earned for completing a story beat
+} as const;
 
 export interface Adventure {
     id: string;

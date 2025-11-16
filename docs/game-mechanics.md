@@ -4,6 +4,67 @@ This document explains all game mechanics in Your Story: stats, resources, items
 
 ## Core Systems
 
+### Momentum
+
+**Purpose**: Metacurrency that gives players agency to influence dice rolls and guarantee success on critical moments.
+
+**Structure**:
+```typescript
+interface StoryData {
+  momentum: number;      // Current momentum (0-maxMomentum)
+  maxMomentum: number;   // Maximum momentum (typically 5)
+  // ...
+}
+```
+
+**Earning Momentum**:
+- **Critical Success**: Roll 100 → Earn 2 momentum
+- **Strong Success**: Beat DC by 20+ → Earn 1 momentum
+- **AI Rewards**: `/modify_momentum: +1` for exceptional roleplay or clever solutions
+- **Story Milestones**: AI can grant momentum for reaching key plot points
+
+**Spending Momentum**:
+- **Reroll (1⚡)**: Roll again and take the better result
+  - Works with advantage/disadvantage
+  - Select before making your choice
+  - Cannot be used after seeing the roll
+- **Guaranteed Success (2⚡)**: Automatically pass the skill check
+  - No roll needed
+  - Cannot earn momentum from guaranteed successes
+  - Use for critical story moments
+
+**Rules**:
+- Momentum is capped at maxMomentum (default: 5)
+- Momentum persists across the entire story
+- Cannot earn momentum when using Guarantee
+- AI can rarely deduct momentum (`/modify_momentum: -1`) for narrative-breaking choices
+
+**UI Display**:
+- Shown on story page as dots (⚡⚡⚡○○)
+- Buttons appear when a choice has a skill check
+- Button text shows cost and effect
+- Stats page shows detailed momentum info
+
+**Examples**:
+```typescript
+// Scenario 1: Normal success with strong roll
+Roll: 45, Stealth: 60, DC: 85
+Total: 45 + 60 = 105 ≥ 85
+Result: Success! Beat DC by 20 → Earn 1 momentum
+
+// Scenario 2: Using reroll
+Roll: 78, Stealth: 60, DC: 120
+Player spends 1 momentum for reroll
+Reroll: 52
+Total: 52 + 60 = 112 ≥ 120
+Result: Still fails, but had a chance
+
+// Scenario 3: Guaranteed success
+DC: 150 (very hard)
+Player spends 2 momentum
+Result: Automatic success, no roll needed
+```
+
 ### Stats
 
 **Purpose**: Character attributes that define capabilities.
@@ -20,9 +81,9 @@ interface Stat {
 ```
 
 **Usage**:
-- Used in skill checks: `DC = stat.value + skill_dc`
+- Used in skill checks: `Roll + Stat Value >= DC`
 - Modified by AI commands: `/modify_stat: Strength(+5)`
-- Displayed in stats page (future)
+- Displayed in stats page
 
 **Examples**:
 - Strength: 65% → Good at physical tasks
@@ -138,28 +199,30 @@ let dice_roll = Math.floor(Math.random() * 100) + 1;
 
 ### Difficulty Class (DC)
 
-**Formula**: `DC = stat_value + skill_dc`
+**Formula**: `Roll + Stat Value >= DC`
 
 **Example**:
 ```typescript
-// Choice with DC 30
-Stealth stat: 45%
-skill_dc: 30
+// Choice with DC 75
+Stealth stat: 45
+skill_dc: 75
 
-DC = 45 + 30 = 75
+Roll: 38
+Total: 38 + 45 = 83
 
-// Success if roll ≤ 75
+// Success because 83 ≥ 75
 ```
 
 ### Success Conditions
 
 ```typescript
-const dc_passed = dice_roll === 1 || dice_roll <= dc;
+const total = dice_roll + stat_value;
+const dc_passed = dice_roll === 100 || total >= dc;
 ```
 
-1. **Critical Success**: Roll = 1 (always succeeds)
-2. **Normal Success**: Roll ≤ DC
-3. **Failure**: Roll > DC
+1. **Critical Success**: Roll = 100 (always succeeds)
+2. **Normal Success**: Roll + Stat Value ≥ DC
+3. **Failure**: Roll + Stat Value < DC
 
 ### Advantage/Disadvantage
 
@@ -190,8 +253,8 @@ Disadvantage → Use 67
 2. Check if item_used exists in inventory
    - Present → Advantage (roll twice, take lower)
    - Missing → Disadvantage (roll twice, take higher)
-3. Calculate DC = stat.value + skill_dc
-4. Compare roll ≤ DC
+3. Calculate Total = roll + stat.value
+4. Compare total >= DC
    - Success → Continue normally
    - Failure → Apply penalties (resource loss, item loss)
 5. Notify user of result
@@ -305,6 +368,36 @@ The AI can modify game state using commands in the `<commands>` block.
 /add_achievement: First Blood
 ```
 - Creates new achievement
+- Ignores duplicates
+- Notification: "🏆 Achievement Unlocked: First Blood" (green)
+- Displayed in achievements list with unlock date
+
+### /modify_momentum: amount
+
+**Award Momentum**:
+```
+/modify_momentum: +1
+```
+- Increases momentum by 1
+- Clamped: 0 ≤ value ≤ maxMomentum
+- Notification: "⚡ Momentum: 3 → 4/5" (green)
+- Use for: Exceptional roleplay, clever solutions, story milestones
+
+**Deduct Momentum** (rare):
+```
+/modify_momentum: -1
+```
+- Decreases momentum by 1
+- Notification: "⚡ Momentum: 4 → 3/5" (yellow)
+- Use sparingly for: Extremely reckless or narrative-breaking choices
+
+**Guidelines**:
+- Reward momentum to encourage creative play
+- Don't over-reward (1 momentum per milestone is sufficient)
+- Avoid deducting momentum unless absolutely necessary
+- Remember: Players earn momentum automatically from strong rolls
+
+### /mark_beat: index
 - Sets dateAchieved to current time
 - Default: 10 points, 🏆 symbol
 - Notification: "🏆 Achievement Unlocked: First Blood"
@@ -410,6 +503,79 @@ AI can end the story with markers:
 - `!!! GAME OVER !!!` → `gameOver: true`
 - Displays ending screen (future)
 
+## Points & Upgrade System
+
+### Earning Points
+
+Players earn upgrade points from story progression:
+
+**Beat Completion**: 25 points
+- AI uses `/mark_beat: index` to mark a story beat complete
+- Points awarded once per beat (tracked in `earnedPointsFromBeats[]`)
+- Example: `/mark_beat: 0` awards 25 points for the first beat
+
+**Chapter Completion**: 50 points
+- AI ends chapter with `!!! END CHAPTER !!!` marker
+- Points awarded once per chapter (tracked in `earnedPointsFromChapters[]`)
+- Larger reward for completing major story milestones
+
+**Achievement Unlocks**: Variable points
+- Future enhancement: achievements can specify custom point values
+- Use `/add_achievement: title` to unlock achievements
+
+### Spending Points
+
+Players access the **Upgrades** tab to spend points:
+
+**Stat Increase** (10 points):
+- Increase any stat by +1
+- Maximum stat value: 100
+- Example: Raise Stealth from 55 to 56
+
+**Resource Max Increase** (15 points):
+- Increase any resource maximum by +10
+- Current value adjusts proportionally
+- Example: Health max from 100 to 110
+
+**Add Custom Item** (20 points):
+- Create a custom item for inventory
+- Player defines name, description, symbol
+- Can be used for advantage in future choices
+
+### Point Balance
+
+Current points displayed in:
+- **Stats Page**: Prominent card at top showing balance and earning info
+- **Upgrades Page**: Header shows current points and purchase costs
+
+### Strategy
+
+**Early Game**: Save points for critical stat increases to pass challenging DCs
+
+**Mid Game**: Balance stat upgrades with resource expansion for survivability
+
+**Late Game**: Use points for custom items to enable creative solutions
+
+### Integration with AI
+
+The AI is aware of the points system:
+- Sees current point balance in context
+- Uses `/mark_beat` to reward progression
+- Times chapter endings for satisfying milestones
+- Balances beat completion pacing with story flow
+
+### Cost Constants
+
+```typescript
+export const UPGRADE_COSTS = {
+    STAT_INCREASE: 10,
+    RESOURCE_MAX_INCREASE: 15,
+    ADD_ITEM: 20,
+    CHAPTER_REWARD: 50,
+    BEAT_REWARD: 25,
+} as const;
+```
+
 ## Complete Example
 
 ### Choice Definition
@@ -417,44 +583,118 @@ AI can end the story with markers:
 - Sneak past the dragon using your cloak of shadows <use_skill: Stealth (DC 60); use_item: Shadow Cloak; item_loss: false; risk_resource: Health>
 ```
 
-### Execution Flow
+### Scenario 1: Normal Success
+
+**Setup**:
+- Stealth: 55
+- Health: 85/100
+- Momentum: 3/5
+- Has Shadow Cloak
+
+**Execution Flow**:
 
 1. **Check Item**: Player has Shadow Cloak → Advantage
 2. **Roll Dice**:
    - Roll 1: 72
    - Roll 2: 48
    - Take 48 (advantage)
-3. **Calculate DC**: Stealth (55) + 60 = 115
-4. **Check Result**: 48 ≤ 115 → **Success!**
-5. **Notifications**:
+3. **Calculate Total**: 48 + 55 (Stealth) = 103
+4. **Check Result**: 103 ≥ 60 (DC) → **Success!**
+5. **Momentum**: Beat DC by 43 (more than 20) → Earn 1 momentum
+6. **Notifications**:
    - "Used item: Shadow Cloak (Advantage!)" (info)
    - "Risked Health (85/100)" (warning)
-   - "✓ Check Passed! (Stealth: 48 ≤ 115)" (success)
-6. **AI Response**: Continues story from success path
+   - "✓ Check Passed! (Stealth: 48 + 55 = 103 ≥ 60)" (success)
+   - "⚡ Strong Success! Earned 1 Momentum! (4/5)" (success)
+7. **AI Response**: Continues story from success path
 
-### If Failed
+### Scenario 2: Using Reroll to Succeed
 
-Same setup, but roll 48 and 92 → Take 92
+**Setup**:
+- Stealth: 55
+- Momentum: 3/5
+- DC: 120 (hard check)
 
-1. **Check Result**: 92 > 115 → **Failure!**
-2. **Penalties**:
+**Execution Flow**:
+
+1. **Player Action**: Spends 1 momentum for reroll before choosing
+2. **First Roll**: 58
+3. **Reroll**: 72
+4. **Take Better Roll**: 58
+5. **Calculate Total**: 58 + 55 = 113
+6. **Check Result**: 113 < 120 → **Failure!**
+7. **Momentum**: Now 2/5 (spent 1, didn't earn any)
+8. **Notifications**:
+   - "⚡ Spent 1 Momentum for Reroll! (2/5 remaining)" (info)
+   - "🎲 Reroll used! Better roll: 58" (success)
+   - "✗ Check Failed! (Stealth: 58 + 55 = 113 < 120)" (failure)
+
+### Scenario 3: Guaranteed Success on Critical Moment
+
+**Setup**:
+- Momentum: 4/5
+- DC: 150 (very hard - escaping collapsing cave)
+
+**Execution Flow**:
+
+1. **Player Action**: Spends 2 momentum for guaranteed success
+2. **Result**: Automatic success, no roll needed
+3. **Momentum**: Now 2/5 (spent 2, cannot earn from guarantee)
+4. **Notifications**:
+   - "⚡ Spent 2 Momentum for Guaranteed Success! (2/5 remaining)" (success)
+   - "✓ Guaranteed Success! (Athletics: Auto-success with 2 Momentum)" (success)
+5. **AI Response**: Epic description of narrow escape
+
+### Scenario 4: Critical Success
+
+**Setup**:
+- Stealth: 55
+- Momentum: 4/5 (near max)
+- DC: 100
+
+**Execution Flow**:
+
+1. **Roll**: 100 (critical!)
+2. **Calculate Total**: 100 + 55 = 155
+3. **Check Result**: Automatic success (roll = 100)
+4. **Momentum**: Earn 1 momentum (only 1 because already at 4/5)
+5. **Notifications**:
+   - "✓ Check Passed! (Stealth: 100 + 55 = 155 ≥ 100)" (success)
+   - "⚡ Critical Success! Earned 1 Momentum! (5/5)" (success)
+6. **AI Response**: Spectacular success with extra narrative reward
+
+### Scenario 5: Failure with Penalties
+
+**Setup**:
+- Stealth: 55
+- Health: 85/100
+- Momentum: 2/5
+- DC: 160 (very hard)
+
+**Execution Flow**:
+
+1. **Roll**: 92
+2. **Calculate Total**: 92 + 55 = 147
+3. **Check Result**: 147 < 160 → **Failure!**
+4. **Penalties**:
    - Lose 20 Health (20% of 100)
    - Health: 85 → 65
-3. **Notifications**:
-   - "✗ Check Failed! (Stealth: 92 > 115)" (failure)
+5. **Notifications**:
+   - "✗ Check Failed! (Stealth: 92 + 55 = 147 < 160)" (failure)
    - "Lost 20 Health from failure! (65/100 remaining)" (failure)
-4. **AI Response**: Continues story from failure path
+6. **AI Response**: Describes consequences of failure
 
 ## Best Practices
 
 ### For Story Creators
 
-1. **Set Reasonable DCs**:
-   - DC 1-20: Very Easy
-   - DC 21-40: Easy
-   - DC 41-60: Medium
-   - DC 61-80: Hard
-   - DC 81-100: Very Hard
+1. **Set Reasonable DCs** (assuming average stat of 50):
+   - DC 20-40: Trivial (auto-succeed with any roll)
+   - DC 50-70: Very Easy (succeed on 1-20)
+   - DC 80-100: Easy (succeed on 30-50)
+   - DC 110-130: Medium (succeed on 60-80)
+   - DC 140-160: Hard (succeed on 90-100)
+   - DC 160+: Very Hard (requires high stats or momentum)
 
 2. **Balance Resources**:
    - Don't risk resources on easy checks
@@ -465,6 +705,12 @@ Same setup, but roll 48 and 92 → Take 92
    - Each choice should feel distinct
    - Failures should be interesting, not punishing
    - Successes should feel rewarding
+
+4. **Momentum Economy**:
+   - Give players opportunities to earn momentum through strong play
+   - Design some high-DC challenges that tempt momentum spending
+   - Reward creative solutions with bonus momentum via `/modify_momentum`
+   - Don't over-reward - momentum should feel earned and special
 
 ### For Developers
 

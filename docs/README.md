@@ -90,8 +90,8 @@ AI can issue commands to modify game state:
 ## 🎲 Dice Mechanics
 
 - **Base Roll**: D100 (1-100)
-- **DC Calculation**: `stat_value + skill_dc`
-- **Success**: Roll ≤ DC (or roll = 1)
+- **Check Formula**: `Roll + Stat Value ≥ DC`
+- **Success**: Total ≥ DC (or roll = 100 for critical success)
 - **Advantage**: Roll twice, take lower (item present)
 - **Disadvantage**: Roll twice, take higher (item missing)
 

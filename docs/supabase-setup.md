@@ -21,18 +21,34 @@ This guide will help you set up the Supabase backend for Your Story application.
 This will create:
 - `adventures` table - Stores user-created adventures
 - `comments` table - Stores comments and ratings for adventures
-- `story_instances` table - Stores individual user playthroughs
+- `stories` table - Stores individual user playthroughs
 - All necessary indexes, RLS policies, and triggers
 
-## Step 2: Verify Tables
+## Step 2: Run Momentum Migration (if you have existing data)
+
+If you already have stories or adventures in your database, run the momentum migration:
+
+1. Navigate to **SQL Editor**
+2. Copy and paste the contents of `docs/momentum-migration.sql`
+3. Click **Run** to execute
+
+This will add momentum fields to all existing stories and adventure templates with default values (3/5).
+
+**Note:** New stories created after deploying the momentum system will automatically include momentum fields from the TypeScript interface, so this migration is only needed for existing data.
+
+## Step 3: Verify Tables
 
 1. Navigate to **Table Editor** in your Supabase dashboard
 2. Verify that you see three tables:
    - `adventures`
    - `comments`
-   - `story_instances`
+   - `stories`
+3. If you ran the momentum migration, check a story record:
+   - Open any story in the Table Editor
+   - Expand the `story_data` JSONB field
+   - Verify you see `momentum` and `maxMomentum` fields
 
-## Step 3: Test the Setup
+## Step 4: Test the Setup
 
 You can test by:
 1. Creating a new adventure through the creator UI
@@ -76,6 +92,11 @@ All tables use Row Level Security (RLS) policies:
 
 ### Story Instances
 - Users can only view/create/edit/delete their own story instances
+- Story data is stored as JSONB and includes:
+  - All game state (scenes, chapters, choices)
+  - Player stats, resources, inventory, achievements
+  - **Momentum system** (momentum, maxMomentum)
+  - Plot beats and memory
 
 ## Automatic Features
 

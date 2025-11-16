@@ -121,9 +121,21 @@ export async function POST(req: NextRequest) {
   }
 
   const model = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
-  const messages: ChatMessage[] = buildMessages({ storyData, userChoice });
-
+  let messages: ChatMessage[] = buildMessages({ storyData, userChoice });
+  // Filter out duplicate messages
+  messages = messages.filter((msg, index, self) =>
+    index === self.findIndex((m) => m.role === msg.role && m.content === msg.content)
+  );
+  console.log("Built messages for Deepseek. Message count:", messages.length);
+  console.log("Last message length:", messages[messages.length - 1]?.content?.length || 0);
+  
   try {
+    console.log("Calling Deepseek API...");
+    
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
     const resp = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
@@ -137,10 +149,15 @@ export async function POST(req: NextRequest) {
         max_tokens: 2000,
         stream: false,
       }),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+    console.log("Deepseek response status:", resp.status);
+    
     if (!resp.ok) {
       const text = await resp.text();
+      console.error("Deepseek error response:", text);
       return NextResponse.json(
         { error: `Deepseek error: ${resp.status} ${resp.statusText}`, details: text },
         { status: 502 }
@@ -148,9 +165,24 @@ export async function POST(req: NextRequest) {
     }
 
     const data = (await resp.json()) as DeepseekResponse;
+    console.log("Deepseek response received. Choices:", data.choices?.length || 0);
+    
     const content = data.choices?.[0]?.message?.content ?? "";
-    console.log(content)
-    const part = coerceToScenePart(content);
+    console.log("Content length:", content.length);
+    console.log("Content preview:", content.substring(0, 200));
+    
+    let part;
+    try {
+      part = coerceToScenePart(content);
+      console.log("Successfully parsed ScenePart. Choices:", part.choices?.length || 0);
+    } catch (parseError) {
+      console.error("Error parsing ScenePart:", parseError);
+      console.error("Raw content:", content);
+      return NextResponse.json(
+        { error: "Failed to parse AI response", details: (parseError as Error).message, rawContent: content },
+        { status: 500 }
+      );
+    }
 
     // Deduct tokens after successful generation
     const deductResult = await deductTokens(userId, REQUIRED_TOKENS, supabaseAdmin);
@@ -176,8 +208,19 @@ export async function POST(req: NextRequest) {
       }
     });
   } catch (err) {
+    const error = err as Error;
+    console.error("Error in /api/story/next:", error);
+    
+    // Check if it's an abort error (timeout)
+    if (error.name === 'AbortError') {
+      return NextResponse.json(
+        { error: "Request timed out. The AI took too long to respond.", details: "Timeout after 30 seconds" },
+        { status: 504 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to call Deepseek API", details: (err as Error).message },
+      { error: "Failed to call Deepseek API", details: error.message, stack: error.stack },
       { status: 500 }
     );
   }

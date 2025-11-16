@@ -16,7 +16,12 @@ const kids_on_machines: StoryData = {
     resources: [],
     inventory: [],
     achievements: [],
-    lore: []
+    lore: [],
+    momentum: 3,
+    maxMomentum: 5,
+    points: 0,
+    earnedPointsFromBeats: [],
+    earnedPointsFromChapters: []
 }
 const goblin_layer: StoryData = {
     story_name: "Goblin Layer",
@@ -59,6 +64,11 @@ const goblin_layer: StoryData = {
     inventory: [{name: "Gold Coins", description: "Currency used for trading and purchasing items.", quantity: 150, symbol: "🪙"}, {name: "Dagger", description: "A small, sharp blade useful for close combat and stealth attacks.", quantity: 1, symbol: "🗡️"}, {name: "Dick Potion", description: "A potion that increases your dick size and stamina.", quantity: 3, symbol: "🧪"}],
     achievements: [{ title: "Goblin Slayer", description: "Defeat your first goblin in the lair.", symbol: "🗡️", dateAchieved: null, points: 10 }, { title: "Stealth Master", description: "Successfully sneak past 10 goblin guards without being detected.", symbol: "🕵️‍♂️", dateAchieved: null, points: 20 }],
     lore: [],
+    momentum: 3,
+    maxMomentum: 5,
+    points: 0,
+    earnedPointsFromBeats: [],
+    earnedPointsFromChapters: [],
     author_notes: "Mind the Layer in Goblin Layer. The player doesn't only kill but he also lays with monsters! Sex baby!",
     player_notes: ""
 };

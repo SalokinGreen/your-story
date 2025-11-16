@@ -8,6 +8,8 @@ interface StoryProps {
   choices: Choices;
   input: Record<string, boolean>;
   loading: boolean;
+  momentumMode: 'none' | 'reroll' | 'guarantee';
+  onMomentumModeChange: (mode: 'none' | 'reroll' | 'guarantee') => void;
   handleChoice: () => void;
   handleSelect: (index: number) => void;
 }
@@ -18,9 +20,16 @@ export default function Story({
   choices,
   input,
   loading,
+  momentumMode,
+  onMomentumModeChange,
   handleChoice,
   handleSelect
 }: StoryProps) {
+  const selectedChoice = choices?.choices.find(c => input[c.text]);
+  const hasSkillCheck = selectedChoice?.skill_used !== undefined;
+  const canUseReroll = storyData.momentum >= 1 && hasSkillCheck;
+  const canUseGuarantee = storyData.momentum >= 2 && hasSkillCheck;
+
   return (
     <div className="w-full">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
@@ -64,13 +73,69 @@ export default function Story({
             </div>
           )}
         </div>
+        
+        {/* Momentum Display and Controls */}
+        <div className="flex items-center justify-between w-full pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">⚡</span>
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Momentum: {storyData.momentum}/{storyData.maxMomentum}
+              </span>
+              <div className="flex gap-1 mt-1">
+                {Array.from({ length: storyData.maxMomentum }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-3 h-3 rounded-full ${
+                      i < storyData.momentum
+                        ? "bg-yellow-400 dark:bg-yellow-500"
+                        : "bg-gray-300 dark:bg-gray-600"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          {hasSkillCheck && !loading && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => onMomentumModeChange(momentumMode === 'reroll' ? 'none' : 'reroll')}
+                disabled={!canUseReroll}
+                className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
+                  momentumMode === 'reroll'
+                    ? "bg-yellow-500 text-white shadow-md"
+                    : canUseReroll
+                    ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-yellow-400 hover:text-white"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                }`}
+              >
+                🎲 Reroll (1⚡)
+              </button>
+              <button
+                onClick={() => onMomentumModeChange(momentumMode === 'guarantee' ? 'none' : 'guarantee')}
+                disabled={!canUseGuarantee}
+                className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
+                  momentumMode === 'guarantee'
+                    ? "bg-green-500 text-white shadow-md"
+                    : canUseGuarantee
+                    ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-green-500 hover:text-white"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                }`}
+              >
+                ✓ Guarantee (2⚡)
+              </button>
+            </div>
+          )}
+        </div>
+        
         <div className="flex justify-center w-full pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
           <button
             onClick={handleChoice}
             className="cursor-pointer px-8 py-4 text-lg font-semibold bg-linear-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg"
             disabled={!Object.values(input).some((v) => v) || loading}
           >
-            {loading ? "Generating..." : "✨ Continue Story"}
+            {loading ? "Generating..." : momentumMode === 'reroll' ? "🎲 Continue with Reroll" : momentumMode === 'guarantee' ? "✓ Continue Guaranteed" : "✨ Continue Story"}
           </button>
         </div>
       </div>

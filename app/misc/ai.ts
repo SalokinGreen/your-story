@@ -1,4 +1,4 @@
-import { ScenePart, StoryData, Choice } from "@/app/misc/structs";
+import { ScenePart, StoryData, Choice, UPGRADE_COSTS } from "@/app/misc/structs";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -49,7 +49,7 @@ Guidelines:
 - Choices should be distinct and lead to different outcomes.
 - Incorporate the player's stats, resources, inventory, and achievements into the story and choices.
 - Adapt the story based on the player's previous choices and current state.
-- DC 1 is extremely easy, shouldn't be a DC at all, and DC 100 is very hard.
+- DC system: Roll (1-100) + Stat Value ≥ DC. For average stats (~50): DC 50 is trivial, DC 100 is easy, DC 120 is medium, DC 140 is hard, DC 160+ is very hard, DC 200+ is impossible.
 
 Commands:
 - /modify_item: item name(amount) - Adds amount (can be negative for removal) to the quantity of an item in the player's inventory. Remove the item if quantity reaches zero.
@@ -59,26 +59,65 @@ Commands:
 - /mark_beat: beat index - Marks a story beat as fulfilled.
 - /edit_beat: edited text (index) - Edits the text of a story beat at the given index.
 - /add_beat: beat text (targetChapter) - Adds a new story beat for the target chapter.
-- /remove_beat: beat index - Removes a story beat at the given index.`
-  const recentScene = storyData.scene.parts.at(-1)?.content ?? storyData.starting_content;
+- /remove_beat: beat index - Removes a story beat at the given index.
 
-  
+Momentum System:
+- Players start with 3 momentum and can have up to 5 maximum.
+- Momentum is earned automatically on critical successes (roll 100) or strong successes (beat DC by 20+).
+- Players can spend momentum before rolling: 1 momentum for reroll (take best result), 2 momentum for guaranteed success.
+- You can reward momentum with /modify_momentum: +1 for exceptional roleplay, clever solutions, or story milestones.
 
+Progression System:
+- Players earn upgrade points from story progression: ${UPGRADE_COSTS.BEAT_REWARD} points per completed story beat, ${UPGRADE_COSTS.CHAPTER_REWARD} points per completed chapter.
+- Points are automatically awarded when you use /mark_beat or end a chapter with "!!! END CHAPTER !!!".
+- Players spend points in the Upgrades shop to increase stats, expand resource maximums, or add custom items.
+- Balance story progression rewards - complete meaningful beats with /mark_beat to grant points for character growth.`
+// - /modify_momentum: amount - Modifies the player's momentum by the given amount (can be negative). Momentum is earned on critical successes and strong rolls, and spent by the player to reroll dice or guarantee success.
+// - Use /modify_momentum: -1 sparingly as a consequence for extremely reckless or narrative-breaking choices.
+const recentScene = storyData.scene.parts.at(-1)?.content ?? storyData.starting_content;
+const memory_cap = 10000; // Max memory size in characters
+// Remove duplicate entries from memory
+let addedItems = new Set<string>();
+const new_memory = storyData.memory.filter((item, index) => 
+{
+  if (addedItems.has(item)) {
+    return false;
+  } else {
+    addedItems.add(item);
+    return true;
+  }
+});
+storyData.memory = new_memory;
+// Trim memory if too large
+let totalMemoryLength = storyData.memory.reduce((acc, entry) => acc + entry.length, 0);
+while (totalMemoryLength > memory_cap && storyData.memory.length > 0) {
+  const removed = storyData.memory.shift();
+  if (removed) {
+    totalMemoryLength -= removed.length;
+  }
+}
   const info = storyDataToString(storyData)
   let context: ChatMessage[] = [
     { role: "system", content: system },
     { role: "user", content: info }
   ];
+  
+  // For very first interaction
   if (storyData.scene.parts.length === 1) {
     context.push({ role: "assistant", content: storyData.starting_content });
     context.push({ role: "user", content: recentScene });
+  } else {
+    // For ongoing stories, only include the last 6 scene parts to avoid context overflow
+    // This keeps recent context while staying under token limits
+    const MAX_RECENT_PARTS = 6;
+    const recentParts = storyData.scene.parts.slice(-MAX_RECENT_PARTS);
+    
+    recentParts.forEach(part => {
+      const role = part.user ? "user" : "assistant";
+      context.push({ role: role, content: part.content });
+    });
   }
-    else {
-        storyData.scene.parts.forEach(part => {
-            const role = part.user ? "user" : "assistant";
-            context.push({ role: role, content: part.content });
-        });
-    }
+  
   return context
 }
 export function storyDataToString(storyData: StoryData): string {
@@ -90,6 +129,8 @@ export function storyDataToString(storyData: StoryData): string {
   result += `### Stats & Resources & Inventory:\n`;
   result += storyData.stats.map(stat => `- ${stat.name}: ${stat.value}% (${stat.description})`).join("\n") + "\n\n";
   result += storyData.resources.map(resource => `- ${resource.name}: ${resource.value}/${resource.maxValue} (${resource.description})`).join("\n") + "\n\n";
+  result += `- Momentum: ${storyData.momentum}/${storyData.maxMomentum} (Player agency resource for rerolls and guarantees)\n`;
+  result += `- Upgrade Points: ${storyData.points} (Earned from beats and chapters, spent in Upgrades shop)\n\n`;
   result += storyData.inventory.map(item => `- ${item.name} x${item.quantity}: ${item.description}`).join("\n") + "\n\n";
   
   result += `## Story Beats:\n`;

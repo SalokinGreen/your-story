@@ -1,6 +1,6 @@
 "use client";
 
-import { StoryData } from "../misc/structs";
+import { StoryData, UPGRADE_COSTS } from "../misc/structs";
 
 export default function StatsPage(storyData: StoryData) {
   return (
@@ -16,6 +16,24 @@ export default function StatsPage(storyData: StoryData) {
             <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300">
               {storyData.player_summary}
             </p>
+          </div>
+
+          {/* Points Display - Prominent at top */}
+          <div className="flex flex-row items-center gap-3 p-4 rounded-lg bg-linear-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-2 border-yellow-400 dark:border-yellow-600 shadow-lg">
+            <span className="text-3xl sm:text-4xl shrink-0">💰</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-row items-baseline justify-between mb-1">
+                <span className="font-bold text-base sm:text-lg text-gray-900 dark:text-white">
+                  Upgrade Points
+                </span>
+                <span className="font-bold text-xl sm:text-2xl text-yellow-600 dark:text-yellow-400">
+                  {storyData.points}
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                Earn {UPGRADE_COSTS.BEAT_REWARD} points per story beat, {UPGRADE_COSTS.CHAPTER_REWARD} per chapter. Spend in the Upgrades shop!
+              </p>
+            </div>
           </div>
 
           {/* Stats Section */}
@@ -65,6 +83,47 @@ export default function StatsPage(storyData: StoryData) {
               Resources
             </h3>
             <div className="space-y-3">
+              {/* Momentum - Special Resource */}
+              <div className="flex flex-row items-center gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 shadow-md">
+                <span className="text-2xl sm:text-3xl shrink-0">⚡</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-row items-baseline justify-between mb-2">
+                    <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">
+                      Momentum
+                    </span>
+                    <span className="font-bold text-base sm:text-lg text-yellow-600 dark:text-yellow-400">
+                      {storyData.momentum}/{storyData.maxMomentum}
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    Earn momentum on critical successes and strong rolls. Spend to reroll (1⚡) or guarantee success (2⚡).
+                  </p>
+                  {/* Momentum dots display */}
+                  <div className="flex gap-1.5 mb-2">
+                    {Array.from({ length: storyData.maxMomentum }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-4 h-4 rounded-full border-2 transition-all ${
+                          i < storyData.momentum
+                            ? "bg-yellow-400 dark:bg-yellow-500 border-yellow-500 dark:border-yellow-400 shadow-sm"
+                            : "bg-transparent border-gray-300 dark:border-gray-600"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  {/* Progress bar */}
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                    <div
+                      className="bg-linear-to-r from-yellow-400 to-yellow-500 h-2.5 rounded-full transition-all duration-300 shadow-sm"
+                      style={{
+                        width: `${(storyData.momentum / storyData.maxMomentum) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Regular Resources */}
               {storyData.resources.map((resource, index) => (
                 <div
                   key={index}

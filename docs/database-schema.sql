@@ -109,12 +109,19 @@ CREATE TABLE IF NOT EXISTS public.stories (
     adventure_id UUID REFERENCES public.adventures(id) ON DELETE SET NULL, -- Can be null if adventure is deleted
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     story_name TEXT NOT NULL,
-    story_data JSONB NOT NULL, -- Full StoryData with current progress
+    story_data JSONB NOT NULL, -- Full StoryData with current progress (includes momentum system)
     is_completed BOOLEAN DEFAULT false,
     is_public BOOLEAN DEFAULT false, -- Allow users to share their stories
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Note: story_data JSONB includes:
+-- - All story state (scenes, choices, chapters)
+-- - Player stats, resources, inventory, achievements
+-- - Momentum system: { momentum: number, maxMomentum: number }
+-- - Plot beats and memory
+-- See app/misc/structs.ts StoryData interface for full structure
 
 -- Add indexes for stories
 CREATE INDEX IF NOT EXISTS idx_stories_user ON public.stories(user_id);
