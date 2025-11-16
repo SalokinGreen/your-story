@@ -101,7 +101,7 @@ export default function LibraryPage() {
         setStories(data.stories || []);
       } else {
         // Fetch user's adventures
-        const response = await fetch(`/api/adventures?userId=${user.id}`);
+        const response = await authenticatedFetch(`/api/adventures?userId=${user.id}`);
         
         if (!response.ok) throw new Error("Failed to fetch adventures");
         

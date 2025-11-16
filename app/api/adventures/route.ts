@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_KEY!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAnonKey = process.env.SUPABASE_KEY!;
 
 // GET - Fetch all published adventures or user's own adventures
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient(supabaseUrl, supabaseKey);
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
     const featured = searchParams.get("featured");
@@ -17,17 +17,54 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : undefined;
 
+    // Check if this request is from the adventure author by validating auth token
+    const authHeader = request.headers.get("authorization");
+    console.log("Auth header:", authHeader ? "present" : "missing");
+    let isAuthor = false;
+    let authenticatedUserId: string | null = null;
+    
+    if (authHeader && userId) {
+      try {
+        const token = authHeader.replace("Bearer ", "");
+        const authenticatedSupabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl,
+          process.env.NEXT_PUBLIC_SUPABASE_KEY || supabaseAnonKey,
+          {
+            global: {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          }
+        );
+        const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser();
+        console.log("Auth user:", user?.id, "Requested userId:", userId, "Auth error:", authError);
+        authenticatedUserId = user?.id || null;
+        isAuthor = user?.id === userId;
+      } catch (error) {
+        console.error("Auth check error:", error);
+      }
+    }
+
+    // Use service role client to bypass RLS when user is viewing their own adventures
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
     let query = supabase
       .from("adventures")
       .select("*");
 
-    // Filter by user's own adventures or published
-    if (userId) {
-      query = query.or(`author_id.eq.${userId},is_published.eq.true`);
+    // Filter by user's own adventures or published public ones
+    console.log("isAuthor:", isAuthor, "userId:", userId);
+    if (userId && isAuthor) {
+      // Show ALL of the authenticated user's own adventures (including private/hidden)
+      query = query.eq("author_id", userId);
+    } else if (userId) {
+      // Show user's public published adventures for non-authenticated requests
+      query = query.eq("author_id", userId).eq("is_published", true).eq("visibility", "public");
     } else {
-      query = query.eq("is_published", true);
+      // Only show public published adventures
+      query = query.eq("is_published", true).eq("visibility", "public");
     }
-
     // Filter by featured
     if (featured === "true") {
       query = query.eq("is_featured", true);
@@ -76,6 +113,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    console.log(`Found ${data.length} adventures for query. Visibilities:`, data.map(a => ({ title: a.title, visibility: a.visibility, published: a.is_published })));
+
     // Transform database format to frontend format
     const adventures = data.map((item: any) => ({
       id: item.id,
@@ -96,6 +135,7 @@ export async function GET(request: NextRequest) {
       updatedAt: item.updated_at,
       isPublished: item.is_published,
       isFeatured: item.is_featured,
+      visibility: item.visibility,
       storyTemplate: item.story_template,
     }));
 
@@ -120,7 +160,7 @@ export async function POST(request: NextRequest) {
     // Create authenticated Supabase client using anon keys for RLS
     const authenticatedSupabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl,
-      process.env.NEXT_PUBLIC_SUPABASE_KEY || supabaseKey,
+      process.env.NEXT_PUBLIC_SUPABASE_KEY || supabaseAnonKey,
       {
         global: {
           headers: {
@@ -147,6 +187,7 @@ export async function POST(request: NextRequest) {
       bannerUrl,
       tags,
       difficulty,
+      visibility,
       estimatedDuration,
       isPublished,
       storyTemplate,
@@ -178,6 +219,7 @@ export async function POST(request: NextRequest) {
           banner_url: bannerUrl,
           tags: tags || [],
           difficulty,
+          visibility: visibility || "public",
           estimated_duration: estimatedDuration,
           is_published: isPublished || false,
           is_featured: false,

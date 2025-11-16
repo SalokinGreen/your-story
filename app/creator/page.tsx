@@ -7,32 +7,38 @@ import { StoryData, Stat, Resource, InventoryItem, PlotBeat, StoryLore, Achievem
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
 import { compressImage } from "@/app/misc/imageCompression";
+import { authenticatedFetch } from "@/app/misc/getAuthToken";
 
 type CreatorStep = "basic" | "premise" | "stats" | "resources" | "inventory" | "lore" | "achievements" | "plot" | "preview";
 
 function AdventureCreatorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { addNotification } = useNotification();
 
   const editAdventureId = searchParams?.get("edit");
 
-  // Redirect if not authenticated
-  if (!user) {
-    router.push("/");
-    return null;
-  }
+  // Redirect if not authenticated (effect only, keep hook order stable)
+  useEffect(() => {
+    // Wait for auth to finish loading before redirecting
+    if (authLoading) return;
+    if (!user) {
+      router.push("/");
+    }
+  }, [user, authLoading, router]);
 
   const [currentStep, setCurrentStep] = useState<CreatorStep>("basic");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   // Basic Info
   const [title, setTitle] = useState("");
   const [shortDescription, setShortDescription] = useState("");
   const [description, setDescription] = useState("");
   const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard" | "Expert">("Medium");
+  const [visibility, setVisibility] = useState<"public" | "hidden" | "private">("public");
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
@@ -43,11 +49,12 @@ function AdventureCreatorContent() {
   // Load adventure data if editing
   useEffect(() => {
     if (!editAdventureId) return;
+    if (!user) return; // Wait for auth to be ready
 
     const loadAdventure = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/adventures/${editAdventureId}`);
+        const response = await authenticatedFetch(`/api/adventures/${editAdventureId}`);
         if (!response.ok) throw new Error("Failed to load adventure");
 
         const { adventure } = await response.json();
@@ -64,6 +71,7 @@ function AdventureCreatorContent() {
         setShortDescription(adventure.shortDescription || "");
         setDescription(adventure.description || "");
         setDifficulty(adventure.difficulty || "Medium");
+        setVisibility(adventure.visibility || "public");
         setTags(adventure.tags || []);
         setThumbnailUrl(adventure.thumbnailUrl || "");
         setBannerUrl(adventure.bannerUrl || "");
@@ -90,13 +98,59 @@ function AdventureCreatorContent() {
         setMomentum(template.momentum || 0);
         setMaxMomentum(template.maxMomentum || 100);
 
-        addNotification("Adventure loaded for editing", "success");
+        // After loading from API, overlay any unsaved draft changes
+        try {
+          const draftKey = `your-story:creator-draft:${editAdventureId}`;
+          const raw = typeof window !== "undefined" ? window.localStorage.getItem(draftKey) : null;
+          if (raw) {
+            const saved = JSON.parse(raw) as any;
+
+            if (saved.title) setTitle(saved.title);
+            if (saved.shortDescription) setShortDescription(saved.shortDescription);
+            if (saved.description) setDescription(saved.description);
+            if (saved.difficulty) setDifficulty(saved.difficulty);
+            if (saved.visibility) setVisibility(saved.visibility);
+            if (Array.isArray(saved.tags)) setTags(saved.tags);
+            if (saved.thumbnailUrl) setThumbnailUrl(saved.thumbnailUrl);
+            if (saved.bannerUrl) setBannerUrl(saved.bannerUrl);
+
+            if (saved.playerName) setPlayerName(saved.playerName);
+            if (saved.playerSummary) setPlayerSummary(saved.playerSummary);
+            if (saved.premise) setPremise(saved.premise);
+            if (saved.startingContent) setStartingContent(saved.startingContent);
+            if (typeof saved.maxChapters === "number") setMaxChapters(saved.maxChapters);
+            if (saved.authorNotes) setAuthorNotes(saved.authorNotes);
+
+            if (typeof saved.points === "number") setPoints(saved.points);
+            if (typeof saved.momentum === "number") setMomentum(saved.momentum);
+            if (typeof saved.maxMomentum === "number") setMaxMomentum(saved.maxMomentum);
+
+            if (Array.isArray(saved.stats)) setStats(saved.stats);
+            if (Array.isArray(saved.resources)) setResources(saved.resources);
+            if (Array.isArray(saved.inventory)) setInventory(saved.inventory);
+            if (Array.isArray(saved.plotBeats)) setPlotBeats(saved.plotBeats);
+            if (Array.isArray(saved.lore)) setLore(saved.lore);
+            if (Array.isArray(saved.achievements)) setAchievements(saved.achievements);
+
+            if (typeof saved.currentStep === "string" && steps.some(s => s.id === saved.currentStep)) {
+              setCurrentStep(saved.currentStep as CreatorStep);
+            }
+
+            addNotification("Adventure loaded with unsaved changes from this device", "success");
+          } else {
+            addNotification("Adventure loaded for editing", "success");
+          }
+        } catch (err) {
+          console.error("Failed to restore draft overlay", err);
+          addNotification("Adventure loaded for editing", "success");
+        }
       } catch (error) {
         console.error("Error loading adventure:", error);
         addNotification("Failed to load adventure", "failure");
         router.push("/explorer");
       } finally {
         setLoading(false);
+        setInitialLoadComplete(true);
       }
     };
 
@@ -177,6 +231,11 @@ function AdventureCreatorContent() {
     symbol: "🏆",
   });
 
+  // Local draft persistence (separate keys for new vs edit mode)
+  const draftKey = editAdventureId
+    ? `your-story:creator-draft:${editAdventureId}`
+    : "your-story:creator-draft";
+
   const commonTags = ["Fantasy", "Sci-Fi", "Mystery", "Horror", "Romance", "Comedy", "Drama", "Action", "Adventure", "Thriller", "Post-Apocalyptic", "Cyberpunk", "Steampunk", "Historical", "Contemporary", "Magic", "Combat", "Exploration", "Puzzle", "Survival", "Detective", "Noir"];
 
   const steps: { id: CreatorStep; label: string; icon: string }[] = [
@@ -190,6 +249,127 @@ function AdventureCreatorContent() {
     { id: "plot", label: "Plot Beats", icon: "🎬" },
     { id: "preview", label: "Preview", icon: "👁️" },
   ];
+
+  // Load draft on mount (only for new adventures, not edit mode)
+  useEffect(() => {
+    // Skip if editing - the edit effect handles draft overlay after API load
+    if (editAdventureId) return;
+    if (!draftKey) return;
+    
+    try {
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem(draftKey) : null;
+      if (!raw) return;
+      const saved = JSON.parse(raw) as any;
+
+      if (saved.title) setTitle(saved.title);
+      if (saved.shortDescription) setShortDescription(saved.shortDescription);
+      if (saved.description) setDescription(saved.description);
+      if (saved.difficulty) setDifficulty(saved.difficulty);
+      if (saved.visibility) setVisibility(saved.visibility);
+      if (Array.isArray(saved.tags)) setTags(saved.tags);
+      if (saved.thumbnailUrl) setThumbnailUrl(saved.thumbnailUrl);
+      if (saved.bannerUrl) setBannerUrl(saved.bannerUrl);
+
+      if (saved.playerName) setPlayerName(saved.playerName);
+      if (saved.playerSummary) setPlayerSummary(saved.playerSummary);
+      if (saved.premise) setPremise(saved.premise);
+      if (saved.startingContent) setStartingContent(saved.startingContent);
+      if (typeof saved.maxChapters === "number") setMaxChapters(saved.maxChapters);
+      if (saved.authorNotes) setAuthorNotes(saved.authorNotes);
+
+      if (typeof saved.points === "number") setPoints(saved.points);
+      if (typeof saved.momentum === "number") setMomentum(saved.momentum);
+      if (typeof saved.maxMomentum === "number") setMaxMomentum(saved.maxMomentum);
+
+      if (Array.isArray(saved.stats)) setStats(saved.stats);
+      if (Array.isArray(saved.resources)) setResources(saved.resources);
+      if (Array.isArray(saved.inventory)) setInventory(saved.inventory);
+      if (Array.isArray(saved.plotBeats)) setPlotBeats(saved.plotBeats);
+      if (Array.isArray(saved.lore)) setLore(saved.lore);
+      if (Array.isArray(saved.achievements)) setAchievements(saved.achievements);
+
+      if (typeof saved.currentStep === "string" && steps.some(s => s.id === saved.currentStep)) {
+        setCurrentStep(saved.currentStep as CreatorStep);
+      }
+
+      addNotification("Restored unsaved adventure draft from this device", "success");
+    } catch (err) {
+      console.error("Failed to restore creator draft", err);
+    }
+    setInitialLoadComplete(true);
+    // we intentionally omit dependencies so this runs once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-save draft when fields change
+  useEffect(() => {
+    // Don't save until initial load is complete to avoid overwriting draft with API data
+    if (!initialLoadComplete) return;
+    if (!draftKey) return;
+
+    const payload = {
+      title,
+      shortDescription,
+      description,
+      difficulty,
+      visibility,
+      tags,
+      thumbnailUrl,
+      bannerUrl,
+      playerName,
+      playerSummary,
+      premise,
+      startingContent,
+      maxChapters,
+      authorNotes,
+      points,
+      momentum,
+      maxMomentum,
+      stats,
+      resources,
+      inventory,
+      plotBeats,
+      lore,
+      achievements,
+      currentStep,
+      updatedAt: Date.now(),
+    };
+
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(draftKey, JSON.stringify(payload));
+      }
+    } catch (err) {
+      console.error("Failed to save creator draft", err);
+    }
+  }, [
+    initialLoadComplete,
+    draftKey,
+    title,
+    shortDescription,
+    description,
+    difficulty,
+    visibility,
+    tags,
+    thumbnailUrl,
+    bannerUrl,
+    playerName,
+    playerSummary,
+    premise,
+    startingContent,
+    maxChapters,
+    authorNotes,
+    points,
+    momentum,
+    maxMomentum,
+    stats,
+    resources,
+    inventory,
+    plotBeats,
+    lore,
+    achievements,
+    currentStep,
+  ]);
 
   const addTag = () => {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
@@ -388,6 +568,51 @@ function AdventureCreatorContent() {
     setAchievements(achievements.filter((_, i) => i !== index));
   };
 
+  const handleDiscardChanges = () => {
+    if (!editAdventureId) {
+      // For new adventures, clear the draft and reset to empty
+      if (draftKey && typeof window !== "undefined") {
+        window.localStorage.removeItem(draftKey);
+      }
+      // Reset all fields to defaults
+      setTitle("");
+      setShortDescription("");
+      setDescription("");
+      setDifficulty("Medium");
+      setVisibility("public");
+      setTags([]);
+      setThumbnailUrl("");
+      setBannerUrl("");
+      setPlayerName("");
+      setPlayerSummary("");
+      setPremise("");
+      setStartingContent("");
+      setMaxChapters(8);
+      setAuthorNotes("");
+      setPoints(0);
+      setMomentum(0);
+      setMaxMomentum(100);
+      setStats([]);
+      setResources([]);
+      setInventory([]);
+      setPlotBeats([]);
+      setLore([]);
+      setAchievements([]);
+      setCurrentStep("basic");
+      addNotification("Draft cleared", "success");
+    } else {
+      // For editing, clear the draft and reload from server
+      if (draftKey && typeof window !== "undefined") {
+        window.localStorage.removeItem(draftKey);
+      }
+      addNotification("Discarding changes and reloading...", "success");
+      // Force a hard reload to fetch fresh data
+      if (typeof window !== "undefined") {
+        window.location.reload();
+      }
+    }
+  };
+
   const handleSave = async () => {
     // Validation
     if (!title.trim()) {
@@ -453,10 +678,11 @@ function AdventureCreatorContent() {
           description,
           thumbnailUrl: thumbnailUrl || null,
           bannerUrl: bannerUrl || null,
-          authorId: user.id,
-          authorName: user.user_metadata?.displayName || "Anonymous",
+          authorId: user!.id,
+          authorName: user!.user_metadata?.displayName || "Anonymous",
           tags,
           difficulty: difficulty.toLowerCase(),
+          visibility: visibility.toLowerCase(),
           estimatedDuration: "1-2 hours",
           isPublished: true,
           isFeatured: false,
@@ -471,6 +697,16 @@ function AdventureCreatorContent() {
 
       const { adventure } = await response.json();
       addNotification(`✨ Adventure ${isEditing ? "updated" : "created"} successfully!`, "success");
+
+      // Clear local draft after successful save
+      try {
+        if (draftKey && typeof window !== "undefined") {
+          window.localStorage.removeItem(draftKey);
+        }
+      } catch (err) {
+        console.error("Failed to clear creator draft", err);
+      }
+
       setSaving(false);
       router.push(`/explorer/${adventure.id}`);
     } catch (error: any) {
@@ -549,6 +785,30 @@ function AdventureCreatorContent() {
                     }`}
                   >
                     {diff}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                Visibility
+              </label>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                <strong>Public:</strong> Everyone can see and play. <strong>Hidden:</strong> Only accessible via direct link. <strong>Private:</strong> Only you can see.
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {(["public", "hidden", "private"] as const).map(vis => (
+                  <button
+                    key={vis}
+                    onClick={() => setVisibility(vis)}
+                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all capitalize ${
+                      visibility === vis
+                        ? "bg-blue-600 text-white border-blue-600 ring-2 ring-blue-400"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400"
+                    }`}
+                  >
+                    {vis === "public" ? "🌍 Public" : vis === "hidden" ? "🔗 Hidden" : "🔒 Private"}
                   </button>
                 ))}
               </div>
@@ -1774,12 +2034,20 @@ function AdventureCreatorContent() {
             <h1 className="text-3xl sm:text-4xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               {editAdventureId ? "✏️ Edit Adventure" : "✨ Adventure Creator"}
             </h1>
-            <button
-              onClick={() => router.push("/explorer")}
-              className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
-            >
-              ← Cancel
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleDiscardChanges}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+              >
+                🗑️ Discard Changes
+              </button>
+              <button
+                onClick={() => router.push("/explorer")}
+                className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
+              >
+                ← Cancel
+              </button>
+            </div>
           </div>
         </div>
 

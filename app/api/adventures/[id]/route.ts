@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_KEY!
-);
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAnonKey = process.env.SUPABASE_KEY!;
 
 // GET - Fetch a single adventure by ID
 export async function GET(
@@ -13,6 +12,31 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+
+    // Try to get the authenticated user (if any)
+    const authHeader = request.headers.get("authorization");
+    let currentUserId: string | null = null;
+    
+    if (authHeader) {
+      const token = authHeader.replace("Bearer ", "");
+      const authenticatedSupabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl,
+        process.env.NEXT_PUBLIC_SUPABASE_KEY || supabaseAnonKey,
+        {
+          global: {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        }
+      );
+      
+      const { data: { user } } = await authenticatedSupabase.auth.getUser();
+      currentUserId = user?.id || null;
+    }
+
+    // Use service role key to bypass RLS
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data, error } = await supabase
       .from("adventures")
@@ -24,6 +48,18 @@ export async function GET(
       console.error("Error fetching adventure:", error);
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
+
+    // Check visibility permissions
+    const isOwner = currentUserId === data.author_id;
+    const visibility = data.visibility || "public";
+    
+    if (visibility === "private" && !isOwner) {
+      return NextResponse.json({ error: "Adventure not found" }, { status: 404 });
+    }
+    
+    // Hidden adventures are accessible via direct link but not listed
+    // Public adventures are accessible to everyone
+    // Private adventures only accessible to owner (checked above)
 
     // Transform database format to frontend format
     const adventure = {
@@ -45,6 +81,7 @@ export async function GET(
       updatedAt: data.updated_at,
       isPublished: data.is_published,
       isFeatured: data.is_featured,
+      visibility: data.visibility,
       storyTemplate: data.story_template,
     };
 
@@ -62,6 +99,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { error } = await supabase
       .from("adventures")
@@ -96,8 +134,8 @@ export async function PATCH(
     
     // Create authenticated client using anon keys for RLS
     const authenticatedSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl,
+      process.env.NEXT_PUBLIC_SUPABASE_KEY || supabaseAnonKey,
       {
         global: {
           headers: {
@@ -141,6 +179,7 @@ export async function PATCH(
     if (body.bannerUrl !== undefined) updateData.banner_url = body.bannerUrl;
     if (body.tags !== undefined) updateData.tags = body.tags;
     if (body.difficulty !== undefined) updateData.difficulty = body.difficulty;
+    if (body.visibility !== undefined) updateData.visibility = body.visibility;
     if (body.estimatedDuration !== undefined) updateData.estimated_duration = body.estimatedDuration;
     if (body.isPublished !== undefined) updateData.is_published = body.isPublished;
     if (body.isFeatured !== undefined) updateData.is_featured = body.isFeatured;
@@ -183,8 +222,8 @@ export async function DELETE(
     
     // Create authenticated client using anon keys for RLS
     const authenticatedSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl,
+      process.env.NEXT_PUBLIC_SUPABASE_KEY || supabaseAnonKey,
       {
         global: {
           headers: {

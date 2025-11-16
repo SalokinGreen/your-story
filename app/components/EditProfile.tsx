@@ -48,13 +48,21 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
 
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/avatar.${fileExt}`;
+      const timestamp = Date.now();
+      const fileName = `${userId}/avatar-${timestamp}.${fileExt}`;
 
       // Delete old avatar if exists
       if (avatarUrl) {
-        const oldPath = avatarUrl.split('/').pop();
-        if (oldPath) {
-          await supabase.storage.from('avatars').remove([`${userId}/${oldPath}`]);
+        try {
+          // Extract the full path from the URL
+          const urlParts = avatarUrl.split('/avatars/');
+          if (urlParts.length > 1) {
+            const oldPath = urlParts[1].split('?')[0]; // Remove query params
+            await supabase.storage.from('avatars').remove([oldPath]);
+          }
+        } catch (error) {
+          console.warn("Could not delete old avatar:", error);
+          // Continue anyway - not critical
         }
       }
 
@@ -67,13 +75,17 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
         throw uploadError;
       }
 
-      // Get public URL
+      // Get public URL with cache-busting query param
       const { data } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName);
 
-      setAvatarUrl(data.publicUrl);
+      const newAvatarUrl = `${data.publicUrl}?t=${timestamp}`;
+      setAvatarUrl(newAvatarUrl);
       addNotification("✓ Avatar uploaded", "success");
+      
+      // Reset the file input so the same file can be selected again if needed
+      e.target.value = '';
     } catch (error) {
       console.error("Error uploading avatar:", error);
       addNotification("Failed to upload avatar", "failure");

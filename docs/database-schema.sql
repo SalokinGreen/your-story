@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS public.adventures (
     play_count INTEGER DEFAULT 0,
     is_published BOOLEAN DEFAULT false,
     is_featured BOOLEAN DEFAULT false,
+    visibility TEXT DEFAULT 'public' CHECK (visibility IN ('public', 'hidden', 'private')),
     story_template JSONB NOT NULL, -- Stores the full StoryData object
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -42,9 +43,9 @@ CREATE INDEX IF NOT EXISTS idx_adventures_tags ON public.adventures USING GIN(ta
 ALTER TABLE public.adventures ENABLE ROW LEVEL SECURITY;
 
 -- Policies for adventures
--- Anyone can view published adventures
+-- Anyone can view public published adventures, or their own adventures
 CREATE POLICY "Adventures are viewable by everyone" ON public.adventures
-    FOR SELECT USING (is_published = true OR auth.uid() = author_id);
+    FOR SELECT USING ((is_published = true AND visibility = 'public') OR auth.uid() = author_id);
 
 -- Users can create their own adventures
 CREATE POLICY "Users can create adventures" ON public.adventures
