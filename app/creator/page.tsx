@@ -38,7 +38,7 @@ function AdventureCreatorContent() {
   const [shortDescription, setShortDescription] = useState("");
   const [description, setDescription] = useState("");
   const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard" | "Expert">("Medium");
-  const [visibility, setVisibility] = useState<"public" | "hidden" | "private">("public");
+  const [visibility, setVisibility] = useState<"public" | "hidden" | "private">("private");
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");

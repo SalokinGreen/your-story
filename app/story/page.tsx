@@ -645,15 +645,67 @@ function StoryPageContent() {
       return;
     }
 
-    // Trim storyData to reduce payload size for Vercel limits
-    // Only send the last 6 scene parts instead of entire history
-    const trimmedStoryData = {
-      ...storyData,
+    // Build minimal payload - only send what the AI needs to generate the next part
+    // The AI uses buildMessages() which only needs recent context + current state
+    const MAX_CONTENT_LENGTH = 2000;
+    
+    // Only send last 6 scene parts with just content, user flag, and role
+    const recentParts = storyData.scene.parts.slice(-6).map(part => ({
+      content: part.content.substring(0, MAX_CONTENT_LENGTH),
+      user: part.user,
+      role: part.role,
+    }));
+
+    // Build minimal story data object
+    const minimalStoryData: any = {
+      story_name: storyData.story_name,
+      premise: storyData.premise?.substring(0, 1500) || "",
+      player_name: storyData.player_name,
+      player_summary: storyData.player_summary?.substring(0, 800) || "",
+      starting_content: storyData.starting_content?.substring(0, 1500) || "",
+      // Current game state - send as-is
+      stats: storyData.stats,
+      resources: storyData.resources,
+      inventory: storyData.inventory,
+      momentum: storyData.momentum,
+      maxMomentum: storyData.maxMomentum,
+      points: storyData.points,
+      // Trimmed narrative context
+      plot_beats: storyData.plot_beats.map(beat => ({
+        content: beat.content.substring(0, 300),
+        fulfilled: beat.fulfilled,
+        targetChapter: beat.targetChapter,
+      })),
+      memory: storyData.memory.slice(-20).map(m => m.substring(0, 300)),
+      lore: storyData.lore.slice(0, 15).map(l => ({
+        title: l.title.substring(0, 100),
+        content: l.content.substring(0, 500),
+      })),
+      author_notes: storyData.author_notes?.substring(0, 1500) || "",
+      player_notes: storyData.player_notes?.substring(0, 800) || "",
+      // Chapter info
+      chapters: storyData.chapters,
+      currentChapter: storyData.currentChapter,
+      // Recent scene parts only
       scene: {
-        ...storyData.scene,
-        parts: storyData.scene.parts.slice(-6), // Only send last 6 parts
+        parts: recentParts,
       },
     };
+
+    const payload = {
+      storyData: minimalStoryData,
+      userChoice: choices.choices[key],
+    };
+
+    const payloadSize = JSON.stringify(payload).length;
+    console.log(`Payload size: ${(payloadSize / 1024).toFixed(2)} KB`);
+    
+    if (payloadSize > 4 * 1024 * 1024) {
+      addNotification("❌ Story data too large for generation.", "failure");
+      console.error('Payload exceeds 4MB limit:', payloadSize);
+      setLoading(false);
+      return;
+    }
 
     await fetch("/api/story/next", {
       method: "POST",
@@ -661,10 +713,7 @@ function StoryPageContent() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({
-        storyData: trimmedStoryData,
-        userChoice: choices.choices[key],
-      }),
+      body: JSON.stringify(payload),
     })
       .then(async (res) => {
         const data = await res.json();
