@@ -1,13 +1,13 @@
 # Your Story
-Your Story is an interactive story game inspired by classic text-based adventure games and Choice of Games. It's powered by various LLMs to create a dynamic and engaging storytelling experience.
+Your Story is a Next.js 16 + React 19 app for AI-powered, choice-driven storytelling. It now includes a unified Library with search, filter, sort, and folder organization for your stories.
 
 ## Features
 - **Interactive Storytelling**: Make choices that influence the direction of the story.
-- **Multiple Genres**: Explore stories in fantasy, sci-fi, mystery, romance, and more.
-- **Dynamic Content Generation**: Stories are generated on-the-fly using advanced language models.
-- **User-Friendly Interface**: Easy-to-navigate interface for an immersive experience.
-- **Save and Load**: Save your progress and return to your story anytime.
-- **Customizable Characters**: Create and customize your own characters to enhance your story.
+- **Dynamic AI Generation**: DeepSeek-powered continuations with a structured parser.
+- **Library Management**: Browse stories and adventures with search, filters, and sorting.
+- **Folders**: Organize stories into customizable folders (color + icon). Create, edit, delete, and move stories between folders.
+- **Authentication**: Supabase auth with a simple profile view.
+- **Responsive UI**: Tailwind CSS v4 with a clean, minimal design.
 
 ## Data Structure
 
@@ -33,9 +33,9 @@ The data structure for Your Story is designed to efficiently manage story elemen
 - **Statistics**: Tracking player choices, achievements, player stats, and story outcomes.
 - **Feedback**: User feedback and ratings for stories and gameplay experience.
 
-### 
+###
 
-## LLM backend (DeepSeek)
+## API and AI
 
 This app now includes a minimal server route that calls DeepSeek's Chat Completions API to generate the next ScenePart for the story.
 
@@ -47,15 +47,30 @@ This app now includes a minimal server route that calls DeepSeek's Chat Completi
 	- `part` (ScenePart) — assistant-generated continuation
 	- `meta` — model/usage info from DeepSeek
 
+Folders and Library endpoints:
+- `GET/POST /api/folders` — list and create folders (auth required)
+- `PATCH/DELETE /api/folders/[id]` — update or delete folder (auth + ownership)
+- `PATCH /api/stories/[id]` — move story via `{ folderId: string | null }`
+
 Environment variables (create a `.env.local`):
 
 ```
 DEEPSEEK_API_KEY=your_api_key_here
 # Optional, defaults to deepseek-chat
 DEEPSEEK_MODEL=deepseek-chat
+
+# Supabase
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_KEY=your_supabase_anon_key
+
+Setup note: run `docs/folders-setup.sql` in your Supabase SQL Editor to create `story_folders` and add `stories.folder_id`.
 ```
 
 Notes:
 - The route enforces safe, structured responses (PG-13) and asks DeepSeek to return strict JSON of the shape `{ content: string; imageUrl: string; user: false }`.
 - If the model returns plain text, it is wrapped into a `ScenePart` as a fallback.
 - Prompt construction lives in `app/misc/ai.ts`.
+
+More docs: see `/docs` for setup, architecture, and mechanics.

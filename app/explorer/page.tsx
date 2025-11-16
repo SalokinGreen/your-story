@@ -3,41 +3,82 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Adventure } from "@/app/misc/structs";
-import { sampleAdventures, getFeaturedAdventures, filterAdventures, getAllTags } from "@/app/misc/sample_adventures";
 import { useAuth } from "@/app/misc/AuthContext";
 
 export default function ExplorerPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [adventures, setAdventures] = useState<Adventure[]>(sampleAdventures);
-  const [featuredAdventures] = useState<Adventure[]>(getFeaturedAdventures());
+  const [adventures, setAdventures] = useState<Adventure[]>([]);
+  const [featuredAdventures, setFeaturedAdventures] = useState<Adventure[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedDifficulties, setSelectedDifficulties] = useState<("Easy" | "Medium" | "Hard" | "Expert")[]>([]);
+  const [selectedDifficulties, setSelectedDifficulties] = useState<("easy" | "medium" | "hard" | "expert")[]>([]);
   const [sortBy, setSortBy] = useState<"popularity" | "newest" | "rating" | "title">("popularity");
   const [showFilters, setShowFilters] = useState(false);
 
-  const allTags = getAllTags();
+  // Fetch adventures from database
+  useEffect(() => {
+    const fetchAdventures = async () => {
+      try {
+        setLoading(true);
+        
+        // Build query params
+        const params = new URLSearchParams();
+        if (searchQuery) params.append("search", searchQuery);
+        if (selectedTags.length > 0) params.append("tags", selectedTags.join(","));
+        if (selectedDifficulties.length > 0) params.append("difficulty", selectedDifficulties.join(","));
+        params.append("sortBy", sortBy);
+
+        const response = await fetch(`/api/adventures?${params}`);
+        if (!response.ok) throw new Error("Failed to fetch adventures");
+
+        const { adventures: fetchedAdventures } = await response.json();
+        setAdventures(fetchedAdventures);
+
+        // Extract unique tags
+        const tags = new Set<string>();
+        fetchedAdventures.forEach((adventure: Adventure) => {
+          adventure.tags.forEach((tag: string) => tags.add(tag));
+        });
+        setAllTags(Array.from(tags).sort());
+      } catch (error) {
+        console.error("Error fetching adventures:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAdventures();
+  }, [searchQuery, selectedTags, selectedDifficulties, sortBy]);
+
+  // Fetch featured adventures
+  useEffect(() => {
+    const fetchFeatured = async () => {
+      try {
+        const response = await fetch("/api/adventures?featured=true");
+        if (!response.ok) throw new Error("Failed to fetch featured");
+
+        const { adventures: featured } = await response.json();
+        setFeaturedAdventures(featured);
+      } catch (error) {
+        console.error("Error fetching featured:", error);
+      }
+    };
+
+    fetchFeatured();
+  }, []);
 
   // Auto-advance carousel
   useEffect(() => {
+    if (featuredAdventures.length === 0) return;
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % featuredAdventures.length);
     }, 5000);
     return () => clearInterval(interval);
   }, [featuredAdventures.length]);
-
-  // Apply filters
-  useEffect(() => {
-    const filtered = filterAdventures(sampleAdventures, {
-      searchQuery,
-      tags: selectedTags.length > 0 ? selectedTags : undefined,
-      difficulty: selectedDifficulties.length > 0 ? selectedDifficulties : undefined,
-      sortBy,
-    });
-    setAdventures(filtered);
-  }, [searchQuery, selectedTags, selectedDifficulties, sortBy]);
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev =>
@@ -45,18 +86,19 @@ export default function ExplorerPage() {
     );
   };
 
-  const toggleDifficulty = (diff: "Easy" | "Medium" | "Hard" | "Expert") => {
+  const toggleDifficulty = (diff: "easy" | "medium" | "hard" | "expert") => {
     setSelectedDifficulties(prev =>
       prev.includes(diff) ? prev.filter(d => d !== diff) : [...prev, diff]
     );
   };
 
   const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "Easy": return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800";
-      case "Medium": return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800";
-      case "Hard": return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800";
-      case "Expert": return "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800";
+    const lower = difficulty.toLowerCase();
+    switch (lower) {
+      case "easy": return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800";
+      case "medium": return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800";
+      case "hard": return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800";
+      case "expert": return "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800";
       default: return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800";
     }
   };
@@ -66,16 +108,26 @@ export default function ExplorerPage() {
       <div className="max-w-7xl mx-auto p-4 sm:p-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <h1 className="text-3xl sm:text-4xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               Story Explorer
             </h1>
-            <button
-              onClick={() => router.push("/")}
-              className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
-            >
-              ← Home
-            </button>
+            <div className="flex gap-2">
+              {user && (
+                <button
+                  onClick={() => router.push("/library")}
+                  className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
+                >
+                  📚 Library
+                </button>
+              )}
+              <button
+                onClick={() => router.push("/")}
+                className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
+              >
+                ← Home
+              </button>
+            </div>
           </div>
           <p className="text-gray-700 dark:text-gray-300 text-lg">
             Discover amazing interactive stories or create your own adventure
@@ -236,7 +288,7 @@ export default function ExplorerPage() {
                     Difficulty:
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {(["Easy", "Medium", "Hard", "Expert"] as const).map(diff => (
+                    {(["easy", "medium", "hard", "expert"] as const).map(diff => (
                       <button
                         key={diff}
                         onClick={() => toggleDifficulty(diff)}
@@ -246,7 +298,7 @@ export default function ExplorerPage() {
                             : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600"
                         }`}
                       >
-                        {diff}
+                        {diff.charAt(0).toUpperCase() + diff.slice(1)}
                       </button>
                     ))}
                   </div>
@@ -297,7 +349,12 @@ export default function ExplorerPage() {
           <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
             All Adventures ({adventures.length})
           </h2>
-          {adventures.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent mx-auto"></div>
+              <p className="text-gray-600 dark:text-gray-400 text-lg mt-4">Loading adventures...</p>
+            </div>
+          ) : adventures.length === 0 ? (
             <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
               <p className="text-gray-600 dark:text-gray-400 text-lg">
                 No adventures found matching your filters
@@ -311,18 +368,25 @@ export default function ExplorerPage() {
                   className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all hover:scale-105 cursor-pointer"
                   onClick={() => router.push(`/explorer/${adventure.id}`)}
                 >
-                  {/* Thumbnail Placeholder */}
-                  <div className="h-40 bg-linear-to-br from-blue-400 via-purple-500 to-pink-500 flex items-center justify-center">
-                    <span className="text-6xl">{adventure.tags[0] === "Fantasy" ? "⚔️" : adventure.tags[0] === "Sci-Fi" ? "🚀" : adventure.tags[0] === "Mystery" ? "🔍" : "📖"}</span>
-                  </div>
+                  {/* Thumbnail Image or Placeholder */}
+                  {adventure.thumbnailUrl ? (
+                    <div 
+                      className="h-40 bg-cover bg-center"
+                      style={{ backgroundImage: `url(${adventure.thumbnailUrl})` }}
+                    />
+                  ) : (
+                    <div className="h-40 bg-linear-to-br from-blue-400 via-purple-500 to-pink-500 flex items-center justify-center">
+                      <span className="text-6xl">{adventure.tags[0] === "Fantasy" ? "⚔️" : adventure.tags[0] === "Sci-Fi" ? "🚀" : adventure.tags[0] === "Mystery" ? "🔍" : "📖"}</span>
+                    </div>
+                  )}
                   
                   <div className="p-5">
                     <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white line-clamp-1">
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white flex-1">
                         {adventure.title}
                       </h3>
                       {adventure.isFeatured && (
-                        <span className="text-yellow-500">⭐</span>
+                        <span className="text-yellow-500 ml-2">⭐</span>
                       )}
                     </div>
                     
@@ -331,7 +395,7 @@ export default function ExplorerPage() {
                     </p>
                     
                     <div className="flex items-center gap-2 mb-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold border ${getDifficultyColor(adventure.difficulty)}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold border capitalize ${getDifficultyColor(adventure.difficulty)}`}>
                         {adventure.difficulty}
                       </span>
                       <span className="text-xs text-gray-600 dark:text-gray-400">
@@ -350,7 +414,7 @@ export default function ExplorerPage() {
                     <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
                       <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
                         <span>⭐ {adventure.rating?.toFixed(1)}</span>
-                        <span>👥 {adventure.playCount.toLocaleString()}</span>
+                        <span>👥 {adventure.playCount ? adventure.playCount.toLocaleString() : "0"}</span>
                       </div>
                       <span className="text-purple-600 dark:text-purple-400 font-semibold text-sm">
                         Play →

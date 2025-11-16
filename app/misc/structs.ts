@@ -140,3 +140,29 @@ export interface AdventureFilter {
     difficulty?: ("Easy" | "Medium" | "Hard" | "Expert")[];
     sortBy?: "popularity" | "newest" | "rating" | "title";
 }
+
+export interface Comment {
+    id: string;
+    adventureId: string;
+    userId: string;
+    userName: string;
+    userAvatar?: string;
+    content: string;
+    rating?: number; // 1-5 stars, optional
+    createdAt: Date;
+    updatedAt?: Date;
+    likes: number;
+    likedBy?: string[]; // User IDs who liked this comment
+}
+
+export interface Story {
+    id: string;
+    adventureId?: string; // Optional - can be null if adventure was deleted
+    userId: string;
+    storyName: string;
+    storyData: StoryData; // Full story state with progress
+    isCompleted: boolean;
+    isPublic: boolean; // Allow sharing stories
+    createdAt: Date;
+    updatedAt: Date;
+}

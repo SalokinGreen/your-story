@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
   const userId = user.id;
 
-  // Check token balance (requires 5 tokens)
+  // Check token balance (requires 3 tokens)
   const REQUIRED_TOKENS = 3;
   const hasTokens = await hasEnoughTokens(userId, REQUIRED_TOKENS, supabaseAdmin);
   

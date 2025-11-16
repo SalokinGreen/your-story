@@ -11,6 +11,7 @@ import GiftTokenForm from "@/app/components/GiftTokenForm";
 import AdminControls from "@/app/components/AdminControls";
 import EditDisplayName from "@/app/components/EditDisplayName";
 import EditProfile from "@/app/components/EditProfile";
+import { Adventure, Story } from "@/app/misc/structs";
 
 interface ProfileUser {
   id: string;
@@ -36,6 +37,11 @@ export default function ProfilePage() {
   const [balance, setBalance] = useState<TokenBalance | null>(null);
   const [loading, setLoading] = useState(true);
   const [userIsAdmin, setUserIsAdmin] = useState(false);
+  const [adventures, setAdventures] = useState<Adventure[]>([]);
+  const [publicStories, setPublicStories] = useState<Story[]>([]);
+  const [loadingAdventures, setLoadingAdventures] = useState(true);
+  const [loadingStories, setLoadingStories] = useState(true);
+  const [activeTab, setActiveTab] = useState<"adventures" | "stories">("adventures");
 
   const userId = params?.userId as string;
   const isOwnProfile = currentUser?.id === userId;
@@ -49,6 +55,8 @@ export default function ProfilePage() {
     }
 
     loadProfile();
+    loadAdventures();
+    loadPublicStories();
   }, [userId, currentUser, authLoading]);
 
   const loadProfile = async () => {
@@ -122,8 +130,51 @@ export default function ProfilePage() {
     }
   };
 
+  const loadAdventures = async () => {
+    setLoadingAdventures(true);
+    try {
+      const response = await fetch(`/api/adventures?userId=${userId}`);
+      if (response.ok) {
+        const { adventures: userAdventures } = await response.json();
+        setAdventures(userAdventures);
+      }
+    } catch (error) {
+      console.error("Error loading adventures:", error);
+    } finally {
+      setLoadingAdventures(false);
+    }
+  };
+
+  const loadPublicStories = async () => {
+    setLoadingStories(true);
+    try {
+      const response = await fetch(`/api/stories?userId=${userId}&isPublic=true`);
+      if (response.ok) {
+        const { stories: userStories } = await response.json();
+        setPublicStories(userStories);
+      }
+    } catch (error) {
+      console.error("Error loading stories:", error);
+    } finally {
+      setLoadingStories(false);
+    }
+  };
+
   const handleRefresh = () => {
     loadProfile();
+    loadAdventures();
+    loadPublicStories();
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    const lower = difficulty.toLowerCase();
+    switch (lower) {
+      case "easy": return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800";
+      case "medium": return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800";
+      case "hard": return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800";
+      case "expert": return "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800";
+      default: return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800";
+    }
   };
 
   if (authLoading || loading) {
@@ -290,6 +341,151 @@ export default function ProfilePage() {
               onSuccess={handleRefresh}
             />
           )}
+
+          {/* Adventures and Stories Tabs */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Tab Headers */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setActiveTab("adventures")}
+                className={`flex-1 px-6 py-4 font-semibold transition-colors ${
+                  activeTab === "adventures"
+                    ? "bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                }`}
+              >
+                🎮 Adventures ({adventures.length})
+              </button>
+              <button
+                onClick={() => setActiveTab("stories")}
+                className={`flex-1 px-6 py-4 font-semibold transition-colors ${
+                  activeTab === "stories"
+                    ? "bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                }`}
+              >
+                📖 Public Stories ({publicStories.length})
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-6">
+              {activeTab === "adventures" && (
+                <div>
+                  {loadingAdventures ? (
+                    <div className="flex justify-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent"></div>
+                    </div>
+                  ) : adventures.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-600 dark:text-gray-400 text-lg mb-4">
+                        {isOwnProfile
+                          ? "You haven't created any adventures yet."
+                          : "This user hasn't created any adventures yet."}
+                      </p>
+                      {isOwnProfile && (
+                        <button
+                          onClick={() => router.push("/creator")}
+                          className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all"
+                        >
+                          Create Your First Adventure
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {adventures.map((adventure) => (
+                        <div
+                          key={adventure.id}
+                          onClick={() => router.push(`/explorer/${adventure.id}`)}
+                          className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer border border-gray-200 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-2 flex-1">
+                              {adventure.title}
+                            </h3>
+                            {adventure.isFeatured && (
+                              <span className="text-yellow-500 ml-2">⭐</span>
+                            )}
+                          </div>
+                          <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
+                            {adventure.shortDescription}
+                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`px-2 py-1 rounded-full text-xs font-bold border capitalize ${getDifficultyColor(adventure.difficulty)}`}>
+                              {adventure.difficulty}
+                            </span>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">
+                              ⭐ {adventure.rating?.toFixed(1) || "N/A"}
+                            </span>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">
+                              🎮 {adventure.playCount} plays
+                            </span>
+                          </div>
+                          {!adventure.isPublished && (
+                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                              <span className="text-xs font-semibold text-orange-600 dark:text-orange-400">
+                                📝 Draft
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "stories" && (
+                <div>
+                  {loadingStories ? (
+                    <div className="flex justify-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent"></div>
+                    </div>
+                  ) : publicStories.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-600 dark:text-gray-400 text-lg">
+                        {isOwnProfile
+                          ? "You don't have any public stories yet."
+                          : "This user hasn't shared any public stories yet."}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {publicStories.map((story) => (
+                        <div
+                          key={story.id}
+                          onClick={() => router.push(`/story?storyId=${story.id}`)}
+                          className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-5 hover:shadow-lg transition-all cursor-pointer border border-gray-200 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-2 flex-1">
+                              {story.storyName}
+                            </h3>
+                            {story.isCompleted && (
+                              <span className="text-green-500 ml-2" title="Completed">
+                                ✓
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                            <span>
+                              📅 {new Date(story.updatedAt).toLocaleDateString()}
+                            </span>
+                            {story.adventureId && (
+                              <span className="text-purple-600 dark:text-purple-400">
+                                🎮 From Adventure
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
 
          
         </div>

@@ -52,6 +52,16 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+### 5. Initialize Database (Folders)
+
+To enable the Library folders feature, run the migration in your Supabase project:
+
+1. Open the Supabase Dashboard → SQL Editor
+2. Copy the contents of `docs/folders-setup.sql`
+3. Execute the script to create `story_folders` and add `stories.folder_id`
+
+You can re-run this script safely; it uses `IF NOT EXISTS` where applicable.
+
 ## Project Commands
 
 ```bash
@@ -83,7 +93,7 @@ npm run test         # Run Vitest tests
 
 ### Database Tables (Optional)
 
-Currently, the app uses local state management. For persistent story saves, you'll need to create tables:
+Folder organization for the Library uses `story_folders` and a `folder_id` column on `stories` (see step 5 above). For additional persistence (e.g., user story saves), you can create extra tables like:
 
 ```sql
 -- Example: User stories table
@@ -156,7 +166,7 @@ export default defineConfig({
 
 ## Next Steps
 
-- **Explore the codebase**: Start with `app/story/page.tsx`
+- **Explore the codebase**: Start with `app/library/page.tsx` (Library) and `app/story/page.tsx` (Story)
 - **Read the architecture**: [Architecture Overview](./architecture.md)
 - **Understand game mechanics**: [Game Mechanics](./game-mechanics.md)
 - **Learn the AI system**: [AI Integration](./ai-integration.md)

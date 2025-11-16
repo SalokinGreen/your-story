@@ -20,6 +20,12 @@ This document explains the system architecture, data flow, and design patterns u
 │         ├─ Dice rolling & checks                            │
 │         └─ Command processing                               │
 ├─────────────────────────────────────────────────────────────┤
+│  Library Page (app/library/page.tsx)                        │
+│    ├─ Dual views: Stories | Adventures                      │
+│    ├─ Search, filter, and sort controls                     │
+│    ├─ Folders sidebar with counts                           │
+│    └─ Create/Edit/Delete/Move folders & assign stories      │
+├─────────────────────────────────────────────────────────────┤
 │  Global Components                                           │
 │    ├─ NotificationContainer (toast notifications)           │
 │    ├─ AuthContext (user state)                              │
@@ -36,6 +42,19 @@ This document explains the system architecture, data flow, and design patterns u
 │    ├─ Parses response (outputToScenePart)                   │
 │    └─ Returns ScenePart                                     │
 ├─────────────────────────────────────────────────────────────┤
+│  /api/folders (GET, POST)                                   │
+│    ├─ Requires auth (Bearer token)                          │
+│    ├─ GET: List user's folders (ordered by name)            │
+│    └─ POST: Create folder (name/color/icon)                 │
+├─────────────────────────────────────────────────────────────┤
+│  /api/folders/[id] (PATCH, DELETE)                          │
+│    ├─ Requires auth + ownership                             │
+│    ├─ PATCH: Update name/color/icon                         │
+│    └─ DELETE: Remove folder (stories set to uncategorized)  │
+├─────────────────────────────────────────────────────────────┤
+│  /api/stories/[id] (PATCH)                                  │
+│    └─ Accepts { folderId: string | null } to move story     │
+├─────────────────────────────────────────────────────────────┤
 │  /api/auth/* (POST/GET)                                     │
 │    ├─ /signup - User registration                           │
 │    ├─ /signin - User login                                  │
@@ -51,7 +70,7 @@ This document explains the system architecture, data flow, and design patterns u
 ├─────────────────────────────────────────────────────────────┤
 │  Supabase                                                    │
 │    ├─ Authentication                                         │
-│    └─ Database (future: story saves)                        │
+│    └─ Database: stories, adventures, story_folders          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -286,6 +305,17 @@ Return structured Choice object
 - `POST /api/auth/signout`: End session
 - `GET /api/auth/user`: Get current user
 
+### Folders Routes
+
+- `GET /api/folders`: List folders for current user
+- `POST /api/folders`: Create a folder `{ name: string, color?: string, icon?: string }`
+- `PATCH /api/folders/[id]`: Update folder `{ name?, color?, icon? }`
+- `DELETE /api/folders/[id]`: Delete folder (stories become uncategorized)
+
+Notes:
+- All folder endpoints require an authenticated Supabase session; the API uses an auth-bound Supabase client under RLS.
+- Moving a story between folders is done via `PATCH /api/stories/[id]` with `{ folderId: string | null }`.
+
 ## Performance Considerations
 
 ### Client-Side
@@ -339,6 +369,9 @@ Return structured Choice object
 - [AI Integration](./ai-integration.md) - Deep dive into prompts
 - [API Reference](./api-reference.md) - Complete API documentation
 
+Related setup:
+- Run the database migration in `docs/folders-setup.sql` to create `story_folders` and add `stories.folder_id`.
+
 ---
 
-*Last updated: November 15, 2025*
+*Last updated: November 16, 2025*

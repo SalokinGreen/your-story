@@ -1,12 +1,37 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { useAuth } from "./misc/AuthContext";
 import AuthForm from "./components/AuthForm";
 import UserProfile from "./components/UserProfile";
+import { Adventure } from "./misc/structs";
 
 export default function Home() {
   const { user, loading } = useAuth();
+  const router = useRouter();
+  const [popularToday, setPopularToday] = useState<Adventure[]>([]);
+  const [loadingPopular, setLoadingPopular] = useState(true);
+
+  // Fetch top 3 most popular adventures
+  useEffect(() => {
+    const fetchPopular = async () => {
+      try {
+        const response = await fetch("/api/adventures?sortBy=popularity&limit=3");
+        if (!response.ok) throw new Error("Failed to fetch");
+
+        const { adventures } = await response.json();
+        setPopularToday(adventures);
+      } catch (error) {
+        console.error("Error fetching popular adventures:", error);
+      } finally {
+        setLoadingPopular(false);
+      }
+    };
+
+    fetchPopular();
+  }, []);
 
   const packages = [
     { name: "Starter", cost: 0.99, tokens: 100, bonus: 0, savings: 0 },
@@ -67,6 +92,123 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* Popular Today Section */}
+        <div className="w-full max-w-5xl mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+              🔥 Popular Today
+            </h2>
+            <button
+              onClick={() => router.push("/explorer")}
+              className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all"
+            >
+              Browse All Adventures →
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {loadingPopular ? (
+              Array(3).fill(0).map((_, i) => (
+                <div key={i} className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse">
+                  <div className="h-48 bg-gray-300 dark:bg-gray-700"></div>
+                  <div className="p-6 space-y-3">
+                    <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-3/4"></div>
+                    <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded"></div>
+                    <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-5/6"></div>
+                  </div>
+                </div>
+              ))
+            ) : popularToday.length === 0 ? (
+              <div className="col-span-3 text-center py-12 text-gray-600 dark:text-gray-400">
+                No adventures available yet. Be the first to create one!
+              </div>
+            ) : (
+              popularToday.map((adventure, index) => (
+                <div
+                  key={adventure.id}
+                  onClick={() => router.push(`/explorer/${adventure.id}`)}
+                  className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer hover:scale-105 transition-transform"
+                >
+                  {/* Thumbnail with fallback to gradient */}
+                  {adventure.thumbnailUrl ? (
+                    <div className="h-48 relative overflow-hidden">
+                      <Image
+                        src={adventure.thumbnailUrl}
+                        alt={adventure.title}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 400px"
+                      />
+                    </div>
+                  ) : (
+                    <div className={`h-48 bg-linear-to-br ${
+                      index === 0 ? "from-blue-400 to-purple-600" :
+                      index === 1 ? "from-purple-400 to-pink-600" :
+                      "from-pink-400 to-red-600"
+                    } flex items-center justify-center`}>
+                      <div className="text-6xl">
+                        {index === 0 ? "👹" : index === 1 ? "🤖" : "🔮"}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-6">
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white line-clamp-1">
+                        {adventure.title}
+                      </h3>
+                      <span className="text-yellow-500 text-sm font-semibold whitespace-nowrap ml-2">
+                        ⭐ {adventure.rating?.toFixed(1) || "N/A"}
+                      </span>
+                    </div>
+
+                    <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">
+                      {adventure.shortDescription}
+                    </p>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${
+                          adventure.difficulty.toLowerCase() === "easy" ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" :
+                          adventure.difficulty.toLowerCase() === "medium" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300" :
+                          adventure.difficulty.toLowerCase() === "hard" ? "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300" :
+                          "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                        }`}>
+                          {adventure.difficulty}
+                        </span>
+                        <span className="text-gray-500 dark:text-gray-400">
+                          🎮 {adventure.playCount >= 1000 ? `${(adventure.playCount / 1000).toFixed(1)}k` : adventure.playCount} plays
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      {adventure.tags.slice(0, 2).map(tag => (
+                        <span
+                          key={tag}
+                          className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* CTA Button for Mobile */}
+          <div className="mt-8 flex justify-center md:hidden">
+            <button
+              onClick={() => router.push("/explorer")}
+              className="w-full max-w-md px-6 py-4 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all text-lg"
+            >
+              Browse All Adventures →
+            </button>
+          </div>
+        </div>
 
         {/* Token Packages Section */}
         <div className="w-full max-w-5xl">

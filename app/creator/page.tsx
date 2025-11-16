@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/misc/AuthContext";
-import { StoryData, Stat, Resource, InventoryItem, Chapter, PlotBeat, StoryLore, Achievement } from "@/app/misc/structs";
+import { StoryData, Stat, Resource, InventoryItem, PlotBeat, StoryLore, Achievement } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
+import { supabase } from "@/app/misc/supabase";
 
-type CreatorStep = "basic" | "premise" | "stats" | "resources" | "inventory" | "lore" | "achievements" | "chapters" | "plot" | "preview";
+type CreatorStep = "basic" | "premise" | "stats" | "resources" | "inventory" | "lore" | "achievements" | "plot" | "preview";
 
 export default function AdventureCreatorPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { addNotification } = useNotification();
+
+  const editAdventureId = searchParams?.get("edit");
 
   // Redirect if not authenticated
   if (!user) {
@@ -21,6 +25,7 @@ export default function AdventureCreatorPage() {
 
   const [currentStep, setCurrentStep] = useState<CreatorStep>("basic");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Basic Info
   const [title, setTitle] = useState("");
@@ -29,6 +34,68 @@ export default function AdventureCreatorPage() {
   const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard" | "Expert">("Medium");
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+
+  // Load adventure data if editing
+  useEffect(() => {
+    if (!editAdventureId) return;
+
+    const loadAdventure = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/adventures/${editAdventureId}`);
+        if (!response.ok) throw new Error("Failed to load adventure");
+
+        const { adventure } = await response.json();
+
+        // Verify user is the author
+        if (adventure.authorId !== user?.id) {
+          addNotification("You can only edit your own adventures", "failure");
+          router.push("/explorer");
+          return;
+        }
+
+        // Load basic info
+        setTitle(adventure.title || "");
+        setShortDescription(adventure.shortDescription || "");
+        setDescription(adventure.description || "");
+        setDifficulty(adventure.difficulty || "Medium");
+        setTags(adventure.tags || []);
+        setThumbnailUrl(adventure.thumbnailUrl || "");
+        setBannerUrl(adventure.bannerUrl || "");
+
+        // Load story template data
+        const template = adventure.storyTemplate;
+        setPlayerName(template.player_name || "");
+        setPlayerSummary(template.player_summary || "");
+        setPremise(template.premise || "");
+        setStartingContent(template.starting_content || "");
+        setMaxChapters(template.max_chapters || 8);
+        setAuthorNotes(template.author_notes || "");
+
+        // Load stats, resources, inventory, etc.
+        setStats(template.stats || []);
+        setResources(template.resources || []);
+        setInventory(template.inventory || []);
+        setPlotBeats(template.plot_beats || []);
+        setLore(template.lore || []);
+        setAchievements(template.achievements || []);
+
+        addNotification("Adventure loaded for editing", "success");
+      } catch (error) {
+        console.error("Error loading adventure:", error);
+        addNotification("Failed to load adventure", "failure");
+        router.push("/explorer");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAdventure();
+  }, [editAdventureId, user, router, addNotification]);
 
   // Story Data
   const [playerName, setPlayerName] = useState("");
@@ -67,14 +134,6 @@ export default function AdventureCreatorPage() {
     symbol: "📦",
   });
 
-  // Chapters
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [newChapter, setNewChapter] = useState<Partial<Chapter>>({
-    title: "",
-    summary: "",
-    notes: [],
-  });
-
   // Plot Beats
   const [plotBeats, setPlotBeats] = useState<PlotBeat[]>([]);
   const [newPlotBeat, setNewPlotBeat] = useState<Partial<PlotBeat>>({
@@ -107,7 +166,6 @@ export default function AdventureCreatorPage() {
   });
 
   const commonTags = ["Fantasy", "Sci-Fi", "Mystery", "Horror", "Romance", "Comedy", "Drama", "Action", "Adventure", "Thriller", "Post-Apocalyptic", "Cyberpunk", "Steampunk", "Historical", "Contemporary", "Magic", "Combat", "Exploration", "Puzzle", "Survival", "Detective", "Noir"];
-  const commonSymbols = ["⭐", "💪", "🧠", "❤️", "🎯", "⚔️", "🛡️", "🔮", "🏹", "💎", "⚡", "🔥", "💧", "🌟", "🎲", "📖", "🗡️", "🏆", "💰", "🔑", "📦", "🧪", "🎒", "🍖"];
 
   const steps: { id: CreatorStep; label: string; icon: string }[] = [
     { id: "basic", label: "Basic Info", icon: "📝" },
@@ -117,7 +175,6 @@ export default function AdventureCreatorPage() {
     { id: "inventory", label: "Starting Items", icon: "🎒" },
     { id: "lore", label: "Lore", icon: "📜" },
     { id: "achievements", label: "Achievements", icon: "🏆" },
-    { id: "chapters", label: "Chapters", icon: "📚" },
     { id: "plot", label: "Plot Beats", icon: "🎬" },
     { id: "preview", label: "Preview", icon: "👁️" },
   ];
@@ -131,6 +188,94 @@ export default function AdventureCreatorPage() {
 
   const removeTag = (tag: string) => {
     setTags(tags.filter(t => t !== tag));
+  };
+
+  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      addNotification("Please select an image file", "warning");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      addNotification("Image must be smaller than 5MB", "warning");
+      return;
+    }
+
+    setUploadingThumbnail(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user.id}-${Date.now()}-thumbnail.${fileExt}`;
+      const filePath = `adventure-thumbnails/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("adventure-images")
+        .upload(filePath, file, { cacheControl: "3600", upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from("adventure-images")
+        .getPublicUrl(filePath);
+
+      setThumbnailUrl(data.publicUrl);
+      addNotification("Thumbnail uploaded!", "success");
+    } catch (error: any) {
+      console.error("Error uploading thumbnail:", error);
+      addNotification(`Upload failed: ${error.message}`, "failure");
+    } finally {
+      setUploadingThumbnail(false);
+    }
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      addNotification("Please select an image file", "warning");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      addNotification("Image must be smaller than 5MB", "warning");
+      return;
+    }
+
+    setUploadingBanner(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user.id}-${Date.now()}-banner.${fileExt}`;
+      const filePath = `adventure-banners/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("adventure-images")
+        .upload(filePath, file, { cacheControl: "3600", upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from("adventure-images")
+        .getPublicUrl(filePath);
+
+      setBannerUrl(data.publicUrl);
+      addNotification("Banner uploaded!", "success");
+    } catch (error: any) {
+      console.error("Error uploading banner:", error);
+      addNotification(`Upload failed: ${error.message}`, "failure");
+    } finally {
+      setUploadingBanner(false);
+    }
   };
 
   const addStat = () => {
@@ -164,17 +309,6 @@ export default function AdventureCreatorPage() {
 
   const removeInventoryItem = (index: number) => {
     setInventory(inventory.filter((_, i) => i !== index));
-  };
-
-  const addChapter = () => {
-    if (newChapter.title && newChapter.summary) {
-      setChapters([...chapters, { ...newChapter, scene: { parts: [] }, notes: newChapter.notes || [] } as Chapter]);
-      setNewChapter({ title: "", summary: "", notes: [] });
-    }
-  };
-
-  const removeChapter = (index: number) => {
-    setChapters(chapters.filter((_, i) => i !== index));
   };
 
   const addPlotBeat = () => {
@@ -273,7 +407,7 @@ export default function AdventureCreatorPage() {
       memory: [],
       max_chapters: maxChapters,
       currentChapter: 0,
-      chapters,
+      chapters: [],
       scene: { parts: [] },
       stats,
       resources,
@@ -283,22 +417,55 @@ export default function AdventureCreatorPage() {
       author_notes: authorNotes,
     };
 
-    // TODO: Save to database
-    console.log("Adventure to save:", {
-      title,
-      shortDescription,
-      description,
-      difficulty,
-      tags,
-      storyTemplate: storyData,
-    });
+    // Save to database
+    try {
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Not authenticated");
+      }
 
-    // Simulate save
-    setTimeout(() => {
-      addNotification("✨ Adventure created successfully!", "success");
+      const isEditing = !!editAdventureId;
+      const url = isEditing ? `/api/adventures/${editAdventureId}` : "/api/adventures";
+      const method = isEditing ? "PATCH" : "POST";
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          title,
+          shortDescription,
+          description,
+          thumbnailUrl: thumbnailUrl || null,
+          bannerUrl: bannerUrl || null,
+          authorId: user.id,
+          authorName: user.user_metadata?.displayName || "Anonymous",
+          tags,
+          difficulty: difficulty.toLowerCase(),
+          estimatedDuration: "1-2 hours",
+          isPublished: true,
+          isFeatured: false,
+          storyTemplate: storyData,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `Failed to ${isEditing ? "update" : "create"} adventure`);
+      }
+
+      const { adventure } = await response.json();
+      addNotification(`✨ Adventure ${isEditing ? "updated" : "created"} successfully!`, "success");
       setSaving(false);
-      router.push("/explorer");
-    }, 1000);
+      router.push(`/explorer/${adventure.id}`);
+    } catch (error: any) {
+      console.error("Error saving adventure:", error);
+      addNotification(`Failed to save: ${error.message}`, "failure");
+      setSaving(false);
+    }
   };
 
   const renderStepContent = () => {
@@ -428,6 +595,96 @@ export default function AdventureCreatorPage() {
                 ))}
               </div>
             </div>
+
+            {/* Thumbnail Upload */}
+            <div>
+              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                Thumbnail Image
+              </label>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                Recommended: 400x300px, max 5MB
+              </p>
+              <div className="flex items-start gap-4">
+                {thumbnailUrl && (
+                  <div className="relative">
+                    <img
+                      src={thumbnailUrl}
+                      alt="Thumbnail preview"
+                      className="w-32 h-24 object-cover rounded-lg border-2 border-gray-300 dark:border-gray-600"
+                    />
+                    <button
+                      onClick={() => setThumbnailUrl("")}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs font-bold"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleThumbnailUpload}
+                    disabled={uploadingThumbnail}
+                    className="hidden"
+                    id="thumbnail-upload"
+                  />
+                  <label
+                    htmlFor="thumbnail-upload"
+                    className={`block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
+                      uploadingThumbnail ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    {uploadingThumbnail ? "Uploading..." : thumbnailUrl ? "Change Thumbnail" : "📸 Upload Thumbnail"}
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Banner Upload */}
+            <div>
+              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                Banner Image
+              </label>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                Recommended: 1200x400px, max 5MB
+              </p>
+              <div className="flex items-start gap-4">
+                {bannerUrl && (
+                  <div className="relative">
+                    <img
+                      src={bannerUrl}
+                      alt="Banner preview"
+                      className="w-48 h-16 object-cover rounded-lg border-2 border-gray-300 dark:border-gray-600"
+                    />
+                    <button
+                      onClick={() => setBannerUrl("")}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs font-bold"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBannerUpload}
+                    disabled={uploadingBanner}
+                    className="hidden"
+                    id="banner-upload"
+                  />
+                  <label
+                    htmlFor="banner-upload"
+                    className={`block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
+                      uploadingBanner ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    {uploadingBanner ? "Uploading..." : bannerUrl ? "Change Banner" : "🖼️ Upload Banner"}
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
         );
 
@@ -541,17 +798,16 @@ export default function AdventureCreatorPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Symbol
+                    Symbol / Emoji
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={newStat.symbol}
                     onChange={(e) => setNewStat({ ...newStat, symbol: e.target.value })}
+                    placeholder="e.g., ⭐ or 💪"
                     className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    {commonSymbols.map(symbol => (
-                      <option key={symbol} value={symbol}>{symbol}</option>
-                    ))}
-                  </select>
+                    maxLength={4}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -640,17 +896,16 @@ export default function AdventureCreatorPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Symbol
+                    Symbol / Emoji
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={newResource.symbol}
                     onChange={(e) => setNewResource({ ...newResource, symbol: e.target.value })}
+                    placeholder="e.g., 💎 or ❤️"
                     className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    {commonSymbols.map(symbol => (
-                      <option key={symbol} value={symbol}>{symbol}</option>
-                    ))}
-                  </select>
+                    maxLength={4}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -752,17 +1007,16 @@ export default function AdventureCreatorPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Symbol
+                    Symbol / Emoji
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={newItem.symbol}
                     onChange={(e) => setNewItem({ ...newItem, symbol: e.target.value })}
+                    placeholder="e.g., 🗡️ or 🎒"
                     className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    {commonSymbols.map(symbol => (
-                      <option key={symbol} value={symbol}>{symbol}</option>
-                    ))}
-                  </select>
+                    maxLength={4}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -842,84 +1096,12 @@ export default function AdventureCreatorPage() {
           </div>
         );
 
-      case "chapters":
-        return (
-          <div className="space-y-6">
-            <div className="bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Chapters help organize your story into major sections (optional but recommended).
-              </p>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Add Chapter</h3>
-              <div className="space-y-4 mb-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={newChapter.title}
-                    onChange={(e) => setNewChapter({ ...newChapter, title: e.target.value })}
-                    placeholder="e.g., The Dark Forest"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Summary *
-                  </label>
-                  <textarea
-                    value={newChapter.summary}
-                    onChange={(e) => setNewChapter({ ...newChapter, summary: e.target.value })}
-                    placeholder="A brief summary of what happens in this chapter..."
-                    rows={3}
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={addChapter}
-                disabled={!newChapter.title || !newChapter.summary}
-                className="w-full px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
-              >
-                Add Chapter
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Chapters ({chapters.length})</h3>
-              {chapters.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400 text-sm">No chapters added yet</p>
-              ) : (
-                chapters.map((chapter, index) => (
-                  <div key={index} className="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-lg border border-pink-200 dark:border-pink-800">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <div className="font-bold text-gray-900 dark:text-white">Chapter {index + 1}: {chapter.title}</div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{chapter.summary}</div>
-                      </div>
-                      <button
-                        onClick={() => removeChapter(index)}
-                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors ml-3"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        );
-
       case "lore":
         return (
           <div className="space-y-6">
             <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4">
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Lore entries provide background information about your world, characters, and locations (optional).
+                💡 <strong>Tip:</strong> Lore entries provide background information about your world. Keys determine when the lore is revealed during gameplay (e.g., "Ancient Ruins Discovered", "Dragon Defeated").
               </p>
             </div>
 
@@ -959,7 +1141,7 @@ export default function AdventureCreatorPage() {
                     className="w-4 h-4 text-purple-600 rounded"
                   />
                   <label htmlFor="loreSecret" className="text-sm text-gray-700 dark:text-gray-300">
-                    🔒 Secret (requires keys to unlock)
+                    🔒 Hidden (only revealed when triggered by keys)
                   </label>
                 </div>
                 <div>
@@ -1045,7 +1227,7 @@ export default function AdventureCreatorPage() {
                 {newLore.secrtet && (
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      🔑 Unlock Keys
+                      🔑 Trigger Keys (events that reveal this lore)
                     </label>
                     <div className="flex gap-2 mb-2">
                       <input
@@ -1053,7 +1235,7 @@ export default function AdventureCreatorPage() {
                         value={newLoreKey}
                         onChange={(e) => setNewLoreKey(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addLoreKey())}
-                        placeholder="Add key name..."
+                        placeholder="e.g., 'Dragon Defeated' or 'Ancient Ruins Discovered'"
                         className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                       <button
@@ -1105,7 +1287,7 @@ export default function AdventureCreatorPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <div className="font-bold text-gray-900 dark:text-white">{entry.title}</div>
-                          {entry.secrtet && <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">🔒 Secret</span>}
+                          {entry.secrtet && <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">🔒 Hidden</span>}
                         </div>
                         <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{entry.content}</div>
                         {entry.relatedCharacters.length > 0 && (
@@ -1120,7 +1302,7 @@ export default function AdventureCreatorPage() {
                         )}
                         {entry.secrtet && entry.keys.length > 0 && (
                           <div className="text-xs text-yellow-700 dark:text-yellow-400">
-                            <strong>Keys:</strong> {entry.keys.join(', ')}
+                            <strong>Triggers:</strong> {entry.keys.join(', ')}
                           </div>
                         )}
                       </div>
@@ -1164,17 +1346,16 @@ export default function AdventureCreatorPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Symbol
+                    Symbol / Emoji
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={newAchievement.symbol}
                     onChange={(e) => setNewAchievement({ ...newAchievement, symbol: e.target.value })}
+                    placeholder="e.g., 🏆 or ⭐"
                     className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    {commonSymbols.map(symbol => (
-                      <option key={symbol} value={symbol}>{symbol}</option>
-                    ))}
-                  </select>
+                    maxLength={4}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -1314,7 +1495,7 @@ export default function AdventureCreatorPage() {
       case "preview":
         return (
           <div className="space-y-6">
-            <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-2xl p-8 text-white">
+            <div className="bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 rounded-2xl p-8 text-white">
               <h2 className="text-3xl font-bold mb-2">{title || "Untitled Adventure"}</h2>
               <p className="text-white/90 mb-4">{shortDescription || "No description"}</p>
               <div className="flex flex-wrap gap-2">
@@ -1357,10 +1538,6 @@ export default function AdventureCreatorPage() {
                     <span className="ml-2 font-semibold text-gray-900 dark:text-white">{achievements.length}</span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">Chapters:</span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">{chapters.length}</span>
-                  </div>
-                  <div>
                     <span className="text-gray-600 dark:text-gray-400">Plot Beats:</span>
                     <span className="ml-2 font-semibold text-gray-900 dark:text-white">{plotBeats.length}</span>
                   </div>
@@ -1398,6 +1575,18 @@ export default function AdventureCreatorPage() {
 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
 
+  // Show loading screen when loading adventure data
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400 mx-auto mb-4"></div>
+          <p className="text-gray-900 dark:text-white font-semibold">Loading adventure...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
       <div className="max-w-6xl mx-auto p-4 sm:p-8">
@@ -1405,7 +1594,7 @@ export default function AdventureCreatorPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl sm:text-4xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-              ✨ Adventure Creator
+              {editAdventureId ? "✏️ Edit Adventure" : "✨ Adventure Creator"}
             </h1>
             <button
               onClick={() => router.push("/explorer")}

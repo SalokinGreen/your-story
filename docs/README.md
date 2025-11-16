@@ -6,9 +6,9 @@ Welcome to **Your Story**, an AI-powered interactive narrative game inspired by 
 
 - [Getting Started](./getting-started.md) - Setup and installation guide
 - [Architecture Overview](./architecture.md) - System design and data flow
+- [API Reference](./api-reference.md) - Complete API endpoint documentation ✨ NEW
 - [Game Mechanics](./game-mechanics.md) - Stats, resources, items, and checks
 - [AI Integration](./ai-integration.md) - LLM prompts, commands, and story generation
-- [API Reference](./api-reference.md) - Backend endpoints and data structures
 - [UI Components](./ui-components.md) - Frontend components and styling
 - [Story Creation](./story-creation.md) - How to create and structure stories
 - [Contributing](./contributing.md) - Development guidelines and best practices
@@ -26,6 +26,8 @@ Your Story is a Next.js 16 application that generates interactive, choice-driven
 ## 🚀 Key Features
 
 - **Dynamic Story Generation**: AI creates unique story continuations based on player choices
+- **Library Management**: Unified Library page with Stories/Adventures views, search, filters, and sorting
+- **Folders**: Organize stories into color/icon-customizable folders with create/edit/delete and move operations
 - **Skill Checks**: D100 rolls against difficulty classes with advantage/disadvantage
 - **Resource Management**: Track health, stamina, and other consumables
 - **Item System**: Use items for advantages, risk losing them on failure
@@ -53,6 +55,7 @@ your-story/
 │   ├── api/              # API routes (story generation, auth)
 │   ├── components/       # Reusable UI components
 │   ├── misc/             # Core logic (AI, auth, types)
+│   ├── library/          # Library page (search/filter/sort, folders)
 │   ├── story/            # Story pages and components
 │   ├── globals.css       # Global styles and animations
 │   ├── layout.tsx        # Root layout with providers
@@ -100,6 +103,9 @@ AI can issue commands to modify game state:
 4. **Creating stories?** See [Story Creation](./story-creation.md)
 5. **Contributing?** Read [Contributing](./contributing.md)
 
+Setup note:
+- To enable folders, run the migration in `docs/folders-setup.sql` in your Supabase SQL Editor.
+
 ## 🔗 External Resources
 
 - [Next.js Documentation](https://nextjs.org/docs)
@@ -109,4 +115,4 @@ AI can issue commands to modify game state:
 
 ---
 
-*Last updated: November 15, 2025*
+*Last updated: November 16, 2025*

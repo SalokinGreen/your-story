@@ -42,6 +42,12 @@ export default function UserProfile() {
           View Profile
         </button>
         <button
+          onClick={() => router.push("/library")}
+          className="w-full px-6 py-3 bg-linear-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+        >
+          📚 My Library
+        </button>
+        <button
           onClick={() => router.push("/story")}
           className="w-full px-6 py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
         >
