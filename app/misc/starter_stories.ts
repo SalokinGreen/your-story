@@ -31,16 +31,20 @@ const goblin_layer: StoryData = {
     starting_content: "You find yourself at the entrance of a rancid village. You see it has been looted and partly burned. The villagers look at you with a mix of fear and hope, whispering about the goblin lair that lies ahead.",
     plot_beats: [
         {
-            content: "Prologue: Eldrin receives a quest from a village elder to retrieve a stolen artifact from a goblin lair.",
-            targetChapter: 1
+            title: "Prologue",
+            content: "Eldrin receives a quest from a village elder to retrieve a stolen artifact from a goblin lair.",
+            fulfilled: false
         },
         {
-            content: "Opening Image: Eldrin approaches the entrance of a dark cave, the rumored goblin lair.",
-            targetChapter: 4
+            title: "Opening Image",
+            content: "Eldrin approaches the entrance of a dark cave, the rumored goblin lair.",
+            fulfilled: false
         },
         {
-            content: "First Plot Point: Eldrin encounters the first wave of goblin guards and must use stealth or combat to proceed.",
-            targetChapter: 6}
+            title: "First Plot Point",
+            content: "Eldrin encounters the first wave of goblin guards and must use stealth or combat to proceed.",
+            fulfilled: false
+        }
     ],
     memory: [],
     max_chapters: 26,
