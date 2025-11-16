@@ -6,6 +6,7 @@ import { useAuth } from "@/app/misc/AuthContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { Adventure } from "@/app/misc/structs";
 import { supabase } from "@/app/misc/supabase";
+import { authenticatedFetch } from "@/app/misc/getAuthToken";
 
 interface Story {
   id: string;
@@ -80,18 +81,9 @@ export default function LibraryPage() {
 
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("Not authenticated");
-      }
-
       if (view === "stories") {
         // Fetch folders
-        const foldersResponse = await fetch("/api/folders", {
-          headers: {
-            "Authorization": `Bearer ${session.access_token}`,
-          },
-        });
+        const foldersResponse = await authenticatedFetch("/api/folders");
         
         if (foldersResponse.ok) {
           const foldersData = await foldersResponse.json();
@@ -99,11 +91,7 @@ export default function LibraryPage() {
         }
 
         // Fetch user's stories
-        const response = await fetch(`/api/stories?userId=${user.id}`, {
-          headers: {
-            "Authorization": `Bearer ${session.access_token}`,
-          },
-        });
+        const response = await authenticatedFetch(`/api/stories?userId=${user.id}`);
         
         if (!response.ok) throw new Error("Failed to fetch stories");
         
@@ -134,16 +122,8 @@ export default function LibraryPage() {
     try {
       setDeleting(storyId);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("Not authenticated");
-      }
-
-      const response = await fetch(`/api/stories/${storyId}`, {
+      const response = await authenticatedFetch(`/api/stories/${storyId}`, {
         method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`,
-        },
       });
 
       if (!response.ok) {
@@ -169,16 +149,8 @@ export default function LibraryPage() {
     try {
       setDeleting(adventureId);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("Not authenticated");
-      }
-
-      const response = await fetch(`/api/adventures/${adventureId}`, {
+      const response = await authenticatedFetch(`/api/adventures/${adventureId}`, {
         method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`,
-        },
       });
 
       if (!response.ok) {
@@ -203,14 +175,10 @@ export default function LibraryPage() {
     }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const response = await fetch("/api/folders", {
+      const response = await authenticatedFetch("/api/folders", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           name: newFolderName,
@@ -239,14 +207,10 @@ export default function LibraryPage() {
 
   const handleUpdateFolder = async (folderId: string, updates: Partial<StoryFolder>) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const response = await fetch(`/api/folders/${folderId}`, {
+      const response = await authenticatedFetch(`/api/folders/${folderId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
         },
         body: JSON.stringify(updates),
       });
@@ -272,14 +236,8 @@ export default function LibraryPage() {
     }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const response = await fetch(`/api/folders/${folderId}`, {
+      const response = await authenticatedFetch(`/api/folders/${folderId}`, {
         method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`,
-        },
       });
 
       if (!response.ok) {
@@ -302,14 +260,10 @@ export default function LibraryPage() {
 
   const handleMoveStory = async (storyId: string, folderId: string | null) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const response = await fetch(`/api/stories/${storyId}`, {
+      const response = await authenticatedFetch(`/api/stories/${storyId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ folderId }),
       });
