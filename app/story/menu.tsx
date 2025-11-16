@@ -117,6 +117,21 @@ function StatsResourcesEditor({
   const [localResources, setLocalResources] = useState<Resource[]>([...resources]);
   const [localAchievements, setLocalAchievements] = useState<Achievement[]>([...achievements]);
 
+  // Drag and edit state for stats
+  const [draggedStatIndex, setDraggedStatIndex] = useState<number | null>(null);
+  const [editingStatIndex, setEditingStatIndex] = useState<number | null>(null);
+  const [editStat, setEditStat] = useState<Partial<Stat>>({});
+
+  // Drag and edit state for resources
+  const [draggedResourceIndex, setDraggedResourceIndex] = useState<number | null>(null);
+  const [editingResourceIndex, setEditingResourceIndex] = useState<number | null>(null);
+  const [editResource, setEditResource] = useState<Partial<Resource>>({});
+
+  // Drag and edit state for achievements
+  const [draggedAchievementIndex, setDraggedAchievementIndex] = useState<number | null>(null);
+  const [editingAchievementIndex, setEditingAchievementIndex] = useState<number | null>(null);
+  const [editAchievement, setEditAchievement] = useState<Partial<Achievement>>({});
+
   const updateStat = (index: number, field: keyof Stat, value: any) => {
     const updated = [...localStats];
     (updated[index] as any)[field] = value;
@@ -190,6 +205,144 @@ function StatsResourcesEditor({
     onUpdate({ achievements: updated });
   };
 
+  // Stat drag-and-drop and edit handlers
+  const handleStatDragStart = (index: number) => setDraggedStatIndex(index);
+  const handleStatDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedStatIndex === null || draggedStatIndex === index) return;
+    const updated = [...localStats];
+    const [moved] = updated.splice(draggedStatIndex, 1);
+    updated.splice(index, 0, moved);
+    setLocalStats(updated);
+    setDraggedStatIndex(index);
+    onUpdate({ stats: updated });
+  };
+  const handleStatDragEnd = () => setDraggedStatIndex(null);
+  const moveStatUp = (index: number) => {
+    if (index === 0) return;
+    const updated = [...localStats];
+    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    setLocalStats(updated);
+    onUpdate({ stats: updated });
+  };
+  const moveStatDown = (index: number) => {
+    if (index === localStats.length - 1) return;
+    const updated = [...localStats];
+    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    setLocalStats(updated);
+    onUpdate({ stats: updated });
+  };
+  const startEditStat = (index: number) => {
+    setEditingStatIndex(index);
+    setEditStat({ ...localStats[index] });
+  };
+  const cancelEditStat = () => {
+    setEditingStatIndex(null);
+    setEditStat({});
+  };
+  const saveEditStat = () => {
+    if (editingStatIndex !== null && editStat.name && editStat.description) {
+      const updated = [...localStats];
+      updated[editingStatIndex] = editStat as Stat;
+      setLocalStats(updated);
+      onUpdate({ stats: updated });
+      setEditingStatIndex(null);
+      setEditStat({});
+    }
+  };
+
+  // Resource drag-and-drop and edit handlers
+  const handleResourceDragStart = (index: number) => setDraggedResourceIndex(index);
+  const handleResourceDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedResourceIndex === null || draggedResourceIndex === index) return;
+    const updated = [...localResources];
+    const [moved] = updated.splice(draggedResourceIndex, 1);
+    updated.splice(index, 0, moved);
+    setLocalResources(updated);
+    setDraggedResourceIndex(index);
+    onUpdate({ resources: updated });
+  };
+  const handleResourceDragEnd = () => setDraggedResourceIndex(null);
+  const moveResourceUp = (index: number) => {
+    if (index === 0) return;
+    const updated = [...localResources];
+    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    setLocalResources(updated);
+    onUpdate({ resources: updated });
+  };
+  const moveResourceDown = (index: number) => {
+    if (index === localResources.length - 1) return;
+    const updated = [...localResources];
+    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    setLocalResources(updated);
+    onUpdate({ resources: updated });
+  };
+  const startEditResource = (index: number) => {
+    setEditingResourceIndex(index);
+    setEditResource({ ...localResources[index] });
+  };
+  const cancelEditResource = () => {
+    setEditingResourceIndex(null);
+    setEditResource({});
+  };
+  const saveEditResource = () => {
+    if (editingResourceIndex !== null && editResource.name && editResource.description) {
+      const updated = [...localResources];
+      updated[editingResourceIndex] = editResource as Resource;
+      setLocalResources(updated);
+      onUpdate({ resources: updated });
+      setEditingResourceIndex(null);
+      setEditResource({});
+    }
+  };
+
+  // Achievement drag-and-drop and edit handlers
+  const handleAchievementDragStart = (index: number) => setDraggedAchievementIndex(index);
+  const handleAchievementDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedAchievementIndex === null || draggedAchievementIndex === index) return;
+    const updated = [...localAchievements];
+    const [moved] = updated.splice(draggedAchievementIndex, 1);
+    updated.splice(index, 0, moved);
+    setLocalAchievements(updated);
+    setDraggedAchievementIndex(index);
+    onUpdate({ achievements: updated });
+  };
+  const handleAchievementDragEnd = () => setDraggedAchievementIndex(null);
+  const moveAchievementUp = (index: number) => {
+    if (index === 0) return;
+    const updated = [...localAchievements];
+    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    setLocalAchievements(updated);
+    onUpdate({ achievements: updated });
+  };
+  const moveAchievementDown = (index: number) => {
+    if (index === localAchievements.length - 1) return;
+    const updated = [...localAchievements];
+    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    setLocalAchievements(updated);
+    onUpdate({ achievements: updated });
+  };
+  const startEditAchievement = (index: number) => {
+    setEditingAchievementIndex(index);
+    setEditAchievement({ ...localAchievements[index] });
+  };
+  const cancelEditAchievement = () => {
+    setEditingAchievementIndex(null);
+    setEditAchievement({});
+  };
+  const saveEditAchievement = () => {
+    if (editingAchievementIndex !== null && editAchievement.title && editAchievement.description) {
+      const updated = [...localAchievements];
+      updated[editingAchievementIndex] = editAchievement as Achievement;
+      setLocalAchievements(updated);
+      onUpdate({ achievements: updated });
+      setEditingAchievementIndex(null);
+      setEditAchievement({});
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Stats Section */}
@@ -204,45 +357,80 @@ function StatsResourcesEditor({
           </button>
         </div>
         <div className="space-y-3">
+          <p className="text-xs text-gray-600 dark:text-gray-400">💡 Drag and drop to reorder (or use arrow buttons on mobile)</p>
           {localStats.map((stat, index) => (
-            <div key={index} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <input
-                  type="text"
-                  value={stat.name}
-                  onChange={(e) => updateStat(index, 'name', e.target.value)}
-                  placeholder="Stat name"
-                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+            editingStatIndex === index ? (
+              // Edit mode
+              <div key={index} className="p-4 bg-blue-100 dark:bg-blue-900/40 rounded-lg border-2 border-blue-400">
+                <h5 className="text-sm font-bold mb-3 text-gray-900 dark:text-white">✏️ Editing Stat</h5>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                  <input
+                    type="text"
+                    value={editStat.name || ""}
+                    onChange={(e) => setEditStat({ ...editStat, name: e.target.value })}
+                    placeholder="Stat name"
+                    className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    value={editStat.symbol || ""}
+                    onChange={(e) => setEditStat({ ...editStat, symbol: e.target.value })}
+                    placeholder="Symbol"
+                    className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    maxLength={4}
+                  />
+                  <input
+                    type="number"
+                    value={editStat.value || 0}
+                    onChange={(e) => setEditStat({ ...editStat, value: parseInt(e.target.value) || 0 })}
+                    placeholder="Value"
+                    className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                </div>
+                <textarea
+                  value={editStat.description || ""}
+                  onChange={(e) => setEditStat({ ...editStat, description: e.target.value })}
+                  placeholder="Description"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white mb-3"
+                  rows={2}
                 />
-                <input
-                  type="text"
-                  value={stat.symbol}
-                  onChange={(e) => updateStat(index, 'symbol', e.target.value)}
-                  placeholder="Symbol"
-                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
-                <input
-                  type="number"
-                  value={stat.value}
-                  onChange={(e) => updateStat(index, 'value', parseInt(e.target.value) || 0)}
-                  placeholder="Value"
-                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
-                <button
-                  onClick={() => removeStat(index)}
-                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
-                >
-                  Remove
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={saveEditStat} disabled={!editStat.name || !editStat.description} className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded">✓ Save</button>
+                  <button onClick={cancelEditStat} className="flex-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded">Cancel</button>
+                </div>
               </div>
-              <textarea
-                value={stat.description}
-                onChange={(e) => updateStat(index, 'description', e.target.value)}
-                placeholder="Description"
-                className="mt-2 w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                rows={2}
-              />
-            </div>
+            ) : (
+              // View mode with drag-drop
+              <div
+                key={index}
+                draggable
+                onDragStart={() => handleStatDragStart(index)}
+                onDragOver={(e) => handleStatDragOver(e, index)}
+                onDragEnd={handleStatDragEnd}
+                className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move"
+                style={{ opacity: draggedStatIndex === index ? 0.5 : 1 }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing mt-2">⋮⋮</div>
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{stat.symbol}</span>
+                      <div>
+                        <div className="font-bold text-gray-900 dark:text-white">{stat.name}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">{stat.description}</div>
+                        <div className="text-sm text-blue-600 dark:text-blue-400 font-semibold">Value: {stat.value}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button onClick={() => moveStatUp(index)} disabled={index === 0} className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs">▲</button>
+                    <button onClick={() => moveStatDown(index)} disabled={index === localStats.length - 1} className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs">▼</button>
+                    <button onClick={() => startEditStat(index)} className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs">✏️</button>
+                    <button onClick={() => removeStat(index)} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">✕</button>
+                  </div>
+                </div>
+              </div>
+            )
           ))}
         </div>
       </div>
@@ -260,44 +448,112 @@ function StatsResourcesEditor({
         </div>
         <div className="space-y-3">
           {localResources.map((resource, index) => (
-            <div key={index} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                <input
-                  type="text"
-                  value={resource.name}
-                  onChange={(e) => updateResource(index, 'name', e.target.value)}
-                  placeholder="Resource name"
-                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
-                <input
-                  type="text"
-                  value={resource.symbol}
-                  onChange={(e) => updateResource(index, 'symbol', e.target.value)}
-                  placeholder="Symbol"
-                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
-                <input
-                  type="number"
-                  value={resource.value}
-                  onChange={(e) => updateResource(index, 'value', parseInt(e.target.value) || 0)}
-                  placeholder="Current"
-                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
-                <input
-                  type="number"
-                  value={resource.maxValue}
-                  onChange={(e) => updateResource(index, 'maxValue', parseInt(e.target.value) || 0)}
-                  placeholder="Max"
-                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
+            editingResourceIndex === index ? (
+              <div key={index} className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg">
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={editResource.name || ''}
+                    onChange={(e) => setEditResource({ ...editResource, name: e.target.value })}
+                    placeholder="Resource name"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    value={editResource.symbol || ''}
+                    onChange={(e) => setEditResource({ ...editResource, symbol: e.target.value })}
+                    placeholder="Symbol"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="number"
+                      value={editResource.value ?? 0}
+                      onChange={(e) => setEditResource({ ...editResource, value: parseInt(e.target.value) || 0 })}
+                      placeholder="Current"
+                      className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="number"
+                      value={editResource.maxValue ?? 0}
+                      onChange={(e) => setEditResource({ ...editResource, maxValue: parseInt(e.target.value) || 0 })}
+                      placeholder="Max"
+                      className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <textarea
+                    value={editResource.description || ''}
+                    onChange={(e) => setEditResource({ ...editResource, description: e.target.value })}
+                    placeholder="Description"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    rows={3}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => saveEditResource()}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={cancelEditResource}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                key={index}
+                draggable
+                onDragStart={() => handleResourceDragStart(index)}
+                onDragOver={(e) => handleResourceDragOver(e, index)}
+                onDragEnd={handleResourceDragEnd}
+                className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
+                  draggedResourceIndex === index ? 'opacity-50' : ''
+                }`}
+              >
+                <span className="text-gray-400 select-none">⋮⋮</span>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    {resource.symbol} {resource.name}: {resource.value}/{resource.maxValue}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{resource.description}</div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => moveResourceUp(index)}
+                    disabled={index === 0}
+                    className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                    title="Move up"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    onClick={() => moveResourceDown(index)}
+                    disabled={index === localResources.length - 1}
+                    className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                    title="Move down"
+                  >
+                    ▼
+                  </button>
+                </div>
+                <button
+                  onClick={() => startEditResource(index)}
+                  className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
+                >
+                  ✏️
+                </button>
                 <button
                   onClick={() => removeResource(index)}
-                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
                 >
                   Remove
                 </button>
               </div>
-            </div>
+            )
           ))}
         </div>
       </div>
@@ -315,53 +571,116 @@ function StatsResourcesEditor({
         </div>
         <div className="space-y-3">
           {localAchievements.map((achievement, index) => (
-            <div key={index} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
-                <input
-                  type="text"
-                  value={achievement.title}
-                  onChange={(e) => updateAchievement(index, 'title', e.target.value)}
-                  placeholder="Title"
-                  className="sm:col-span-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
-                <input
-                  type="text"
-                  value={achievement.symbol}
-                  onChange={(e) => updateAchievement(index, 'symbol', e.target.value)}
-                  placeholder="Symbol"
-                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
-                <input
-                  type="number"
-                  value={achievement.points}
-                  onChange={(e) => updateAchievement(index, 'points', parseInt(e.target.value) || 0)}
-                  placeholder="Points"
-                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
-                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            editingAchievementIndex === index ? (
+              <div key={index} className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg">
+                <div className="space-y-3">
                   <input
-                    type="checkbox"
-                    checked={!!achievement.dateAchieved}
-                    onChange={(e) => toggleAchievement(index, e.target.checked)}
-                    className="rounded"
+                    type="text"
+                    value={editAchievement.title || ''}
+                    onChange={(e) => setEditAchievement({ ...editAchievement, title: e.target.value })}
+                    placeholder="Title"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
-                  <span>Achieved</span>
-                </label>
+                  <input
+                    type="text"
+                    value={editAchievement.symbol || ''}
+                    onChange={(e) => setEditAchievement({ ...editAchievement, symbol: e.target.value })}
+                    placeholder="Symbol"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="number"
+                    value={editAchievement.points ?? 0}
+                    onChange={(e) => setEditAchievement({ ...editAchievement, points: parseInt(e.target.value) || 0 })}
+                    placeholder="Points"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                  <textarea
+                    value={editAchievement.description || ''}
+                    onChange={(e) => setEditAchievement({ ...editAchievement, description: e.target.value })}
+                    placeholder="Description"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    rows={3}
+                  />
+                  <label className="flex items-center gap-2 text-gray-900 dark:text-white">
+                    <input
+                      type="checkbox"
+                      checked={!!editAchievement.dateAchieved}
+                      onChange={(e) => setEditAchievement({ 
+                        ...editAchievement, 
+                        dateAchieved: e.target.checked ? new Date() : null
+                      })}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span>Achieved</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => saveEditAchievement()}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={cancelEditAchievement}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                key={index}
+                draggable
+                onDragStart={() => handleAchievementDragStart(index)}
+                onDragOver={(e) => handleAchievementDragOver(e, index)}
+                onDragEnd={handleAchievementDragEnd}
+                className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
+                  draggedAchievementIndex === index ? 'opacity-50' : ''
+                }`}
+              >
+                <span className="text-gray-400 select-none">⋮⋮</span>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    {achievement.symbol} {achievement.title} ({achievement.points} pts)
+                    {achievement.dateAchieved && <span className="ml-2 text-green-500">✓</span>}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{achievement.description}</div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => moveAchievementUp(index)}
+                    disabled={index === 0}
+                    className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                    title="Move up"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    onClick={() => moveAchievementDown(index)}
+                    disabled={index === localAchievements.length - 1}
+                    className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                    title="Move down"
+                  >
+                    ▼
+                  </button>
+                </div>
+                <button
+                  onClick={() => startEditAchievement(index)}
+                  className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
+                >
+                  ✏️
+                </button>
                 <button
                   onClick={() => removeAchievement(index)}
-                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
                 >
                   Remove
                 </button>
               </div>
-              <textarea
-                value={achievement.description}
-                onChange={(e) => updateAchievement(index, 'description', e.target.value)}
-                placeholder="Description"
-                className="mt-2 w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                rows={2}
-              />
-            </div>
+            )
           ))}
           {localAchievements.length === 0 && (
             <p className="text-sm text-gray-600 dark:text-gray-400">No achievements yet.</p>
@@ -381,6 +700,69 @@ function InventoryEditor({
   onUpdate: (inventory: InventoryItem[]) => void;
 }) {
   const [localInventory, setLocalInventory] = useState([...inventory]);
+  const [draggedInventoryIndex, setDraggedInventoryIndex] = useState<number | null>(null);
+  const [editingInventoryIndex, setEditingInventoryIndex] = useState<number | null>(null);
+  const [editInventoryItem, setEditInventoryItem] = useState<Partial<InventoryItem>>({});
+
+  // Drag-and-drop handlers for inventory
+  const handleInventoryDragStart = (index: number) => {
+    setDraggedInventoryIndex(index);
+  };
+
+  const handleInventoryDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedInventoryIndex === null || draggedInventoryIndex === index) return;
+    
+    const items = [...localInventory];
+    const draggedItem = items[draggedInventoryIndex];
+    items.splice(draggedInventoryIndex, 1);
+    items.splice(index, 0, draggedItem);
+    
+    setLocalInventory(items);
+    setDraggedInventoryIndex(index);
+    onUpdate(items);
+  };
+
+  const handleInventoryDragEnd = () => {
+    setDraggedInventoryIndex(null);
+  };
+
+  // Arrow button handlers for inventory
+  const moveInventoryUp = (index: number) => {
+    if (index === 0) return;
+    const items = [...localInventory];
+    [items[index - 1], items[index]] = [items[index], items[index - 1]];
+    setLocalInventory(items);
+    onUpdate(items);
+  };
+
+  const moveInventoryDown = (index: number) => {
+    if (index === localInventory.length - 1) return;
+    const items = [...localInventory];
+    [items[index], items[index + 1]] = [items[index + 1], items[index]];
+    setLocalInventory(items);
+    onUpdate(items);
+  };
+
+  // Edit mode handlers for inventory
+  const startEditInventoryItem = (index: number) => {
+    setEditingInventoryIndex(index);
+    setEditInventoryItem({ ...localInventory[index] });
+  };
+
+  const cancelEditInventoryItem = () => {
+    setEditingInventoryIndex(null);
+    setEditInventoryItem({});
+  };
+
+  const saveEditInventoryItem = (index: number) => {
+    const items = [...localInventory];
+    items[index] = { ...items[index], ...editInventoryItem };
+    setLocalInventory(items);
+    onUpdate(items);
+    setEditingInventoryIndex(null);
+    setEditInventoryItem({});
+  };
 
   const updateItem = (index: number, field: keyof InventoryItem, value: any) => {
     const updated = [...localInventory];
@@ -421,51 +803,112 @@ function InventoryEditor({
       </div>
       <div className="space-y-3">
         {localInventory.map((item, index) => (
-          <div key={index} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-              <input
-                type="text"
-                value={item.name}
-                onChange={(e) => updateItem(index, 'name', e.target.value)}
-                placeholder="Item name"
-                className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-              />
-              <input
-                type="text"
-                value={item.symbol}
-                onChange={(e) => updateItem(index, 'symbol', e.target.value)}
-                placeholder="Symbol"
-                className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-              />
-              <input
-                type="number"
-                value={item.quantity}
-                onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                placeholder="Qty"
-                className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-              />
-              <input
-                type="text"
-                value={item.type || ""}
-                onChange={(e) => updateItem(index, 'type', e.target.value)}
-                placeholder="Type"
-                className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-              />
+          editingInventoryIndex === index ? (
+            <div key={index} className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg">
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={editInventoryItem.name || ''}
+                  onChange={(e) => setEditInventoryItem({ ...editInventoryItem, name: e.target.value })}
+                  placeholder="Item name"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                />
+                <input
+                  type="text"
+                  value={editInventoryItem.symbol || ''}
+                  onChange={(e) => setEditInventoryItem({ ...editInventoryItem, symbol: e.target.value })}
+                  placeholder="Symbol"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="number"
+                    value={editInventoryItem.quantity ?? 1}
+                    onChange={(e) => setEditInventoryItem({ ...editInventoryItem, quantity: parseInt(e.target.value) || 1 })}
+                    placeholder="Quantity"
+                    className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    value={editInventoryItem.type || ''}
+                    onChange={(e) => setEditInventoryItem({ ...editInventoryItem, type: e.target.value })}
+                    placeholder="Type"
+                    className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                </div>
+                <textarea
+                  value={editInventoryItem.description || ''}
+                  onChange={(e) => setEditInventoryItem({ ...editInventoryItem, description: e.target.value })}
+                  placeholder="Description"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  rows={3}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => saveEditInventoryItem(index)}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={cancelEditInventoryItem}
+                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div
+              key={index}
+              draggable
+              onDragStart={() => handleInventoryDragStart(index)}
+              onDragOver={(e) => handleInventoryDragOver(e, index)}
+              onDragEnd={handleInventoryDragEnd}
+              className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
+                draggedInventoryIndex === index ? 'opacity-50' : ''
+              }`}
+            >
+              <span className="text-gray-400 select-none">⋮⋮</span>
+              <div className="flex-1">
+                <div className="font-medium text-gray-900 dark:text-white">
+                  {item.symbol} {item.name} x{item.quantity} {item.type && `(${item.type})`}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">{item.description}</div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={() => moveInventoryUp(index)}
+                  disabled={index === 0}
+                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                  title="Move up"
+                >
+                  ▲
+                </button>
+                <button
+                  onClick={() => moveInventoryDown(index)}
+                  disabled={index === localInventory.length - 1}
+                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                  title="Move down"
+                >
+                  ▼
+                </button>
+              </div>
+              <button
+                onClick={() => startEditInventoryItem(index)}
+                className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
+              >
+                ✏️
+              </button>
               <button
                 onClick={() => removeItem(index)}
-                className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
               >
                 Remove
               </button>
             </div>
-            <textarea
-              value={item.description}
-              onChange={(e) => updateItem(index, 'description', e.target.value)}
-              placeholder="Description"
-              className="mt-2 w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-              rows={2}
-            />
-          </div>
+          )
         ))}
       </div>
     </div>
@@ -482,7 +925,70 @@ function LoreEditor({
 }) {
   const [localLore, setLocalLore] = useState([...lore]);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [draggedLoreIndex, setDraggedLoreIndex] = useState<number | null>(null);
+  const [editingLoreIndex, setEditingLoreIndex] = useState<number | null>(null);
+  const [editLore, setEditLore] = useState<Partial<StoryLore>>({});
   const { addNotification } = useNotification();
+
+  // Drag-and-drop handlers for lore
+  const handleLoreDragStart = (index: number) => {
+    setDraggedLoreIndex(index);
+  };
+
+  const handleLoreDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedLoreIndex === null || draggedLoreIndex === index) return;
+    
+    const items = [...localLore];
+    const draggedItem = items[draggedLoreIndex];
+    items.splice(draggedLoreIndex, 1);
+    items.splice(index, 0, draggedItem);
+    
+    setLocalLore(items);
+    setDraggedLoreIndex(index);
+    onUpdate(items);
+  };
+
+  const handleLoreDragEnd = () => {
+    setDraggedLoreIndex(null);
+  };
+
+  // Arrow button handlers for lore
+  const moveLoreUp = (index: number) => {
+    if (index === 0) return;
+    const items = [...localLore];
+    [items[index - 1], items[index]] = [items[index], items[index - 1]];
+    setLocalLore(items);
+    onUpdate(items);
+  };
+
+  const moveLoreDown = (index: number) => {
+    if (index === localLore.length - 1) return;
+    const items = [...localLore];
+    [items[index], items[index + 1]] = [items[index + 1], items[index]];
+    setLocalLore(items);
+    onUpdate(items);
+  };
+
+  // Edit mode handlers for lore
+  const startEditLore = (index: number) => {
+    setEditingLoreIndex(index);
+    setEditLore({ ...localLore[index] });
+  };
+
+  const cancelEditLore = () => {
+    setEditingLoreIndex(null);
+    setEditLore({});
+  };
+
+  const saveEditLore = (index: number) => {
+    const items = [...localLore];
+    items[index] = { ...items[index], ...editLore };
+    setLocalLore(items);
+    onUpdate(items);
+    setEditingLoreIndex(null);
+    setEditLore({});
+  };
 
   const updateLore = (index: number, field: keyof StoryLore, value: any) => {
     const updated = [...localLore];
@@ -565,32 +1071,19 @@ function LoreEditor({
       </div>
       <div className="space-y-3">
         {localLore.map((loreItem, index) => (
-          <div key={index} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <input
-                type="text"
-                value={loreItem.title}
-                onChange={(e) => updateLore(index, 'title', e.target.value)}
-                className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white font-semibold"
-              />
-              <button
-                onClick={() => setExpandedIndex(expandedIndex === index ? null : index)}
-                className="ml-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
-              >
-                {expandedIndex === index ? 'Collapse' : 'Expand'}
-              </button>
-              <button
-                onClick={() => removeLore(index)}
-                className="ml-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
-              >
-                Remove
-              </button>
-            </div>
-            {expandedIndex === index && (
-              <div className="space-y-3 mt-3">
+          editingLoreIndex === index ? (
+            <div key={index} className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg">
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={editLore.title || ''}
+                  onChange={(e) => setEditLore({ ...editLore, title: e.target.value })}
+                  placeholder="Lore title"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white font-semibold"
+                />
                 <textarea
-                  value={loreItem.content}
-                  onChange={(e) => updateLore(index, 'content', e.target.value)}
+                  value={editLore.content || ''}
+                  onChange={(e) => setEditLore({ ...editLore, content: e.target.value })}
                   placeholder="Lore content (supports Markdown)"
                   className="w-full h-32 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
                 />
@@ -599,15 +1092,15 @@ function LoreEditor({
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Thumbnail URL (optional)</label>
                     <input
                       type="url"
-                      value={loreItem.thumbnailUrl || ""}
-                      onChange={(e) => updateLore(index, 'thumbnailUrl', e.target.value)}
+                      value={editLore.thumbnailUrl || ''}
+                      onChange={(e) => setEditLore({ ...editLore, thumbnailUrl: e.target.value })}
                       placeholder="https://..."
                       className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     />
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Shown in lore list and detail if provided (ideal ~320×180px, max 5MB).</p>
                     <div className="mt-2 flex items-center gap-2">
                       <input
-                        id={`upload-lore-thumb-${index}`}
+                        id={`upload-lore-thumb-edit-${index}`}
                         type="file"
                         accept="image/*"
                         className="hidden"
@@ -617,14 +1110,14 @@ function LoreEditor({
                         }}
                       />
                       <label
-                        htmlFor={`upload-lore-thumb-${index}`}
+                        htmlFor={`upload-lore-thumb-edit-${index}`}
                         className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer text-sm"
                       >
                         📸 Upload Thumbnail
                       </label>
-                      {loreItem.thumbnailUrl && (
+                      {editLore.thumbnailUrl && (
                         <button
-                          onClick={() => updateLore(index, 'thumbnailUrl', '')}
+                          onClick={() => setEditLore({ ...editLore, thumbnailUrl: '' })}
                           className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
                         >
                           Remove
@@ -633,10 +1126,10 @@ function LoreEditor({
                     </div>
                   </div>
                   <div className="flex items-center justify-center">
-                    {loreItem.thumbnailUrl ? (
+                    {editLore.thumbnailUrl ? (
                       <img
-                        src={loreItem.thumbnailUrl}
-                        alt={loreItem.title}
+                        src={editLore.thumbnailUrl}
+                        alt={editLore.title || ''}
                         className="w-24 h-24 object-cover rounded border border-gray-300 dark:border-gray-600"
                       />
                     ) : (
@@ -649,15 +1142,85 @@ function LoreEditor({
                 <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                   <input
                     type="checkbox"
-                    checked={loreItem.secrtet}
-                    onChange={(e) => updateLore(index, 'secrtet', e.target.checked)}
+                    checked={editLore.secrtet ?? false}
+                    onChange={(e) => setEditLore({ ...editLore, secrtet: e.target.checked })}
                     className="rounded"
                   />
                   <span>🔒 Secret Lore (hidden until discovered)</span>
                 </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => saveEditLore(index)}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={cancelEditLore}
+                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div
+              key={index}
+              draggable
+              onDragStart={() => handleLoreDragStart(index)}
+              onDragOver={(e) => handleLoreDragOver(e, index)}
+              onDragEnd={handleLoreDragEnd}
+              className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
+                draggedLoreIndex === index ? 'opacity-50' : ''
+              }`}
+            >
+              <span className="text-gray-400 select-none">⋮⋮</span>
+              <div className="flex-1">
+                <div className="font-medium text-gray-900 dark:text-white">
+                  {loreItem.secrtet && '🔒 '}{loreItem.title}
+                </div>
+                {loreItem.thumbnailUrl && (
+                  <img
+                    src={loreItem.thumbnailUrl}
+                    alt={loreItem.title}
+                    className="mt-2 w-20 h-20 object-cover rounded border border-gray-300 dark:border-gray-600"
+                  />
+                )}
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{loreItem.content}</div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={() => moveLoreUp(index)}
+                  disabled={index === 0}
+                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                  title="Move up"
+                >
+                  ▲
+                </button>
+                <button
+                  onClick={() => moveLoreDown(index)}
+                  disabled={index === localLore.length - 1}
+                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                  title="Move down"
+                >
+                  ▼
+                </button>
+              </div>
+              <button
+                onClick={() => startEditLore(index)}
+                className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
+              >
+                ✏️
+              </button>
+              <button
+                onClick={() => removeLore(index)}
+                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
+              >
+                Remove
+              </button>
+            </div>
+          )
         ))}
       </div>
     </div>

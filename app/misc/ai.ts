@@ -44,6 +44,7 @@ Example:
 
 Guidelines:
 - Always provide at least six choices.
+- Only use one of the available skills and resources, or none of them.
 - You can use items that are not in the inventory, but the player rolls at a disadvantage.
 - You can use markdown formatting for more immersive experience. But only in the story section.
 - Choices should be distinct and lead to different outcomes.
@@ -121,11 +122,14 @@ export function storyDataToString(storyData: StoryData): string {
 
   result += `## Player: ${storyData.player_name}\n`;
   result += `${storyData.player_summary}\n\n`;
-  result += `### Stats & Resources & Inventory:\n`;
+  
+  result += `## Stats:\n`;
   result += storyData.stats.map(stat => `- ${stat.name}: ${stat.value}% (${stat.description})`).join("\n") + "\n\n";
+  
+  result += `## Resources:\n`;
   result += storyData.resources.map(resource => `- ${resource.name}: ${resource.value}/${resource.maxValue} (${resource.description})`).join("\n") + "\n\n";
-  result += `- Momentum: ${storyData.momentum}/${storyData.maxMomentum} (Player agency resource for rerolls and guarantees)\n`;
-  result += `- Upgrade Points: ${storyData.points} (Earned from beats and chapters, spent in Upgrades shop)\n\n`;
+  
+  result += `## Inventory:\n`;
   result += storyData.inventory.map(item => `- ${item.name} x${item.quantity}: ${item.description}`).join("\n") + "\n\n";
   
   result += `## Plot Beats:\n`;
@@ -184,11 +188,7 @@ export function storyDataToString(storyData: StoryData): string {
   if (storyData.player_notes) {
     result += `${storyData.player_notes}\n\n`;
   }
-   const currentChapter = storyData.chapters[storyData.currentChapter];
-    if (currentChapter) {
-    result += `### Chapter ${storyData.currentChapter}\n\n`;
-    // result += `${currentChapter.summary}\n\n`;
-    }
+  
     console.log("storyDataToString result:", result);
   return result;
 
