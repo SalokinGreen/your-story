@@ -36,58 +36,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     try {
-      const res = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+      // Use Supabase client directly for sign up
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
       });
 
-      const data = await res.json();
+      if (error) {
+        return { error: error.message };
+      }
 
-      if (!res.ok) {
-        return { error: data.error || "Sign up failed" };
+      if (data.user) {
+        setUser(data.user);
       }
 
       return { error: null };
     } catch (error) {
+      console.error("Sign up error:", error);
       return { error: "Network error" };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      const res = await fetch("/api/auth/signin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+      // Use Supabase client directly for sign in
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        return { error: data.error || "Sign in failed" };
+      if (error) {
+        return { error: error.message };
       }
 
-      setUser(data.user);
+      if (data.user) {
+        setUser(data.user);
+      }
+
       return { error: null };
     } catch (error) {
+      console.error("Sign in error:", error);
       return { error: "Network error" };
     }
   };
 
   const signOut = async () => {
     try {
-      const res = await fetch("/api/auth/signout", {
-        method: "POST",
-      });
+      const { error } = await supabase.auth.signOut();
 
-      if (!res.ok) {
-        return { error: "Sign out failed" };
+      if (error) {
+        return { error: error.message };
       }
 
       setUser(null);
       return { error: null };
     } catch (error) {
+      console.error("Sign out error:", error);
       return { error: "Network error" };
     }
   };
