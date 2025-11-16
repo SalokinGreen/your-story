@@ -14,52 +14,40 @@ export interface TokenBalance {
  */
 export async function getUserTokenBalance(userId: string, supabaseClient?: any): Promise<TokenBalance | null> {
   try {
-    // Use provided client (with service role) or default client
     const client = supabaseClient || supabase;
-    
-    // Get all tokens owned by the user
-    const { data: ownerships, error } = await client
+
+    // Compute totals via aggregate counts to avoid row caps
+    const now = new Date();
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Total tokens owned
+    const { count: totalCount, error: totalError } = await client
       .from('token_ownerships')
-      .select(`
-        token_id,
-        tokens!inner (
-          minted_at
-        )
-      `)
+      .select('*', { count: 'exact', head: true })
       .eq('owner_id', userId);
 
-    if (error) {
-      console.error('Error fetching token balance:', error);
+    if (totalError) {
+      console.error('Error counting total tokens:', totalError);
       return null;
     }
 
-    if (!ownerships || ownerships.length === 0) {
-      return { total: 0, tradable: 0, locked: 0 };
+    // Tradable tokens (minted >= 1 month ago)
+    const { count: tradableCount, error: tradableError } = await client
+      .from('token_ownerships')
+      .select('token_id, tokens!inner(minted_at)', { count: 'exact', head: true })
+      .eq('owner_id', userId)
+      .lte('tokens.minted_at', oneMonthAgo);
+
+    if (tradableError) {
+      console.error('Error counting tradable tokens:', tradableError);
+      return null;
     }
 
-    const now = new Date();
-    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const total = totalCount ?? 0;
+    const tradable = tradableCount ?? 0;
+    const locked = Math.max(0, total - tradable);
 
-    let tradable = 0;
-    let locked = 0;
-
-    for (const ownership of ownerships) {
-      const token = (ownership as any).tokens;
-      if (!token) continue;
-
-      const mintedAt = new Date(token.minted_at);
-      if (mintedAt <= oneMonthAgo) {
-        tradable++;
-      } else {
-        locked++;
-      }
-    }
-
-    return {
-      total: tradable + locked,
-      tradable,
-      locked
-    };
+    return { total, tradable, locked };
   } catch (error) {
     console.error('Error in getUserTokenBalance:', error);
     return null;

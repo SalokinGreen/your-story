@@ -48,9 +48,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Verify the userId matches the authenticated user
-    if (userId !== user.id) {
-      return NextResponse.json({ error: "Forbidden: Cannot access another user's stories" }, { status: 403 });
+    // If requesting public stories only, allow viewing any user's public stories
+    // Otherwise, verify the userId matches the authenticated user
+    const requestingPublicOnly = isPublic === "true";
+    if (!requestingPublicOnly && userId !== user.id) {
+      return NextResponse.json({ error: "Forbidden: Cannot access another user's private stories" }, { status: 403 });
     }
 
     let query = authenticatedSupabase
@@ -77,8 +79,6 @@ export async function GET(request: NextRequest) {
       console.error("Error fetching stories:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
-    console.log(`Fetched ${data?.length || 0} stories for user ${userId}`);
 
     return NextResponse.json({ stories: data || [] }, { status: 200 });
   } catch (error) {

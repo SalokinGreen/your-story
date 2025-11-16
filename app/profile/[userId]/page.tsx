@@ -108,9 +108,23 @@ export default function ProfilePage() {
         setProfileData(profData);
       }
 
-      // Fetch token balance
-      const tokenBalance = await getUserTokenBalance(userId);
-      setBalance(tokenBalance);
+      // Fetch token balance via API (uses service role for accuracy)
+      const balanceResponse = await fetch(`/api/tokens/balance?userId=${userId}`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      
+      console.log("Balance API response status:", balanceResponse.status);
+      
+      if (balanceResponse.ok) {
+        const { balance: tokenBalance } = await balanceResponse.json();
+        console.log("Balance fetched from API:", tokenBalance);
+        setBalance(tokenBalance);
+      } else {
+        const errorText = await balanceResponse.text();
+        console.error("Failed to fetch token balance:", balanceResponse.status, errorText);
+      }
 
       // Check if current user is admin (client-side check using auth context)
       if (currentUser) {
@@ -148,10 +162,26 @@ export default function ProfilePage() {
   const loadPublicStories = async () => {
     setLoadingStories(true);
     try {
-      const response = await fetch(`/api/stories?userId=${userId}&isPublic=true`);
+      // Get session token for authenticated request
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        console.error("No session found");
+        setLoadingStories(false);
+        return;
+      }
+
+      const response = await fetch(`/api/stories?userId=${userId}&isPublic=true`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
       if (response.ok) {
         const { stories: userStories } = await response.json();
         setPublicStories(userStories);
+      } else {
+        console.error("Error loading stories:", await response.text());
       }
     } catch (error) {
       console.error("Error loading stories:", error);

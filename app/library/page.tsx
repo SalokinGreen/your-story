@@ -93,7 +93,9 @@ export default function LibraryPage() {
         // Fetch user's stories
         const response = await authenticatedFetch(`/api/stories?userId=${user.id}`);
         
-        if (!response.ok) throw new Error("Failed to fetch stories");
+        if (!response.ok) {
+          throw new Error("Failed to fetch stories");
+        }
         
         const data = await response.json();
         setStories(data.stories || []);

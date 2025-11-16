@@ -155,8 +155,12 @@ export async function POST(req: NextRequest) {
     // Deduct tokens after successful generation
     const deductResult = await deductTokens(userId, REQUIRED_TOKENS, supabaseAdmin);
     if (!deductResult.success) {
-      console.error('Failed to deduct tokens:', deductResult.error);
+      console.error('Failed to deduct tokens after generation:', deductResult.error);
+      console.error('User ID:', userId);
+      console.error('Service role key configured:', !!supabaseServiceKey);
       // Log error but don't fail the request since generation succeeded
+    } else {
+      console.log(`Successfully deducted ${REQUIRED_TOKENS} tokens from user ${userId}`);
     }
 
     // Get updated balance
