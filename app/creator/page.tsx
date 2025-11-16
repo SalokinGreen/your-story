@@ -666,28 +666,38 @@ function AdventureCreatorContent() {
       const url = isEditing ? `/api/adventures/${editAdventureId}` : "/api/adventures";
       const method = isEditing ? "PATCH" : "POST";
 
+      const payload = {
+        title,
+        shortDescription,
+        description,
+        thumbnailUrl: thumbnailUrl || null,
+        bannerUrl: bannerUrl || null,
+        authorId: user!.id,
+        authorName: user!.user_metadata?.displayName || "Anonymous",
+        tags,
+        difficulty: difficulty.toLowerCase(),
+        visibility: visibility.toLowerCase(),
+        estimatedDuration: "1-2 hours",
+        isPublished: true,
+        isFeatured: false,
+        storyTemplate: storyData,
+      };
+
+      // Check payload size
+      const payloadSize = JSON.stringify(payload).length;
+      console.log(`Adventure payload size: ${(payloadSize / 1024).toFixed(2)} KB`);
+      
+      if (payloadSize > 4 * 1024 * 1024) {
+        addNotification("⚠️ Adventure data is very large (>4MB). Consider reducing lore entries or plot beats.", "warning");
+      }
+
       const response = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({
-          title,
-          shortDescription,
-          description,
-          thumbnailUrl: thumbnailUrl || null,
-          bannerUrl: bannerUrl || null,
-          authorId: user!.id,
-          authorName: user!.user_metadata?.displayName || "Anonymous",
-          tags,
-          difficulty: difficulty.toLowerCase(),
-          visibility: visibility.toLowerCase(),
-          estimatedDuration: "1-2 hours",
-          isPublished: true,
-          isFeatured: false,
-          storyTemplate: storyData,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
