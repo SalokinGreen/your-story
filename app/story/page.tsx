@@ -110,22 +110,16 @@ function processCommands(
       continue;
     }
 
-    // /add_achievement: achievement title
-    const achievementMatch = trimmed.match(/^\/add_achievement:\s*(.+)$/i);
+    // /trigger_achievement: achievement title
+    const achievementMatch = trimmed.match(/^\/trigger_achievement:\s*(.+)$/i);
     if (achievementMatch) {
       const achievementTitle = achievementMatch[1].trim();
 
       const existing = storyData.achievements.find(
         (a) => a.title === achievementTitle
       );
-      if (!existing) {
-        storyData.achievements.push({
-          title: achievementTitle,
-          description: "",
-          dateAchieved: new Date(),
-          points: 10,
-          symbol: "🏆",
-        });
+      if (existing && !existing.dateAchieved) {
+        existing.dateAchieved = new Date();
         addNotification(
           `🏆 Achievement Unlocked: ${achievementTitle}`,
           "success"
@@ -260,7 +254,7 @@ function StoryPageContent() {
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [loadingStory, setLoadingStory] = useState(true);
   const [started, setStarted] = useState(false);
-  const memory_cap = 5000; // Max memory size in characters
+  const memory_cap = 20000; // Max memory size in characters
   // Load story from database on mount
   useEffect(() => {
     if (!storyId) {
@@ -631,19 +625,12 @@ function StoryPageContent() {
     // Reset momentum mode after use
     setMomentumMode("none");
 
-    for (const mem of storyData.scene.parts.flatMap(
-      (p) => p.memoryEntries || []
-    )) {
-      storyData.memory.push(mem);
-    }
-
     storyData.scene.parts.push({
       content: text,
       imageUrl: "",
       user: true,
       role: "user",
       choices: [...choices.choices],
-      memoryEntries: storyData.memory,
     });
 
     setChoices({ choices: [] });
@@ -679,6 +666,7 @@ function StoryPageContent() {
       stats: storyData.stats,
       resources: storyData.resources,
       inventory: storyData.inventory,
+      achievements: storyData.achievements,
       momentum: storyData.momentum,
       maxMomentum: storyData.maxMomentum,
       points: storyData.points,
@@ -728,7 +716,54 @@ function StoryPageContent() {
       body: JSON.stringify(payload),
     })
       .then(async (res) => {
-        const data = await res.json();
+        // Check if response has content before parsing JSON
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          addNotification(
+            `❌ Invalid response from server (expected JSON)`,
+            "failure"
+          );
+          setLoading(false);
+          setChoices({
+            choices:
+              storyData.scene.parts[storyData.scene.parts.length - 1].choices ||
+              [],
+          });
+          return;
+        }
+
+        const text = await res.text();
+        if (!text || text.trim() === '') {
+          addNotification(
+            `❌ Empty response from server`,
+            "failure"
+          );
+          setLoading(false);
+          setChoices({
+            choices:
+              storyData.scene.parts[storyData.scene.parts.length - 1].choices ||
+              [],
+          });
+          return;
+        }
+
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          console.error('Failed to parse response:', text);
+          addNotification(
+            `❌ Invalid JSON response from server`,
+            "failure"
+          );
+          setLoading(false);
+          setChoices({
+            choices:
+              storyData.scene.parts[storyData.scene.parts.length - 1].choices ||
+              [],
+          });
+          return;
+        }
 
         if (res.status === 402) {
           addNotification(`❌ ${data.error}`, "failure");

@@ -10,6 +10,24 @@ export interface BuildPromptInput {
   userChoice?: string;
 }
 
+// Cleans text by removing problematic characters and normalizing whitespace
+function cleanString(text: string): string {
+  return text
+    // Remove null bytes and other control characters (except newlines and tabs)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // Normalize different types of whitespace to standard space
+    .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g, ' ')
+    // Replace multiple spaces with single space
+    .replace(/ {2,}/g, ' ')
+    // Replace more than 2 consecutive newlines with exactly 2
+    .replace(/\n{3,}/g, '\n\n')
+    // Trim spaces at start/end of lines
+    .replace(/[ \t]+$/gm, '')
+    .replace(/^[ \t]+/gm, '')
+    // Trim overall
+    .trim();
+}
+
 export function buildMessages({ storyData }: BuildPromptInput): ChatMessage[] {
   const system = `You are a helpful, creative narrative engine for a choice-driven, text-only adventure game.
 Stay in character and respond in the style of an interactive fiction game. You're the narrator and the characters.
@@ -54,15 +72,21 @@ Guidelines:
 
 Commands:
 - /modify_item: item name(amount) - Adds amount (can be negative for removal) to the quantity of an item in the player's inventory. Remove the item if quantity reaches zero.
-- /modify_stat: stat name(amount) - Adds amount (can be negative for removal) to a player's stat by the given amount.
 - /modify_resource: resource name(amount) - Modifies a player's resource by the given amount.
-- /add_achievement: achievement title - Adds an achievement to the player's profile.
-- /mark_beat: beat index - Marks a story beat as fulfilled.
+- /trigger_achievement: achievement title - Triggers/unlocks an existing achievement from the player's achievement list. Only use titles that exist in the Achievements section below.
+- /mark_beat: beat index - Marks a story beat as fulfilled. IMPORTANT: Only mark a beat as fulfilled after ALL events, objectives, and key moments described in that beat's content have been completed in the narrative. Do not mark it early.
 - /edit_beat_title: new title (index) - Edits the title of a story beat at the given index.
 - /edit_beat_content: new content (index) - Edits the content of a story beat at the given index.
 - /add_beat: title | content - Adds a new story beat with the given title and content.
 - /remove_beat: beat index - Removes a story beat at the given index.
 
+Plot Beat Guidelines:
+- Each plot beat represents a significant story milestone with multiple scenes and events.
+- The "Current Plot Beat" section shows what needs to be accomplished - read it carefully.
+- Only use /mark_beat when the player has fully experienced and completed everything described in that beat's content.
+- If a beat describes multiple events or objectives, ensure ALL of them happen before marking it complete.
+- Beats should feel substantial - don't rush through them. Let the story breathe and develop naturally.
+- After marking a beat complete, the next beat becomes current. Reference it to smoothly transition the narrative forward.
 
 Progression System:
 - Players earn upgrade points from story progression: ${UPGRADE_COSTS.BEAT_REWARD} points per completed story beat, ${UPGRADE_COSTS.CHAPTER_REWARD} points per completed chapter.
@@ -71,7 +95,7 @@ Progression System:
 - Balance story progression rewards - complete meaningful beats with /mark_beat to grant points for character growth.`
 
 const recentScene = storyData.scene.parts.at(-1)?.content ?? storyData.starting_content;
-const memory_cap = 10000; // Max memory size in characters
+const memory_cap = 20000; // Max memory size in characters
 // Remove duplicate entries from memory
 let addedItems = new Set<string>();
 const new_memory = storyData.memory.filter((item, index) => 
@@ -92,7 +116,7 @@ while (totalMemoryLength > memory_cap && storyData.memory.length > 0) {
     totalMemoryLength -= removed.length;
   }
 }
-  const info = storyDataToString(storyData)
+  const info = cleanString(storyDataToString(storyData));
   let context: ChatMessage[] = [
     { role: "system", content: system },
     { role: "user", content: info }
@@ -100,17 +124,17 @@ while (totalMemoryLength > memory_cap && storyData.memory.length > 0) {
   
   // For very first interaction
   if (storyData.scene.parts.length === 1) {
-    context.push({ role: "assistant", content: storyData.starting_content });
-    context.push({ role: "user", content: recentScene });
+    context.push({ role: "assistant", content: cleanString(storyData.starting_content) });
+    context.push({ role: "user", content: cleanString(recentScene) });
   } else {
     // For ongoing stories, only include the last 6 scene parts to avoid context overflow
     // This keeps recent context while staying under token limits
-    const MAX_RECENT_PARTS = 6;
+    const MAX_RECENT_PARTS = 12;
     const recentParts = storyData.scene.parts.slice(-MAX_RECENT_PARTS);
     
     recentParts.forEach(part => {
       const role = part.user ? "user" : "assistant";
-      context.push({ role: role, content: part.content });
+      context.push({ role: role, content: cleanString(part.content) });
     });
   }
   
@@ -131,6 +155,13 @@ export function storyDataToString(storyData: StoryData): string {
   
   result += `## Inventory:\n`;
   result += storyData.inventory.map(item => `- ${item.name} x${item.quantity}: ${item.description}`).join("\n") + "\n\n";
+  
+  if (storyData.achievements && storyData.achievements.length > 0) {
+    result += `## Achievements:\n`;
+    result += storyData.achievements.map(ach => 
+      `- ${ach.symbol} ${ach.title} (${ach.points} pts)${ach.dateAchieved ? ' ✓ UNLOCKED' : ' 🔒 LOCKED'}: ${ach.description}`
+    ).join("\n") + "\n\n";
+  }
   
   result += `## Plot Beats:\n`;
   
