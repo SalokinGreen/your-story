@@ -85,8 +85,8 @@ export interface Scene {
     parts: ScenePart[];
 }
 export interface PlotBeat {
+    title: string;
     content: string;
-    targetChapter: number;
     fulfilled?: boolean;
 } 
 export interface Choices {

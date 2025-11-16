@@ -69,7 +69,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/components/GiftTokenForm.tsx: Gift tokens form (shown on other users' profiles).
 - app/components/AdminControls.tsx: Admin-only UI for minting, removing tokens, and changing user roles.
 - app/components/EditDisplayName.tsx: Edit display name inline.
-- app/components/EditProfile.tsx: Edit profile (bio, location, website).
+- app/components/EditProfile.tsx: Edit profile (bio, location, website, avatar). Avatar uploads use unique timestamped filenames, cache-busting URLs, and proper old file deletion.
 - app/components/NotificationContainer.tsx: Toast notifications display.
 
 ### Config
@@ -108,6 +108,13 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - **Operations**: deductTokens (burn newest first), giftTokens (transfer tradable only), mintTokens (admin only).
 - **API balance**: Always use /api/tokens/balance with service role for accurate counts.
 
+### Adventure Visibility System
+
+- **Visibility levels**: Adventures have three visibility settings: 'public' (visible in explorer), 'hidden' (accessible via direct link only), 'private' (only visible to author).
+- **Database**: adventures.visibility column with CHECK constraint; RLS policy filters by visibility.
+- **API enforcement**: /api/adventures uses service role key to bypass RLS when user is viewing their own adventures; validates ownership for private adventures.
+- **Client behavior**: Library shows all user's adventures; Explorer shows only public adventures; Direct links work for hidden/public, blocked for private non-owners.
+
 ### UI Patterns
 
 - Mark client components with "use client" only when needed.
@@ -120,6 +127,8 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - app/api/story/next/route.ts accepts { storyData, userChoice? } and returns { part: ScenePart, meta: { model, usage, balance } }.
 - Requires DEEPSEEK_API_KEY in env; optional DEEPSEEK_MODEL (default: deepseek-chat).
 - Deducts tokens before generation; returns updated balance in response meta.
+- **Payload optimization**: Client trims storyData before sending to stay under Vercel's 4.5MB limit. Only sends last 6 scene parts with minimal fields (content, user, role), caps text fields, and strips heavy nested data like choices/commands from history.
+- **Creator payload**: Adventure creation logs payload size and warns if >4MB to help creators manage content size.
 
 ## Developer workflows
 

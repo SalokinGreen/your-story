@@ -682,6 +682,9 @@ function StoryMetaEditor({
   const [localAuthorNotes, setLocalAuthorNotes] = useState<string>(authorNotes || "");
   const [localMemory, setLocalMemory] = useState<string[]>([...memory]);
   const [newMemoryEntry, setNewMemoryEntry] = useState<string>("");
+  const [draggedPlotBeatIndex, setDraggedPlotBeatIndex] = useState<number | null>(null);
+  const [editingPlotBeatIndex, setEditingPlotBeatIndex] = useState<number | null>(null);
+  const [editPlotBeat, setEditPlotBeat] = useState<Partial<PlotBeat>>({});
 
   const updateBeat = (index: number, field: keyof PlotBeat, value: any) => {
     const updated = [...localPlotBeats];
@@ -691,7 +694,7 @@ function StoryMetaEditor({
   };
 
   const addBeat = () => {
-    const newBeat: PlotBeat = { content: "New plot beat", targetChapter: 1, fulfilled: false };
+    const newBeat: PlotBeat = { title: "New plot beat", content: "Description...", fulfilled: false };
     const updated = [...localPlotBeats, newBeat];
     setLocalPlotBeats(updated);
     onUpdate({ plot_beats: updated });
@@ -701,6 +704,65 @@ function StoryMetaEditor({
     const updated = localPlotBeats.filter((_, i) => i !== index);
     setLocalPlotBeats(updated);
     onUpdate({ plot_beats: updated });
+  };
+
+  const handlePlotBeatDragStart = (index: number) => {
+    setDraggedPlotBeatIndex(index);
+  };
+
+  const handlePlotBeatDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedPlotBeatIndex === null || draggedPlotBeatIndex === index) return;
+
+    const newPlotBeats = [...localPlotBeats];
+    const draggedItem = newPlotBeats[draggedPlotBeatIndex];
+    newPlotBeats.splice(draggedPlotBeatIndex, 1);
+    newPlotBeats.splice(index, 0, draggedItem);
+    
+    setLocalPlotBeats(newPlotBeats);
+    setDraggedPlotBeatIndex(index);
+    onUpdate({ plot_beats: newPlotBeats });
+  };
+
+  const handlePlotBeatDragEnd = () => {
+    setDraggedPlotBeatIndex(null);
+  };
+
+  const movePlotBeatUp = (index: number) => {
+    if (index === 0) return;
+    const newPlotBeats = [...localPlotBeats];
+    [newPlotBeats[index - 1], newPlotBeats[index]] = [newPlotBeats[index], newPlotBeats[index - 1]];
+    setLocalPlotBeats(newPlotBeats);
+    onUpdate({ plot_beats: newPlotBeats });
+  };
+
+  const movePlotBeatDown = (index: number) => {
+    if (index === localPlotBeats.length - 1) return;
+    const newPlotBeats = [...localPlotBeats];
+    [newPlotBeats[index], newPlotBeats[index + 1]] = [newPlotBeats[index + 1], newPlotBeats[index]];
+    setLocalPlotBeats(newPlotBeats);
+    onUpdate({ plot_beats: newPlotBeats });
+  };
+
+  const startEditPlotBeat = (index: number) => {
+    setEditingPlotBeatIndex(index);
+    setEditPlotBeat({ ...localPlotBeats[index] });
+  };
+
+  const cancelEditPlotBeat = () => {
+    setEditingPlotBeatIndex(null);
+    setEditPlotBeat({});
+  };
+
+  const saveEditPlotBeat = () => {
+    if (editingPlotBeatIndex !== null && editPlotBeat.title && editPlotBeat.content) {
+      const updated = [...localPlotBeats];
+      updated[editingPlotBeatIndex] = editPlotBeat as PlotBeat;
+      setLocalPlotBeats(updated);
+      onUpdate({ plot_beats: updated });
+      setEditingPlotBeatIndex(null);
+      setEditPlotBeat({});
+    }
   };
 
   return (
@@ -716,40 +778,104 @@ function StoryMetaEditor({
             + Add Beat
           </button>
         </div>
+        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">💡 Drag and drop to reorder (or use arrow buttons on mobile)</p>
         <div className="space-y-3">
           {localPlotBeats.map((beat, index) => (
-            <div key={index} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <input
-                  type="text"
-                  value={beat.content}
-                  onChange={(e) => updateBeat(index, 'content', e.target.value)}
-                  placeholder="Plot beat description"
-                  className="sm:col-span-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
-                <input
-                  type="number"
-                  value={beat.targetChapter}
-                  onChange={(e) => updateBeat(index, 'targetChapter', parseInt(e.target.value) || 1)}
-                  placeholder="Chapter"
-                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
-                <button
-                  onClick={() => removeBeat(index)}
-                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
-                >
-                  Remove
-                </button>
-              </div>
-              <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 dark:text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={beat.fulfilled || false}
-                  onChange={(e) => updateBeat(index, 'fulfilled', e.target.checked)}
-                  className="rounded"
-                />
-                <span>✓ Fulfilled</span>
-              </label>
+            <div
+              key={index}
+              draggable={editingPlotBeatIndex !== index}
+              onDragStart={() => handlePlotBeatDragStart(index)}
+              onDragOver={(e) => handlePlotBeatDragOver(e, index)}
+              onDragEnd={handlePlotBeatDragEnd}
+              className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-opacity ${
+                editingPlotBeatIndex === index ? '' : 'cursor-move'
+              } ${draggedPlotBeatIndex === index ? 'opacity-50' : 'opacity-100'}`}
+            >
+              {editingPlotBeatIndex === index ? (
+                // Edit mode
+                <div className="space-y-3">
+                  <h5 className="text-sm font-bold text-gray-900 dark:text-white">✏️ Editing Plot Beat</h5>
+                  <input
+                    type="text"
+                    value={editPlotBeat.title || ""}
+                    onChange={(e) => setEditPlotBeat({ ...editPlotBeat, title: e.target.value })}
+                    placeholder="Title"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                  <textarea
+                    value={editPlotBeat.content || ""}
+                    onChange={(e) => setEditPlotBeat({ ...editPlotBeat, content: e.target.value })}
+                    placeholder="Content"
+                    rows={3}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={saveEditPlotBeat}
+                      disabled={!editPlotBeat.title || !editPlotBeat.content}
+                      className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded"
+                    >
+                      ✓ Save
+                    </button>
+                    <button
+                      onClick={cancelEditPlotBeat}
+                      className="flex-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // View mode
+                <div className="flex items-start gap-3">
+                  <div className="text-xl cursor-grab active:cursor-grabbing select-none pt-1">⋮⋮</div>
+                  <div className="flex-1">
+                    <div className="font-bold text-gray-900 dark:text-white mb-1">{beat.title}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">{beat.content}</div>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={beat.fulfilled || false}
+                        onChange={(e) => updateBeat(index, 'fulfilled', e.target.checked)}
+                        className="rounded"
+                      />
+                      <span>✓ Fulfilled</span>
+                    </label>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => movePlotBeatUp(index)}
+                        disabled={index === 0}
+                        className="px-2 py-1 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs"
+                        title="Move up"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        onClick={() => movePlotBeatDown(index)}
+                        disabled={index === localPlotBeats.length - 1}
+                        className="px-2 py-1 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs"
+                        title="Move down"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => startEditPlotBeat(index)}
+                      className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs"
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button
+                      onClick={() => removeBeat(index)}
+                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

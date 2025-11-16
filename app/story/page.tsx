@@ -171,30 +171,42 @@ function processCommands(
       continue;
     }
 
-    // /edit_beat: edited text (index)
-    const editBeatMatch = trimmed.match(/^\/edit_beat:\s*(.+?)\((\d+)\)$/i);
-    if (editBeatMatch) {
-      const beatText = editBeatMatch[1].trim();
-      const beatIndex = parseInt(editBeatMatch[2], 10);
+    // /edit_beat_title: new title (index)
+    const editBeatTitleMatch = trimmed.match(/^\/edit_beat_title:\s*(.+?)\((\d+)\)$/i);
+    if (editBeatTitleMatch) {
+      const newTitle = editBeatTitleMatch[1].trim();
+      const beatIndex = parseInt(editBeatTitleMatch[2], 10);
       if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
-        storyData.plot_beats[beatIndex].content = beatText;
-        addNotification(`📖 Story beat ${beatIndex + 1} updated`, "info");
+        storyData.plot_beats[beatIndex].title = newTitle;
+        addNotification(`📖 Story beat ${beatIndex + 1} title updated`, "info");
       }
       continue;
     }
 
-    // /add_beat: beat text (targetChapter)
-    const addBeatMatch = trimmed.match(/^\/add_beat:\s*(.+?)\((\d+)\)$/i);
+    // /edit_beat_content: new content (index)
+    const editBeatContentMatch = trimmed.match(/^\/edit_beat_content:\s*(.+?)\((\d+)\)$/i);
+    if (editBeatContentMatch) {
+      const newContent = editBeatContentMatch[1].trim();
+      const beatIndex = parseInt(editBeatContentMatch[2], 10);
+      if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
+        storyData.plot_beats[beatIndex].content = newContent;
+        addNotification(`📖 Story beat ${beatIndex + 1} content updated`, "info");
+      }
+      continue;
+    }
+
+    // /add_beat: title | content
+    const addBeatMatch = trimmed.match(/^\/add_beat:\s*(.+?)\|(.+)$/i);
     if (addBeatMatch) {
-      const beatText = addBeatMatch[1].trim();
-      const targetChapter = parseInt(addBeatMatch[2], 10);
+      const title = addBeatMatch[1].trim();
+      const content = addBeatMatch[2].trim();
       storyData.plot_beats.push({
-        content: beatText,
-        targetChapter: targetChapter,
+        title: title,
+        content: content,
         fulfilled: false,
       });
       addNotification(
-        `📖 New story beat added for Chapter ${targetChapter}`,
+        `📖 New story beat added: ${title}`,
         "success"
       );
       continue;
@@ -672,9 +684,9 @@ function StoryPageContent() {
       points: storyData.points,
       // Trimmed narrative context
       plot_beats: storyData.plot_beats.map(beat => ({
+        title: beat.title.substring(0, 100),
         content: beat.content.substring(0, 300),
         fulfilled: beat.fulfilled,
-        targetChapter: beat.targetChapter,
       })),
       memory: storyData.memory.slice(-20).map(m => m.substring(0, 300)),
       lore: storyData.lore.slice(0, 15).map(l => ({

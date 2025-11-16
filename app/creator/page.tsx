@@ -178,6 +178,9 @@ function AdventureCreatorContent() {
     description: "",
     symbol: "⭐",
   });
+  const [draggedStatIndex, setDraggedStatIndex] = useState<number | null>(null);
+  const [editingStatIndex, setEditingStatIndex] = useState<number | null>(null);
+  const [editStat, setEditStat] = useState<Partial<Stat>>({});
 
   // Resources
   const [resources, setResources] = useState<Resource[]>([]);
@@ -188,6 +191,9 @@ function AdventureCreatorContent() {
     description: "",
     symbol: "💎",
   });
+  const [draggedResourceIndex, setDraggedResourceIndex] = useState<number | null>(null);
+  const [editingResourceIndex, setEditingResourceIndex] = useState<number | null>(null);
+  const [editResource, setEditResource] = useState<Partial<Resource>>({});
 
   // Starting Inventory
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -198,14 +204,20 @@ function AdventureCreatorContent() {
     type: "misc",
     symbol: "📦",
   });
+  const [draggedInventoryIndex, setDraggedInventoryIndex] = useState<number | null>(null);
+  const [editingInventoryIndex, setEditingInventoryIndex] = useState<number | null>(null);
+  const [editInventoryItem, setEditInventoryItem] = useState<Partial<InventoryItem>>({});
 
   // Plot Beats
   const [plotBeats, setPlotBeats] = useState<PlotBeat[]>([]);
   const [newPlotBeat, setNewPlotBeat] = useState<Partial<PlotBeat>>({
+    title: "",
     content: "",
-    targetChapter: 0,
     fulfilled: false,
   });
+  const [draggedPlotBeatIndex, setDraggedPlotBeatIndex] = useState<number | null>(null);
+  const [editingPlotBeatIndex, setEditingPlotBeatIndex] = useState<number | null>(null);
+  const [editPlotBeat, setEditPlotBeat] = useState<Partial<PlotBeat>>({});
 
   // Lore
   const [lore, setLore] = useState<StoryLore[]>([]);
@@ -221,6 +233,12 @@ function AdventureCreatorContent() {
   const [newLoreCharacter, setNewLoreCharacter] = useState("");
   const [newLoreLocation, setNewLoreLocation] = useState("");
   const [newLoreKey, setNewLoreKey] = useState("");
+  const [draggedLoreIndex, setDraggedLoreIndex] = useState<number | null>(null);
+  const [editingLoreIndex, setEditingLoreIndex] = useState<number | null>(null);
+  const [editLore, setEditLore] = useState<Partial<StoryLore>>({});
+  const [editLoreCharacter, setEditLoreCharacter] = useState("");
+  const [editLoreLocation, setEditLoreLocation] = useState("");
+  const [editLoreKey, setEditLoreKey] = useState("");
 
   // Achievements
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -230,6 +248,9 @@ function AdventureCreatorContent() {
     points: 10,
     symbol: "🏆",
   });
+  const [draggedAchievementIndex, setDraggedAchievementIndex] = useState<number | null>(null);
+  const [editingAchievementIndex, setEditingAchievementIndex] = useState<number | null>(null);
+  const [editAchievement, setEditAchievement] = useState<Partial<Achievement>>({});
 
   // Local draft persistence (separate keys for new vs edit mode)
   const draftKey = editAdventureId
@@ -498,14 +519,329 @@ function AdventureCreatorContent() {
   };
 
   const addPlotBeat = () => {
-    if (newPlotBeat.content) {
+    if (newPlotBeat.title && newPlotBeat.content) {
       setPlotBeats([...plotBeats, newPlotBeat as PlotBeat]);
-      setNewPlotBeat({ content: "", targetChapter: 0, fulfilled: false });
+      setNewPlotBeat({ title: "", content: "", fulfilled: false });
     }
   };
 
   const removePlotBeat = (index: number) => {
     setPlotBeats(plotBeats.filter((_, i) => i !== index));
+  };
+
+  const handlePlotBeatDragStart = (index: number) => {
+    setDraggedPlotBeatIndex(index);
+  };
+
+  const handlePlotBeatDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedPlotBeatIndex === null || draggedPlotBeatIndex === index) return;
+
+    const newPlotBeats = [...plotBeats];
+    const draggedItem = newPlotBeats[draggedPlotBeatIndex];
+    newPlotBeats.splice(draggedPlotBeatIndex, 1);
+    newPlotBeats.splice(index, 0, draggedItem);
+    
+    setPlotBeats(newPlotBeats);
+    setDraggedPlotBeatIndex(index);
+  };
+
+  const handlePlotBeatDragEnd = () => {
+    setDraggedPlotBeatIndex(null);
+  };
+
+  const movePlotBeatUp = (index: number) => {
+    if (index === 0) return;
+    const newPlotBeats = [...plotBeats];
+    [newPlotBeats[index - 1], newPlotBeats[index]] = [newPlotBeats[index], newPlotBeats[index - 1]];
+    setPlotBeats(newPlotBeats);
+  };
+
+  const movePlotBeatDown = (index: number) => {
+    if (index === plotBeats.length - 1) return;
+    const newPlotBeats = [...plotBeats];
+    [newPlotBeats[index], newPlotBeats[index + 1]] = [newPlotBeats[index + 1], newPlotBeats[index]];
+    setPlotBeats(newPlotBeats);
+  };
+
+  const startEditPlotBeat = (index: number) => {
+    setEditingPlotBeatIndex(index);
+    setEditPlotBeat({ ...plotBeats[index] });
+  };
+
+  const cancelEditPlotBeat = () => {
+    setEditingPlotBeatIndex(null);
+    setEditPlotBeat({});
+  };
+
+  const saveEditPlotBeat = () => {
+    if (editingPlotBeatIndex !== null && editPlotBeat.title && editPlotBeat.content) {
+      const updated = [...plotBeats];
+      updated[editingPlotBeatIndex] = editPlotBeat as PlotBeat;
+      setPlotBeats(updated);
+      setEditingPlotBeatIndex(null);
+      setEditPlotBeat({});
+    }
+  };
+
+  // Stat drag-and-drop and edit functions
+  const handleStatDragStart = (index: number) => {
+    setDraggedStatIndex(index);
+  };
+
+  const handleStatDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedStatIndex === null || draggedStatIndex === index) return;
+
+    const newStats = [...stats];
+    const draggedItem = newStats[draggedStatIndex];
+    newStats.splice(draggedStatIndex, 1);
+    newStats.splice(index, 0, draggedItem);
+    
+    setStats(newStats);
+    setDraggedStatIndex(index);
+  };
+
+  const handleStatDragEnd = () => {
+    setDraggedStatIndex(null);
+  };
+
+  const moveStatUp = (index: number) => {
+    if (index === 0) return;
+    const newStats = [...stats];
+    [newStats[index - 1], newStats[index]] = [newStats[index], newStats[index - 1]];
+    setStats(newStats);
+  };
+
+  const moveStatDown = (index: number) => {
+    if (index === stats.length - 1) return;
+    const newStats = [...stats];
+    [newStats[index], newStats[index + 1]] = [newStats[index + 1], newStats[index]];
+    setStats(newStats);
+  };
+
+  const startEditStat = (index: number) => {
+    setEditingStatIndex(index);
+    setEditStat({ ...stats[index] });
+  };
+
+  const cancelEditStat = () => {
+    setEditingStatIndex(null);
+    setEditStat({});
+  };
+
+  const saveEditStat = () => {
+    if (editingStatIndex !== null && editStat.name && editStat.description) {
+      const updated = [...stats];
+      updated[editingStatIndex] = editStat as Stat;
+      setStats(updated);
+      setEditingStatIndex(null);
+      setEditStat({});
+    }
+  };
+
+  // Resource drag-and-drop and edit functions
+  const handleResourceDragStart = (index: number) => {
+    setDraggedResourceIndex(index);
+  };
+
+  const handleResourceDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedResourceIndex === null || draggedResourceIndex === index) return;
+
+    const newResources = [...resources];
+    const draggedItem = newResources[draggedResourceIndex];
+    newResources.splice(draggedResourceIndex, 1);
+    newResources.splice(index, 0, draggedItem);
+    
+    setResources(newResources);
+    setDraggedResourceIndex(index);
+  };
+
+  const handleResourceDragEnd = () => {
+    setDraggedResourceIndex(null);
+  };
+
+  const moveResourceUp = (index: number) => {
+    if (index === 0) return;
+    const newResources = [...resources];
+    [newResources[index - 1], newResources[index]] = [newResources[index], newResources[index - 1]];
+    setResources(newResources);
+  };
+
+  const moveResourceDown = (index: number) => {
+    if (index === resources.length - 1) return;
+    const newResources = [...resources];
+    [newResources[index], newResources[index + 1]] = [newResources[index + 1], newResources[index]];
+    setResources(newResources);
+  };
+
+  const startEditResource = (index: number) => {
+    setEditingResourceIndex(index);
+    setEditResource({ ...resources[index] });
+  };
+
+  const cancelEditResource = () => {
+    setEditingResourceIndex(null);
+    setEditResource({});
+  };
+
+  const saveEditResource = () => {
+    if (editingResourceIndex !== null && editResource.name && editResource.description) {
+      const updated = [...resources];
+      updated[editingResourceIndex] = editResource as Resource;
+      setResources(updated);
+      setEditingResourceIndex(null);
+      setEditResource({});
+    }
+  };
+
+  // Inventory drag-and-drop and edit functions
+  const handleInventoryDragStart = (index: number) => {
+    setDraggedInventoryIndex(index);
+  };
+
+  const handleInventoryDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedInventoryIndex === null || draggedInventoryIndex === index) return;
+
+    const newInventory = [...inventory];
+    const draggedItem = newInventory[draggedInventoryIndex];
+    newInventory.splice(draggedInventoryIndex, 1);
+    newInventory.splice(index, 0, draggedItem);
+    
+    setInventory(newInventory);
+    setDraggedInventoryIndex(index);
+  };
+
+  const handleInventoryDragEnd = () => {
+    setDraggedInventoryIndex(null);
+  };
+
+  const moveInventoryUp = (index: number) => {
+    if (index === 0) return;
+    const newInventory = [...inventory];
+    [newInventory[index - 1], newInventory[index]] = [newInventory[index], newInventory[index - 1]];
+    setInventory(newInventory);
+  };
+
+  const moveInventoryDown = (index: number) => {
+    if (index === inventory.length - 1) return;
+    const newInventory = [...inventory];
+    [newInventory[index], newInventory[index + 1]] = [newInventory[index + 1], newInventory[index]];
+    setInventory(newInventory);
+  };
+
+  const startEditInventoryItem = (index: number) => {
+    setEditingInventoryIndex(index);
+    setEditInventoryItem({ ...inventory[index] });
+  };
+
+  const cancelEditInventoryItem = () => {
+    setEditingInventoryIndex(null);
+    setEditInventoryItem({});
+  };
+
+  const saveEditInventoryItem = () => {
+    if (editingInventoryIndex !== null && editInventoryItem.name) {
+      const updated = [...inventory];
+      updated[editingInventoryIndex] = editInventoryItem as InventoryItem;
+      setInventory(updated);
+      setEditingInventoryIndex(null);
+      setEditInventoryItem({});
+    }
+  };
+
+  // Lore drag-and-drop functions (edit already exists)
+  const handleLoreDragStart = (index: number) => {
+    setDraggedLoreIndex(index);
+  };
+
+  const handleLoreDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedLoreIndex === null || draggedLoreIndex === index) return;
+
+    const newLore = [...lore];
+    const draggedItem = newLore[draggedLoreIndex];
+    newLore.splice(draggedLoreIndex, 1);
+    newLore.splice(index, 0, draggedItem);
+    
+    setLore(newLore);
+    setDraggedLoreIndex(index);
+  };
+
+  const handleLoreDragEnd = () => {
+    setDraggedLoreIndex(null);
+  };
+
+  const moveLoreUp = (index: number) => {
+    if (index === 0) return;
+    const newLore = [...lore];
+    [newLore[index - 1], newLore[index]] = [newLore[index], newLore[index - 1]];
+    setLore(newLore);
+  };
+
+  const moveLoreDown = (index: number) => {
+    if (index === lore.length - 1) return;
+    const newLore = [...lore];
+    [newLore[index], newLore[index + 1]] = [newLore[index + 1], newLore[index]];
+    setLore(newLore);
+  };
+
+  // Achievement drag-and-drop and edit functions
+  const handleAchievementDragStart = (index: number) => {
+    setDraggedAchievementIndex(index);
+  };
+
+  const handleAchievementDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedAchievementIndex === null || draggedAchievementIndex === index) return;
+
+    const newAchievements = [...achievements];
+    const draggedItem = newAchievements[draggedAchievementIndex];
+    newAchievements.splice(draggedAchievementIndex, 1);
+    newAchievements.splice(index, 0, draggedItem);
+    
+    setAchievements(newAchievements);
+    setDraggedAchievementIndex(index);
+  };
+
+  const handleAchievementDragEnd = () => {
+    setDraggedAchievementIndex(null);
+  };
+
+  const moveAchievementUp = (index: number) => {
+    if (index === 0) return;
+    const newAchievements = [...achievements];
+    [newAchievements[index - 1], newAchievements[index]] = [newAchievements[index], newAchievements[index - 1]];
+    setAchievements(newAchievements);
+  };
+
+  const moveAchievementDown = (index: number) => {
+    if (index === achievements.length - 1) return;
+    const newAchievements = [...achievements];
+    [newAchievements[index], newAchievements[index + 1]] = [newAchievements[index + 1], newAchievements[index]];
+    setAchievements(newAchievements);
+  };
+
+  const startEditAchievement = (index: number) => {
+    setEditingAchievementIndex(index);
+    setEditAchievement({ ...achievements[index] });
+  };
+
+  const cancelEditAchievement = () => {
+    setEditingAchievementIndex(null);
+    setEditAchievement({});
+  };
+
+  const saveEditAchievement = () => {
+    if (editingAchievementIndex !== null && editAchievement.title && editAchievement.description) {
+      const updated = [...achievements];
+      updated[editingAchievementIndex] = editAchievement as Achievement;
+      setAchievements(updated);
+      setEditingAchievementIndex(null);
+      setEditAchievement({});
+    }
   };
 
   const addLoreCharacter = () => {
@@ -555,6 +891,59 @@ function AdventureCreatorContent() {
 
   const removeLore = (index: number) => {
     setLore(lore.filter((_, i) => i !== index));
+  };
+
+  const startEditLore = (index: number) => {
+    setEditingLoreIndex(index);
+    setEditLore({ ...lore[index] });
+    setEditLoreCharacter("");
+    setEditLoreLocation("");
+    setEditLoreKey("");
+  };
+
+  const cancelEditLore = () => {
+    setEditingLoreIndex(null);
+    setEditLore({});
+  };
+
+  const saveEditLore = () => {
+    if (editingLoreIndex !== null && editLore.title && editLore.content) {
+      const updated = [...lore];
+      updated[editingLoreIndex] = editLore as StoryLore;
+      setLore(updated);
+      setEditingLoreIndex(null);
+      setEditLore({});
+    }
+  };
+
+  const addEditLoreCharacter = () => {
+    if (editLoreCharacter.trim() && !editLore.relatedCharacters?.includes(editLoreCharacter.trim())) {
+      setEditLore({
+        ...editLore,
+        relatedCharacters: [...(editLore.relatedCharacters || []), editLoreCharacter.trim()],
+      });
+      setEditLoreCharacter("");
+    }
+  };
+
+  const addEditLoreLocation = () => {
+    if (editLoreLocation.trim() && !editLore.relatedLocations?.includes(editLoreLocation.trim())) {
+      setEditLore({
+        ...editLore,
+        relatedLocations: [...(editLore.relatedLocations || []), editLoreLocation.trim()],
+      });
+      setEditLoreLocation("");
+    }
+  };
+
+  const addEditLoreKey = () => {
+    if (editLoreKey.trim() && !editLore.keys?.includes(editLoreKey.trim())) {
+      setEditLore({
+        ...editLore,
+        keys: [...(editLore.keys || []), editLoreKey.trim()],
+      });
+      setEditLoreKey("");
+    }
   };
 
   const addAchievement = () => {
@@ -673,7 +1062,6 @@ function AdventureCreatorContent() {
         thumbnailUrl: thumbnailUrl || null,
         bannerUrl: bannerUrl || null,
         authorId: user!.id,
-        authorName: user!.user_metadata?.displayName || "Anonymous",
         tags,
         difficulty: difficulty.toLowerCase(),
         visibility: visibility.toLowerCase(),
@@ -1027,20 +1415,6 @@ function AdventureCreatorContent() {
 
             <div>
               <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
-                Max Chapters
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={maxChapters}
-                onChange={(e) => setMaxChapters(parseInt(e.target.value) || 8)}
-                className="w-full sm:w-48 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
                 Author Notes (Optional)
               </label>
               <textarea
@@ -1054,7 +1428,7 @@ function AdventureCreatorContent() {
 
             <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Story Points let players upgrade their character. Momentum builds up from dramatic moments and choices. Chapter completion rewards 50 points, plot beat completion rewards 25 points.
+                💡 <strong>Tip:</strong> Story Points let players upgrade their character. Momentum builds up from dramatic moments and choices. Plot beat completion rewards points.
               </p>
             </div>
 
@@ -1185,20 +1559,118 @@ function AdventureCreatorContent() {
                 <p className="text-gray-600 dark:text-gray-400 text-sm">No stats added yet</p>
               ) : (
                 stats.map((stat, index) => (
-                  <div key={index} className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <span className="text-2xl">{stat.symbol}</span>
-                    <div className="flex-1">
-                      <div className="font-bold text-gray-900 dark:text-white">{stat.name}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">{stat.description}</div>
-                      <div className="text-sm text-blue-600 dark:text-blue-400 font-semibold">Value: {stat.value}</div>
+                  editingStatIndex === index ? (
+                    // Edit mode
+                    <div key={index} className="p-4 bg-blue-100 dark:bg-blue-900/40 rounded-lg border-2 border-blue-400 dark:border-blue-600">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Name *</label>
+                          <input
+                            type="text"
+                            value={editStat.name || ""}
+                            onChange={(e) => setEditStat({ ...editStat, name: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Symbol</label>
+                          <input
+                            type="text"
+                            value={editStat.symbol || ""}
+                            onChange={(e) => setEditStat({ ...editStat, symbol: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            maxLength={4}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Value (0-100)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={editStat.value || 0}
+                            onChange={(e) => setEditStat({ ...editStat, value: parseInt(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Description *</label>
+                          <input
+                            type="text"
+                            value={editStat.description || ""}
+                            onChange={(e) => setEditStat({ ...editStat, description: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveEditStat}
+                          disabled={!editStat.name || !editStat.description}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          💾 Save
+                        </button>
+                        <button
+                          onClick={cancelEditStat}
+                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => removeStat(index)}
-                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                  ) : (
+                    // View mode with drag-and-drop
+                    <div
+                      key={index}
+                      draggable
+                      onDragStart={() => handleStatDragStart(index)}
+                      onDragOver={(e) => handleStatDragOver(e, index)}
+                      onDragEnd={handleStatDragEnd}
+                      className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 cursor-move hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                      style={{ opacity: draggedStatIndex === index ? 0.5 : 1 }}
                     >
-                      Remove
-                    </button>
-                  </div>
+                      <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
+                        ⋮⋮
+                      </div>
+                      <span className="text-2xl">{stat.symbol}</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-gray-900 dark:text-white">{stat.name}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">{stat.description}</div>
+                        <div className="text-sm text-blue-600 dark:text-blue-400 font-semibold">Value: {stat.value}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => moveStatUp(index)}
+                          disabled={index === 0}
+                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                          title="Move up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          onClick={() => moveStatDown(index)}
+                          disabled={index === stats.length - 1}
+                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                          title="Move down"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          onClick={() => startEditStat(index)}
+                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={() => removeStat(index)}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )
                 ))
               )}
             </div>
@@ -1294,22 +1766,129 @@ function AdventureCreatorContent() {
                 <p className="text-gray-600 dark:text-gray-400 text-sm">No resources added yet</p>
               ) : (
                 resources.map((resource, index) => (
-                  <div key={index} className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                    <span className="text-2xl">{resource.symbol}</span>
-                    <div className="flex-1">
-                      <div className="font-bold text-gray-900 dark:text-white">{resource.name}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">{resource.description}</div>
-                      <div className="text-sm text-green-600 dark:text-green-400 font-semibold">
-                        {resource.value}/{resource.maxValue}
+                  editingResourceIndex === index ? (
+                    // Edit mode
+                    <div key={index} className="p-4 bg-green-100 dark:bg-green-900/40 rounded-lg border-2 border-green-400 dark:border-green-600">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Name *</label>
+                          <input
+                            type="text"
+                            value={editResource.name || ""}
+                            onChange={(e) => setEditResource({ ...editResource, name: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Symbol</label>
+                          <input
+                            type="text"
+                            value={editResource.symbol || ""}
+                            onChange={(e) => setEditResource({ ...editResource, symbol: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            maxLength={4}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Starting Value</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editResource.value || 0}
+                            onChange={(e) => setEditResource({ ...editResource, value: parseInt(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Max Value</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editResource.maxValue || 1}
+                            onChange={(e) => setEditResource({ ...editResource, maxValue: parseInt(e.target.value) || 1 })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Description *</label>
+                          <input
+                            type="text"
+                            value={editResource.description || ""}
+                            onChange={(e) => setEditResource({ ...editResource, description: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveEditResource}
+                          disabled={!editResource.name || !editResource.description}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          💾 Save
+                        </button>
+                        <button
+                          onClick={cancelEditResource}
+                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          Cancel
+                        </button>
                       </div>
                     </div>
-                    <button
-                      onClick={() => removeResource(index)}
-                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                  ) : (
+                    // View mode with drag-and-drop
+                    <div
+                      key={index}
+                      draggable
+                      onDragStart={() => handleResourceDragStart(index)}
+                      onDragOver={(e) => handleResourceDragOver(e, index)}
+                      onDragEnd={handleResourceDragEnd}
+                      className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800 cursor-move hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                      style={{ opacity: draggedResourceIndex === index ? 0.5 : 1 }}
                     >
-                      Remove
-                    </button>
-                  </div>
+                      <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
+                        ⋮⋮
+                      </div>
+                      <span className="text-2xl">{resource.symbol}</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-gray-900 dark:text-white">{resource.name}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">{resource.description}</div>
+                        <div className="text-sm text-green-600 dark:text-green-400 font-semibold">
+                          {resource.value}/{resource.maxValue}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => moveResourceUp(index)}
+                          disabled={index === 0}
+                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                          title="Move up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          onClick={() => moveResourceDown(index)}
+                          disabled={index === resources.length - 1}
+                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                          title="Move down"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          onClick={() => startEditResource(index)}
+                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={() => removeResource(index)}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )
                 ))
               )}
             </div>
@@ -1409,22 +1988,132 @@ function AdventureCreatorContent() {
                 <p className="text-gray-600 dark:text-gray-400 text-sm">No items added yet</p>
               ) : (
                 inventory.map((item, index) => (
-                  <div key={index} className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                    <span className="text-2xl">{item.symbol}</span>
-                    <div className="flex-1">
-                      <div className="font-bold text-gray-900 dark:text-white">{item.name} ×{item.quantity}</div>
-                      {item.description && (
-                        <div className="text-sm text-gray-600 dark:text-gray-400">{item.description}</div>
-                      )}
-                      <div className="text-xs text-purple-600 dark:text-purple-400">{item.type}</div>
+                  editingInventoryIndex === index ? (
+                    // Edit mode
+                    <div key={index} className="p-4 bg-purple-100 dark:bg-purple-900/40 rounded-lg border-2 border-purple-400 dark:border-purple-600">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Name *</label>
+                          <input
+                            type="text"
+                            value={editInventoryItem.name || ""}
+                            onChange={(e) => setEditInventoryItem({ ...editInventoryItem, name: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Symbol</label>
+                          <input
+                            type="text"
+                            value={editInventoryItem.symbol || ""}
+                            onChange={(e) => setEditInventoryItem({ ...editInventoryItem, symbol: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            maxLength={4}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Quantity</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editInventoryItem.quantity || 1}
+                            onChange={(e) => setEditInventoryItem({ ...editInventoryItem, quantity: parseInt(e.target.value) || 1 })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Type</label>
+                          <select
+                            value={editInventoryItem.type || "misc"}
+                            onChange={(e) => setEditInventoryItem({ ...editInventoryItem, type: e.target.value as any })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          >
+                            <option value="weapon">Weapon</option>
+                            <option value="armor">Armor</option>
+                            <option value="consumable">Consumable</option>
+                            <option value="misc">Misc</option>
+                          </select>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                          <input
+                            type="text"
+                            value={editInventoryItem.description || ""}
+                            onChange={(e) => setEditInventoryItem({ ...editInventoryItem, description: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveEditInventoryItem}
+                          disabled={!editInventoryItem.name}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          💾 Save
+                        </button>
+                        <button
+                          onClick={cancelEditInventoryItem}
+                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => removeInventoryItem(index)}
-                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                  ) : (
+                    // View mode with drag-and-drop
+                    <div
+                      key={index}
+                      draggable
+                      onDragStart={() => handleInventoryDragStart(index)}
+                      onDragOver={(e) => handleInventoryDragOver(e, index)}
+                      onDragEnd={handleInventoryDragEnd}
+                      className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800 cursor-move hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                      style={{ opacity: draggedInventoryIndex === index ? 0.5 : 1 }}
                     >
-                      Remove
-                    </button>
-                  </div>
+                      <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
+                        ⋮⋮
+                      </div>
+                      <span className="text-2xl">{item.symbol}</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-gray-900 dark:text-white">{item.name} ×{item.quantity}</div>
+                        {item.description && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400">{item.description}</div>
+                        )}
+                        <div className="text-xs text-purple-600 dark:text-purple-400">{item.type}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => moveInventoryUp(index)}
+                          disabled={index === 0}
+                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                          title="Move up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          onClick={() => moveInventoryDown(index)}
+                          disabled={index === inventory.length - 1}
+                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                          title="Move down"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          onClick={() => startEditInventoryItem(index)}
+                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={() => removeInventoryItem(index)}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )
                 ))
               )}
             </div>
@@ -1673,86 +2362,248 @@ function AdventureCreatorContent() {
                 <p className="text-gray-600 dark:text-gray-400 text-sm">No lore entries added yet</p>
               ) : (
                 lore.map((entry, index) => (
-                  <div key={index} className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="font-bold text-gray-900 dark:text-white">{entry.title}</div>
-                          {entry.secrtet && <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">🔒 Hidden</span>}
-                        </div>
-                        {entry.thumbnailUrl && (
-                          <img src={entry.thumbnailUrl} alt="Lore thumb" className="w-24 h-24 object-cover rounded border mb-2" />
-                        )}
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{entry.content}</div>
-                        {entry.relatedCharacters.length > 0 && (
-                          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                            <strong>Characters:</strong> {entry.relatedCharacters.join(', ')}
-                          </div>
-                        )}
-                        {entry.relatedLocations.length > 0 && (
-                          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                            <strong>Locations:</strong> {entry.relatedLocations.join(', ')}
-                          </div>
-                        )}
-                        {entry.secrtet && entry.keys.length > 0 && (
-                          <div className="text-xs text-yellow-700 dark:text-yellow-400">
-                            <strong>Triggers:</strong> {entry.keys.join(', ')}
-                          </div>
-                        )}
-                        <div className="mt-2 flex items-center gap-2">
+                  <div
+                    key={index}
+                    draggable={editingLoreIndex !== index}
+                    onDragStart={() => handleLoreDragStart(index)}
+                    onDragOver={(e) => handleLoreDragOver(e, index)}
+                    onDragEnd={handleLoreDragEnd}
+                    className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800"
+                    style={{ opacity: draggedLoreIndex === index ? 0.5 : 1, cursor: editingLoreIndex === index ? "default" : "move" }}
+                  >
+                    {editingLoreIndex === index ? (
+                      // Edit mode
+                      <div className="space-y-4">
+                        <h4 className="text-md font-bold text-indigo-900 dark:text-indigo-100">✏️ Editing Lore Entry</h4>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Title *</label>
                           <input
-                            id={`edit-lore-thumb-${index}`}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                // upload and update the specific entry
-                                if (!file.type.startsWith("image/")) { addNotification("Please select an image file", "warning"); return; }
-                                if (file.size > 5 * 1024 * 1024) { addNotification("Image must be smaller than 5MB", "warning"); return; }
-                                try {
-                                  const { data: { session } } = await supabase.auth.getSession();
-                                  if (!session) throw new Error("Not authenticated");
-                                  const ext = file.name.split('.').pop();
-                                  const fileName = `${user!.id}-${Date.now()}-lore-thumb.${ext}`;
-                                  const filePath = `lore-thumbnails/${fileName}`;
-                                  const { error: uploadError } = await supabase.storage.from("adventure-images").upload(filePath, file, { cacheControl: "3600", upsert: false });
-                                  if (uploadError) throw uploadError;
-                                  const { data } = supabase.storage.from("adventure-images").getPublicUrl(filePath);
-                                  const updated = [...lore];
-                                  updated[index] = { ...updated[index], thumbnailUrl: data.publicUrl } as StoryLore;
-                                  setLore(updated);
-                                  addNotification("Thumbnail updated!", "success");
-                                } catch (err: any) {
-                                  console.error("Upload failed:", err);
-                                  addNotification(err.message || "Upload failed", "failure");
-                                }
-                              }
-                            }}
+                            type="text"
+                            value={editLore.title || ""}
+                            onChange={(e) => setEditLore({ ...editLore, title: e.target.value })}
+                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                           />
-                          <label htmlFor={`edit-lore-thumb-${index}`} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer">Change Thumbnail</label>
-                          {entry.thumbnailUrl && (
-                            <button
-                              onClick={() => {
-                                const updated = [...lore];
-                                updated[index] = { ...updated[index], thumbnailUrl: "" } as StoryLore;
-                                setLore(updated);
-                              }}
-                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
-                            >
-                              Remove
-                            </button>
-                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Content *</label>
+                          <textarea
+                            value={editLore.content || ""}
+                            onChange={(e) => setEditLore({ ...editLore, content: e.target.value })}
+                            rows={5}
+                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`edit-lore-secret-${index}`}
+                            checked={editLore.secrtet || false}
+                            onChange={(e) => setEditLore({ ...editLore, secrtet: e.target.checked })}
+                            className="w-4 h-4 text-purple-600 rounded"
+                          />
+                          <label htmlFor={`edit-lore-secret-${index}`} className="text-sm text-gray-700 dark:text-gray-300">
+                            🔒 Hidden (only revealed when triggered by keys)
+                          </label>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Thumbnail</label>
+                          <div className="flex items-start gap-3">
+                            {editLore.thumbnailUrl ? (
+                              <div className="relative">
+                                <img src={editLore.thumbnailUrl} alt="Lore thumb" className="w-24 h-24 object-cover rounded border" />
+                                <button
+                                  onClick={() => setEditLore({ ...editLore, thumbnailUrl: "" })}
+                                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-24 h-24 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
+                                No Preview
+                              </div>
+                            )}
+                            <div>
+                              <input
+                                id={`edit-mode-lore-thumb-${index}`}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  if (!file.type.startsWith("image/")) { addNotification("Please select an image file", "warning"); return; }
+                                  if (file.size > 5 * 1024 * 1024) { addNotification("Image must be smaller than 5MB", "warning"); return; }
+                                  try {
+                                    const { data: { session } } = await supabase.auth.getSession();
+                                    if (!session) throw new Error("Not authenticated");
+                                    const ext = file.name.split('.').pop();
+                                    const fileName = `${user!.id}-${Date.now()}-lore-thumb.${ext}`;
+                                    const filePath = `lore-thumbnails/${fileName}`;
+                                    const { error: uploadError } = await supabase.storage.from("adventure-images").upload(filePath, file, { cacheControl: "3600", upsert: false });
+                                    if (uploadError) throw uploadError;
+                                    const { data } = supabase.storage.from("adventure-images").getPublicUrl(filePath);
+                                    setEditLore({ ...editLore, thumbnailUrl: data.publicUrl });
+                                    addNotification("Thumbnail uploaded!", "success");
+                                  } catch (err: any) {
+                                    console.error("Upload failed:", err);
+                                    addNotification(err.message || "Upload failed", "failure");
+                                  }
+                                }}
+                              />
+                              <label htmlFor={`edit-mode-lore-thumb-${index}`} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer inline-block text-sm">
+                                📸 Upload Thumbnail
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Related Characters</label>
+                          <div className="flex gap-2 mb-2">
+                            <input
+                              type="text"
+                              value={editLoreCharacter}
+                              onChange={(e) => setEditLoreCharacter(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addEditLoreCharacter())}
+                              placeholder="Add character name..."
+                              className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            />
+                            <button onClick={addEditLoreCharacter} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm">Add</button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {(editLore.relatedCharacters || []).map(char => (
+                              <span key={char} className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm flex items-center gap-1">
+                                {char}
+                                <button onClick={() => setEditLore({ ...editLore, relatedCharacters: (editLore.relatedCharacters || []).filter(c => c !== char) })} className="hover:text-indigo-900 dark:hover:text-indigo-100">×</button>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Related Locations</label>
+                          <div className="flex gap-2 mb-2">
+                            <input
+                              type="text"
+                              value={editLoreLocation}
+                              onChange={(e) => setEditLoreLocation(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addEditLoreLocation())}
+                              placeholder="Add location name..."
+                              className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            />
+                            <button onClick={addEditLoreLocation} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm">Add</button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {(editLore.relatedLocations || []).map(loc => (
+                              <span key={loc} className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm flex items-center gap-1">
+                                {loc}
+                                <button onClick={() => setEditLore({ ...editLore, relatedLocations: (editLore.relatedLocations || []).filter(l => l !== loc) })} className="hover:text-indigo-900 dark:hover:text-indigo-100">×</button>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        {editLore.secrtet && (
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">🔑 Trigger Keys</label>
+                            <div className="flex gap-2 mb-2">
+                              <input
+                                type="text"
+                                value={editLoreKey}
+                                onChange={(e) => setEditLoreKey(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addEditLoreKey())}
+                                placeholder="e.g., 'Dragon Defeated'"
+                                className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              />
+                              <button onClick={addEditLoreKey} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm">Add</button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(editLore.keys || []).map(key => (
+                                <span key={key} className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-sm flex items-center gap-1">
+                                  🔑 {key}
+                                  <button onClick={() => setEditLore({ ...editLore, keys: (editLore.keys || []).filter(k => k !== key) })} className="hover:text-yellow-900 dark:hover:text-yellow-100">×</button>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex gap-2 pt-2">
+                          <button
+                            onClick={saveEditLore}
+                            disabled={!editLore.title || !editLore.content}
+                            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg"
+                          >
+                            ✓ Save Changes
+                          </button>
+                          <button
+                            onClick={cancelEditLore}
+                            className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg"
+                          >
+                            Cancel
+                          </button>
                         </div>
                       </div>
-                      <button
-                        onClick={() => removeLore(index)}
-                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors ml-3"
-                      >
-                        Remove
-                      </button>
-                    </div>
+                    ) : (
+                      // View mode with drag-and-drop
+                      <div className="flex items-start justify-between">
+                        <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing mr-3 mt-1">
+                          ⋮⋮
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="font-bold text-gray-900 dark:text-white">{entry.title}</div>
+                            {entry.secrtet && <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">🔒 Hidden</span>}
+                          </div>
+                          {entry.thumbnailUrl && (
+                            <img src={entry.thumbnailUrl} alt="Lore thumb" className="w-24 h-24 object-cover rounded border mb-2" />
+                          )}
+                          <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{entry.content}</div>
+                          {entry.relatedCharacters.length > 0 && (
+                            <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                              <strong>Characters:</strong> {entry.relatedCharacters.join(', ')}
+                            </div>
+                          )}
+                          {entry.relatedLocations.length > 0 && (
+                            <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                              <strong>Locations:</strong> {entry.relatedLocations.join(', ')}
+                            </div>
+                          )}
+                          {entry.secrtet && entry.keys.length > 0 && (
+                            <div className="text-xs text-yellow-700 dark:text-yellow-400">
+                              <strong>Triggers:</strong> {entry.keys.join(', ')}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-2 ml-3">
+                          <button
+                            onClick={() => moveLoreUp(index)}
+                            disabled={index === 0}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move up"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            onClick={() => moveLoreDown(index)}
+                            disabled={index === lore.length - 1}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move down"
+                          >
+                            ▼
+                          </button>
+                          <button
+                            onClick={() => startEditLore(index)}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() => removeLore(index)}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -1837,20 +2688,117 @@ function AdventureCreatorContent() {
                 <p className="text-gray-600 dark:text-gray-400 text-sm">No achievements added yet</p>
               ) : (
                 achievements.map((achievement, index) => (
-                  <div key={index} className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                    <span className="text-2xl">{achievement.symbol}</span>
-                    <div className="flex-1">
-                      <div className="font-bold text-gray-900 dark:text-white">{achievement.title}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">{achievement.description}</div>
-                      <div className="text-sm text-amber-600 dark:text-amber-400 font-semibold">{achievement.points} points</div>
+                  editingAchievementIndex === index ? (
+                    // Edit mode
+                    <div key={index} className="p-4 bg-amber-100 dark:bg-amber-900/40 rounded-lg border-2 border-amber-400 dark:border-amber-600">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Title *</label>
+                          <input
+                            type="text"
+                            value={editAchievement.title || ""}
+                            onChange={(e) => setEditAchievement({ ...editAchievement, title: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Symbol</label>
+                          <input
+                            type="text"
+                            value={editAchievement.symbol || ""}
+                            onChange={(e) => setEditAchievement({ ...editAchievement, symbol: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            maxLength={4}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Points</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editAchievement.points || 10}
+                            onChange={(e) => setEditAchievement({ ...editAchievement, points: parseInt(e.target.value) || 10 })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Description *</label>
+                          <input
+                            type="text"
+                            value={editAchievement.description || ""}
+                            onChange={(e) => setEditAchievement({ ...editAchievement, description: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveEditAchievement}
+                          disabled={!editAchievement.title || !editAchievement.description}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          💾 Save
+                        </button>
+                        <button
+                          onClick={cancelEditAchievement}
+                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => removeAchievement(index)}
-                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                  ) : (
+                    // View mode with drag-and-drop
+                    <div
+                      key={index}
+                      draggable
+                      onDragStart={() => handleAchievementDragStart(index)}
+                      onDragOver={(e) => handleAchievementDragOver(e, index)}
+                      onDragEnd={handleAchievementDragEnd}
+                      className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800 cursor-move hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                      style={{ opacity: draggedAchievementIndex === index ? 0.5 : 1 }}
                     >
-                      Remove
-                    </button>
-                  </div>
+                      <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
+                        ⋮⋮
+                      </div>
+                      <span className="text-2xl">{achievement.symbol}</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-gray-900 dark:text-white">{achievement.title}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">{achievement.description}</div>
+                        <div className="text-sm text-amber-600 dark:text-amber-400 font-semibold">{achievement.points} points</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => moveAchievementUp(index)}
+                          disabled={index === 0}
+                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                          title="Move up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          onClick={() => moveAchievementDown(index)}
+                          disabled={index === achievements.length - 1}
+                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                          title="Move down"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          onClick={() => startEditAchievement(index)}
+                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={() => removeAchievement(index)}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )
                 ))
               )}
             </div>
@@ -1871,6 +2819,18 @@ function AdventureCreatorContent() {
               <div className="space-y-4 mb-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={newPlotBeat.title}
+                    onChange={(e) => setNewPlotBeat({ ...newPlotBeat, title: e.target.value })}
+                    placeholder="e.g., The Ancient Prophecy"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
                     Content *
                   </label>
                   <textarea
@@ -1881,23 +2841,10 @@ function AdventureCreatorContent() {
                     className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Target Chapter
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max={maxChapters - 1}
-                    value={newPlotBeat.targetChapter}
-                    onChange={(e) => setNewPlotBeat({ ...newPlotBeat, targetChapter: parseInt(e.target.value) || 0 })}
-                    className="w-full sm:w-48 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
               </div>
               <button
                 onClick={addPlotBeat}
-                disabled={!newPlotBeat.content}
+                disabled={!newPlotBeat.title || !newPlotBeat.content}
                 className="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
               >
                 Add Plot Beat
@@ -1906,25 +2853,103 @@ function AdventureCreatorContent() {
 
             <div className="space-y-3">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Plot Beats ({plotBeats.length})</h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400">💡 Drag and drop to reorder (or use arrow buttons on mobile)</p>
               {plotBeats.length === 0 ? (
                 <p className="text-gray-600 dark:text-gray-400 text-sm">No plot beats added yet</p>
               ) : (
                 plotBeats.map((beat, index) => (
-                  <div key={index} className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="text-sm text-orange-600 dark:text-orange-400 font-semibold mb-1">
-                          Chapter {beat.targetChapter}
+                  <div
+                    key={index}
+                    draggable={editingPlotBeatIndex !== index}
+                    onDragStart={() => handlePlotBeatDragStart(index)}
+                    onDragOver={(e) => handlePlotBeatDragOver(e, index)}
+                    onDragEnd={handlePlotBeatDragEnd}
+                    className={`p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800 transition-opacity ${
+                      editingPlotBeatIndex === index ? '' : 'cursor-move'
+                    } ${draggedPlotBeatIndex === index ? 'opacity-50' : 'opacity-100'}`}
+                  >
+                    {editingPlotBeatIndex === index ? (
+                      // Edit mode
+                      <div className="space-y-4">
+                        <h4 className="text-md font-bold text-orange-900 dark:text-orange-100">✏️ Editing Plot Beat</h4>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Title *</label>
+                          <input
+                            type="text"
+                            value={editPlotBeat.title || ""}
+                            onChange={(e) => setEditPlotBeat({ ...editPlotBeat, title: e.target.value })}
+                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          />
                         </div>
-                        <div className="text-gray-900 dark:text-white">{beat.content}</div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Content *</label>
+                          <textarea
+                            value={editPlotBeat.content || ""}
+                            onChange={(e) => setEditPlotBeat({ ...editPlotBeat, content: e.target.value })}
+                            rows={3}
+                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={saveEditPlotBeat}
+                            disabled={!editPlotBeat.title || !editPlotBeat.content}
+                            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg"
+                          >
+                            ✓ Save Changes
+                          </button>
+                          <button
+                            onClick={cancelEditPlotBeat}
+                            className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => removePlotBeat(index)}
-                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors ml-3"
-                      >
-                        Remove
-                      </button>
-                    </div>
+                    ) : (
+                      // View mode
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className="text-2xl cursor-grab active:cursor-grabbing select-none">⋮⋮</div>
+                          <div className="flex-1">
+                            <div className="font-bold text-gray-900 dark:text-white mb-1">{beat.title}</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">{beat.content}</div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => movePlotBeatUp(index)}
+                              disabled={index === 0}
+                              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs transition-colors"
+                              title="Move up"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              onClick={() => movePlotBeatDown(index)}
+                              disabled={index === plotBeats.length - 1}
+                              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs transition-colors"
+                              title="Move down"
+                            >
+                              ▼
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => startEditPlotBeat(index)}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() => removePlotBeat(index)}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -1941,9 +2966,6 @@ function AdventureCreatorContent() {
               <div className="flex flex-wrap gap-2">
                 <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-semibold">
                   {difficulty}
-                </span>
-                <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-semibold">
-                  {maxChapters} Chapters
                 </span>
                 {tags.slice(0, 3).map(tag => (
                   <span key={tag} className="px-3 py-1 bg-white/20 rounded-full text-sm">

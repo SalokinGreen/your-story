@@ -170,6 +170,9 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Get current display name from user metadata
+    const authorName = user.user_metadata?.display_name || "Anonymous";
+
     const updateData: any = {};
     
     if (body.title !== undefined) updateData.title = body.title;
@@ -185,6 +188,8 @@ export async function PATCH(
     if (body.isFeatured !== undefined) updateData.is_featured = body.isFeatured;
     if (body.storyTemplate !== undefined) updateData.story_template = body.storyTemplate;
 
+    // Always update author name to current display name
+    updateData.author_name = authorName;
     updateData.updated_at = new Date().toISOString();
 
     const { data, error } = await authenticatedSupabase

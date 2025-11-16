@@ -182,7 +182,6 @@ export async function POST(request: NextRequest) {
       description,
       shortDescription,
       authorId,
-      authorName,
       thumbnailUrl,
       bannerUrl,
       tags,
@@ -198,8 +197,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden: Cannot create adventure for another user" }, { status: 403 });
     }
 
+    // Get current display name from user metadata
+    const authorName = user.user_metadata?.display_name || "Anonymous";
+
     // Validate required fields
-    if (!title || !description || !shortDescription || !authorId || !authorName || !difficulty || !estimatedDuration || !storyTemplate) {
+    if (!title || !description || !shortDescription || !authorId || !difficulty || !estimatedDuration || !storyTemplate) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }

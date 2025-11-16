@@ -57,8 +57,9 @@ Commands:
 - /modify_resource: resource name(amount) - Modifies a player's resource by the given amount.
 - /add_achievement: achievement title - Adds an achievement to the player's profile.
 - /mark_beat: beat index - Marks a story beat as fulfilled.
-- /edit_beat: edited text (index) - Edits the text of a story beat at the given index.
-- /add_beat: beat text (targetChapter) - Adds a new story beat for the target chapter.
+- /edit_beat_title: new title (index) - Edits the title of a story beat at the given index.
+- /edit_beat_content: new content (index) - Edits the content of a story beat at the given index.
+- /add_beat: title | content - Adds a new story beat with the given title and content.
 - /remove_beat: beat index - Removes a story beat at the given index.
 
 
@@ -67,8 +68,7 @@ Progression System:
 - Points are automatically awarded when you use /mark_beat or end a chapter with "!!! END CHAPTER !!!".
 - Players spend points in the Upgrades shop to increase stats, expand resource maximums, or add custom items.
 - Balance story progression rewards - complete meaningful beats with /mark_beat to grant points for character growth.`
-// - /modify_momentum: amount - Modifies the player's momentum by the given amount (can be negative). Momentum is earned on critical successes and strong rolls, and spent by the player to reroll dice or guarantee success.
-// - Use /modify_momentum: -1 sparingly as a consequence for extremely reckless or narrative-breaking choices.
+
 const recentScene = storyData.scene.parts.at(-1)?.content ?? storyData.starting_content;
 const memory_cap = 10000; // Max memory size in characters
 // Remove duplicate entries from memory
@@ -128,21 +128,44 @@ export function storyDataToString(storyData: StoryData): string {
   result += `- Upgrade Points: ${storyData.points} (Earned from beats and chapters, spent in Upgrades shop)\n\n`;
   result += storyData.inventory.map(item => `- ${item.name} x${item.quantity}: ${item.description}`).join("\n") + "\n\n";
   
-  result += `## Story Beats:\n`;
-  let foundBeat = false;
-  storyData.plot_beats.forEach((beat, index) => {
-    if (beat.fulfilled) {
-    result += `${index + 1}. ~~${beat.content} (done)~~\n`;
+  result += `## Plot Beats:\n`;
+  
+  // Find the first unfulfilled beat (current beat)
+  const currentBeatIndex = storyData.plot_beats.findIndex(beat => !beat.fulfilled);
+  
+  // Show previous completed beats (just titles)
+  if (currentBeatIndex > 0) {
+    result += `\n### Previous Plot Beats (Completed):\n`;
+    for (let i = 0; i < currentBeatIndex; i++) {
+      result += `- ${i + 1}. ${storyData.plot_beats[i].title}\n`;
     }
-    else {
-      if (!foundBeat) {
-        result += `${index + 1}. **${beat.content} (Current Beat)**\n`;
-        foundBeat = true;
-      } else {
-    result += `${index + 1}. ${beat.content} (for Chapter ${beat.targetChapter})\n`;
-    }}{
-    
-  }});
+  }
+  
+  // Show last beat (with full content)
+  if (currentBeatIndex > 0) {
+    const lastBeat = storyData.plot_beats[currentBeatIndex - 1];
+    result += `\n### Last Plot Beat\n#### ${currentBeatIndex}. ${lastBeat.title}\n${lastBeat.content}\n`;
+  }
+  
+  // Show current beat (with full content)
+  if (currentBeatIndex !== -1 && currentBeatIndex < storyData.plot_beats.length) {
+    const currentBeat = storyData.plot_beats[currentBeatIndex];
+    result += `\n### Current Plot Beat\n#### ${currentBeatIndex + 1}. ${currentBeat.title}\n${currentBeat.content}\n`;
+  }
+  
+  // Show next beat (with full content)
+  if (currentBeatIndex !== -1 && currentBeatIndex + 1 < storyData.plot_beats.length) {
+    const nextBeat = storyData.plot_beats[currentBeatIndex + 1];
+    result += `\n### Next Plot Beat\n#### ${currentBeatIndex + 2}. ${nextBeat.title}\n${nextBeat.content}\n`;
+  }
+  
+  // Show future beats (just titles)
+  if (currentBeatIndex !== -1 && currentBeatIndex + 2 < storyData.plot_beats.length) {
+    result += `\n### Future Plot Beats:\n`;
+    for (let i = currentBeatIndex + 2; i < storyData.plot_beats.length; i++) {
+      result += `- ${i + 1}. ${storyData.plot_beats[i].title}\n`;
+    }
+  }
  
   result += `## Memory:\n`;
   storyData.memory.forEach((mem, index) => {
@@ -151,7 +174,7 @@ export function storyDataToString(storyData: StoryData): string {
   // Lore
   result += `\n## Lore Entries:\n`;
   storyData.lore.forEach((lore, index) => {
-    result += `- ${lore.title}: ${lore.content}\n`;
+    result += `----\nLore: ${lore.title}\n${lore.content}\n`;
   });
   result += `\n## Author Notes (AI instructions from the author of the story):\n`;
   if (storyData.author_notes) {
@@ -166,6 +189,7 @@ export function storyDataToString(storyData: StoryData): string {
     result += `### Chapter ${storyData.currentChapter}\n\n`;
     // result += `${currentChapter.summary}\n\n`;
     }
+    console.log("storyDataToString result:", result);
   return result;
 
 }
