@@ -61,11 +61,6 @@ Commands:
 - /add_beat: beat text (targetChapter) - Adds a new story beat for the target chapter.
 - /remove_beat: beat index - Removes a story beat at the given index.
 
-Momentum System:
-- Players start with 3 momentum and can have up to 5 maximum.
-- Momentum is earned automatically on critical successes (roll 100) or strong successes (beat DC by 20+).
-- Players can spend momentum before rolling: 1 momentum for reroll (take best result), 2 momentum for guaranteed success.
-- You can reward momentum with /modify_momentum: +1 for exceptional roleplay, clever solutions, or story milestones.
 
 Progression System:
 - Players earn upgrade points from story progression: ${UPGRADE_COSTS.BEAT_REWARD} points per completed story beat, ${UPGRADE_COSTS.CHAPTER_REWARD} points per completed chapter.

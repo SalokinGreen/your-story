@@ -645,6 +645,16 @@ function StoryPageContent() {
       return;
     }
 
+    // Trim storyData to reduce payload size for Vercel limits
+    // Only send the last 6 scene parts instead of entire history
+    const trimmedStoryData = {
+      ...storyData,
+      scene: {
+        ...storyData.scene,
+        parts: storyData.scene.parts.slice(-6), // Only send last 6 parts
+      },
+    };
+
     await fetch("/api/story/next", {
       method: "POST",
       headers: {
@@ -652,7 +662,7 @@ function StoryPageContent() {
         Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({
-        storyData: storyData,
+        storyData: trimmedStoryData,
         userChoice: choices.choices[key],
       }),
     })
