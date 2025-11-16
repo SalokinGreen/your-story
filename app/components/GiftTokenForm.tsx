@@ -22,7 +22,7 @@ export default function GiftTokenForm({ recipientId, recipientEmail, onSuccess }
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        addNotification("Please sign in to gift tokens", "warning");
+        addNotification("Please sign in to gift credits", "warning");
         setLoading(false);
         return;
       }
@@ -42,16 +42,17 @@ export default function GiftTokenForm({ recipientId, recipientEmail, onSuccess }
       const data = await response.json();
 
       if (!response.ok) {
-        addNotification(`❌ ${data.error || "Failed to gift tokens"}`, "failure");
+        addNotification(`❌ ${data.error || "Failed to gift credits"}`, "failure");
         setLoading(false);
         return;
       }
 
-      addNotification(`✓ Gifted ${amount} token(s) to ${recipientEmail}`, "success");
+      const creditLabel = amount === 1 ? "credit" : "credits";
+      addNotification(`✓ Gifted ${amount} ${creditLabel} to ${recipientEmail}`, "success");
       setAmount(1);
       onSuccess?.();
     } catch (error) {
-      console.error("Error gifting tokens:", error);
+      console.error("Error gifting credits:", error);
       addNotification("Network error. Please try again.", "failure");
     } finally {
       setLoading(false);
@@ -62,7 +63,7 @@ export default function GiftTokenForm({ recipientId, recipientEmail, onSuccess }
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
       <h3 className="text-lg sm:text-xl font-bold mb-6 flex items-center gap-2 text-gray-900 dark:text-white">
         <span className="text-2xl">🎁</span>
-        Gift Tokens
+        Gift Credits
       </h3>
       <form onSubmit={handleGift} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
@@ -84,7 +85,7 @@ export default function GiftTokenForm({ recipientId, recipientEmail, onSuccess }
           disabled={loading || amount <= 0}
           className="px-6 py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
-          {loading ? "Gifting..." : `🎁 Gift ${amount} Token(s)`}
+          {loading ? "Gifting..." : `🎁 Gift ${amount} ${amount === 1 ? "Credit" : "Credits"}`}
         </button>
         <p className="text-xs text-gray-600 dark:text-gray-400">
           Sending to: <span className="font-semibold text-gray-900 dark:text-white">{recipientEmail}</span>

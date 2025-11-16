@@ -26,7 +26,7 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        addNotification("Please sign in to mint tokens", "warning");
+        addNotification("Please sign in to mint credits", "warning");
         setLoading(false);
         return;
       }
@@ -46,16 +46,17 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
       const data = await response.json();
 
       if (!response.ok) {
-        addNotification(`❌ ${data.error || "Failed to mint tokens"}`, "failure");
+        addNotification(`❌ ${data.error || "Failed to mint credits"}`, "failure");
         setLoading(false);
         return;
       }
 
-      addNotification(`✓ Minted ${amount} token(s) for ${userEmail}`, "success");
+      const creditMintLabel = amount === 1 ? "credit" : "credits";
+      addNotification(`✓ Minted ${amount} ${creditMintLabel} for ${userEmail}`, "success");
       setAmount(10);
       onSuccess?.();
     } catch (error) {
-      console.error("Error minting tokens:", error);
+      console.error("Error minting credits:", error);
       addNotification("Network error. Please try again.", "failure");
     } finally {
       setLoading(false);
@@ -68,7 +69,7 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        addNotification("Please sign in to remove tokens", "warning");
+        addNotification("Please sign in to remove credits", "warning");
         setLoading(false);
         return;
       }
@@ -81,11 +82,12 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
         body: JSON.stringify({ userId, amount: removeAmount }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to remove tokens");
-      addNotification(`✓ Removed ${removeAmount} token(s) for ${userEmail}` , "success");
+      if (!res.ok) throw new Error(data.error || "Failed to remove credits");
+      const creditRemoveLabel = removeAmount === 1 ? "credit" : "credits";
+      addNotification(`✓ Removed ${removeAmount} ${creditRemoveLabel} for ${userEmail}` , "success");
       onSuccess?.();
     } catch (err: any) {
-      addNotification(err.message || "Failed to remove tokens", "failure");
+      addNotification(err.message || "Failed to remove credits", "failure");
     } finally {
       setLoading(false);
     }
@@ -140,12 +142,12 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
       </h3>
       
       <div className="space-y-6">
-        {/* Mint Tokens Section */}
+        {/* Mint Credits Section */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-red-200 dark:border-red-800">
           <form onSubmit={handleMint} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <label htmlFor="mint-amount" className="font-bold text-gray-900 dark:text-white">
-                💎 Mint Tokens:
+                💎 Mint Credits:
               </label>
               <input
                 id="mint-amount"
@@ -162,7 +164,7 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
               disabled={loading || amount <= 0}
               className="px-6 py-3 bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {loading ? "Minting..." : `💎 Mint ${amount} Token(s)`}
+              {loading ? "Minting..." : `💎 Mint ${amount} ${amount === 1 ? "Credit" : "Credits"}`}
             </button>
           </form>
         </div>
@@ -170,12 +172,12 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
         {/* Divider */}
         <div className="border-t-2 border-red-300 dark:border-red-700"></div>
 
-        {/* Remove Tokens Section */}
+        {/* Remove Credits Section */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-red-200 dark:border-red-800">
           <form onSubmit={handleRemove} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <label htmlFor="remove-amount" className="font-bold text-gray-900 dark:text-white">
-                ❌ Remove Tokens:
+                ❌ Remove Credits:
               </label>
               <input
                 id="remove-amount"
@@ -192,7 +194,7 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
               disabled={loading || removeAmount <= 0}
               className="px-6 py-3 bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {loading ? "Removing..." : `❌ Remove ${removeAmount} Token(s)`}
+              {loading ? "Removing..." : `❌ Remove ${removeAmount} ${removeAmount === 1 ? "Credit" : "Credits"}`}
             </button>
           </form>
         </div>
