@@ -898,6 +898,9 @@ export default function MenuPage({
   };
 
   const stats = calculateStoryProgress();
+  const totalEarnedPoints = (storyData.earnedPointsFromBeats || []).reduce((a, b) => a + b, 0) +
+    (storyData.earnedPointsFromChapters || []).reduce((a, b) => a + b, 0);
+  const availablePoints = storyData.points;
 
   return (
     <div className="w-full space-y-6">
@@ -950,6 +953,26 @@ export default function MenuPage({
             className="bg-linear-to-r from-purple-500 to-pink-500 h-3 transition-all duration-500"
             style={{ width: `${stats.progress}%` }}
           />
+        </div>
+
+        {/* Points & Momentum Summary */}
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-center">
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Available Points</p>
+            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{availablePoints}</p>
+          </div>
+          <div className="p-4 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-center">
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total Earned</p>
+            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{totalEarnedPoints}</p>
+          </div>
+          <div className="p-4 rounded-lg bg-pink-50 dark:bg-pink-900/20 text-center">
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Spent / Used</p>
+            <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">{Math.max(totalEarnedPoints - availablePoints, 0)}</p>
+          </div>
+          <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-center">
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Momentum</p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{storyData.momentum}/{storyData.maxMomentum}</p>
+          </div>
         </div>
       </div>
 

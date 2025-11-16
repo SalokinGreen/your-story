@@ -1,5 +1,6 @@
 "use client";
 import { Choice, Choices, StoryData } from "../misc/structs";
+import React from 'react';
 import ReactMarkdown from "react-markdown";
 
 interface StoryProps {
@@ -12,6 +13,7 @@ interface StoryProps {
   onMomentumModeChange: (mode: 'none' | 'reroll' | 'guarantee') => void;
   handleChoice: () => void;
   handleSelect: (index: number) => void;
+  onCustomInput?: (text: string) => void; // optional callback for free-form input
 }
 
 export default function Story({
@@ -23,8 +25,15 @@ export default function Story({
   momentumMode,
   onMomentumModeChange,
   handleChoice,
-  handleSelect
+  handleSelect,
+  onCustomInput
 }: StoryProps) {
+  const [freeInputEnabled, setFreeInputEnabled] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('freeInputEnabled') === 'true';
+  });
+  const [customInput, setCustomInput] = React.useState<string>("");
+  const [submittingCustom, setSubmittingCustom] = React.useState<boolean>(false);
   const selectedChoice = choices?.choices.find(c => input[c.text]);
   const hasSkillCheck = selectedChoice?.skill_used !== undefined;
   const canUseReroll = storyData.momentum >= 1 && hasSkillCheck;
@@ -70,6 +79,7 @@ export default function Story({
                     </div>
                   </div>
                 ))}
+
             </div>
           )}
         </div>
@@ -137,6 +147,81 @@ export default function Story({
           >
             {loading ? "Generating..." : momentumMode === 'reroll' ? "🎲 Continue with Reroll" : momentumMode === 'guarantee' ? "✓ Continue Guaranteed" : "✨ Continue Story"}
           </button>
+        </div>
+
+        {/* Bottom Custom Input Toggle & Section */}
+        <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-3">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !freeInputEnabled;
+                setFreeInputEnabled(next);
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('freeInputEnabled', String(next));
+                }
+              }}
+              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors border ${
+                freeInputEnabled
+                  ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-purple-200 dark:hover:bg-purple-600/40'
+              }`}
+            >
+              {freeInputEnabled ? 'Hide Custom Input ✕' : 'Add Custom Input ✍️'}
+            </button>
+            {freeInputEnabled && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">Free-form input steers narrative (no skill checks).</span>
+            )}
+          </div>
+          <div
+            className={`transition-all duration-300 ease-out overflow-hidden ${
+              freeInputEnabled ? 'opacity-100 scale-100 max-h-80' : 'opacity-0 scale-95 max-h-0 pointer-events-none'
+            }`}
+          >
+            <div className="space-y-3">
+              <textarea
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value)}
+                placeholder="Write your own action, dialog, or narration..."
+                rows={3}
+                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{customInput.length} characters</p>
+                <button
+                  type="button"
+                  disabled={submittingCustom || loading || customInput.trim().length === 0}
+                  onClick={async () => {
+                    const text = customInput.trim();
+                    if (!text) return;
+                    if (!onCustomInput) {
+                      setSubmittingCustom(true);
+                      try {
+                        // Parent should implement onCustomInput; fallback does nothing.
+                      } finally {
+                        setSubmittingCustom(false);
+                      }
+                      return;
+                    }
+                    setSubmittingCustom(true);
+                    try {
+                      await Promise.resolve(onCustomInput(text));
+                      setCustomInput('');
+                    } finally {
+                      setSubmittingCustom(false);
+                    }
+                  }}
+                  className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                    submittingCustom || loading || customInput.trim().length === 0
+                      ? 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
+                      : 'bg-purple-600 hover:bg-purple-700 text-white'
+                  }`}
+                >
+                  {submittingCustom ? 'Submitting...' : 'Submit Custom Input'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
