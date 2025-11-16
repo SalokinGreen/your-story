@@ -6,7 +6,7 @@ import StatsPage from "./stats";
 import LorePage from "./lore";
 import MenuPage from "./menu";
 import UpgradesPage from "./upgrades";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { useAuth } from "../misc/AuthContext";
 import { supabase } from "../misc/supabase";
@@ -213,6 +213,18 @@ function processCommands(
   }
 }
 
+// Utility: trim scene history to prevent bloat
+function trimStoryData(data: StoryData): StoryData {
+  const MAX_PERSISTED_PARTS = 10; // Keep last 10 scene parts
+  return {
+    ...data,
+    scene: {
+      ...data.scene,
+      parts: data.scene.parts.slice(-MAX_PERSISTED_PARTS)
+    }
+  };
+}
+
 function StoryPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -225,6 +237,7 @@ function StoryPageContent() {
   );
   const [storyData, setStoryData] = useState<StoryData | null>(null);
   const [storyDbId, setStoryDbId] = useState<string | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const [choices, setChoices] = useState<Choices>({ choices: [] });
   const [input, setInput] = useState<Record<string, boolean>>({});
   const [storyText, setStoryText] = useState("");
@@ -314,30 +327,40 @@ function StoryPageContent() {
     loadStory();
   }, [storyId, addNotification]);
 
-  // Save story progress to database
+  // Save story progress to database (debounced)
   async function saveProgress(updatedStoryData: StoryData) {
     if (!storyDbId) return;
     
-
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) return;
-
-      await fetch(`/api/stories/${storyDbId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          storyData: updatedStoryData,
-        }),
-      });
-    } catch (error) {
-      console.error("Error saving progress:", error);
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
+    
+    // Debounce: only save after 3 seconds of no activity
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session) return;
+
+        // Trim scene history before saving to reduce data size
+        const trimmedData = trimStoryData(updatedStoryData);
+
+        await fetch(`/api/stories/${storyDbId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            storyData: trimmedData,
+          }),
+        });
+      } catch (error) {
+        console.error("Error saving progress:", error);
+      }
+    }, 3000); // 3 second debounce
   }
 
   // Update story data in state
