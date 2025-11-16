@@ -21,12 +21,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const authHeader = request.headers.get("authorization");
     let clientToUse = supabase;
 
-    // If authenticated, use authenticated client for RLS
+    // If authenticated, use authenticated client for RLS with anon keys
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
       clientToUse = createClient(
-        process.env.SUPABASE_URL!,
-        process.env.SUPABASE_KEY!,
+        process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY!,
         {
           global: {
             headers: {
@@ -164,8 +164,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const token = authHeader.substring(7);
     const authenticatedSupabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY!,
       {
         global: {
           headers: {

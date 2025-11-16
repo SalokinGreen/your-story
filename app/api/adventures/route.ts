@@ -117,16 +117,20 @@ export async function POST(request: NextRequest) {
 
     const token = authHeader.replace("Bearer ", "");
     
-    // Create authenticated Supabase client
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
+    // Create authenticated Supabase client using anon keys for RLS
+    const authenticatedSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl,
+      process.env.NEXT_PUBLIC_SUPABASE_KEY || supabaseKey,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      },
-    });
+      }
+    );
     
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser();
     
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -161,7 +165,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await authenticatedSupabase
       .from("adventures")
       .insert([
         {

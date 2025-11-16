@@ -69,10 +69,10 @@ export async function PATCH(
 
     const token = authHeader.replace("Bearer ", "");
     
-    // Create authenticated client
+    // Create authenticated client using anon keys for RLS
     const authenticatedSupabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY!,
       {
         global: {
           headers: {
@@ -156,10 +156,10 @@ export async function DELETE(
 
     const token = authHeader.replace("Bearer ", "");
     
-    // Create authenticated client
+    // Create authenticated client using anon keys for RLS
     const authenticatedSupabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY!,
       {
         global: {
           headers: {

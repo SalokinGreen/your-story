@@ -20,25 +20,40 @@ export async function GET(request: NextRequest) {
 
     // Get the authorization header for authenticated requests
     const authHeader = request.headers.get("authorization");
-    let clientToUse = supabase;
-
-    // If authenticated, use authenticated client for RLS
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.replace("Bearer ", "");
-      clientToUse = createClient(
-        process.env.SUPABASE_URL!,
-        process.env.SUPABASE_KEY!,
-        {
-          global: {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        }
-      );
+    
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let query = clientToUse
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Create authenticated Supabase client with the user's token
+    const authenticatedSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      }
+    );
+
+    // Verify the token is valid
+    const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser();
+    
+    if (authError || !user) {
+      console.error("Auth error:", authError);
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+
+    // Verify the userId matches the authenticated user
+    if (userId !== user.id) {
+      return NextResponse.json({ error: "Forbidden: Cannot access another user's stories" }, { status: 403 });
+    }
+
+    let query = authenticatedSupabase
       .from("stories")
       .select("*")
       .eq("user_id", userId);

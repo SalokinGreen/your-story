@@ -51,9 +51,13 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
+    const authenticatedSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl,
+      process.env.NEXT_PUBLIC_SUPABASE_KEY || supabaseKey,
+      {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      }
+    );
 
     const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser();
     if (authError || !user) {
