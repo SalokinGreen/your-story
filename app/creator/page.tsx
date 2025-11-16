@@ -84,6 +84,11 @@ function AdventureCreatorContent() {
         setLore(template.lore || []);
         setAchievements(template.achievements || []);
 
+        // Load points and momentum
+        setPoints(template.points || 0);
+        setMomentum(template.momentum || 0);
+        setMaxMomentum(template.maxMomentum || 100);
+
         addNotification("Adventure loaded for editing", "success");
       } catch (error) {
         console.error("Error loading adventure:", error);
@@ -104,6 +109,11 @@ function AdventureCreatorContent() {
   const [startingContent, setStartingContent] = useState("");
   const [maxChapters, setMaxChapters] = useState(8);
   const [authorNotes, setAuthorNotes] = useState("");
+
+  // Points and Momentum
+  const [points, setPoints] = useState(0);
+  const [momentum, setMomentum] = useState(0);
+  const [maxMomentum, setMaxMomentum] = useState(100);
 
   // Stats
   const [stats, setStats] = useState<Stat[]>([]);
@@ -414,6 +424,11 @@ function AdventureCreatorContent() {
       inventory,
       achievements,
       lore,
+      momentum,
+      maxMomentum,
+      points,
+      earnedPointsFromBeats: [],
+      earnedPointsFromChapters: [],
       author_notes: authorNotes,
     };
 
@@ -769,6 +784,59 @@ function AdventureCreatorContent() {
                 className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
               />
             </div>
+
+            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                💡 <strong>Tip:</strong> Story Points let players upgrade their character. Momentum builds up from dramatic moments and choices. Chapter completion rewards 50 points, plot beat completion rewards 25 points.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                  Starting Points
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={points}
+                  onChange={(e) => setPoints(parseInt(e.target.value) || 0)}
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                />
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Points players start with</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                  Starting Momentum
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max={maxMomentum}
+                  value={momentum}
+                  onChange={(e) => setMomentum(Math.min(parseInt(e.target.value) || 0, maxMomentum))}
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                />
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Current momentum value</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                  Max Momentum
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={maxMomentum}
+                  onChange={(e) => setMaxMomentum(Math.max(1, parseInt(e.target.value) || 5))}
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                />
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Maximum momentum capacity</p>
+              </div>
+            </div>
+
+            
           </div>
         );
 
@@ -1544,6 +1612,14 @@ function AdventureCreatorContent() {
                   <div>
                     <span className="text-gray-600 dark:text-gray-400">Tags:</span>
                     <span className="ml-2 font-semibold text-gray-900 dark:text-white">{tags.length}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Starting Points:</span>
+                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">{points}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Momentum:</span>
+                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">{momentum}/{maxMomentum}</span>
                   </div>
                 </div>
               </div>

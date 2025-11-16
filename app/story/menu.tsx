@@ -7,13 +7,22 @@ import { useNotification } from "../misc/NotificationContext";
 import { supabase } from "../misc/supabase";
 
 // Basic Settings Component
-function BasicSettings({ form, onChange }: { form: any; onChange: (form: any) => void }) {
+interface BasicSettingsForm {
+  story_name: string;
+  player_name: string;
+  player_summary: string;
+  premise: string;
+  max_chapters: number;
+  points: number;
+  momentum: number;
+  maxMomentum: number;
+}
+
+function BasicSettings({ form, onChange }: { form: BasicSettingsForm; onChange: (form: BasicSettingsForm) => void }) {
   return (
     <div className="space-y-5">
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-          Story Name
-        </label>
+        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Story Name</label>
         <input
           type="text"
           value={form.story_name}
@@ -22,9 +31,7 @@ function BasicSettings({ form, onChange }: { form: any; onChange: (form: any) =>
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-          Player/Character Name
-        </label>
+        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Player/Character Name</label>
         <input
           type="text"
           value={form.player_name}
@@ -33,9 +40,7 @@ function BasicSettings({ form, onChange }: { form: any; onChange: (form: any) =>
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-          Character Description
-        </label>
+        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Character Description</label>
         <textarea
           value={form.player_summary}
           onChange={(e) => onChange({ ...form, player_summary: e.target.value })}
@@ -43,9 +48,7 @@ function BasicSettings({ form, onChange }: { form: any; onChange: (form: any) =>
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-          Story Premise
-        </label>
+        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Story Premise</label>
         <textarea
           value={form.premise}
           onChange={(e) => onChange({ ...form, premise: e.target.value })}
@@ -53,15 +56,45 @@ function BasicSettings({ form, onChange }: { form: any; onChange: (form: any) =>
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-          Max Chapters
-        </label>
+        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Max Chapters</label>
         <input
           type="number"
           value={form.max_chapters}
           onChange={(e) => onChange({ ...form, max_chapters: parseInt(e.target.value) || 0 })}
           className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Starting Points</label>
+          <input
+            type="number"
+            min={0}
+            value={form.points}
+            onChange={(e) => onChange({ ...form, points: parseInt(e.target.value) || 0 })}
+            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Starting Momentum</label>
+          <input
+            type="number"
+            min={0}
+            value={form.momentum}
+            onChange={(e) => onChange({ ...form, momentum: parseInt(e.target.value) || 0 })}
+            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Max Momentum</label>
+          <input
+            type="number"
+            min={1}
+            value={form.maxMomentum}
+            onChange={(e) => onChange({ ...form, maxMomentum: parseInt(e.target.value) || 1 })}
+            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
       </div>
     </div>
   );
@@ -79,9 +112,9 @@ function StatsResourcesEditor({
   achievements: Achievement[];
   onUpdate: (updates: Partial<StoryData>) => void;
 }) {
-  const [localStats, setLocalStats] = useState([...stats]);
-  const [localResources, setLocalResources] = useState([...resources]);
-  const [localAchievements, setLocalAchievements] = useState([...achievements]);
+  const [localStats, setLocalStats] = useState<Stat[]>([...stats]);
+  const [localResources, setLocalResources] = useState<Resource[]>([...resources]);
+  const [localAchievements, setLocalAchievements] = useState<Achievement[]>([...achievements]);
 
   const updateStat = (index: number, field: keyof Stat, value: any) => {
     const updated = [...localStats];
@@ -121,6 +154,39 @@ function StatsResourcesEditor({
     const updated = localResources.filter((_, i) => i !== index);
     setLocalResources(updated);
     onUpdate({ resources: updated });
+  };
+
+  const updateAchievement = (index: number, field: keyof Achievement, value: any) => {
+    const updated = [...localAchievements];
+    (updated[index] as any)[field] = value;
+    setLocalAchievements(updated);
+    onUpdate({ achievements: updated });
+  };
+
+  const toggleAchievement = (index: number, achieved: boolean) => {
+    const updated = [...localAchievements];
+    updated[index] = { ...updated[index], dateAchieved: achieved ? new Date() : null };
+    setLocalAchievements(updated);
+    onUpdate({ achievements: updated });
+  };
+
+  const addAchievement = () => {
+    const newAchievement: Achievement = {
+      title: "New Achievement",
+      description: "",
+      dateAchieved: null,
+      points: 10,
+      symbol: "🏆"
+    };
+    const updated = [...localAchievements, newAchievement];
+    setLocalAchievements(updated);
+    onUpdate({ achievements: updated });
+  };
+
+  const removeAchievement = (index: number) => {
+    const updated = localAchievements.filter((_, i) => i !== index);
+    setLocalAchievements(updated);
+    onUpdate({ achievements: updated });
   };
 
   return (
@@ -235,21 +301,70 @@ function StatsResourcesEditor({
         </div>
       </div>
 
-      {/* Achievements List (Read-only) */}
+      {/* Achievements Editor */}
       <div>
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">🏆 Achievements ({localAchievements.length})</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white">🏆 Achievements</h4>
+          <button
+            onClick={addAchievement}
+            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
+          >
+            + Add Achievement
+          </button>
+        </div>
+        <div className="space-y-3">
           {localAchievements.map((achievement, index) => (
-            <div key={index} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{achievement.symbol}</span>
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900 dark:text-white">{achievement.title}</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">{achievement.points} points</p>
-                </div>
+            <div key={index} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
+                <input
+                  type="text"
+                  value={achievement.title}
+                  onChange={(e) => updateAchievement(index, 'title', e.target.value)}
+                  placeholder="Title"
+                  className="sm:col-span-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                />
+                <input
+                  type="text"
+                  value={achievement.symbol}
+                  onChange={(e) => updateAchievement(index, 'symbol', e.target.value)}
+                  placeholder="Symbol"
+                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                />
+                <input
+                  type="number"
+                  value={achievement.points}
+                  onChange={(e) => updateAchievement(index, 'points', parseInt(e.target.value) || 0)}
+                  placeholder="Points"
+                  className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                />
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={!!achievement.dateAchieved}
+                    onChange={(e) => toggleAchievement(index, e.target.checked)}
+                    className="rounded"
+                  />
+                  <span>Achieved</span>
+                </label>
+                <button
+                  onClick={() => removeAchievement(index)}
+                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+                >
+                  Remove
+                </button>
               </div>
+              <textarea
+                value={achievement.description}
+                onChange={(e) => updateAchievement(index, 'description', e.target.value)}
+                placeholder="Description"
+                className="mt-2 w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                rows={2}
+              />
             </div>
           ))}
+          {localAchievements.length === 0 && (
+            <p className="text-sm text-gray-600 dark:text-gray-400">No achievements yet.</p>
+          )}
         </div>
       </div>
     </div>
@@ -468,8 +583,10 @@ function StoryMetaEditor({
   authorNotes?: string;
   onUpdate: (updates: Partial<StoryData>) => void;
 }) {
-  const [localPlotBeats, setLocalPlotBeats] = useState([...plotBeats]);
-  const [localAuthorNotes, setLocalAuthorNotes] = useState(authorNotes || "");
+  const [localPlotBeats, setLocalPlotBeats] = useState<PlotBeat[]>([...plotBeats]);
+  const [localAuthorNotes, setLocalAuthorNotes] = useState<string>(authorNotes || "");
+  const [localMemory, setLocalMemory] = useState<string[]>([...memory]);
+  const [newMemoryEntry, setNewMemoryEntry] = useState<string>("");
 
   const updateBeat = (index: number, field: keyof PlotBeat, value: any) => {
     const updated = [...localPlotBeats];
@@ -562,17 +679,52 @@ function StoryMetaEditor({
         </p>
       </div>
 
-      {/* Memory Entries */}
+      {/* Memory Entries (Editable) */}
       <div>
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-          🧠 Memory Entries ({memory.length})
-        </h4>
-        <div className="max-h-60 overflow-y-auto space-y-2">
-          {memory.map((entry, index) => (
-            <div key={index} className="p-3 bg-gray-50 dark:bg-gray-700 rounded text-sm text-gray-700 dark:text-gray-300">
-              {entry}
-            </div>
-          ))}
+        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3">🧠 Memory Entries ({localMemory.length})</h4>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Add new memory entry..."
+              value={newMemoryEntry}
+              onChange={(e) => setNewMemoryEntry(e.target.value)}
+              className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+            />
+            <button
+              onClick={() => {
+                const trimmed = newMemoryEntry.trim();
+                if (!trimmed) return;
+                const updated = [...localMemory, trimmed];
+                setLocalMemory(updated);
+                onUpdate({ memory: updated });
+                setNewMemoryEntry("");
+              }}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
+            >
+              Add
+            </button>
+          </div>
+          <div className="max-h-60 overflow-y-auto space-y-2">
+            {localMemory.map((entry, index) => (
+              <div key={index} className="p-3 bg-gray-50 dark:bg-gray-700 rounded text-sm text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                <span className="pr-2 flex-1">{entry}</span>
+                <button
+                  onClick={() => {
+                    const updated = localMemory.filter((_, i) => i !== index);
+                    setLocalMemory(updated);
+                    onUpdate({ memory: updated });
+                  }}
+                  className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            {localMemory.length === 0 && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 italic">No memory entries yet.</p>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -602,12 +754,15 @@ export default function MenuPage({
   const [playerNotes, setPlayerNotes] = useState(storyData.player_notes || "");
   
   // Settings form state
-  const [settingsForm, setSettingsForm] = useState({
+  const [settingsForm, setSettingsForm] = useState<BasicSettingsForm>({
     story_name: storyData.story_name,
     player_name: storyData.player_name,
     player_summary: storyData.player_summary,
     premise: storyData.premise,
     max_chapters: storyData.max_chapters,
+    points: storyData.points,
+    momentum: storyData.momentum,
+    maxMomentum: storyData.maxMomentum,
   });
   
   // Advanced editing states
@@ -650,6 +805,9 @@ export default function MenuPage({
         player_summary: settingsForm.player_summary,
         premise: settingsForm.premise,
         max_chapters: settingsForm.max_chapters,
+        points: settingsForm.points,
+        momentum: settingsForm.momentum,
+        maxMomentum: settingsForm.maxMomentum,
       });
       await onSaveProgress();
       setShowSettings(false);
@@ -1107,6 +1265,9 @@ export default function MenuPage({
                     player_summary: storyData.player_summary,
                     premise: storyData.premise,
                     max_chapters: storyData.max_chapters,
+                    points: storyData.points,
+                    momentum: storyData.momentum,
+                    maxMomentum: storyData.maxMomentum,
                   });
                   setShowSettings(false);
                 }}

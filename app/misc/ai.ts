@@ -153,6 +153,11 @@ export function storyDataToString(storyData: StoryData): string {
   storyData.memory.forEach((mem, index) => {
     result += `- ${mem}\n`;
   });
+  // Lore
+  result += `\n## Lore Entries:\n`;
+  storyData.lore.forEach((lore, index) => {
+    result += `- ${lore.title}: ${lore.content}\n`;
+  });
   result += `\n## Author Notes (AI instructions from the author of the story):\n`;
   if (storyData.author_notes) {
     result += `${storyData.author_notes}\n\n`;
