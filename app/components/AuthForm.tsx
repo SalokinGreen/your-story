@@ -8,25 +8,31 @@ export default function AuthForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+    const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
   const { signUp, signIn } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setInfo("");
     setLoading(true);
 
-    const { error } = isSignUp
+    const result = isSignUp
       ? await signUp(email, password)
       : await signIn(email, password);
 
     setLoading(false);
 
-    if (error) {
-      setError(error);
+    if (result.error) {
+      setError(result.error);
     } else {
-      setEmail("");
-      setPassword("");
+      if (isSignUp) {
+        setInfo("Check your email to confirm your account before signing in.");
+      } else {
+        setEmail("");
+        setPassword("");
+      }
     }
   };
 
@@ -45,6 +51,12 @@ export default function AuthForm() {
         {error && (
           <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-lg text-sm">
             {error}
+          </div>
+        )}
+
+        {info && (
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 rounded-lg text-sm">
+            {info}
           </div>
         )}
 
@@ -89,6 +101,35 @@ export default function AuthForm() {
         >
           {loading ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
         </button>
+
+        {isSignUp && (
+          <button
+            type="button"
+            disabled={loading || !email}
+            onClick={async () => {
+              setError("");
+              setInfo("");
+              try {
+                const res = await fetch("/api/auth/resend-confirmation", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                  setError(data.error || "Could not resend confirmation email.");
+                } else {
+                  setInfo("Confirmation email resent. Please check your inbox (and spam folder).");
+                }
+              } catch (err) {
+                setError("Network error while resending confirmation email.");
+              }
+            }}
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium self-start"
+          >
+            Resend confirmation email
+          </button>
+        )}
 
         <button
           type="button"

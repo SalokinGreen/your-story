@@ -187,6 +187,24 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Function to increment play_count when a story is created for an adventure
+CREATE OR REPLACE FUNCTION increment_adventure_play_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.adventure_id IS NOT NULL THEN
+        UPDATE public.adventures
+        SET play_count = play_count + 1
+        WHERE id = NEW.adventure_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Trigger: when a new story is created, bump the adventure's play_count
+CREATE TRIGGER increment_play_count_on_story
+AFTER INSERT ON public.stories
+FOR EACH ROW EXECUTE FUNCTION increment_adventure_play_count();
+
 -- Trigger to update rating when comment with rating is added
 CREATE TRIGGER update_rating_on_comment AFTER INSERT OR UPDATE OR DELETE ON public.comments
     FOR EACH ROW EXECUTE FUNCTION update_adventure_rating();

@@ -51,6 +51,7 @@ export interface StoryLore {
     relatedLocations: string[];
     secrtet: boolean;
     keys: string[];
+    thumbnailUrl?: string;
 }
 export interface Chapter {
     title: string;

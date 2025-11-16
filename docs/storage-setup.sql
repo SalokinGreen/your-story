@@ -21,8 +21,12 @@ TO public
 USING (bucket_id = 'adventure-images');
 
 -- Allow users to delete their own images
+-- This assumes files are stored under a per-user folder, e.g. '<user_id>/...'
 CREATE POLICY "Allow users to delete their own adventure images"
 ON storage.objects
 FOR DELETE
 TO authenticated
-USING (bucket_id = 'adventure-images' AND auth.uid()::text = (storage.foldername(name))[1]);
+USING (
+	bucket_id = 'adventure-images'
+	AND auth.uid()::text = (storage.foldername(name))[1]
+);

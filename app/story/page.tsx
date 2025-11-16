@@ -156,7 +156,7 @@ function processCommands(
       const beatIndex = parseInt(markBeatMatch[1], 10);
       if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
         storyData.plot_beats[beatIndex].fulfilled = true;
-        addNotification(`📖 Story beat ${beatIndex + 1} completed`, "success");
+        addNotification(`📖 Story beat ${beatIndex} completed`, "success");
         
         // Award points for completing a new beat
         if (!storyData.earnedPointsFromBeats.includes(beatIndex)) {

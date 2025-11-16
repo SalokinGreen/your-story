@@ -72,6 +72,19 @@ export async function getSession() {
   return { session, error: null };
 }
 
+export async function resendConfirmationEmail(email: string) {
+  const { data, error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+  });
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  return { data, error: null };
+}
+
 export async function isAdmin(userId?: string): Promise<boolean> {
   try {
     // Get current user data

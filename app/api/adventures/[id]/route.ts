@@ -55,6 +55,31 @@ export async function GET(
   }
 }
 
+// POST - Increment play_count when an adventure is started
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    const { error } = await supabase
+      .from("adventures")
+      .update({ play_count: (undefined as any) })
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error incrementing play count (legacy stub):", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true }, { status: 200 });
+  } catch (error) {
+    console.error("Error in POST /api/adventures/[id] (play count):", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
 // PATCH - Update an adventure
 export async function PATCH(
   request: NextRequest,

@@ -6,6 +6,7 @@ import { useAuth } from "@/app/misc/AuthContext";
 import { StoryData, Stat, Resource, InventoryItem, PlotBeat, StoryLore, Achievement } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
+import { compressImage } from "@/app/misc/imageCompression";
 
 type CreatorStep = "basic" | "premise" | "stats" | "resources" | "inventory" | "lore" | "achievements" | "plot" | "preview";
 
@@ -161,6 +162,7 @@ function AdventureCreatorContent() {
     relatedLocations: [],
     secrtet: false,
     keys: [],
+    thumbnailUrl: "",
   });
   const [newLoreCharacter, setNewLoreCharacter] = useState("");
   const [newLoreLocation, setNewLoreLocation] = useState("");
@@ -209,24 +211,21 @@ function AdventureCreatorContent() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      addNotification("Image must be smaller than 5MB", "warning");
-      return;
-    }
-
     setUploadingThumbnail(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
+      const compressed = await compressImage(file, 400, 300, 0.8);
+
       const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}-${Date.now()}-thumbnail.${fileExt}`;
-      const filePath = `adventure-thumbnails/${fileName}`;
+      const fileName = `${Date.now()}-thumbnail.${fileExt}`;
+      const filePath = `${session.user.id}/adventure-thumbnails/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from("adventure-images")
-        .upload(filePath, file, { cacheControl: "3600", upsert: false });
+        .upload(filePath, compressed, { cacheControl: "3600", upsert: false });
 
       if (uploadError) throw uploadError;
 
@@ -253,24 +252,21 @@ function AdventureCreatorContent() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      addNotification("Image must be smaller than 5MB", "warning");
-      return;
-    }
-
     setUploadingBanner(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
+      const compressed = await compressImage(file, 1200, 400, 0.85);
+
       const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}-${Date.now()}-banner.${fileExt}`;
-      const filePath = `adventure-banners/${fileName}`;
+      const fileName = `${Date.now()}-banner.${fileExt}`;
+      const filePath = `${session.user.id}/adventure-banners/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from("adventure-images")
-        .upload(filePath, file, { cacheControl: "3600", upsert: false });
+        .upload(filePath, compressed, { cacheControl: "3600", upsert: false });
 
       if (uploadError) throw uploadError;
 
@@ -372,6 +368,7 @@ function AdventureCreatorContent() {
         relatedLocations: [],
         secrtet: false,
         keys: [],
+        thumbnailUrl: "",
       });
     }
   };
@@ -617,7 +614,7 @@ function AdventureCreatorContent() {
                 Thumbnail Image
               </label>
               <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                Recommended: 400x300px, max 5MB
+                Recommended: 400×300px (or 320×180px), max 5MB
               </p>
               <div className="flex items-start gap-4">
                 {thumbnailUrl && (
@@ -662,7 +659,7 @@ function AdventureCreatorContent() {
                 Banner Image
               </label>
               <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                Recommended: 1200x400px, max 5MB
+                Recommended: 1200×400px, max 5MB
               </p>
               <div className="flex items-start gap-4">
                 {bannerUrl && (
@@ -1214,6 +1211,62 @@ function AdventureCreatorContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Thumbnail (optional)
+                  </label>
+                  <div className="flex items-start gap-3">
+                    {newLore.thumbnailUrl ? (
+                      <div className="relative">
+                        <img src={newLore.thumbnailUrl} alt="Lore thumbnail" className="w-24 h-24 object-cover rounded border" />
+                        <button
+                          onClick={() => setNewLore({ ...newLore, thumbnailUrl: "" })}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
+                        No Preview
+                      </div>
+                    )}
+                    <div>
+                      <input
+                        id="new-lore-thumb"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (!file.type.startsWith("image/")) { addNotification("Please select an image file", "warning"); return; }
+                          if (file.size > 5 * 1024 * 1024) { addNotification("Image must be smaller than 5MB", "warning"); return; }
+                          try {
+                            const { data: { session } } = await supabase.auth.getSession();
+                            if (!session) throw new Error("Not authenticated");
+                            const ext = file.name.split('.').pop();
+                            const fileName = `${user!.id}-${Date.now()}-lore-thumb.${ext}`;
+                            const filePath = `lore-thumbnails/${fileName}`;
+                            const { error: uploadError } = await supabase.storage
+                              .from("adventure-images")
+                              .upload(filePath, file, { cacheControl: "3600", upsert: false });
+                            if (uploadError) throw uploadError;
+                            const { data } = supabase.storage.from("adventure-images").getPublicUrl(filePath);
+                            setNewLore({ ...newLore, thumbnailUrl: data.publicUrl });
+                            addNotification("Thumbnail uploaded!", "success");
+                          } catch (err: any) {
+                            console.error("Upload failed:", err);
+                            addNotification(err.message || "Upload failed", "failure");
+                          }
+                        }}
+                      />
+                      <label htmlFor="new-lore-thumb" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer inline-block">
+                        📸 Upload Thumbnail
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
                     Related Characters
                   </label>
                   <div className="flex gap-2 mb-2">
@@ -1357,6 +1410,9 @@ function AdventureCreatorContent() {
                           <div className="font-bold text-gray-900 dark:text-white">{entry.title}</div>
                           {entry.secrtet && <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">🔒 Hidden</span>}
                         </div>
+                        {entry.thumbnailUrl && (
+                          <img src={entry.thumbnailUrl} alt="Lore thumb" className="w-24 h-24 object-cover rounded border mb-2" />
+                        )}
                         <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{entry.content}</div>
                         {entry.relatedCharacters.length > 0 && (
                           <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
@@ -1373,6 +1429,52 @@ function AdventureCreatorContent() {
                             <strong>Triggers:</strong> {entry.keys.join(', ')}
                           </div>
                         )}
+                        <div className="mt-2 flex items-center gap-2">
+                          <input
+                            id={`edit-lore-thumb-${index}`}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                // upload and update the specific entry
+                                if (!file.type.startsWith("image/")) { addNotification("Please select an image file", "warning"); return; }
+                                if (file.size > 5 * 1024 * 1024) { addNotification("Image must be smaller than 5MB", "warning"); return; }
+                                try {
+                                  const { data: { session } } = await supabase.auth.getSession();
+                                  if (!session) throw new Error("Not authenticated");
+                                  const ext = file.name.split('.').pop();
+                                  const fileName = `${user!.id}-${Date.now()}-lore-thumb.${ext}`;
+                                  const filePath = `lore-thumbnails/${fileName}`;
+                                  const { error: uploadError } = await supabase.storage.from("adventure-images").upload(filePath, file, { cacheControl: "3600", upsert: false });
+                                  if (uploadError) throw uploadError;
+                                  const { data } = supabase.storage.from("adventure-images").getPublicUrl(filePath);
+                                  const updated = [...lore];
+                                  updated[index] = { ...updated[index], thumbnailUrl: data.publicUrl } as StoryLore;
+                                  setLore(updated);
+                                  addNotification("Thumbnail updated!", "success");
+                                } catch (err: any) {
+                                  console.error("Upload failed:", err);
+                                  addNotification(err.message || "Upload failed", "failure");
+                                }
+                              }
+                            }}
+                          />
+                          <label htmlFor={`edit-lore-thumb-${index}`} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer">Change Thumbnail</label>
+                          {entry.thumbnailUrl && (
+                            <button
+                              onClick={() => {
+                                const updated = [...lore];
+                                updated[index] = { ...updated[index], thumbnailUrl: "" } as StoryLore;
+                                setLore(updated);
+                              }}
+                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <button
                         onClick={() => removeLore(index)}

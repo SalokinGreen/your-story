@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { supabase } from "../misc/supabase";
+import { compressImage } from "../misc/imageCompression";
 
 // Basic Settings Component
 interface BasicSettingsForm {
@@ -481,6 +482,7 @@ function LoreEditor({
 }) {
   const [localLore, setLocalLore] = useState([...lore]);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const { addNotification } = useNotification();
 
   const updateLore = (index: number, field: keyof StoryLore, value: any) => {
     const updated = [...localLore];
@@ -496,7 +498,8 @@ function LoreEditor({
       relatedCharacters: [],
       relatedLocations: [],
       secrtet: false,
-      keys: []
+      keys: [],
+      thumbnailUrl: ""
     };
     const updated = [...localLore, newLore];
     setLocalLore(updated);
@@ -507,6 +510,46 @@ function LoreEditor({
     const updated = localLore.filter((_, i) => i !== index);
     setLocalLore(updated);
     onUpdate(updated);
+  };
+
+  const handleLoreThumbnailUpload = async (index: number, file: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      addNotification("Please select an image file", "warning");
+      return;
+    }
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        addNotification("Not authenticated", "failure");
+        return;
+      }
+
+      const compressed = await compressImage(file, 320, 180, 0.8);
+
+      const ext = file.name.split('.').pop();
+      const fileName = `${Date.now()}-lore-thumb.${ext}`;
+      const filePath = `${session.user.id}/lore-thumbnails/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("adventure-images")
+        .upload(filePath, compressed, { cacheControl: "3600", upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from("adventure-images")
+        .getPublicUrl(filePath);
+
+      const updated = [...localLore];
+      updated[index] = { ...updated[index], thumbnailUrl: data.publicUrl };
+      setLocalLore(updated);
+      onUpdate(updated);
+      addNotification("Thumbnail uploaded!", "success");
+    } catch (err: any) {
+      console.error("Lore thumbnail upload failed:", err);
+      addNotification(err.message || "Upload failed", "failure");
+    }
   };
 
   return (
@@ -551,6 +594,58 @@ function LoreEditor({
                   placeholder="Lore content (supports Markdown)"
                   className="w-full h-32 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
                 />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Thumbnail URL (optional)</label>
+                    <input
+                      type="url"
+                      value={loreItem.thumbnailUrl || ""}
+                      onChange={(e) => updateLore(index, 'thumbnailUrl', e.target.value)}
+                      placeholder="https://..."
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Shown in lore list and detail if provided (ideal ~320×180px, max 5MB).</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        id={`upload-lore-thumb-${index}`}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleLoreThumbnailUpload(index, f);
+                        }}
+                      />
+                      <label
+                        htmlFor={`upload-lore-thumb-${index}`}
+                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer text-sm"
+                      >
+                        📸 Upload Thumbnail
+                      </label>
+                      {loreItem.thumbnailUrl && (
+                        <button
+                          onClick={() => updateLore(index, 'thumbnailUrl', '')}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    {loreItem.thumbnailUrl ? (
+                      <img
+                        src={loreItem.thumbnailUrl}
+                        alt={loreItem.title}
+                        className="w-24 h-24 object-cover rounded border border-gray-300 dark:border-gray-600"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
+                        No Preview
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                   <input
                     type="checkbox"

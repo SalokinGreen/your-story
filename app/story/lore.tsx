@@ -103,29 +103,38 @@ export default function LorePage(storyData: StoryData) {
               <button
                 key={index}
                 onClick={() => setSelectedLore(loreItem)}
-                className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                className={`w-full text-left p-4 rounded-lg border-2 transition-all flex items-start gap-3 ${
                   selectedLore === loreItem
                     ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
                     : "border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600"
                 }`}
               >
-                <h4 className="font-semibold text-gray-900 dark:text-white mb-1">
-                  {loreItem.title}
-                </h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                  {loreItem.content.substring(0, 100)}...
-                </p>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {loreItem.relatedCharacters.length > 0 && (
-                    <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
-                      👤 {loreItem.relatedCharacters.length}
-                    </span>
-                  )}
-                  {loreItem.relatedLocations.length > 0 && (
-                    <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
-                      📍 {loreItem.relatedLocations.length}
-                    </span>
-                  )}
+                {loreItem.thumbnailUrl && (
+                  <img
+                    src={loreItem.thumbnailUrl}
+                    alt={loreItem.title}
+                    className="w-14 h-14 rounded-md object-cover border border-gray-200 dark:border-gray-600"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-1 truncate">
+                    {loreItem.title}
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                    {loreItem.content.substring(0, 100)}...
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {loreItem.relatedCharacters.length > 0 && (
+                      <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                        👤 {loreItem.relatedCharacters.length}
+                      </span>
+                    )}
+                    {loreItem.relatedLocations.length > 0 && (
+                      <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
+                        📍 {loreItem.relatedLocations.length}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </button>
             ))}
@@ -140,18 +149,27 @@ export default function LorePage(storyData: StoryData) {
                   <button
                     key={`secret-${index}`}
                     onClick={() => setSelectedLore(loreItem)}
-                    className={`w-full text-left p-4 rounded-lg border-2 transition-all mb-3 ${
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all mb-3 flex items-start gap-3 ${
                       selectedLore === loreItem
                         ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20"
                         : "border-amber-200 dark:border-amber-700 hover:border-amber-400 dark:hover:border-amber-500"
                     }`}
                   >
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
-                      🔒 {loreItem.title}
-                    </h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                      {loreItem.content.substring(0, 100)}...
-                    </p>
+                    {loreItem.thumbnailUrl && (
+                      <img
+                        src={loreItem.thumbnailUrl}
+                        alt={loreItem.title}
+                        className="w-14 h-14 rounded-md object-cover border border-amber-200 dark:border-amber-700"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2 truncate">
+                        🔒 {loreItem.title}
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                        {loreItem.content.substring(0, 100)}...
+                      </p>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -199,6 +217,16 @@ export default function LorePage(storyData: StoryData) {
                   </p>
                 )}
               </div>
+
+              {selectedLore.thumbnailUrl && (
+                <div className="relative w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                  <img
+                    src={selectedLore.thumbnailUrl}
+                    alt={selectedLore.title}
+                    className="w-full h-48 sm:h-64 object-cover"
+                  />
+                </div>
+              )}
 
               <div className="prose prose-sm sm:prose prose-zinc dark:prose-invert max-w-none">
                 <ReactMarkdown>{selectedLore.content}</ReactMarkdown>

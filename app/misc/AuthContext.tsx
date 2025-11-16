@@ -7,7 +7,7 @@ import { supabase } from "@/app/misc/supabase";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: string | null; emailSent?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<{ error: string | null }>;
 }
@@ -43,17 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        return { error: error.message };
+        return { error: error.message, emailSent: false };
       }
 
-      if (data.user) {
-        setUser(data.user);
-      }
-
-      return { error: null };
+      // Do NOT auto-log in; require email confirmation instead
+      return { error: null, emailSent: true };
     } catch (error) {
       console.error("Sign up error:", error);
-      return { error: "Network error" };
+      return { error: "Network error", emailSent: false };
     }
   };
 

@@ -67,7 +67,7 @@ export default function StatsPage(storyData: StoryData) {
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
                       <div
                         className="bg-linear-to-r from-blue-500 to-blue-600 h-2.5 rounded-full transition-all duration-300 shadow-sm"
-                        style={{ width: `${stat.value}%` }}
+                        style={{ width: `${stat.value <= 100 ? stat.value : 100}%` }}
                       />
                     </div>
                   </div>
@@ -116,7 +116,7 @@ export default function StatsPage(storyData: StoryData) {
                     <div
                       className="bg-linear-to-r from-yellow-400 to-yellow-500 h-2.5 rounded-full transition-all duration-300 shadow-sm"
                       style={{
-                        width: `${(storyData.momentum / storyData.maxMomentum) * 100}%`,
+                        width: `${((storyData.momentum / storyData.maxMomentum) * 100)  <= 100 ? ((storyData.momentum / storyData.maxMomentum) * 100) : 100}%`,
                       }}
                     />
                   </div>
@@ -155,7 +155,7 @@ export default function StatsPage(storyData: StoryData) {
                             : "bg-linear-to-r from-red-500 to-red-600"
                         }`}
                         style={{
-                          width: `${(resource.value / resource.maxValue) * 100}%`,
+                          width: `${((resource.value / resource.maxValue) * 100) <= 100 ? ((resource.value / resource.maxValue) * 100) : 100}%`,
                         }}
                       />
                     </div>
