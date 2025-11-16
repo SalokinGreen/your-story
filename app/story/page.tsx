@@ -5,7 +5,7 @@ import Story from "./story";
 import StatsPage from "./stats";
 import LorePage from "./lore";
 import MenuPage from "./menu";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { useAuth } from "../misc/AuthContext";
 import { supabase } from "../misc/supabase";
@@ -152,7 +152,7 @@ function processCommands(commands: string[], storyData: StoryData, addNotificati
   }
 }
 
-export default function StoryPage() {
+function StoryPageContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const storyId = searchParams.get('storyId');
@@ -591,5 +591,17 @@ export default function StoryPage() {
 
             </main>
         </div>
+    );
+}
+
+export default function StoryPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
+            </div>
+        }>
+            <StoryPageContent />
+        </Suspense>
     );
 }

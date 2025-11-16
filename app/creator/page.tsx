@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/misc/AuthContext";
 import { StoryData, Stat, Resource, InventoryItem, PlotBeat, StoryLore, Achievement } from "@/app/misc/structs";
@@ -9,7 +9,7 @@ import { supabase } from "@/app/misc/supabase";
 
 type CreatorStep = "basic" | "premise" | "stats" | "resources" | "inventory" | "lore" | "achievements" | "plot" | "preview";
 
-export default function AdventureCreatorPage() {
+function AdventureCreatorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -1674,5 +1674,17 @@ export default function AdventureCreatorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdventureCreatorPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
+      </div>
+    }>
+      <AdventureCreatorContent />
+    </Suspense>
   );
 }
