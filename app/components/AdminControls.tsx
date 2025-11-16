@@ -14,6 +14,7 @@ interface AdminControlsProps {
 export default function AdminControls({ userId, userEmail, currentRole, onSuccess }: AdminControlsProps) {
   const { addNotification } = useNotification();
   const [amount, setAmount] = useState(10);
+  const [removeAmount, setRemoveAmount] = useState(1);
   const [role, setRole] = useState<"user" | "moderator" | "admin">(currentRole as any || "user");
   const [loading, setLoading] = useState(false);
   const [roleLoading, setRoleLoading] = useState(false);
@@ -56,6 +57,35 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
     } catch (error) {
       console.error("Error minting tokens:", error);
       addNotification("Network error. Please try again.", "failure");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemove = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        addNotification("Please sign in to remove tokens", "warning");
+        setLoading(false);
+        return;
+      }
+      const res = await fetch("/api/tokens/remove", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ userId, amount: removeAmount }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to remove tokens");
+      addNotification(`✓ Removed ${removeAmount} token(s) for ${userEmail}` , "success");
+      onSuccess?.();
+    } catch (err: any) {
+      addNotification(err.message || "Failed to remove tokens", "failure");
     } finally {
       setLoading(false);
     }
@@ -139,6 +169,33 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
 
         {/* Divider */}
         <div className="border-t-2 border-red-300 dark:border-red-700"></div>
+
+        {/* Remove Tokens Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-red-200 dark:border-red-800">
+          <form onSubmit={handleRemove} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="remove-amount" className="font-bold text-gray-900 dark:text-white">
+                ❌ Remove Tokens:
+              </label>
+              <input
+                id="remove-amount"
+                type="number"
+                min="1"
+                value={removeAmount}
+                onChange={(e) => setRemoveAmount(parseInt(e.target.value) || 1)}
+                className="px-4 py-3 border-2 border-red-300 dark:border-red-700 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-red-500 dark:focus:border-red-400 focus:ring-2 focus:ring-red-200 dark:focus:ring-red-800 transition-colors"
+                disabled={loading}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading || removeAmount <= 0}
+              className="px-6 py-3 bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              {loading ? "Removing..." : `❌ Remove ${removeAmount} Token(s)`}
+            </button>
+          </form>
+        </div>
 
         {/* Change Role Section */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-red-200 dark:border-red-800">

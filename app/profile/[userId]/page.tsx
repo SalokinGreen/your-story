@@ -362,16 +362,6 @@ export default function ProfilePage() {
             />
           )}
 
-          {/* Admin Controls */}
-          {userIsAdmin && (
-            <AdminControls
-              userId={profileUser.id}
-              userEmail={profileUser.email}
-              currentRole={profileUser.role}
-              onSuccess={handleRefresh}
-            />
-          )}
-
           {/* Adventures and Stories Tabs */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             {/* Tab Headers */}
@@ -516,6 +506,17 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
+
+          {/* IMPORTANT: Admin Controls must always remain at the very bottom of the page */}
+          {/* Admin Controls */}
+          {userIsAdmin && (
+            <AdminControls
+              userId={profileUser.id}
+              userEmail={profileUser.email}
+              currentRole={profileUser.role}
+              onSuccess={handleRefresh}
+            />
+          )}
 
          
         </div>

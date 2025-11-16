@@ -340,7 +340,7 @@ function StoryPageContent() {
         }
 
         if (choice.skill_used) {
-            const dc = (storyData.stats.find((stat) => stat.name === choice.skill_used)?.value || 0) + (choice.skill_dc || 0);
+            const dc = (storyData.stats.find((stat) => stat.name === choice.skill_used)?.value || 0) - (choice.skill_dc || 0);
             const dc_passed = dice_roll === 1 || dice_roll <= dc;
             if (dc_passed) {
                 text += " <Success" + extra + ">";
