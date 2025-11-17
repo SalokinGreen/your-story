@@ -18,13 +18,17 @@ const VOICES = [
   { id: "george", name: "George (US)", emoji: "🇺🇸" },
 ];
 
-const getCustomVoices = (): Array<{ id: string; name: string; emoji: string }> => {
+const getCustomVoices = (): Array<{
+  id: string;
+  name: string;
+  emoji: string;
+}> => {
   if (typeof window === "undefined") return [];
   const saved = localStorage.getItem("ttsCustomVoices");
   if (!saved) return [];
   try {
     const voiceIds = JSON.parse(saved) as string[];
-    return voiceIds.map(id => ({ id, name: id, emoji: "🎤" }));
+    return voiceIds.map((id) => ({ id, name: id, emoji: "🎤" }));
   } catch {
     return [];
   }
@@ -43,7 +47,10 @@ const getTTSSettings = () => {
   return { enabled, customVoice, volume };
 };
 
-export default function TTSControls({ text, disabled = false }: TTSControlsProps) {
+export default function TTSControls({
+  text,
+  disabled = false,
+}: TTSControlsProps) {
   const { addNotification } = useNotification();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -147,7 +154,7 @@ export default function TTSControls({ text, disabled = false }: TTSControlsProps
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ text, voiceId: selectedVoice }),
       });
@@ -156,7 +163,9 @@ export default function TTSControls({ text, disabled = false }: TTSControlsProps
         const error = await response.json();
         if (response.status === 402) {
           // Payment required - insufficient tokens
-          throw new Error(error.error || "Insufficient tokens for TTS generation");
+          throw new Error(
+            error.error || "Insufficient tokens for TTS generation"
+          );
         }
         throw new Error(error.error || "Failed to generate speech");
       }
@@ -194,7 +203,7 @@ export default function TTSControls({ text, disabled = false }: TTSControlsProps
       await audio.play();
       setIsPlaying(true);
       setIsPaused(false);
-      
+
       // Show success notification with token info
       if (tokenCost && tokenBalance) {
         addNotification(
@@ -230,7 +239,8 @@ export default function TTSControls({ text, disabled = false }: TTSControlsProps
   };
 
   const allVoices = getAllVoices();
-  const currentVoice = allVoices.find((v) => v.id === selectedVoice) || allVoices[0] || VOICES[0];
+  const currentVoice =
+    allVoices.find((v) => v.id === selectedVoice) || allVoices[0] || VOICES[0];
 
   if (!ttsEnabled) {
     return null;
@@ -306,7 +316,9 @@ export default function TTSControls({ text, disabled = false }: TTSControlsProps
                   clipRule="evenodd"
                 />
               </svg>
-              <span className="hidden sm:inline text-xs">{Math.round(volume * 100)}%</span>
+              <span className="hidden sm:inline text-xs">
+                {Math.round(volume * 100)}%
+              </span>
             </button>
 
             {showVolumeSlider && (
@@ -324,10 +336,16 @@ export default function TTSControls({ text, disabled = false }: TTSControlsProps
                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
                 />
                 <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  <button onClick={() => setVolume(0)} className="hover:text-blue-500">
+                  <button
+                    onClick={() => setVolume(0)}
+                    className="hover:text-blue-500"
+                  >
                     🔇 Mute
                   </button>
-                  <button onClick={() => setVolume(1)} className="hover:text-blue-500">
+                  <button
+                    onClick={() => setVolume(1)}
+                    className="hover:text-blue-500"
+                  >
                     🔊 Max
                   </button>
                 </div>
@@ -346,11 +364,17 @@ export default function TTSControls({ text, disabled = false }: TTSControlsProps
               ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
               : "bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg"
           }`}
-          title={isPaused ? "Resume" : canReplay ? "Replay" : "Read story aloud"}
+          title={
+            isPaused ? "Resume" : canReplay ? "Replay" : "Read story aloud"
+          }
         >
           {isLoading ? (
             <>
-              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+              <svg
+                className="animate-spin h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
                 <circle
                   className="opacity-25"
                   cx="12"
@@ -383,7 +407,9 @@ export default function TTSControls({ text, disabled = false }: TTSControlsProps
                   clipRule="evenodd"
                 />
               </svg>
-              <span className="hidden sm:inline">{isPaused ? "Resume" : "Play"}</span>
+              <span className="hidden sm:inline">
+                {isPaused ? "Resume" : "Play"}
+              </span>
             </>
           )}
         </button>

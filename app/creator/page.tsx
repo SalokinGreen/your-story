@@ -3015,7 +3015,7 @@ function AdventureCreatorContent() {
                       htmlFor="loreOn"
                       className="text-sm text-gray-700 dark:text-gray-300"
                     >
-                      ✅ Enabled
+                      Enabled
                     </label>
                   </div>
                 </div>

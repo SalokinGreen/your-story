@@ -3151,18 +3151,26 @@ export default function MenuPage({
                   <h4 className="text-lg font-bold text-gray-900 dark:text-white">
                     🔊 Text-to-Speech Settings
                   </h4>
-                  
+
                   <div className="space-y-4">
                     <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
                       <input
                         type="checkbox"
-                        checked={typeof window !== 'undefined' && localStorage.getItem('ttsEnabled') !== 'false'}
+                        checked={
+                          typeof window !== "undefined" &&
+                          localStorage.getItem("ttsEnabled") !== "false"
+                        }
                         onChange={(e) => {
-                          if (typeof window !== 'undefined') {
-                            localStorage.setItem('ttsEnabled', e.target.checked ? 'true' : 'false');
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem(
+                              "ttsEnabled",
+                              e.target.checked ? "true" : "false"
+                            );
                             addNotification(
-                              e.target.checked ? '🔊 TTS Enabled' : '🔇 TTS Disabled',
-                              'success'
+                              e.target.checked
+                                ? "🔊 TTS Enabled"
+                                : "🔇 TTS Disabled",
+                              "success"
                             );
                             // Force re-render
                             window.location.reload();
@@ -3180,26 +3188,37 @@ export default function MenuPage({
                       </div>
                     </label>
 
-                    <CustomVoiceManager 
-                      addNotification={addNotification}
-                    />
+                    <CustomVoiceManager addNotification={addNotification} />
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                        Default Volume: {Math.round((typeof window !== 'undefined' ? parseFloat(localStorage.getItem('ttsVolume') || '1.0') : 1.0) * 100)}%
+                        Default Volume:{" "}
+                        {Math.round(
+                          (typeof window !== "undefined"
+                            ? parseFloat(
+                                localStorage.getItem("ttsVolume") || "1.0"
+                              )
+                            : 1.0) * 100
+                        )}
+                        %
                       </label>
                       <input
                         type="range"
                         min="0"
                         max="1"
                         step="0.05"
-                        defaultValue={typeof window !== 'undefined' ? localStorage.getItem('ttsVolume') || '1.0' : '1.0'}
+                        defaultValue={
+                          typeof window !== "undefined"
+                            ? localStorage.getItem("ttsVolume") || "1.0"
+                            : "1.0"
+                        }
                         onChange={(e) => {
-                          if (typeof window !== 'undefined') {
-                            localStorage.setItem('ttsVolume', e.target.value);
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem("ttsVolume", e.target.value);
                             // Update the label
-                            e.currentTarget.previousElementSibling!.textContent = 
-                              `Default Volume: ${Math.round(parseFloat(e.target.value) * 100)}%`;
+                            e.currentTarget.previousElementSibling!.textContent = `Default Volume: ${Math.round(
+                              parseFloat(e.target.value) * 100
+                            )}%`;
                           }
                         }}
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
@@ -3215,10 +3234,15 @@ export default function MenuPage({
                         ℹ️ How TTS Works
                       </h5>
                       <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
-                        <li>• TTS controls appear at the top of the story when enabled</li>
+                        <li>
+                          • TTS controls appear at the top of the story when
+                          enabled
+                        </li>
                         <li>• Audio is generated once and saved for replay</li>
                         <li>• Volume and voice settings are saved locally</li>
-                        <li>• New story content generates new audio automatically</li>
+                        <li>
+                          • New story content generates new audio automatically
+                        </li>
                       </ul>
                     </div>
                   </div>

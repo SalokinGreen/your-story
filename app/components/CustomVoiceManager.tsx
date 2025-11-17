@@ -4,10 +4,16 @@ import { useState, useEffect } from "react";
 
 interface CustomVoiceManagerProps {
   onVoicesChange?: (voices: string[]) => void;
-  addNotification: (message: string, type: "success" | "failure" | "warning") => void;
+  addNotification: (
+    message: string,
+    type: "success" | "failure" | "warning"
+  ) => void;
 }
 
-export default function CustomVoiceManager({ onVoicesChange, addNotification }: CustomVoiceManagerProps) {
+export default function CustomVoiceManager({
+  onVoicesChange,
+  addNotification,
+}: CustomVoiceManagerProps) {
   const [customVoices, setCustomVoices] = useState<string[]>([]);
   const [newVoiceInput, setNewVoiceInput] = useState("");
 
@@ -45,7 +51,7 @@ export default function CustomVoiceManager({ onVoicesChange, addNotification }: 
   };
 
   const removeCustomVoice = (voiceId: string) => {
-    const updated = customVoices.filter(v => v !== voiceId);
+    const updated = customVoices.filter((v) => v !== voiceId);
     saveCustomVoices(updated);
     addNotification(`🗑️ Removed voice: ${voiceId}`, "success");
   };
@@ -74,7 +80,7 @@ export default function CustomVoiceManager({ onVoicesChange, addNotification }: 
         </div>
         {customVoices.length > 0 && (
           <div className="space-y-2 mt-3">
-            {customVoices.map(voiceId => (
+            {customVoices.map((voiceId) => (
               <div
                 key={voiceId}
                 className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
@@ -93,7 +99,8 @@ export default function CustomVoiceManager({ onVoicesChange, addNotification }: 
           </div>
         )}
         <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-          💡 Add custom Speechify voice IDs. Built-in voices: mrbeast, henry, snoop, gwyneth, cliff, george
+          💡 Add custom Speechify voice IDs. Built-in voices: mrbeast, henry,
+          snoop, gwyneth, cliff, george
         </p>
       </div>
     </div>
