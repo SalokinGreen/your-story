@@ -1,7 +1,8 @@
 "use client";
 import { Choice, Choices, StoryData } from "../misc/structs";
-import React from 'react';
+import React from "react";
 import ReactMarkdown from "react-markdown";
+import TTSControls from "../components/TTSControls";
 
 interface StoryProps {
   storyData: StoryData;
@@ -9,8 +10,8 @@ interface StoryProps {
   choices: Choices;
   input: Record<string, boolean>;
   loading: boolean;
-  momentumMode: 'none' | 'reroll' | 'guarantee';
-  onMomentumModeChange: (mode: 'none' | 'reroll' | 'guarantee') => void;
+  momentumMode: "none" | "reroll" | "guarantee";
+  onMomentumModeChange: (mode: "none" | "reroll" | "guarantee") => void;
   handleChoice: () => void;
   handleSelect: (index: number) => void;
   onCustomInput?: (text: string) => void; // optional callback for free-form input
@@ -30,15 +31,18 @@ export default function Story({
   handleSelect,
   onCustomInput,
   onRetry,
-  canRetry
+  canRetry,
 }: StoryProps) {
-  const [freeInputEnabled, setFreeInputEnabled] = React.useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('freeInputEnabled') === 'true';
-  });
+  const [freeInputEnabled, setFreeInputEnabled] = React.useState<boolean>(
+    () => {
+      if (typeof window === "undefined") return false;
+      return localStorage.getItem("freeInputEnabled") === "true";
+    }
+  );
   const [customInput, setCustomInput] = React.useState<string>("");
-  const [submittingCustom, setSubmittingCustom] = React.useState<boolean>(false);
-  const selectedChoice = choices?.choices.find(c => input[c.text]);
+  const [submittingCustom, setSubmittingCustom] =
+    React.useState<boolean>(false);
+  const selectedChoice = choices?.choices.find((c) => input[c.text]);
   const hasSkillCheck = selectedChoice?.skill_used !== undefined;
   const canUseReroll = storyData.momentum >= 1 && hasSkillCheck;
   const canUseGuarantee = storyData.momentum >= 2 && hasSkillCheck;
@@ -47,12 +51,25 @@ export default function Story({
     <div className="w-full">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col gap-6">
+          {/* TTS Controls - positioned at top */}
+          <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🔊</span>
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Text-to-Speech
+              </span>
+            </div>
+            <TTSControls text={storyText} disabled={loading} />
+          </div>
+
           {prettify(storyText)}
 
           {loading ? (
             <div className="flex flex-col items-center justify-center w-full py-8 border-t border-gray-200 dark:border-gray-700">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
-              <p className="mt-4 text-gray-600 dark:text-gray-400 text-sm font-medium">Weaving your tale...</p>
+              <p className="mt-4 text-gray-600 dark:text-gray-400 text-sm font-medium">
+                Weaving your tale...
+              </p>
             </div>
           ) : (
             <div className="w-full space-y-3">
@@ -83,7 +100,6 @@ export default function Story({
                     </div>
                   </div>
                 ))}
-
             </div>
           )}
 
@@ -94,15 +110,25 @@ export default function Story({
                 onClick={onRetry}
                 className="px-4 py-2 text-sm font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all flex items-center gap-2"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
                 </svg>
                 Retry AI Response
               </button>
             </div>
           )}
         </div>
-        
+
         {/* Momentum Display and Controls */}
         <div className="flex sm:flex-col xl:flex-row l:flex-row m:flex-row gap-4 items-center justify-between w-full pt-4 border-t border-gray-200 dark:border-gray-700 mt-4 overflow-hidden">
           <div className="flex items-center gap-2">
@@ -125,14 +151,18 @@ export default function Story({
               </div>
             </div>
           </div>
-          
+
           {hasSkillCheck && !loading && (
             <div className="flex gap-2">
               <button
-                onClick={() => onMomentumModeChange(momentumMode === 'reroll' ? 'none' : 'reroll')}
+                onClick={() =>
+                  onMomentumModeChange(
+                    momentumMode === "reroll" ? "none" : "reroll"
+                  )
+                }
                 disabled={!canUseReroll}
                 className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
-                  momentumMode === 'reroll'
+                  momentumMode === "reroll"
                     ? "bg-yellow-500 text-white shadow-md"
                     : canUseReroll
                     ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-yellow-400 hover:text-white"
@@ -142,10 +172,14 @@ export default function Story({
                 🎲 Reroll (1⚡)
               </button>
               <button
-                onClick={() => onMomentumModeChange(momentumMode === 'guarantee' ? 'none' : 'guarantee')}
+                onClick={() =>
+                  onMomentumModeChange(
+                    momentumMode === "guarantee" ? "none" : "guarantee"
+                  )
+                }
                 disabled={!canUseGuarantee}
                 className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
-                  momentumMode === 'guarantee'
+                  momentumMode === "guarantee"
                     ? "bg-green-500 text-white shadow-md"
                     : canUseGuarantee
                     ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-green-500 hover:text-white"
@@ -157,14 +191,20 @@ export default function Story({
             </div>
           )}
         </div>
-        
+
         <div className="flex justify-center w-full pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
           <button
             onClick={handleChoice}
             className="cursor-pointer px-8 py-4 text-lg font-semibold bg-linear-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg"
             disabled={!Object.values(input).some((v) => v) || loading}
           >
-            {loading ? "Generating..." : momentumMode === 'reroll' ? "🎲 Continue with Reroll" : momentumMode === 'guarantee' ? "✓ Continue Guaranteed" : "✨ Continue Story"}
+            {loading
+              ? "Generating..."
+              : momentumMode === "reroll"
+              ? "🎲 Continue with Reroll"
+              : momentumMode === "guarantee"
+              ? "✓ Continue Guaranteed"
+              : "✨ Continue Story"}
           </button>
         </div>
 
@@ -176,25 +216,29 @@ export default function Story({
               onClick={() => {
                 const next = !freeInputEnabled;
                 setFreeInputEnabled(next);
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('freeInputEnabled', String(next));
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("freeInputEnabled", String(next));
                 }
               }}
               className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors border ${
                 freeInputEnabled
-                  ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-purple-200 dark:hover:bg-purple-600/40'
+                  ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-purple-200 dark:hover:bg-purple-600/40"
               }`}
             >
-              {freeInputEnabled ? 'Hide Custom Input ✕' : 'Add Custom Input ✍️'}
+              {freeInputEnabled ? "Hide Custom Input ✕" : "Add Custom Input ✍️"}
             </button>
             {freeInputEnabled && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">Free-form input steers narrative (no skill checks).</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Free-form input steers narrative (no skill checks).
+              </span>
             )}
           </div>
           <div
             className={`transition-all duration-300 ease-out overflow-hidden ${
-              freeInputEnabled ? 'opacity-100 scale-100 max-h-80' : 'opacity-0 scale-95 max-h-0 pointer-events-none'
+              freeInputEnabled
+                ? "opacity-100 scale-100 max-h-80"
+                : "opacity-0 scale-95 max-h-0 pointer-events-none"
             }`}
           >
             <div className="space-y-3">
@@ -206,10 +250,16 @@ export default function Story({
                 className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
               />
               <div className="flex items-center justify-between">
-                <p className="text-xs text-gray-500 dark:text-gray-400">{customInput.length} characters</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {customInput.length} characters
+                </p>
                 <button
                   type="button"
-                  disabled={submittingCustom || loading || customInput.trim().length === 0}
+                  disabled={
+                    submittingCustom ||
+                    loading ||
+                    customInput.trim().length === 0
+                  }
                   onClick={async () => {
                     const text = customInput.trim();
                     if (!text) return;
@@ -225,18 +275,20 @@ export default function Story({
                     setSubmittingCustom(true);
                     try {
                       await Promise.resolve(onCustomInput(text));
-                      setCustomInput('');
+                      setCustomInput("");
                     } finally {
                       setSubmittingCustom(false);
                     }
                   }}
                   className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                    submittingCustom || loading || customInput.trim().length === 0
-                      ? 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
-                      : 'bg-purple-600 hover:bg-purple-700 text-white'
+                    submittingCustom ||
+                    loading ||
+                    customInput.trim().length === 0
+                      ? "bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed"
+                      : "bg-purple-600 hover:bg-purple-700 text-white"
                   }`}
                 >
-                  {submittingCustom ? 'Submitting...' : 'Submit Custom Input'}
+                  {submittingCustom ? "Submitting..." : "Submit Custom Input"}
                 </button>
               </div>
             </div>

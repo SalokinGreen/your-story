@@ -15,6 +15,7 @@ import { useState, useEffect } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { supabase } from "../misc/supabase";
 import { compressImage } from "../misc/imageCompression";
+import CustomVoiceManager from "../components/CustomVoiceManager";
 
 // Basic Settings Component
 interface BasicSettingsForm {
@@ -2519,7 +2520,7 @@ export default function MenuPage({
   const [editingLore, setEditingLore] = useState(false);
   const [editingPlotBeats, setEditingPlotBeats] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "basic" | "stats" | "inventory" | "quests" | "lore" | "story"
+    "basic" | "stats" | "inventory" | "quests" | "lore" | "story" | "tts"
   >("basic");
 
   const handleSaveProgress = async () => {
@@ -3083,6 +3084,7 @@ export default function MenuPage({
                 { id: "quests", label: "📜 Quests", icon: "📜" },
                 { id: "lore", label: "📚 Lore", icon: "📚" },
                 { id: "story", label: "📖 Story", icon: "📖" },
+                { id: "tts", label: "🔊 TTS", icon: "🔊" },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -3142,6 +3144,85 @@ export default function MenuPage({
                   premise={storyData.premise}
                   onUpdate={(updates) => onUpdateStoryData(updates)}
                 />
+              )}
+
+              {activeTab === "tts" && (
+                <div className="space-y-6">
+                  <h4 className="text-lg font-bold text-gray-900 dark:text-white">
+                    🔊 Text-to-Speech Settings
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={typeof window !== 'undefined' && localStorage.getItem('ttsEnabled') !== 'false'}
+                        onChange={(e) => {
+                          if (typeof window !== 'undefined') {
+                            localStorage.setItem('ttsEnabled', e.target.checked ? 'true' : 'false');
+                            addNotification(
+                              e.target.checked ? '🔊 TTS Enabled' : '🔇 TTS Disabled',
+                              'success'
+                            );
+                            // Force re-render
+                            window.location.reload();
+                          }
+                        }}
+                        className="w-5 h-5 rounded text-blue-600"
+                      />
+                      <div>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          Enable Text-to-Speech
+                        </span>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Show TTS controls for story narration
+                        </p>
+                      </div>
+                    </label>
+
+                    <CustomVoiceManager 
+                      addNotification={addNotification}
+                    />
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Default Volume: {Math.round((typeof window !== 'undefined' ? parseFloat(localStorage.getItem('ttsVolume') || '1.0') : 1.0) * 100)}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        defaultValue={typeof window !== 'undefined' ? localStorage.getItem('ttsVolume') || '1.0' : '1.0'}
+                        onChange={(e) => {
+                          if (typeof window !== 'undefined') {
+                            localStorage.setItem('ttsVolume', e.target.value);
+                            // Update the label
+                            e.currentTarget.previousElementSibling!.textContent = 
+                              `Default Volume: ${Math.round(parseFloat(e.target.value) * 100)}%`;
+                          }
+                        }}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                      />
+                      <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <span>🔇 0%</span>
+                        <span>🔊 100%</span>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <h5 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">
+                        ℹ️ How TTS Works
+                      </h5>
+                      <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
+                        <li>• TTS controls appear at the top of the story when enabled</li>
+                        <li>• Audio is generated once and saved for replay</li>
+                        <li>• Volume and voice settings are saved locally</li>
+                        <li>• New story content generates new audio automatically</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
 

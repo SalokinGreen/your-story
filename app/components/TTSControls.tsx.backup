@@ -1,0 +1,254 @@
+"use client";
+
+import React, { useState, useRef, useEffect } from "react";
+import { useNotification } from "../misc/NotificationContext";
+
+interface TTSControlsProps {
+  text: string; // The content to read
+  disabled?: boolean;
+}
+
+// Popular Speechify voices
+const VOICES = [
+  { id: "mrbeast", name: "MrBeast", emoji: "🎬" },
+  { id: "henry", name: "Henry (British)", emoji: "🇬🇧" },
+  { id: "snoop", name: "Snoop", emoji: "🎤" },
+  { id: "gwyneth", name: "Gwyneth", emoji: "🎭" },
+  { id: "cliff", name: "Cliff (Deep)", emoji: "🎙️" },
+  { id: "george", name: "George (US)", emoji: "🇺🇸" },
+];
+
+// Helper to get TTS settings from localStorage
+const getTTSSettings = () => {
+  if (typeof window === 'undefined') return { enabled: true, customVoice: '', volume: 1.0 };
+  const enabled = localStorage.getItem('ttsEnabled') !== 'false';
+  const customVoice = localStorage.getItem('ttsCustomVoice') || '';
+  const volume = parseFloat(localStorage.getItem('ttsVolume') || '1.0');
+  return { enabled, customVoice, volume };
+};
+
+export default function TTSControls({
+  text,
+  disabled = false,
+}: TTSControlsProps) {
+  const { addNotification } = useNotification();
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [selectedVoice, setSelectedVoice] = useState(VOICES[0].id);
+  const [showVoiceMenu, setShowVoiceMenu] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Clean up audio when component unmounts or text changes
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [text]);
+
+  const handlePlay = async () => {
+    if (disabled || !text.trim()) return;
+
+    try {
+      setIsLoading(true);
+
+      // Call API to generate speech
+      const response = await fetch("/api/tts/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text, voiceId: selectedVoice }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to generate speech");
+      }
+
+      // Get audio blob
+      const audioBlob = await response.blob();
+      const url = URL.createObjectURL(audioBlob);
+      setAudioUrl(url);
+
+      // Create and play audio
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        setIsPlaying(false);
+      };
+
+      audio.onerror = () => {
+        addNotification("Failed to play audio", "failure");
+        setIsPlaying(false);
+      };
+
+      await audio.play();
+      setIsPlaying(true);
+      addNotification("🎧 Playing narration", "success");
+    } catch (error: any) {
+      console.error("TTS error:", error);
+      addNotification(error.message || "Failed to generate speech", "failure");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePause = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  const handleStop = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsPlaying(false);
+    }
+  };
+
+  const currentVoice = VOICES.find((v) => v.id === selectedVoice) || VOICES[0];
+
+  return (
+    <div className="flex items-center gap-2">
+      {/* Voice Selection */}
+      {!isPlaying && (
+        <div className="relative">
+          <button
+            onClick={() => setShowVoiceMenu(!showVoiceMenu)}
+            disabled={disabled}
+            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-all ${
+              disabled
+                ? "bg-gray-100 dark:bg-gray-700 text-gray-400 border-gray-300 dark:border-gray-600 cursor-not-allowed"
+                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500"
+            }`}
+            title="Select voice"
+          >
+            <span>{currentVoice.emoji}</span>
+            <span className="hidden sm:inline">{currentVoice.name}</span>
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+
+          {showVoiceMenu && (
+            <div className="absolute top-full mt-2 left-0 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[180px]">
+              {VOICES.map((voice) => (
+                <button
+                  key={voice.id}
+                  onClick={() => {
+                    setSelectedVoice(voice.id);
+                    setShowVoiceMenu(false);
+                  }}
+                  className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors ${
+                    voice.id === selectedVoice
+                      ? "bg-blue-100 dark:bg-blue-900/50 text-blue-900 dark:text-blue-200"
+                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <span>{voice.emoji}</span>
+                  <span>{voice.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Play/Pause/Stop Controls */}
+      {!isPlaying ? (
+        <button
+          onClick={handlePlay}
+          disabled={disabled || isLoading || !text.trim()}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+            disabled || isLoading || !text.trim()
+              ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+              : "bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg"
+          }`}
+          title="Read story aloud"
+        >
+          {isLoading ? (
+            <>
+              <svg
+                className="animate-spin h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <span className="hidden sm:inline">Loading...</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span className="hidden sm:inline">Read Aloud</span>
+              <span className="sm:hidden">Play</span>
+            </>
+          )}
+        </button>
+      ) : (
+        <>
+          <button
+            onClick={handlePause}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-all shadow-md hover:shadow-lg"
+            title="Pause"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span className="hidden sm:inline">Pause</span>
+          </button>
+          <button
+            onClick={handleStop}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all shadow-md hover:shadow-lg"
+            title="Stop"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span className="hidden sm:inline">Stop</span>
+          </button>
+        </>
+      )}
+    </div>
+  );
+}

@@ -1075,28 +1075,30 @@ function StoryPageContent() {
             "success"
           );
 
-          // Earn momentum on success (not when using guarantee)
-          if (dice_roll === 100) {
-            // Critical success: earn 2 momentum
-            if (storyData.momentum < storyData.maxMomentum) {
-              const earned = Math.min(
-                2,
-                storyData.maxMomentum - storyData.momentum
-              );
-              storyData.momentum += earned;
-              addNotification(
-                `⚡ Critical Success! Earned ${earned} Momentum! (${storyData.momentum}/${storyData.maxMomentum})`,
-                "success"
-              );
-            }
-          } else if (total >= dc + 20) {
-            // Strong success (beat DC by 20+): earn 1 momentum
-            if (storyData.momentum < storyData.maxMomentum) {
-              storyData.momentum++;
-              addNotification(
-                `⚡ Strong Success! Earned 1 Momentum! (${storyData.momentum}/${storyData.maxMomentum})`,
-                "success"
-              );
+          // Earn momentum on success (not when using guarantee or reroll)
+          if (momentumMode === "none") {
+            if (dice_roll === 100) {
+              // Critical success: earn 2 momentum
+              if (storyData.momentum < storyData.maxMomentum) {
+                const earned = Math.min(
+                  2,
+                  storyData.maxMomentum - storyData.momentum
+                );
+                storyData.momentum += earned;
+                addNotification(
+                  `⚡ Critical Success! Earned ${earned} Momentum! (${storyData.momentum}/${storyData.maxMomentum})`,
+                  "success"
+                );
+              }
+            } else if (total >= dc + 20) {
+              // Strong success (beat DC by 20+): earn 1 momentum
+              if (storyData.momentum < storyData.maxMomentum) {
+                storyData.momentum++;
+                addNotification(
+                  `⚡ Strong Success! Earned 1 Momentum! (${storyData.momentum}/${storyData.maxMomentum})`,
+                  "success"
+                );
+              }
             }
           }
         } else {
