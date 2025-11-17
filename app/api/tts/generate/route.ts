@@ -51,8 +51,8 @@ export async function POST(req: NextRequest) {
 
     const userId = user.id;
 
-    // Check if user has enough tokens
-    const balance = await getUserTokenBalance(userId);
+    // Check if user has enough tokens (pass supabase client for proper access)
+    const balance = await getUserTokenBalance(userId, supabase);
     if (!balance || balance.total < TTS_COST) {
       return NextResponse.json(
         {
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
 
     // Deduct tokens after successful generation
     try {
-      await deductTokens(userId, TTS_COST);
+      await deductTokens(userId, TTS_COST, supabase);
     } catch (deductError: any) {
       console.error("Failed to deduct tokens:", deductError);
       // Still return the audio since generation succeeded
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get updated balance
-    const newBalance = await getUserTokenBalance(userId);
+    const newBalance = await getUserTokenBalance(userId, supabase);
 
     // Convert Blob to ArrayBuffer for proper response
     const audioBuffer = await response.audioData.arrayBuffer();
