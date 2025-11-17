@@ -11,7 +11,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/story/story.tsx: Presentational story component. Receives full StoryData via spread props, renders scenes with choices. Includes custom input toggle, retry button, and momentum mode selection.
 - app/story/stats.tsx: Stats display component showing character stats, resources, inventory, achievements.
 - app/story/lore.tsx: Lore display component, filters by `on` state (only shows active lore).
-- app/story/menu.tsx: In-game editor for story state (stats, resources, inventory, achievements, lore, plot beats). Feature parity with creator for all systems.
+- app/story/menu.tsx: In-game editor for story state (stats, resources, inventory, achievements, lore, plot beats). Feature parity with creator for all systems. Includes AI Config tab with model selection and TTS settings.
 - app/story/upgrades.tsx: Character upgrade shop for spending progression points.
 - app/library/page.tsx: Library page showing user's stories and adventures with authenticated fetch.
 - app/creator/page.tsx: Adventure creation interface with full editing capabilities for all story elements.
@@ -41,7 +41,10 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Achievement display**: Shows only locked achievements using `ai_hint || description` for precise triggering.
   - **Robust parsing**: Handles responses with or without `<story>` tags via fallback extraction logic.
   - **Item types**: Provides AI with type-specific behavior descriptions (normal, consumable, story, misc).
-- app/api/story/next/route.ts: POST endpoint calling DeepSeek Chat Completions API; deducts tokens via service role; returns { part: ScenePart, meta: { model, usage, balance } }.
+  - **Resource System**: Dynamic DC-based resource requirements - Required: DC÷10 (min 5), Success recovery: DC÷20 (min 1), Failure penalty: DC÷10 (min 5). Insufficient resources apply -DC÷10 dice penalty.
+- app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter). Includes getModelConfig() helper for dynamic model selection.
+- app/api/story/next/route.ts: POST endpoint supporting multiple AI providers (DeepSeek, OpenRouter); accepts optional `model` parameter; deducts tokens via service role; returns { part: ScenePart, meta: { model, modelName, provider, usage, tokenCost, balance } }.
+- app/api/tts/generate/route.ts: POST endpoint for Speechify text-to-speech generation; deducts 3 tokens per generation; returns audio blob with token metadata.
 
 ### API Routes
 
@@ -82,6 +85,8 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/components/EditDisplayName.tsx: Edit display name inline.
 - app/components/EditProfile.tsx: Edit profile (bio, location, website, avatar). Avatar uploads use unique timestamped filenames, cache-busting URLs, and proper old file deletion.
 - app/components/NotificationContainer.tsx: Toast notifications display.
+- app/components/TTSControls.tsx: Text-to-speech controls with voice selection, volume, play/pause/stop, and auto-generation support.
+- app/components/CustomVoiceManager.tsx: Manage custom Speechify voice IDs for TTS.
 
 ### Config
 
@@ -118,6 +123,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - **Balance counting**: Use aggregate counts (via head count) to bypass Supabase 1000-row limit; getUserTokenBalance in tokens.ts returns { total, tradable, locked }.
 - **Operations**: deductTokens (burn newest first), giftTokens (transfer tradable only), mintTokens (admin only).
 - **API balance**: Always use /api/tokens/balance with service role for accurate counts.
+- **Token costs**: Story generation = 1 token, TTS generation = 3 tokens.
 
 ### Adventure Visibility System
 
@@ -132,14 +138,19 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Keep server components for Next 16 app router by default.
 - Toast notifications via NotificationContext; use addNotification("message", "success"|"failure"|"warning").
 - Profile page: Admin controls must always be at the very bottom (see comment in profile/[userId]/page.tsx).
+- **AI Config Menu**: Model selection saved to localStorage as "aiModel", defaults to "deep-seek/deepseek-chat".
+- **TTS Settings**: All TTS preferences saved to localStorage (ttsEnabled, ttsLastVoice, ttsAutoGenerate, ttsVolume, ttsCustomVoices).
 
 ### DeepSeek API
 
-- app/api/story/next/route.ts accepts { storyData, userChoice? } and returns { part: ScenePart, meta: { model, usage, balance } }.
-- Requires DEEPSEEK_API_KEY in env; optional DEEPSEEK_MODEL (default: deepseek-chat).
-- Deducts tokens before generation; returns updated balance in response meta.
+- app/api/story/next/route.ts accepts { storyData, userChoice?, model? } and returns { part: ScenePart, meta: { model, modelName, provider, usage, tokenCost, balance } }.
+- **Multi-provider support**: Automatically routes to DeepSeek or OpenRouter based on model parameter.
+- Requires DEEPSEEK_API_KEY for DeepSeek models, OPENROUTER_API_KEY for OpenRouter models.
+- Optional: DEFAULT_AI_MODEL, DEEPSEEK_MODEL, NEXT_PUBLIC_SITE_URL environment variables.
+- Deducts 1 token before generation; returns updated balance in response meta.
 - **Payload optimization**: Client trims storyData before sending to stay under Vercel's 4.5MB limit. Only sends last 6 scene parts with minimal fields (content, user, role), caps text fields, and strips heavy nested data like choices/commands from history.
 - **Creator payload**: Adventure creation logs payload size and warns if >4MB to help creators manage content size.
+- **Model selection**: Client reads from localStorage "aiModel" key and includes in API request.
 
 ## Developer workflows
 
@@ -150,12 +161,16 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Node: Use an LTS Node >= 18 compatible with Next 16 and React 19.
 - Environment: Create .env.local with:
   - DEEPSEEK_API_KEY=<your_key>
+  - OPENROUTER_API_KEY=<your_key>
+  - SPEECHIFY_API_KEY=<your_key>
   - NEXT_PUBLIC_SUPABASE_URL=<your_url>
   - NEXT_PUBLIC_SUPABASE_KEY=<your_anon_key>
   - SUPABASE_URL=<your_url> (same as NEXT_PUBLIC)
   - SUPABASE_KEY=<your_anon_key> (same as NEXT_PUBLIC)
   - SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
+  - Optional: DEFAULT_AI_MODEL=deep-seek/deepseek-chat
   - Optional: DEEPSEEK_MODEL=deepseek-chat
+  - Optional: NEXT_PUBLIC_SITE_URL=<your_site_url>
 
 ## Working with story state
 
@@ -167,8 +182,15 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - consumable: Advantage on use, consumed immediately
   - story: Advantage on use, never breaks/consumed (quest items)
   - misc: Prevents disadvantage, never breaks/consumed
+- **Resource System**:
+  - Required amount: DC ÷ 10 (minimum 5)
+  - Insufficient resource penalty: -DC÷10 to dice roll (minimum -5)
+  - Success: Recovers DC ÷ 20 points (minimum 1), capped at max value
+  - Failure: Loses DC ÷ 10 points (minimum 5)
+  - Players keep skill bonus but dice roll is penalized when under-resourced
 - **Custom input**: handleCustomInput function allows free-form text submission to AI without predefined choices.
 - **Retry system**: handleRetry removes last AI response and regenerates with same context.
+- **TTS Integration**: Auto-generate narration clears old audio on text change, triggers handlePlay after 500ms delay when enabled.
 
 ## Extending the app
 

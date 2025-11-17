@@ -16,6 +16,7 @@ import { useNotification } from "../misc/NotificationContext";
 import { supabase } from "../misc/supabase";
 import { compressImage } from "../misc/imageCompression";
 import CustomVoiceManager from "../components/CustomVoiceManager";
+import { AI_MODELS } from "../misc/ai_prices";
 
 // Basic Settings Component
 interface BasicSettingsForm {
@@ -3160,29 +3161,34 @@ export default function MenuPage({
                       <select
                         value={
                           typeof window !== "undefined"
-                            ? localStorage.getItem("aiModel") || "deep-seek/deepseek-chat"
-                            : "deep-seek/deepseek-chat"
+                            ? localStorage.getItem("aiModel") ||
+                              "deep-seek/deepseek-chat-120"
+                            : "deep-seek/deepseek-chat-120"
                         }
                         onChange={(e) => {
                           if (typeof window !== "undefined") {
                             localStorage.setItem("aiModel", e.target.value);
                             addNotification(
-                              `🤖 Model changed to ${e.target.options[e.target.selectedIndex].text}`,
+                              `🤖 Model changed to ${
+                                e.target.options[e.target.selectedIndex].text
+                              }`,
                               "success"
                             );
                           }
                         }}
                         className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                       >
-                        <option value="deep-seek/deepseek-chat">
-                          DeepSeek Chat (1 token)
-                        </option>
-                        <option value="x-ai/grok-4-fast">
-                          Grok 4 Fast (1 token)
-                        </option>
+                        {Object.entries(AI_MODELS).map(([key, config]) => (
+                          <option key={key} value={key}>
+                            {config.name} ({config.cost} coins
+                            {config.cost > 1 ? "s" : ""})
+                          </option>
+                        ))}
                       </select>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                        Select the AI model used for story generation. Different models may have different writing styles and response times.
+                        Select the AI model used for story generation. Different
+                        models may have different writing styles and response
+                        times.
                       </p>
                     </div>
 
@@ -3259,7 +3265,7 @@ export default function MenuPage({
                       <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                         🔊 TTS Voice Settings
                       </h5>
-                      
+
                       <CustomVoiceManager addNotification={addNotification} />
 
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 mt-4">

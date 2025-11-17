@@ -780,9 +780,10 @@ function StoryPageContent() {
     const payload = {
       storyData: minimalStoryData,
       userChoice: null, // No specific choice, just custom text
-      model: typeof window !== "undefined" 
-        ? localStorage.getItem("aiModel") || undefined 
-        : undefined,
+      model:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModel") || undefined
+          : undefined,
     };
 
     const payloadSize = JSON.stringify(payload).length;
@@ -1324,9 +1325,10 @@ function StoryPageContent() {
     const payload = {
       storyData: minimalStoryData,
       userChoice: choices.choices[key],
-      model: typeof window !== "undefined" 
-        ? localStorage.getItem("aiModel") || undefined 
-        : undefined,
+      model:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModel") || undefined
+          : undefined,
     };
 
     const payloadSize = JSON.stringify(payload).length;
@@ -1591,11 +1593,12 @@ function StoryPageContent() {
       scene: { parts: recentParts },
     };
 
-    const payload = { 
+    const payload = {
       storyData: minimalStoryData,
-      model: typeof window !== "undefined" 
-        ? localStorage.getItem("aiModel") || undefined 
-        : undefined,
+      model:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModel") || undefined
+          : undefined,
     };
 
     await fetch("/api/story/next", {
