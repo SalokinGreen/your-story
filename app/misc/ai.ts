@@ -76,11 +76,11 @@ Resource System:
 - Choose resources that thematically fit the action: use Stamina for running/escaping, Health for combat/dangerous situations, Mana for spellcasting, etc.
 - Resource requirements are DYNAMIC based on DC:
   * Required amount: DC ÷ 10 (rounded down, minimum 5)
-  * If player has insufficient resource: rolls WITHOUT skill bonus (disadvantage can still stack on top)
-  * On success: consumes DC ÷ 20 points (minimum 1)
-  * On failure: additional penalty of DC ÷ 10 points (minimum 5)
-- Example: DC 120 requires 12 resource points. Success costs 6 points, failure costs additional 12 points.
-- This creates meaningful risk/reward - higher DC actions demand more resources and have steeper failure costs.
+  * If player has insufficient resource: dice roll receives -DC÷10 penalty (minimum -5)
+  * On success: RECOVERS DC ÷ 20 points (minimum 1), capped at max value
+  * On failure: loses DC ÷ 10 points (minimum 5)
+- Example: DC 120 requires 12 resource points. Insufficient resources = -12 to dice roll. Success recovers 6 points, failure loses 12 points.
+- This creates meaningful risk/reward - higher DC actions demand more resources but reward success with recovery.
 
 Guidelines:
 - Always provide at least six choices.

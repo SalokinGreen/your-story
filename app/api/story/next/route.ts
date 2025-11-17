@@ -3,33 +3,35 @@ import { StoryData } from "@/app/misc/structs";
 import { buildMessages, coerceToScenePart, ChatMessage } from "@/app/misc/ai";
 import { createClient } from "@supabase/supabase-js";
 import { hasEnoughTokens, deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
+import { getModelConfig } from "@/app/misc/ai_prices";
 
 export const runtime = "nodejs";
 
 interface RequestBody {
   storyData: StoryData;
   userChoice?: string;
+  model?: string; // Optional model selection
 }
 
-interface DeepseekChoice {
+interface AIChoice {
   index: number;
   message: { role: "assistant" | "user" | "system"; content: string };
   finish_reason?: string;
 }
 
-interface DeepseekUsage {
+interface AIUsage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
 }
 
-interface DeepseekResponse {
+interface AIResponse {
   id: string;
   object: string;
   created: number;
   model: string;
-  choices: DeepseekChoice[];
-  usage?: DeepseekUsage;
+  choices: AIChoice[];
+  usage?: AIUsage;
 }
 
 export async function POST(req: NextRequest) {
@@ -103,7 +105,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { storyData, userChoice } = body;
+  const { storyData, userChoice, model: requestedModel } = body;
   if (!storyData) {
     return NextResponse.json(
       { error: "Missing storyData in request body" },
@@ -111,16 +113,38 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  console.log("Using Deepseek API Key:", apiKey ? "FOUND" : "MISSING");
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Server not configured: missing DEEPSEEK_API_KEY" },
-      { status: 500 }
-    );
+  // Get model configuration
+  const modelKey = requestedModel || process.env.DEFAULT_AI_MODEL || "deep-seek/deepseek-chat";
+  const modelConfig = getModelConfig(modelKey);
+  console.log("Using model:", modelConfig.name, "Provider:", modelConfig.provider);
+
+  // Get appropriate API key based on provider
+  let apiKey: string | undefined;
+  let apiUrl: string;
+  
+  if (modelConfig.provider === "openrouter") {
+    apiKey = process.env.OPENROUTER_API_KEY;
+    apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+    console.log("OpenRouter API Key:", apiKey ? "FOUND" : "MISSING");
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "Server not configured: missing OPENROUTER_API_KEY" },
+        { status: 500 }
+      );
+    }
+  } else {
+    // DeepSeek provider
+    apiKey = process.env.DEEPSEEK_API_KEY;
+    apiUrl = "https://api.deepseek.com/chat/completions";
+    console.log("DeepSeek API Key:", apiKey ? "FOUND" : "MISSING");
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "Server not configured: missing DEEPSEEK_API_KEY" },
+        { status: 500 }
+      );
+    }
   }
 
-  const model = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
   let messages: ChatMessage[] = buildMessages({ storyData, userChoice });
   // Filter out duplicate messages
   messages = messages.filter((msg, index, self) =>
@@ -130,41 +154,50 @@ export async function POST(req: NextRequest) {
   console.log("Last message length:", messages[messages.length - 1]?.content?.length || 0);
   
   try {
-    console.log("Calling Deepseek API...");
+    console.log(`Calling ${modelConfig.provider} API...`);
     
     // Add timeout to prevent hanging requests
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
-    const resp = await fetch("https://api.deepseek.com/chat/completions", {
+    // Build headers based on provider
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    };
+    
+    // Add OpenRouter-specific headers
+    if (modelConfig.provider === "openrouter") {
+      headers["HTTP-Referer"] = process.env.NEXT_PUBLIC_SITE_URL || "https://your-story.app";
+      headers["X-Title"] = "Your Story - Interactive Fiction";
+    }
+    
+    const resp = await fetch(apiUrl, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
-        model,
+        model: modelConfig.model,
         messages,
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: modelConfig.maxOutputTokens,
         stream: false,
       }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-    console.log("Deepseek response status:", resp.status);
+    console.log(`${modelConfig.provider} response status:`, resp.status);
     
     if (!resp.ok) {
       const text = await resp.text();
-      console.error("Deepseek error response:", text);
+      console.error(`${modelConfig.provider} error response:`, text);
       return NextResponse.json(
-        { error: `Deepseek error: ${resp.status} ${resp.statusText}`, details: text },
+        { error: `${modelConfig.provider} error: ${resp.status} ${resp.statusText}`, details: text },
         { status: 502 }
       );
     }
 
-    const data = (await resp.json()) as DeepseekResponse;
-    console.log("Deepseek response received. Choices:", data.choices?.length || 0);
+    const data = (await resp.json()) as AIResponse;
+    console.log(`${modelConfig.provider} response received. Choices:`, data.choices?.length || 0);
     
     const content = data.choices?.[0]?.message?.content ?? "";
     console.log("Content:", content);
@@ -201,9 +234,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       part,
       meta: { 
-        model: data.model, 
+        model: data.model,
+        modelName: modelConfig.name,
+        provider: modelConfig.provider,
         usage: data.usage,
         tokensDeducted: REQUIRED_TOKENS,
+        tokenCost: modelConfig.cost,
         remainingBalance: updatedBalance
       }
     });
@@ -220,7 +256,7 @@ export async function POST(req: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: "Failed to call Deepseek API", details: error.message, stack: error.stack },
+      { error: "Failed to call AI API", details: error.message, stack: error.stack },
       { status: 500 }
     );
   }

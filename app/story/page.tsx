@@ -780,6 +780,9 @@ function StoryPageContent() {
     const payload = {
       storyData: minimalStoryData,
       userChoice: null, // No specific choice, just custom text
+      model: typeof window !== "undefined" 
+        ? localStorage.getItem("aiModel") || undefined 
+        : undefined,
     };
 
     const payloadSize = JSON.stringify(payload).length;
@@ -1035,26 +1038,18 @@ function StoryPageContent() {
       if (resource) {
         const dc = choice.skill_dc || 0;
         const requiredAmount = Math.max(5, Math.floor(dc / 10)); // DC ÷ 10, minimum 5
-        const successCost = Math.max(1, Math.floor(dc / 20)); // DC ÷ 20, minimum 1
 
         resourceUsedBefore = resource.value;
 
         // Check if player has enough resource
         if (resource.value < requiredAmount) {
           insufficientResource = true;
+          const penalty = Math.max(5, Math.floor(dc / 10)); // DC ÷ 10, minimum 5
           addNotification(
-            `⚠️ Insufficient ${resource.name}! Need ${requiredAmount}, have ${resource.value}. Rolling without skill bonus!`,
+            `⚠️ Insufficient ${resource.name}! Need ${requiredAmount}, have ${resource.value}. Roll penalty: -${penalty}`,
             "warning"
           );
         }
-
-        // Consume resource on use
-        resource.value = Math.max(0, resource.value - successCost);
-        resourceUsedAfter = resource.value;
-        addNotification(
-          `📊 ${resource.name}: ${resourceUsedBefore} → ${resourceUsedAfter}`,
-          "info"
-        );
       } else {
         addNotification(
           `⚠️ Resource not found: ${choice.resource_used}`,
@@ -1070,8 +1065,11 @@ function StoryPageContent() {
           ?.value || 0;
       const dc = choice.skill_dc || 0;
 
-      // Apply stat bonus only if player has sufficient resource
-      const effectiveStatValue = insufficientResource ? 0 : statValue;
+      // Calculate dice penalty if insufficient resource
+      const dicePenalty = insufficientResource
+        ? Math.max(5, Math.floor(dc / 10))
+        : 0;
+      const effectiveDiceRoll = Math.max(1, dice_roll - dicePenalty);
 
       // Handle guaranteed success
       if (momentumMode === "guarantee") {
@@ -1081,18 +1079,40 @@ function StoryPageContent() {
           "success"
         );
       } else {
-        const total = dice_roll + effectiveStatValue;
+        const total = effectiveDiceRoll + statValue;
         const dc_passed = dice_roll === 100 || total >= dc;
 
         if (dc_passed) {
           skillCheckResult = "success";
-          const bonusText = insufficientResource
-            ? " (no skill bonus - insufficient resource)"
+          const penaltyText = insufficientResource
+            ? ` (-${dicePenalty} dice penalty from insufficient resource)`
             : "";
           addNotification(
-            `✓ Check Passed! (${choice.skill_used}: ${dice_roll} + ${effectiveStatValue} = ${total} ≥ ${dc})${bonusText}`,
+            `✓ Check Passed! (${choice.skill_used}: ${dice_roll}${
+              insufficientResource ? ` - ${dicePenalty}` : ""
+            } + ${statValue} = ${total} ≥ ${dc})${penaltyText}`,
             "success"
           );
+
+          // Recover resource on success
+          if (choice.resource_used) {
+            const resource = storyData.resources.find(
+              (r) => r.name === choice.resource_used
+            );
+            if (resource) {
+              const recovery = Math.max(1, Math.floor(dc / 20)); // DC ÷ 20, minimum 1
+              const beforeRecovery = resource.value;
+              resource.value = Math.min(
+                resource.maxValue,
+                resource.value + recovery
+              );
+              resourceUsedAfter = resource.value;
+              addNotification(
+                `✨ ${resource.name} recovered: ${beforeRecovery} → ${resourceUsedAfter} (+${recovery})`,
+                "success"
+              );
+            }
+          }
 
           // Earn momentum on success (not when using guarantee or reroll)
           if (momentumMode === "none") {
@@ -1122,11 +1142,13 @@ function StoryPageContent() {
           }
         } else {
           skillCheckResult = "failure";
-          const bonusText = insufficientResource
-            ? " (no skill bonus - insufficient resource)"
+          const penaltyText = insufficientResource
+            ? ` (-${dicePenalty} dice penalty from insufficient resource)`
             : "";
           addNotification(
-            `✗ Check Failed! (${choice.skill_used}: ${dice_roll} + ${effectiveStatValue} = ${total} < ${dc})${bonusText}`,
+            `✗ Check Failed! (${choice.skill_used}: ${dice_roll}${
+              insufficientResource ? ` - ${dicePenalty}` : ""
+            } + ${statValue} = ${total} < ${dc})${penaltyText}`,
             "failure"
           );
 
@@ -1302,6 +1324,9 @@ function StoryPageContent() {
     const payload = {
       storyData: minimalStoryData,
       userChoice: choices.choices[key],
+      model: typeof window !== "undefined" 
+        ? localStorage.getItem("aiModel") || undefined 
+        : undefined,
     };
 
     const payloadSize = JSON.stringify(payload).length;
@@ -1566,7 +1591,12 @@ function StoryPageContent() {
       scene: { parts: recentParts },
     };
 
-    const payload = { storyData: minimalStoryData };
+    const payload = { 
+      storyData: minimalStoryData,
+      model: typeof window !== "undefined" 
+        ? localStorage.getItem("aiModel") || undefined 
+        : undefined,
+    };
 
     await fetch("/api/story/next", {
       method: "POST",

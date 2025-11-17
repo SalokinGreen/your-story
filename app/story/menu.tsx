@@ -3084,7 +3084,7 @@ export default function MenuPage({
                 { id: "quests", label: "📜 Quests", icon: "📜" },
                 { id: "lore", label: "📚 Lore", icon: "📚" },
                 { id: "story", label: "📖 Story", icon: "📖" },
-                { id: "tts", label: "🔊 TTS", icon: "🔊" },
+                { id: "tts", label: "🤖 AI Config", icon: "🤖" },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -3149,10 +3149,43 @@ export default function MenuPage({
               {activeTab === "tts" && (
                 <div className="space-y-6">
                   <h4 className="text-lg font-bold text-gray-900 dark:text-white">
-                    🔊 Text-to-Speech Settings
+                    🤖 AI Configuration
                   </h4>
 
                   <div className="space-y-4">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                        🤖 AI Model Selection
+                      </label>
+                      <select
+                        value={
+                          typeof window !== "undefined"
+                            ? localStorage.getItem("aiModel") || "deep-seek/deepseek-chat"
+                            : "deep-seek/deepseek-chat"
+                        }
+                        onChange={(e) => {
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem("aiModel", e.target.value);
+                            addNotification(
+                              `🤖 Model changed to ${e.target.options[e.target.selectedIndex].text}`,
+                              "success"
+                            );
+                          }
+                        }}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="deep-seek/deepseek-chat">
+                          DeepSeek Chat (1 token)
+                        </option>
+                        <option value="x-ai/grok-4-fast">
+                          Grok 4 Fast (1 token)
+                        </option>
+                      </select>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                        Select the AI model used for story generation. Different models may have different writing styles and response times.
+                      </p>
+                    </div>
+
                     <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
                       <input
                         type="checkbox"
@@ -3222,10 +3255,14 @@ export default function MenuPage({
                       </div>
                     </label>
 
-                    <CustomVoiceManager addNotification={addNotification} />
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                        🔊 TTS Voice Settings
+                      </h5>
+                      
+                      <CustomVoiceManager addNotification={addNotification} />
 
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 mt-4">
                         Default Volume:{" "}
                         {Math.round(
                           (typeof window !== "undefined"

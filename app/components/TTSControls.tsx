@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { getAuthToken } from "../misc/getAuthToken";
 
@@ -69,6 +69,8 @@ export default function TTSControls({
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const savedAudioBlobRef = useRef<Blob | null>(null);
+  const lastTextRef = useRef<string>("");
+  const autoGenerateTriggeredRef = useRef<boolean>(false);
 
   const ttsEnabled = getTTSSettings().enabled;
 
@@ -97,24 +99,7 @@ export default function TTSControls({
     localStorage.setItem("ttsVolume", volume.toString());
   }, [volume]);
 
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, [text]);
-
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    setIsPlaying(false);
-    setIsPaused(false);
-  }, [text]);
-
-  const handlePlay = async () => {
+  const handlePlay = useCallback(async () => {
     if (disabled || !text.trim()) return;
 
     if (audioRef.current && isPaused) {
@@ -225,7 +210,54 @@ export default function TTSControls({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [
+    disabled,
+    text,
+    isPaused,
+    audioUrl,
+    volume,
+    selectedVoice,
+    addNotification,
+  ]);
+
+  // Handle text changes - clear audio and trigger auto-generate
+  useEffect(() => {
+    // Check if text has changed
+    if (text !== lastTextRef.current) {
+      lastTextRef.current = text;
+
+      // Clear everything when text changes
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+        setAudioUrl(null);
+      }
+      savedAudioBlobRef.current = null;
+      setIsPlaying(false);
+      setIsPaused(false);
+      autoGenerateTriggeredRef.current = false;
+
+      // Auto-generate TTS if enabled
+      const autoGenerate = localStorage.getItem("ttsAutoGenerate") === "true";
+      if (
+        autoGenerate &&
+        text.trim() &&
+        ttsEnabled &&
+        !disabled &&
+        !autoGenerateTriggeredRef.current
+      ) {
+        autoGenerateTriggeredRef.current = true;
+        // Small delay to ensure component is ready
+        const timer = setTimeout(() => {
+          handlePlay();
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [text, disabled, ttsEnabled, handlePlay, audioUrl]);
 
   const handlePause = () => {
     if (audioRef.current) {
