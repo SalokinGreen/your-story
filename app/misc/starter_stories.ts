@@ -65,7 +65,7 @@ const goblin_layer: StoryData = {
         { name: "Sex Appeal", value: 30, description: "Your attractiveness and charm and ability in the sheets.", symbol: "💋" }
     ],
     resources: [{ name: "Health", value: 100, maxValue: 100, description: "Your overall health and vitality.", symbol: "❤️" }, { name: "Stamina", value: 80, maxValue: 100, description: "Your energy levels for physical activities.", symbol: "⚡" }, { name: "Mana", value: 50, maxValue: 100, description: "Your magical energy for casting spells.", symbol: "🔮" }],
-    inventory: [{name: "Gold Coins", description: "Currency used for trading and purchasing items.", quantity: 150, symbol: "🪙"}, {name: "Dagger", description: "A small, sharp blade useful for close combat and stealth attacks.", quantity: 1, symbol: "🗡️"}, {name: "Dick Potion", description: "A potion that increases your dick size and stamina.", quantity: 3, symbol: "🧪"}],
+    inventory: [{name: "Gold Coins", description: "Currency used for trading and purchasing items.", quantity: 150, symbol: "🪙", type: "misc", stat: "", resource: ""}, {name: "Dagger", description: "A small, sharp blade useful for close combat and stealth attacks.", quantity: 1, symbol: "🗡️", type: "normal", stat: "", resource: ""}, {name: "Dick Potion", description: "A potion that increases your dick size and stamina.", quantity: 3, symbol: "🧪", type: "consumable", stat: "", resource: ""}],
     achievements: [{ title: "Goblin Slayer", description: "Defeat your first goblin in the lair.", symbol: "🗡️", dateAchieved: null, points: 10 }, { title: "Stealth Master", description: "Successfully sneak past 10 goblin guards without being detected.", symbol: "🕵️‍♂️", dateAchieved: null, points: 20 }],
     lore: [],
     momentum: 3,
