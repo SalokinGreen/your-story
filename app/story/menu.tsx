@@ -3188,6 +3188,40 @@ export default function MenuPage({
                       </div>
                     </label>
 
+                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={
+                          typeof window !== "undefined" &&
+                          localStorage.getItem("ttsAutoGenerate") === "true"
+                        }
+                        onChange={(e) => {
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem(
+                              "ttsAutoGenerate",
+                              e.target.checked ? "true" : "false"
+                            );
+                            addNotification(
+                              e.target.checked
+                                ? "🤖 Auto-generate enabled"
+                                : "🤖 Auto-generate disabled",
+                              "success"
+                            );
+                          }
+                        }}
+                        className="w-5 h-5 rounded text-blue-600"
+                      />
+                      <div>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          Auto-Generate Narration
+                        </span>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Automatically generate audio when new story content
+                          appears
+                        </p>
+                      </div>
+                    </label>
+
                     <CustomVoiceManager addNotification={addNotification} />
 
                     <div>

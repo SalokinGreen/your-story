@@ -86,7 +86,6 @@ export interface Choice {
   skill_used?: string;
   skill_dc?: number;
   resource_used?: string;
-  risked_resource?: string;
 }
 export interface Scene {
   parts: ScenePart[];

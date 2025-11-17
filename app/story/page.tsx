@@ -935,8 +935,7 @@ function StoryPageContent() {
     let itemBroken = false;
     let resourceUsedBefore = 0;
     let resourceUsedAfter = 0;
-    let resourceLostBefore = 0;
-    let resourceLostAfter = 0;
+    let insufficientResource = false;
     let skillCheckResult = "";
 
     // Process item usage
@@ -1028,23 +1027,37 @@ function StoryPageContent() {
       addNotification(`🎲 Reroll used! Better roll: ${dice_roll}`, "success");
     }
 
-    // Process resource usage
+    // Process resource usage (resource is automatically at risk on skill check failure)
     if (choice.resource_used) {
       const resource = storyData.resources.find(
         (r) => r.name === choice.resource_used
       );
       if (resource) {
+        const dc = choice.skill_dc || 0;
+        const requiredAmount = Math.max(5, Math.floor(dc / 10)); // DC ÷ 10, minimum 5
+        const successCost = Math.max(1, Math.floor(dc / 20)); // DC ÷ 20, minimum 1
+
         resourceUsedBefore = resource.value;
-        const usage = Math.max(1, Math.floor(resource.maxValue * 0.1));
-        resource.value = Math.max(0, resource.value - usage);
+
+        // Check if player has enough resource
+        if (resource.value < requiredAmount) {
+          insufficientResource = true;
+          addNotification(
+            `⚠️ Insufficient ${resource.name}! Need ${requiredAmount}, have ${resource.value}. Rolling without skill bonus!`,
+            "warning"
+          );
+        }
+
+        // Consume resource on use
+        resource.value = Math.max(0, resource.value - successCost);
         resourceUsedAfter = resource.value;
         addNotification(
-          `Used ${usage} ${choice.resource_used} (${resource.value}/${resource.maxValue} remaining)`,
+          `📊 ${resource.name}: ${resourceUsedBefore} → ${resourceUsedAfter}`,
           "info"
         );
       } else {
         addNotification(
-          `Resource not found: ${choice.resource_used}`,
+          `⚠️ Resource not found: ${choice.resource_used}`,
           "warning"
         );
       }
@@ -1057,6 +1070,9 @@ function StoryPageContent() {
           ?.value || 0;
       const dc = choice.skill_dc || 0;
 
+      // Apply stat bonus only if player has sufficient resource
+      const effectiveStatValue = insufficientResource ? 0 : statValue;
+
       // Handle guaranteed success
       if (momentumMode === "guarantee") {
         skillCheckResult = "success";
@@ -1065,13 +1081,16 @@ function StoryPageContent() {
           "success"
         );
       } else {
-        const total = dice_roll + statValue;
+        const total = dice_roll + effectiveStatValue;
         const dc_passed = dice_roll === 100 || total >= dc;
 
         if (dc_passed) {
           skillCheckResult = "success";
+          const bonusText = insufficientResource
+            ? " (no skill bonus - insufficient resource)"
+            : "";
           addNotification(
-            `✓ Check Passed! (${choice.skill_used}: ${dice_roll} + ${statValue} = ${total} ≥ ${dc})`,
+            `✓ Check Passed! (${choice.skill_used}: ${dice_roll} + ${effectiveStatValue} = ${total} ≥ ${dc})${bonusText}`,
             "success"
           );
 
@@ -1103,23 +1122,26 @@ function StoryPageContent() {
           }
         } else {
           skillCheckResult = "failure";
+          const bonusText = insufficientResource
+            ? " (no skill bonus - insufficient resource)"
+            : "";
           addNotification(
-            `✗ Check Failed! (${choice.skill_used}: ${dice_roll} + ${statValue} = ${total} < ${dc})`,
+            `✗ Check Failed! (${choice.skill_used}: ${dice_roll} + ${effectiveStatValue} = ${total} < ${dc})${bonusText}`,
             "failure"
           );
 
-          // Handle risked resource loss on failure
-          if (choice.risked_resource) {
+          // On failure: lose additional resource if one was used (DC-based penalty)
+          if (choice.resource_used) {
             const resource = storyData.resources.find(
-              (r) => r.name === choice.risked_resource
+              (r) => r.name === choice.resource_used
             );
             if (resource) {
-              resourceLostBefore = resource.value;
-              const loss = Math.max(1, Math.floor(resource.maxValue * 0.2));
-              resource.value = Math.max(0, resource.value - loss);
-              resourceLostAfter = resource.value;
+              const lossBefore = resource.value;
+              const penalty = Math.max(5, Math.floor(dc / 10)); // DC ÷ 10, minimum 5
+              resource.value = Math.max(0, resource.value - penalty);
+              const lossAfter = resource.value;
               addNotification(
-                `Lost ${loss} ${choice.risked_resource} from failure! (${resource.value}/${resource.maxValue} remaining)`,
+                `💔 ${resource.name} lost from failure: ${lossBefore} → ${lossAfter} (-${penalty})`,
                 "failure"
               );
             }
@@ -1161,7 +1183,10 @@ function StoryPageContent() {
       }
 
       // Build skill check line
-      choiceDetails.push(`[ ${choice.skill_used}: ${skillCheckResult} ]`);
+      const insufficientText = insufficientResource ? " ⚠️ NO SKILL BONUS" : "";
+      choiceDetails.push(
+        `[ ${choice.skill_used}: ${skillCheckResult}${insufficientText} ]`
+      );
     }
 
     // Build item usage line
@@ -1181,25 +1206,15 @@ function StoryPageContent() {
       }
     }
 
-    // Build resource usage line
+    // Build resource usage line (includes any additional loss from failure)
     if (choice.resource_used && resourceUsedBefore > 0) {
       const resource = storyData.resources.find(
         (r) => r.name === choice.resource_used
       );
       const maxValue = resource?.maxValue || 100;
+      const currentValue = resource?.value || 0;
       choiceDetails.push(
-        `[ Resource used: ${choice.resource_used} ${resourceUsedBefore} → ${resourceUsedAfter}/${maxValue} ]`
-      );
-    }
-
-    // Build resource lost line (only if actually lost)
-    if (resourceLostBefore > 0 && resourceLostAfter < resourceLostBefore) {
-      const resource = storyData.resources.find(
-        (r) => r.name === choice.risked_resource
-      );
-      const maxValue = resource?.maxValue || 100;
-      choiceDetails.push(
-        `[ Resource lost: ${choice.risked_resource} ${resourceLostBefore} → ${resourceLostAfter}/${maxValue} ]`
+        `[ Resource: ${choice.resource_used} ${resourceUsedBefore} → ${currentValue}/${maxValue} ]`
       );
     }
 

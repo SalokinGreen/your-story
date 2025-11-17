@@ -67,9 +67,20 @@ Story prose here. Write your narrative content between these tags.
 IMPORTANT: The <story></story> tags are MANDATORY. Never write story text without wrapping it in <story> tags. All narrative content must be enclosed in <story></story> tags.
 
 Choice Syntax:
-- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; risk_resource: resource name or none; use_item: item name or none; item_loss: true or false>
+- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; item_loss: true or false>
 Example:
-- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 50); use_item: Stamina Potion; item_loss: true>
+- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 50); use_resource: Stamina; use_item: Stamina Potion; item_loss: true>
+
+Resource System:
+- When a choice uses a resource (use_resource), that resource is AUTOMATICALLY at risk if the skill check fails.
+- Choose resources that thematically fit the action: use Stamina for running/escaping, Health for combat/dangerous situations, Mana for spellcasting, etc.
+- Resource requirements are DYNAMIC based on DC:
+  * Required amount: DC ÷ 10 (rounded down, minimum 5)
+  * If player has insufficient resource: rolls WITHOUT skill bonus (disadvantage can still stack on top)
+  * On success: consumes DC ÷ 20 points (minimum 1)
+  * On failure: additional penalty of DC ÷ 10 points (minimum 5)
+- Example: DC 120 requires 12 resource points. Success costs 6 points, failure costs additional 12 points.
+- This creates meaningful risk/reward - higher DC actions demand more resources and have steeper failure costs.
 
 Guidelines:
 - Always provide at least six choices.
@@ -373,21 +384,12 @@ export function outputToScenePart(text: string): ScenePart {
         }
       }
 
-      // Parse use_resource: name
+      // Parse use_resource: name (automatically at risk on failure)
       const resourceMatch = metadata.match(/use_resource:\s*([^;]+?)(?:;|$)/i);
       if (resourceMatch) {
         const resourceName = resourceMatch[1].trim();
         if (resourceName.toLowerCase() !== "none") {
           choice.resource_used = resourceName;
-        }
-      }
-
-      // Parse risk_resource: name
-      const riskMatch = metadata.match(/risk_resource:\s*([^;]+?)(?:;|$)/i);
-      if (riskMatch) {
-        const riskName = riskMatch[1].trim();
-        if (riskName.toLowerCase() !== "none") {
-          choice.risked_resource = riskName;
         }
       }
 

@@ -99,8 +99,8 @@ export default function CustomVoiceManager({
           </div>
         )}
         <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-          💡 Add custom Speechify voice IDs. Built-in voices: mrbeast, henry,
-          snoop, gwyneth, cliff, george
+          💡 Add custom Speechify voice IDs. Built-in voices: henry, snoop,
+          gwyneth, cliff, george
         </p>
       </div>
     </div>

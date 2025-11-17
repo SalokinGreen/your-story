@@ -10,7 +10,6 @@ interface TTSControlsProps {
 }
 
 const VOICES = [
-  { id: "mrbeast", name: "MrBeast", emoji: "🎬" },
   { id: "henry", name: "Henry (British)", emoji: "🇬🇧" },
   { id: "snoop", name: "Snoop", emoji: "🎤" },
   { id: "gwyneth", name: "Gwyneth", emoji: "🎭" },
@@ -57,6 +56,10 @@ export default function TTSControls({
   const [isLoading, setIsLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [selectedVoice, setSelectedVoice] = useState(() => {
+    if (typeof window !== "undefined") {
+      const lastVoice = localStorage.getItem("ttsLastVoice");
+      if (lastVoice) return lastVoice;
+    }
     const allVoices = getAllVoices();
     const settings = getTTSSettings();
     return settings.customVoice || allVoices[0]?.id || VOICES[0].id;
@@ -69,8 +72,11 @@ export default function TTSControls({
 
   const ttsEnabled = getTTSSettings().enabled;
 
-  // Clear saved audio when voice changes
+  // Clear saved audio when voice changes and save to localStorage
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ttsLastVoice", selectedVoice);
+    }
     savedAudioBlobRef.current = null;
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
