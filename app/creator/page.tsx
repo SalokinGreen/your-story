@@ -2299,35 +2299,40 @@ function AdventureCreatorContent() {
                           Value: {stat.value}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => moveStatUp(index)}
-                          disabled={index === 0}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                          title="Move up"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          onClick={() => moveStatDown(index)}
-                          disabled={index === stats.length - 1}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                          title="Move down"
-                        >
-                          ▼
-                        </button>
-                        <button
-                          onClick={() => startEditStat(index)}
-                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => removeStat(index)}
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          Remove
-                        </button>
+                      {/* Button Area */}
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => moveStatUp(index)}
+                            disabled={index === 0}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move up"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            onClick={() => moveStatDown(index)}
+                            disabled={index === stats.length - 1}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move down"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => startEditStat(index)}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => removeStat(index)}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -2590,35 +2595,39 @@ function AdventureCreatorContent() {
                           {resource.value}/{resource.maxValue}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => moveResourceUp(index)}
-                          disabled={index === 0}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                          title="Move up"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          onClick={() => moveResourceDown(index)}
-                          disabled={index === resources.length - 1}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                          title="Move down"
-                        >
-                          ▼
-                        </button>
-                        <button
-                          onClick={() => startEditResource(index)}
-                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => removeResource(index)}
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          Remove
-                        </button>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => moveResourceUp(index)}
+                            disabled={index === 0}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move up"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            onClick={() => moveResourceDown(index)}
+                            disabled={index === resources.length - 1}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move down"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => startEditResource(index)}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => removeResource(index)}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -2887,35 +2896,39 @@ function AdventureCreatorContent() {
                           {item.type}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => moveInventoryUp(index)}
-                          disabled={index === 0}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                          title="Move up"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          onClick={() => moveInventoryDown(index)}
-                          disabled={index === inventory.length - 1}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                          title="Move down"
-                        >
-                          ▼
-                        </button>
-                        <button
-                          onClick={() => startEditInventoryItem(index)}
-                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => removeInventoryItem(index)}
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          Remove
-                        </button>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => moveInventoryUp(index)}
+                            disabled={index === 0}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move up"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            onClick={() => moveInventoryDown(index)}
+                            disabled={index === inventory.length - 1}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move down"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => startEditInventoryItem(index)}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => removeInventoryItem(index)}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -3879,35 +3892,39 @@ function AdventureCreatorContent() {
                               </div>
                             )}
                         </div>
-                        <div className="flex flex-col gap-2 ml-3">
-                          <button
-                            onClick={() => moveLoreUp(index)}
-                            disabled={index === 0}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move up"
-                          >
-                            ▲
-                          </button>
-                          <button
-                            onClick={() => moveLoreDown(index)}
-                            disabled={index === lore.length - 1}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move down"
-                          >
-                            ▼
-                          </button>
-                          <button
-                            onClick={() => startEditLore(index)}
-                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            onClick={() => removeLore(index)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            Remove
-                          </button>
+                        <div className="flex flex-col items-center  gap-2 ml-3">
+                          <div className="flex flex-row items-center gap-1 ml-3">
+                            <button
+                              onClick={() => moveLoreUp(index)}
+                              disabled={index === 0}
+                              className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                              title="Move up"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              onClick={() => moveLoreDown(index)}
+                              disabled={index === lore.length - 1}
+                              className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                              title="Move down"
+                            >
+                              ▼
+                            </button>
+                          </div>
+                          <div className="flex flex-row items-center gap-1 ml-3">
+                            <button
+                              onClick={() => startEditLore(index)}
+                              className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => removeLore(index)}
+                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -4240,35 +4257,39 @@ function AdventureCreatorContent() {
                           {achievement.points} points
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => moveAchievementUp(index)}
-                          disabled={index === 0}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                          title="Move up"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          onClick={() => moveAchievementDown(index)}
-                          disabled={index === achievements.length - 1}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                          title="Move down"
-                        >
-                          ▼
-                        </button>
-                        <button
-                          onClick={() => startEditAchievement(index)}
-                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => removeAchievement(index)}
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          Remove
-                        </button>
+                      <div className="flex flex-col items-center  gap-2 ml-3">
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => moveAchievementUp(index)}
+                            disabled={index === 0}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move up"
+                          >
+                            ▲
+                          </button>
+                        </div>
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => moveAchievementDown(index)}
+                            disabled={index === achievements.length - 1}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move down"
+                          >
+                            ▼
+                          </button>
+                          <button
+                            onClick={() => startEditAchievement(index)}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => removeAchievement(index)}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -4486,36 +4507,41 @@ function AdventureCreatorContent() {
                           </div>
                         </div>
                         <div className="flex flex-col gap-2">
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => movePlotBeatUp(index)}
-                              disabled={index === 0}
-                              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs transition-colors"
-                              title="Move up"
-                            >
-                              ▲
-                            </button>
-                            <button
-                              onClick={() => movePlotBeatDown(index)}
-                              disabled={index === plotBeats.length - 1}
-                              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs transition-colors"
-                              title="Move down"
-                            >
-                              ▼
-                            </button>
+                          <div className="flex flex-col items-center  gap-2 ml-3">
+                            <div className="flex flex-row items-center gap-1 ml-3">
+                              <button
+                                onClick={() => movePlotBeatUp(index)}
+                                disabled={index === 0}
+                                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs transition-colors"
+                                title="Move up"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                onClick={() => movePlotBeatDown(index)}
+                                disabled={index === plotBeats.length - 1}
+                                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs transition-colors"
+                                title="Move down"
+                              >
+                                ▼
+                              </button>
+                            </div>
+
+                            <div className="flex flex-row items-center gap-1 ml-3">
+                              <button
+                                onClick={() => startEditPlotBeat(index)}
+                                className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => removePlotBeat(index)}
+                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </div>
-                          <button
-                            onClick={() => startEditPlotBeat(index)}
-                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            onClick={() => removePlotBeat(index)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            Remove
-                          </button>
                         </div>
                       </div>
                     )}
@@ -4905,59 +4931,63 @@ function AdventureCreatorContent() {
                           {quest.points} points
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            if (index === 0) return;
-                            const updated = [...quests];
-                            [updated[index - 1], updated[index]] = [
-                              updated[index],
-                              updated[index - 1],
-                            ];
-                            setQuests(updated);
-                          }}
-                          disabled={index === 0}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                          title="Move up"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (index === quests.length - 1) return;
-                            const updated = [...quests];
-                            [updated[index + 1], updated[index]] = [
-                              updated[index],
-                              updated[index + 1],
-                            ];
-                            setQuests(updated);
-                          }}
-                          disabled={index === quests.length - 1}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                          title="Move down"
-                        >
-                          ▼
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingQuestIndex(index);
-                            setEditQuest({ ...quest });
-                          }}
-                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Remove quest "${quest.title}"?`)) {
-                              setQuests(quests.filter((_, i) => i !== index));
-                              addNotification("Quest removed", "success");
-                            }
-                          }}
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          Remove
-                        </button>
+                      <div className="flex flex-col items-center  gap-2 ml-3">
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => {
+                              if (index === 0) return;
+                              const updated = [...quests];
+                              [updated[index - 1], updated[index]] = [
+                                updated[index],
+                                updated[index - 1],
+                              ];
+                              setQuests(updated);
+                            }}
+                            disabled={index === 0}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move up"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (index === quests.length - 1) return;
+                              const updated = [...quests];
+                              [updated[index + 1], updated[index]] = [
+                                updated[index],
+                                updated[index + 1],
+                              ];
+                              setQuests(updated);
+                            }}
+                            disabled={index === quests.length - 1}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move down"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => {
+                              setEditingQuestIndex(index);
+                              setEditQuest({ ...quest });
+                            }}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm(`Remove quest "${quest.title}"?`)) {
+                                setQuests(quests.filter((_, i) => i !== index));
+                                addNotification("Quest removed", "success");
+                              }
+                            }}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -5951,14 +5981,14 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Navigation */}
-        <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between gap-4 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
           <button
             onClick={() => {
               const prevIndex = Math.max(0, currentStepIndex - 1);
               setCurrentStep(steps[prevIndex].id);
             }}
             disabled={currentStepIndex === 0}
-            className="px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
           >
             ← Previous
           </button>
@@ -5971,7 +6001,7 @@ function AdventureCreatorContent() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-8 py-3 bg-linear-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold rounded-lg transition-all shadow-md hover:shadow-lg"
+              className="px-6 py-2 bg-linear-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold rounded-lg transition-all shadow-md hover:shadow-lg"
             >
               {saving ? "Publishing..." : "🚀 Publish Adventure"}
             </button>
@@ -5984,7 +6014,7 @@ function AdventureCreatorContent() {
                 );
                 setCurrentStep(steps[nextIndex].id);
               }}
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
             >
               Next →
             </button>

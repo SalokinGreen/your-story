@@ -201,16 +201,16 @@ export default function AdventureDetailPage() {
         </div>
 
         {/* Hero Banner */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-visible p-1 mb-8 mt-0 border border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden mb-8 border border-gray-200 dark:border-gray-700">
           {/* Banner Image or Gradient */}
           {adventure.bannerUrl ? (
             <div
-              className="h-86 bg-cover bg-center relative"
+              className="min-h-[600px] sm:min-h-[500px] md:h-96 bg-cover bg-center relative"
               style={{ backgroundImage: `url(${adventure.bannerUrl})` }}
             >
-              <div className="absolute inset-0 p-4 bg-linear-to-t from-black/70 via-black/30 to-transparent"></div>
-              <div className="absolute inset-0 p-4 sm:p-0 flex flex-col justify-around">
-                <div className="flex items-center gap-3 mb-4">
+              <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-black/20"></div>
+              <div className="absolute inset-0 p-6 sm:p-8 md:p-12 flex flex-col justify-between">
+                <div className="flex items-center gap-3">
                   {adventure.isFeatured && (
                     <span className="px-3 py-1 bg-yellow-400 text-yellow-900 rounded-full text-sm font-bold">
                       ⭐ Featured
@@ -225,15 +225,105 @@ export default function AdventureDetailPage() {
                   </span>
                 </div>
 
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mt-0 wrap-break-word">
+                <div className="flex-1 flex flex-col justify-center gap-4 my-6">
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white wrap-break-word">
+                    {adventure.title}
+                  </h1>
+
+                  <p className="text-white/90 text-lg sm:text-xl max-w-3xl wrap-break-word">
+                    {adventure.shortDescription}
+                  </p>
+
+                  <div className="flex flex-wrap gap-4 text-white/90">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">⏱️</span>
+                      <span>{adventure.estimatedDuration}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">⭐</span>
+                      <span>{adventure.rating?.toFixed(1)} / 5.0</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">👥</span>
+                      <span>
+                        {(adventure.playCount || 0).toLocaleString()} plays
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">✍️</span>
+                      <span>by {adventure.author || "Unknown"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={handleStartAdventure}
+                    disabled={startingAdventure}
+                    className="w-full sm:w-auto px-8 py-4 bg-white text-purple-600 font-bold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  >
+                    {startingAdventure ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="animate-spin rounded-full h-5 w-5 border-2 border-purple-600 border-t-transparent"></span>
+                        Starting...
+                      </span>
+                    ) : user ? (
+                      "🎮 Start Adventure"
+                    ) : (
+                      "🔐 Sign In to Play"
+                    )}
+                  </button>
+
+                  {/* Author Controls */}
+                  {isAuthor && (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={() =>
+                          router.push(`/creator?edit=${adventureId}`)
+                        }
+                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-colors"
+                      >
+                        ✏️ Edit Adventure
+                      </button>
+                      <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {deleting ? "Deleting..." : "🗑️ Delete"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 p-6 sm:p-8 md:p-12 min-h-[500px] flex flex-col justify-between">
+              <div className="flex items-center gap-3 mb-4">
+                {adventure.isFeatured && (
+                  <span className="px-3 py-1 bg-yellow-400 text-yellow-900 rounded-full text-sm font-bold">
+                    ⭐ Featured
+                  </span>
+                )}
+                <span
+                  className={`px-3 py-1 rounded-full text-sm font-bold border-2 capitalize ${getDifficultyColor(
+                    adventure.difficulty
+                  )}`}
+                >
+                  {adventure.difficulty}
+                </span>
+              </div>
+
+              <div className="flex-1 flex flex-col justify-center gap-4 my-6">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white wrap-break-word">
                   {adventure.title}
                 </h1>
 
-                <p className="text-white/90 text-lg sm:text-xl mb-6 max-w-3xl wrap-break-word">
+                <p className="text-white/90 text-lg sm:text-xl max-w-3xl wrap-break-word">
                   {adventure.shortDescription}
                 </p>
 
-                <div className="flex flex-wrap gap-4 mb-8 text-white/90">
+                <div className="flex flex-wrap gap-4 text-white/90">
                   <div className="flex items-center gap-2">
                     <span className="text-xl">⏱️</span>
                     <span>{adventure.estimatedDuration}</span>
@@ -253,14 +343,16 @@ export default function AdventureDetailPage() {
                     <span>by {adventure.author || "Unknown"}</span>
                   </div>
                 </div>
+              </div>
 
+              <div className="space-y-3">
                 <button
                   onClick={handleStartAdventure}
                   disabled={startingAdventure}
-                  className="px-8 py-4 bg-white text-purple-600 font-bold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="w-full sm:w-auto px-8 py-4 bg-white text-purple-600 font-bold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   {startingAdventure ? (
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-center justify-center gap-2">
                       <span className="animate-spin rounded-full h-5 w-5 border-2 border-purple-600 border-t-transparent"></span>
                       Starting...
                     </span>
@@ -273,7 +365,7 @@ export default function AdventureDetailPage() {
 
                 {/* Author Controls */}
                 {isAuthor && (
-                  <div className="flex gap-3 mt-4">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={() =>
                         router.push(`/creator?edit=${adventureId}`)
@@ -292,88 +384,6 @@ export default function AdventureDetailPage() {
                   </div>
                 )}
               </div>
-            </div>
-          ) : (
-            <div className="bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 p-8 sm:p-12">
-              <div className="flex items-center gap-3 mb-4">
-                {adventure.isFeatured && (
-                  <span className="px-3 py-1 bg-yellow-400 text-yellow-900 rounded-full text-sm font-bold">
-                    ⭐ Featured
-                  </span>
-                )}
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-bold border-2 capitalize ${getDifficultyColor(
-                    adventure.difficulty
-                  )}`}
-                >
-                  {adventure.difficulty}
-                </span>
-              </div>
-
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 wrap-break-word">
-                {adventure.title}
-              </h1>
-
-              <p className="text-white/90 text-lg sm:text-xl mb-6 max-w-3xl wrap-break-word">
-                {adventure.shortDescription}
-              </p>
-
-              <div className="flex flex-wrap gap-4 mb-8 text-white/90">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">⏱️</span>
-                  <span>{adventure.estimatedDuration}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">⭐</span>
-                  <span>{adventure.rating?.toFixed(1)} / 5.0</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">👥</span>
-                  <span>
-                    {(adventure.playCount || 0).toLocaleString()} plays
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">✍️</span>
-                  <span>by {adventure.author || "Unknown"}</span>
-                </div>
-              </div>
-
-              <button
-                onClick={handleStartAdventure}
-                disabled={startingAdventure}
-                className="px-8 py-4 bg-white text-purple-600 font-bold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              >
-                {startingAdventure ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin rounded-full h-5 w-5 border-2 border-purple-600 border-t-transparent"></span>
-                    Starting...
-                  </span>
-                ) : user ? (
-                  "🎮 Start Adventure"
-                ) : (
-                  "🔐 Sign In to Play"
-                )}
-              </button>
-
-              {/* Author Controls */}
-              {isAuthor && (
-                <div className="flex gap-3 mt-4">
-                  <button
-                    onClick={() => router.push(`/creator?edit=${adventureId}`)}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-colors"
-                  >
-                    ✏️ Edit Adventure
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {deleting ? "Deleting..." : "🗑️ Delete"}
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>

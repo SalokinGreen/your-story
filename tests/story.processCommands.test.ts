@@ -574,7 +574,9 @@ describe("processCommands", () => {
   describe("/create_lore command", () => {
     it("should create a new lore entry with triggers", () => {
       processCommands(
-        ["/create_lore: Ancient Order | A secret society of mages | ancient,order | disbanded"],
+        [
+          "/create_lore: Ancient Order | A secret society of mages | ancient,order | disbanded",
+        ],
         mockStoryData,
         mockNotification
       );
@@ -641,7 +643,9 @@ describe("processCommands", () => {
 
     it("should trim whitespace from triggers", () => {
       processCommands(
-        ["/create_lore: Trimmed Lore | Test content | sword , shield , armor | lost , broken "],
+        [
+          "/create_lore: Trimmed Lore | Test content | sword , shield , armor | lost , broken ",
+        ],
         mockStoryData,
         mockNotification
       );

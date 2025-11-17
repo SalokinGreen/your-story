@@ -284,10 +284,16 @@ export function processCommands(
         addNotification(`📚 Lore "${loreTitle}" already exists`, "warning");
       } else {
         const onTriggerArray = onTriggers
-          ? onTriggers.split(",").map((t) => t.trim()).filter((t) => t.length > 0)
+          ? onTriggers
+              .split(",")
+              .map((t) => t.trim())
+              .filter((t) => t.length > 0)
           : [];
         const offTriggerArray = offTriggers
-          ? offTriggers.split(",").map((t) => t.trim()).filter((t) => t.length > 0)
+          ? offTriggers
+              .split(",")
+              .map((t) => t.trim())
+              .filter((t) => t.length > 0)
           : [];
 
         storyData.lore.push({
