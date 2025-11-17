@@ -83,6 +83,8 @@ export async function GET(
       isFeatured: data.is_featured,
       visibility: data.visibility,
       storyTemplate: data.story_template,
+      selectedPreset: data.selected_preset,
+      presets: data.presets,
     };
 
     return NextResponse.json({ adventure }, { status: 200 });
@@ -187,6 +189,8 @@ export async function PATCH(
     if (body.isPublished !== undefined) updateData.is_published = body.isPublished;
     if (body.isFeatured !== undefined) updateData.is_featured = body.isFeatured;
     if (body.storyTemplate !== undefined) updateData.story_template = body.storyTemplate;
+    if (body.selectedPreset !== undefined) updateData.selected_preset = body.selectedPreset;
+    if (body.presets !== undefined) updateData.presets = body.presets;
 
     // Always update author name to current display name
     updateData.author_name = authorName;

@@ -1,8 +1,17 @@
 "use client";
 
-import { StoryData, Stat, Resource, InventoryItem, Achievement, StoryLore, PlotBeat } from "../misc/structs";
+import {
+  StoryData,
+  Stat,
+  Resource,
+  InventoryItem,
+  Achievement,
+  StoryLore,
+  PlotBeat,
+  Quest,
+} from "../misc/structs";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { supabase } from "../misc/supabase";
 import { compressImage } from "../misc/imageCompression";
@@ -19,11 +28,19 @@ interface BasicSettingsForm {
   maxMomentum: number;
 }
 
-function BasicSettings({ form, onChange }: { form: BasicSettingsForm; onChange: (form: BasicSettingsForm) => void }) {
+function BasicSettings({
+  form,
+  onChange,
+}: {
+  form: BasicSettingsForm;
+  onChange: (form: BasicSettingsForm) => void;
+}) {
   return (
     <div className="space-y-5">
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Story Name</label>
+        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+          Story Name
+        </label>
         <input
           type="text"
           value={form.story_name}
@@ -32,7 +49,9 @@ function BasicSettings({ form, onChange }: { form: BasicSettingsForm; onChange: 
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Player/Character Name</label>
+        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+          Player/Character Name
+        </label>
         <input
           type="text"
           value={form.player_name}
@@ -41,15 +60,21 @@ function BasicSettings({ form, onChange }: { form: BasicSettingsForm; onChange: 
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Character Description</label>
+        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+          Character Description
+        </label>
         <textarea
           value={form.player_summary}
-          onChange={(e) => onChange({ ...form, player_summary: e.target.value })}
+          onChange={(e) =>
+            onChange({ ...form, player_summary: e.target.value })
+          }
           className="w-full h-32 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Story Premise</label>
+        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+          Story Premise
+        </label>
         <textarea
           value={form.premise}
           onChange={(e) => onChange({ ...form, premise: e.target.value })}
@@ -57,42 +82,58 @@ function BasicSettings({ form, onChange }: { form: BasicSettingsForm; onChange: 
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Max Chapters</label>
+        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+          Max Chapters
+        </label>
         <input
           type="number"
           value={form.max_chapters}
-          onChange={(e) => onChange({ ...form, max_chapters: parseInt(e.target.value) || 0 })}
+          onChange={(e) =>
+            onChange({ ...form, max_chapters: parseInt(e.target.value) || 0 })
+          }
           className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Starting Points</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            Starting Points
+          </label>
           <input
             type="number"
             min={0}
             value={form.points}
-            onChange={(e) => onChange({ ...form, points: parseInt(e.target.value) || 0 })}
+            onChange={(e) =>
+              onChange({ ...form, points: parseInt(e.target.value) || 0 })
+            }
             className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Starting Momentum</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            Starting Momentum
+          </label>
           <input
             type="number"
             min={0}
             value={form.momentum}
-            onChange={(e) => onChange({ ...form, momentum: parseInt(e.target.value) || 0 })}
+            onChange={(e) =>
+              onChange({ ...form, momentum: parseInt(e.target.value) || 0 })
+            }
             className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Max Momentum</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            Max Momentum
+          </label>
           <input
             type="number"
             min={1}
             value={form.maxMomentum}
-            onChange={(e) => onChange({ ...form, maxMomentum: parseInt(e.target.value) || 1 })}
+            onChange={(e) =>
+              onChange({ ...form, maxMomentum: parseInt(e.target.value) || 1 })
+            }
             className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
@@ -102,20 +143,24 @@ function BasicSettings({ form, onChange }: { form: BasicSettingsForm; onChange: 
 }
 
 // Stats & Resources Editor
-function StatsResourcesEditor({ 
-  stats, 
-  resources, 
+function StatsResourcesEditor({
+  stats,
+  resources,
   achievements,
-  onUpdate 
-}: { 
-  stats: Stat[]; 
-  resources: Resource[]; 
+  onUpdate,
+}: {
+  stats: Stat[];
+  resources: Resource[];
   achievements: Achievement[];
   onUpdate: (updates: Partial<StoryData>) => void;
 }) {
   const [localStats, setLocalStats] = useState<Stat[]>([...stats]);
-  const [localResources, setLocalResources] = useState<Resource[]>([...resources]);
-  const [localAchievements, setLocalAchievements] = useState<Achievement[]>([...achievements]);
+  const [localResources, setLocalResources] = useState<Resource[]>([
+    ...resources,
+  ]);
+  const [localAchievements, setLocalAchievements] = useState<Achievement[]>([
+    ...achievements,
+  ]);
 
   // Drag and edit state for stats
   const [draggedStatIndex, setDraggedStatIndex] = useState<number | null>(null);
@@ -123,14 +168,24 @@ function StatsResourcesEditor({
   const [editStat, setEditStat] = useState<Partial<Stat>>({});
 
   // Drag and edit state for resources
-  const [draggedResourceIndex, setDraggedResourceIndex] = useState<number | null>(null);
-  const [editingResourceIndex, setEditingResourceIndex] = useState<number | null>(null);
+  const [draggedResourceIndex, setDraggedResourceIndex] = useState<
+    number | null
+  >(null);
+  const [editingResourceIndex, setEditingResourceIndex] = useState<
+    number | null
+  >(null);
   const [editResource, setEditResource] = useState<Partial<Resource>>({});
 
   // Drag and edit state for achievements
-  const [draggedAchievementIndex, setDraggedAchievementIndex] = useState<number | null>(null);
-  const [editingAchievementIndex, setEditingAchievementIndex] = useState<number | null>(null);
-  const [editAchievement, setEditAchievement] = useState<Partial<Achievement>>({});
+  const [draggedAchievementIndex, setDraggedAchievementIndex] = useState<
+    number | null
+  >(null);
+  const [editingAchievementIndex, setEditingAchievementIndex] = useState<
+    number | null
+  >(null);
+  const [editAchievement, setEditAchievement] = useState<Partial<Achievement>>(
+    {}
+  );
 
   const updateStat = (index: number, field: keyof Stat, value: any) => {
     const updated = [...localStats];
@@ -147,7 +202,12 @@ function StatsResourcesEditor({
   };
 
   const addStat = () => {
-    const newStat: Stat = { name: "New Stat", value: 50, description: "", symbol: "⭐" };
+    const newStat: Stat = {
+      name: "New Stat",
+      value: 50,
+      description: "",
+      symbol: "⭐",
+    };
     const updated = [...localStats, newStat];
     setLocalStats(updated);
     onUpdate({ stats: updated });
@@ -160,7 +220,13 @@ function StatsResourcesEditor({
   };
 
   const addResource = () => {
-    const newResource: Resource = { name: "New Resource", value: 100, maxValue: 100, description: "", symbol: "💎" };
+    const newResource: Resource = {
+      name: "New Resource",
+      value: 100,
+      maxValue: 100,
+      description: "",
+      symbol: "💎",
+    };
     const updated = [...localResources, newResource];
     setLocalResources(updated);
     onUpdate({ resources: updated });
@@ -172,7 +238,11 @@ function StatsResourcesEditor({
     onUpdate({ resources: updated });
   };
 
-  const updateAchievement = (index: number, field: keyof Achievement, value: any) => {
+  const updateAchievement = (
+    index: number,
+    field: keyof Achievement,
+    value: any
+  ) => {
     const updated = [...localAchievements];
     (updated[index] as any)[field] = value;
     setLocalAchievements(updated);
@@ -181,7 +251,10 @@ function StatsResourcesEditor({
 
   const toggleAchievement = (index: number, achieved: boolean) => {
     const updated = [...localAchievements];
-    updated[index] = { ...updated[index], dateAchieved: achieved ? new Date() : null };
+    updated[index] = {
+      ...updated[index],
+      dateAchieved: achieved ? new Date() : null,
+    };
     setLocalAchievements(updated);
     onUpdate({ achievements: updated });
   };
@@ -192,7 +265,7 @@ function StatsResourcesEditor({
       description: "",
       dateAchieved: null,
       points: 10,
-      symbol: "🏆"
+      symbol: "🏆",
     };
     const updated = [...localAchievements, newAchievement];
     setLocalAchievements(updated);
@@ -252,7 +325,8 @@ function StatsResourcesEditor({
   };
 
   // Resource drag-and-drop and edit handlers
-  const handleResourceDragStart = (index: number) => setDraggedResourceIndex(index);
+  const handleResourceDragStart = (index: number) =>
+    setDraggedResourceIndex(index);
   const handleResourceDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     if (draggedResourceIndex === null || draggedResourceIndex === index) return;
@@ -287,7 +361,11 @@ function StatsResourcesEditor({
     setEditResource({});
   };
   const saveEditResource = () => {
-    if (editingResourceIndex !== null && editResource.name && editResource.description) {
+    if (
+      editingResourceIndex !== null &&
+      editResource.name &&
+      editResource.description
+    ) {
       const updated = [...localResources];
       updated[editingResourceIndex] = editResource as Resource;
       setLocalResources(updated);
@@ -298,10 +376,12 @@ function StatsResourcesEditor({
   };
 
   // Achievement drag-and-drop and edit handlers
-  const handleAchievementDragStart = (index: number) => setDraggedAchievementIndex(index);
+  const handleAchievementDragStart = (index: number) =>
+    setDraggedAchievementIndex(index);
   const handleAchievementDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
-    if (draggedAchievementIndex === null || draggedAchievementIndex === index) return;
+    if (draggedAchievementIndex === null || draggedAchievementIndex === index)
+      return;
     const updated = [...localAchievements];
     const [moved] = updated.splice(draggedAchievementIndex, 1);
     updated.splice(index, 0, moved);
@@ -333,7 +413,11 @@ function StatsResourcesEditor({
     setEditAchievement({});
   };
   const saveEditAchievement = () => {
-    if (editingAchievementIndex !== null && editAchievement.title && editAchievement.description) {
+    if (
+      editingAchievementIndex !== null &&
+      editAchievement.title &&
+      editAchievement.description
+    ) {
       const updated = [...localAchievements];
       updated[editingAchievementIndex] = editAchievement as Achievement;
       setLocalAchievements(updated);
@@ -348,7 +432,9 @@ function StatsResourcesEditor({
       {/* Stats Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white">📊 Stats</h4>
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white">
+            📊 Stats
+          </h4>
           <button
             onClick={addStat}
             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
@@ -357,24 +443,35 @@ function StatsResourcesEditor({
           </button>
         </div>
         <div className="space-y-3">
-          <p className="text-xs text-gray-600 dark:text-gray-400">💡 Drag and drop to reorder (or use arrow buttons on mobile)</p>
-          {localStats.map((stat, index) => (
+          <p className="text-xs text-gray-600 dark:text-gray-400">
+            💡 Drag and drop to reorder (or use arrow buttons on mobile)
+          </p>
+          {localStats.map((stat, index) =>
             editingStatIndex === index ? (
               // Edit mode
-              <div key={index} className="p-4 bg-blue-100 dark:bg-blue-900/40 rounded-lg border-2 border-blue-400">
-                <h5 className="text-sm font-bold mb-3 text-gray-900 dark:text-white">✏️ Editing Stat</h5>
+              <div
+                key={index}
+                className="p-4 bg-blue-100 dark:bg-blue-900/40 rounded-lg border-2 border-blue-400"
+              >
+                <h5 className="text-sm font-bold mb-3 text-gray-900 dark:text-white">
+                  ✏️ Editing Stat
+                </h5>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                   <input
                     type="text"
                     value={editStat.name || ""}
-                    onChange={(e) => setEditStat({ ...editStat, name: e.target.value })}
+                    onChange={(e) =>
+                      setEditStat({ ...editStat, name: e.target.value })
+                    }
                     placeholder="Stat name"
                     className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <input
                     type="text"
                     value={editStat.symbol || ""}
-                    onChange={(e) => setEditStat({ ...editStat, symbol: e.target.value })}
+                    onChange={(e) =>
+                      setEditStat({ ...editStat, symbol: e.target.value })
+                    }
                     placeholder="Symbol"
                     className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     maxLength={4}
@@ -382,21 +479,39 @@ function StatsResourcesEditor({
                   <input
                     type="number"
                     value={editStat.value || 0}
-                    onChange={(e) => setEditStat({ ...editStat, value: parseInt(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setEditStat({
+                        ...editStat,
+                        value: parseInt(e.target.value) || 0,
+                      })
+                    }
                     placeholder="Value"
                     className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                 </div>
                 <textarea
                   value={editStat.description || ""}
-                  onChange={(e) => setEditStat({ ...editStat, description: e.target.value })}
+                  onChange={(e) =>
+                    setEditStat({ ...editStat, description: e.target.value })
+                  }
                   placeholder="Description"
                   className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white mb-3"
                   rows={2}
                 />
                 <div className="flex gap-2">
-                  <button onClick={saveEditStat} disabled={!editStat.name || !editStat.description} className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded">✓ Save</button>
-                  <button onClick={cancelEditStat} className="flex-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded">Cancel</button>
+                  <button
+                    onClick={saveEditStat}
+                    disabled={!editStat.name || !editStat.description}
+                    className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded"
+                  >
+                    ✓ Save
+                  </button>
+                  <button
+                    onClick={cancelEditStat}
+                    className="flex-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             ) : (
@@ -411,34 +526,66 @@ function StatsResourcesEditor({
                 style={{ opacity: draggedStatIndex === index ? 0.5 : 1 }}
               >
                 <div className="flex items-start gap-3">
-                  <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing mt-2">⋮⋮</div>
+                  <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing mt-2">
+                    ⋮⋮
+                  </div>
                   <div className="flex-1 space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="text-2xl">{stat.symbol}</span>
                       <div>
-                        <div className="font-bold text-gray-900 dark:text-white">{stat.name}</div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">{stat.description}</div>
-                        <div className="text-sm text-blue-600 dark:text-blue-400 font-semibold">Value: {stat.value}</div>
+                        <div className="font-bold text-gray-900 dark:text-white">
+                          {stat.name}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {stat.description}
+                        </div>
+                        <div className="text-sm text-blue-600 dark:text-blue-400 font-semibold">
+                          Value: {stat.value}
+                        </div>
                       </div>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <button onClick={() => moveStatUp(index)} disabled={index === 0} className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs">▲</button>
-                    <button onClick={() => moveStatDown(index)} disabled={index === localStats.length - 1} className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs">▼</button>
-                    <button onClick={() => startEditStat(index)} className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs">✏️</button>
-                    <button onClick={() => removeStat(index)} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">✕</button>
+                    <button
+                      onClick={() => moveStatUp(index)}
+                      disabled={index === 0}
+                      className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => moveStatDown(index)}
+                      disabled={index === localStats.length - 1}
+                      className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs"
+                    >
+                      ▼
+                    </button>
+                    <button
+                      onClick={() => startEditStat(index)}
+                      className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => removeStat(index)}
+                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
+                    >
+                      ✕
+                    </button>
                   </div>
                 </div>
               </div>
             )
-          ))}
+          )}
         </div>
       </div>
 
       {/* Resources Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white">💎 Resources</h4>
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white">
+            💎 Resources
+          </h4>
           <button
             onClick={addResource}
             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
@@ -447,21 +594,31 @@ function StatsResourcesEditor({
           </button>
         </div>
         <div className="space-y-3">
-          {localResources.map((resource, index) => (
+          {localResources.map((resource, index) =>
             editingResourceIndex === index ? (
-              <div key={index} className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg">
+              <div
+                key={index}
+                className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg"
+              >
                 <div className="space-y-3">
                   <input
                     type="text"
-                    value={editResource.name || ''}
-                    onChange={(e) => setEditResource({ ...editResource, name: e.target.value })}
+                    value={editResource.name || ""}
+                    onChange={(e) =>
+                      setEditResource({ ...editResource, name: e.target.value })
+                    }
                     placeholder="Resource name"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <input
                     type="text"
-                    value={editResource.symbol || ''}
-                    onChange={(e) => setEditResource({ ...editResource, symbol: e.target.value })}
+                    value={editResource.symbol || ""}
+                    onChange={(e) =>
+                      setEditResource({
+                        ...editResource,
+                        symbol: e.target.value,
+                      })
+                    }
                     placeholder="Symbol"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
@@ -469,21 +626,36 @@ function StatsResourcesEditor({
                     <input
                       type="number"
                       value={editResource.value ?? 0}
-                      onChange={(e) => setEditResource({ ...editResource, value: parseInt(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setEditResource({
+                          ...editResource,
+                          value: parseInt(e.target.value) || 0,
+                        })
+                      }
                       placeholder="Current"
                       className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     />
                     <input
                       type="number"
                       value={editResource.maxValue ?? 0}
-                      onChange={(e) => setEditResource({ ...editResource, maxValue: parseInt(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setEditResource({
+                          ...editResource,
+                          maxValue: parseInt(e.target.value) || 0,
+                        })
+                      }
                       placeholder="Max"
                       className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     />
                   </div>
                   <textarea
-                    value={editResource.description || ''}
-                    onChange={(e) => setEditResource({ ...editResource, description: e.target.value })}
+                    value={editResource.description || ""}
+                    onChange={(e) =>
+                      setEditResource({
+                        ...editResource,
+                        description: e.target.value,
+                      })
+                    }
                     placeholder="Description"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     rows={3}
@@ -512,15 +684,18 @@ function StatsResourcesEditor({
                 onDragOver={(e) => handleResourceDragOver(e, index)}
                 onDragEnd={handleResourceDragEnd}
                 className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
-                  draggedResourceIndex === index ? 'opacity-50' : ''
+                  draggedResourceIndex === index ? "opacity-50" : ""
                 }`}
               >
                 <span className="text-gray-400 select-none">⋮⋮</span>
                 <div className="flex-1">
                   <div className="font-medium text-gray-900 dark:text-white">
-                    {resource.symbol} {resource.name}: {resource.value}/{resource.maxValue}
+                    {resource.symbol} {resource.name}: {resource.value}/
+                    {resource.maxValue}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{resource.description}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {resource.description}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-1">
                   <button
@@ -554,14 +729,16 @@ function StatsResourcesEditor({
                 </button>
               </div>
             )
-          ))}
+          )}
         </div>
       </div>
 
       {/* Achievements Editor */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white">🏆 Achievements</h4>
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white">
+            🏆 Achievements
+          </h4>
           <button
             onClick={addAchievement}
             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
@@ -570,53 +747,97 @@ function StatsResourcesEditor({
           </button>
         </div>
         <div className="space-y-3">
-          {localAchievements.map((achievement, index) => (
+          {localAchievements.map((achievement, index) =>
             editingAchievementIndex === index ? (
-              <div key={index} className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg">
+              <div
+                key={index}
+                className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg"
+              >
                 <div className="space-y-3">
                   <input
                     type="text"
-                    value={editAchievement.title || ''}
-                    onChange={(e) => setEditAchievement({ ...editAchievement, title: e.target.value })}
+                    value={editAchievement.title || ""}
+                    onChange={(e) =>
+                      setEditAchievement({
+                        ...editAchievement,
+                        title: e.target.value,
+                      })
+                    }
                     placeholder="Title"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <input
                     type="text"
-                    value={editAchievement.symbol || ''}
-                    onChange={(e) => setEditAchievement({ ...editAchievement, symbol: e.target.value })}
+                    value={editAchievement.symbol || ""}
+                    onChange={(e) =>
+                      setEditAchievement({
+                        ...editAchievement,
+                        symbol: e.target.value,
+                      })
+                    }
                     placeholder="Symbol"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <input
                     type="number"
                     value={editAchievement.points ?? 0}
-                    onChange={(e) => setEditAchievement({ ...editAchievement, points: parseInt(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setEditAchievement({
+                        ...editAchievement,
+                        points: parseInt(e.target.value) || 0,
+                      })
+                    }
                     placeholder="Points"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <textarea
-                    value={editAchievement.description || ''}
-                    onChange={(e) => setEditAchievement({ ...editAchievement, description: e.target.value })}
+                    value={editAchievement.description || ""}
+                    onChange={(e) =>
+                      setEditAchievement({
+                        ...editAchievement,
+                        description: e.target.value,
+                      })
+                    }
                     placeholder="Description (shown to players)"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     rows={3}
                   />
                   <input
                     type="text"
-                    value={editAchievement.ai_hint || ''}
-                    onChange={(e) => setEditAchievement({ ...editAchievement, ai_hint: e.target.value })}
+                    value={editAchievement.ai_hint || ""}
+                    onChange={(e) =>
+                      setEditAchievement({
+                        ...editAchievement,
+                        ai_hint: e.target.value,
+                      })
+                    }
                     placeholder="AI Hint (optional precise trigger conditions)"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <label className="flex items-center gap-2 text-gray-900 dark:text-white">
                     <input
                       type="checkbox"
+                      checked={!!editAchievement.hidden}
+                      onChange={(e) =>
+                        setEditAchievement({
+                          ...editAchievement,
+                          hidden: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 rounded"
+                    />
+                    <span>🔒 Hidden Achievement</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-gray-900 dark:text-white">
+                    <input
+                      type="checkbox"
                       checked={!!editAchievement.dateAchieved}
-                      onChange={(e) => setEditAchievement({ 
-                        ...editAchievement, 
-                        dateAchieved: e.target.checked ? new Date() : null
-                      })}
+                      onChange={(e) =>
+                        setEditAchievement({
+                          ...editAchievement,
+                          dateAchieved: e.target.checked ? new Date() : null,
+                        })
+                      }
                       className="w-4 h-4 rounded"
                     />
                     <span>Achieved</span>
@@ -645,16 +866,28 @@ function StatsResourcesEditor({
                 onDragOver={(e) => handleAchievementDragOver(e, index)}
                 onDragEnd={handleAchievementDragEnd}
                 className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
-                  draggedAchievementIndex === index ? 'opacity-50' : ''
+                  draggedAchievementIndex === index ? "opacity-50" : ""
                 }`}
               >
                 <span className="text-gray-400 select-none">⋮⋮</span>
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    {achievement.symbol} {achievement.title} ({achievement.points} pts)
-                    {achievement.dateAchieved && <span className="ml-2 text-green-500">✓</span>}
+                  <div className="flex items-center gap-2 font-medium text-gray-900 dark:text-white">
+                    <span>
+                      {achievement.symbol} {achievement.title} (
+                      {achievement.points} pts)
+                      {achievement.dateAchieved && (
+                        <span className="ml-2 text-green-500">✓</span>
+                      )}
+                    </span>
+                    {achievement.hidden && (
+                      <span className="px-2 py-0.5 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full text-xs font-bold">
+                        🔒 Hidden
+                      </span>
+                    )}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{achievement.description}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {achievement.description}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-1">
                   <button
@@ -688,9 +921,306 @@ function StatsResourcesEditor({
                 </button>
               </div>
             )
-          ))}
+          )}
           {localAchievements.length === 0 && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">No achievements yet.</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              No achievements yet.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Quest Editor
+function QuestEditor({
+  quests,
+  onUpdate,
+}: {
+  quests: Quest[];
+  onUpdate: (quests: Quest[]) => void;
+}) {
+  const [localQuests, setLocalQuests] = useState([...quests]);
+  const [draggedQuestIndex, setDraggedQuestIndex] = useState<number | null>(
+    null
+  );
+  const [editingQuestIndex, setEditingQuestIndex] = useState<number | null>(
+    null
+  );
+  const [editQuest, setEditQuest] = useState<Quest | null>(null);
+
+  useEffect(() => {
+    onUpdate(localQuests);
+  }, [localQuests, onUpdate]);
+
+  const addQuest = () => {
+    const newQuest: Quest = {
+      id: `quest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: "New Quest",
+      shortDescription: "Quest objective",
+      description: "Detailed quest description",
+      active: true,
+      fulfilled: false,
+      points: 10,
+      createdAt: new Date(),
+    };
+    setLocalQuests([...localQuests, newQuest]);
+  };
+
+  const removeQuest = (index: number) => {
+    setLocalQuests(localQuests.filter((_, i) => i !== index));
+  };
+
+  const startEditQuest = (index: number) => {
+    setEditingQuestIndex(index);
+    setEditQuest({ ...localQuests[index] });
+  };
+
+  const saveEditQuest = () => {
+    if (editingQuestIndex !== null && editQuest) {
+      const updated = [...localQuests];
+      updated[editingQuestIndex] = editQuest;
+      setLocalQuests(updated);
+      setEditingQuestIndex(null);
+      setEditQuest(null);
+    }
+  };
+
+  const cancelEditQuest = () => {
+    setEditingQuestIndex(null);
+    setEditQuest(null);
+  };
+
+  const moveQuestUp = (index: number) => {
+    if (index > 0) {
+      const updated = [...localQuests];
+      [updated[index - 1], updated[index]] = [
+        updated[index],
+        updated[index - 1],
+      ];
+      setLocalQuests(updated);
+    }
+  };
+
+  const moveQuestDown = (index: number) => {
+    if (index < localQuests.length - 1) {
+      const updated = [...localQuests];
+      [updated[index], updated[index + 1]] = [
+        updated[index + 1],
+        updated[index],
+      ];
+      setLocalQuests(updated);
+    }
+  };
+
+  const handleQuestDragStart = (index: number) => {
+    setDraggedQuestIndex(index);
+  };
+
+  const handleQuestDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedQuestIndex === null || draggedQuestIndex === index) return;
+
+    const updated = [...localQuests];
+    const draggedQuest = updated[draggedQuestIndex];
+    updated.splice(draggedQuestIndex, 1);
+    updated.splice(index, 0, draggedQuest);
+
+    setLocalQuests(updated);
+    setDraggedQuestIndex(index);
+  };
+
+  const handleQuestDragEnd = () => {
+    setDraggedQuestIndex(null);
+  };
+
+  return (
+    <div>
+      {/* Quests Editor */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white">
+            📜 Quests
+          </h4>
+          <button
+            onClick={addQuest}
+            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
+          >
+            + Add Quest
+          </button>
+        </div>
+        <div className="space-y-3">
+          {localQuests.map((quest, index) =>
+            editingQuestIndex === index ? (
+              <div
+                key={quest.id}
+                className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg"
+              >
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={editQuest?.title || ""}
+                    onChange={(e) =>
+                      setEditQuest({ ...editQuest!, title: e.target.value })
+                    }
+                    placeholder="Quest Title"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    value={editQuest?.shortDescription || ""}
+                    onChange={(e) =>
+                      setEditQuest({
+                        ...editQuest!,
+                        shortDescription: e.target.value,
+                      })
+                    }
+                    placeholder="Short Description"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                  <textarea
+                    value={editQuest?.description || ""}
+                    onChange={(e) =>
+                      setEditQuest({
+                        ...editQuest!,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Full Description"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    rows={4}
+                  />
+                  <input
+                    type="number"
+                    value={editQuest?.points ?? 0}
+                    onChange={(e) =>
+                      setEditQuest({
+                        ...editQuest!,
+                        points: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    placeholder="Points"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  />
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-gray-900 dark:text-white">
+                      <input
+                        type="checkbox"
+                        checked={!!editQuest?.active}
+                        onChange={(e) =>
+                          setEditQuest({
+                            ...editQuest!,
+                            active: e.target.checked,
+                          })
+                        }
+                        className="w-4 h-4 rounded"
+                      />
+                      <span>Active</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-gray-900 dark:text-white">
+                      <input
+                        type="checkbox"
+                        checked={!!editQuest?.fulfilled}
+                        onChange={(e) =>
+                          setEditQuest({
+                            ...editQuest!,
+                            fulfilled: e.target.checked,
+                          })
+                        }
+                        className="w-4 h-4 rounded"
+                      />
+                      <span>Fulfilled</span>
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => saveEditQuest()}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={cancelEditQuest}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                key={quest.id}
+                draggable
+                onDragStart={() => handleQuestDragStart(index)}
+                onDragOver={(e) => handleQuestDragOver(e, index)}
+                onDragEnd={handleQuestDragEnd}
+                className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
+                  draggedQuestIndex === index ? "opacity-50" : ""
+                }`}
+              >
+                <span className="text-gray-400 select-none">⋮⋮</span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 font-medium text-gray-900 dark:text-white">
+                    <span>
+                      📜 {quest.title} ({quest.points} pts)
+                    </span>
+                    {quest.active && !quest.fulfilled && (
+                      <span className="px-2 py-0.5 bg-blue-200 dark:bg-blue-800/50 text-blue-800 dark:text-blue-200 rounded-full text-xs font-bold">
+                        Active
+                      </span>
+                    )}
+                    {quest.fulfilled && (
+                      <span className="text-green-500">✓</span>
+                    )}
+                    {!quest.active && !quest.fulfilled && (
+                      <span className="px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full text-xs font-bold">
+                        Inactive
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {quest.shortDescription}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => moveQuestUp(index)}
+                    disabled={index === 0}
+                    className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                    title="Move up"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    onClick={() => moveQuestDown(index)}
+                    disabled={index === localQuests.length - 1}
+                    className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                    title="Move down"
+                  >
+                    ▼
+                  </button>
+                </div>
+                <button
+                  onClick={() => startEditQuest(index)}
+                  className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
+                >
+                  ✏️
+                </button>
+                <button
+                  onClick={() => removeQuest(index)}
+                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
+                >
+                  Remove
+                </button>
+              </div>
+            )
+          )}
+          {localQuests.length === 0 && (
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              No quests yet.
+            </p>
           )}
         </div>
       </div>
@@ -699,17 +1229,23 @@ function StatsResourcesEditor({
 }
 
 // Inventory Editor
-function InventoryEditor({ 
-  inventory, 
-  onUpdate 
-}: { 
-  inventory: InventoryItem[]; 
+function InventoryEditor({
+  inventory,
+  onUpdate,
+}: {
+  inventory: InventoryItem[];
   onUpdate: (inventory: InventoryItem[]) => void;
 }) {
   const [localInventory, setLocalInventory] = useState([...inventory]);
-  const [draggedInventoryIndex, setDraggedInventoryIndex] = useState<number | null>(null);
-  const [editingInventoryIndex, setEditingInventoryIndex] = useState<number | null>(null);
-  const [editInventoryItem, setEditInventoryItem] = useState<Partial<InventoryItem>>({});
+  const [draggedInventoryIndex, setDraggedInventoryIndex] = useState<
+    number | null
+  >(null);
+  const [editingInventoryIndex, setEditingInventoryIndex] = useState<
+    number | null
+  >(null);
+  const [editInventoryItem, setEditInventoryItem] = useState<
+    Partial<InventoryItem>
+  >({});
 
   // Drag-and-drop handlers for inventory
   const handleInventoryDragStart = (index: number) => {
@@ -718,13 +1254,14 @@ function InventoryEditor({
 
   const handleInventoryDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
-    if (draggedInventoryIndex === null || draggedInventoryIndex === index) return;
-    
+    if (draggedInventoryIndex === null || draggedInventoryIndex === index)
+      return;
+
     const items = [...localInventory];
     const draggedItem = items[draggedInventoryIndex];
     items.splice(draggedInventoryIndex, 1);
     items.splice(index, 0, draggedItem);
-    
+
     setLocalInventory(items);
     setDraggedInventoryIndex(index);
     onUpdate(items);
@@ -771,7 +1308,11 @@ function InventoryEditor({
     setEditInventoryItem({});
   };
 
-  const updateItem = (index: number, field: keyof InventoryItem, value: any) => {
+  const updateItem = (
+    index: number,
+    field: keyof InventoryItem,
+    value: any
+  ) => {
     const updated = [...localInventory];
     (updated[index] as any)[field] = value;
     setLocalInventory(updated);
@@ -779,12 +1320,12 @@ function InventoryEditor({
   };
 
   const addItem = () => {
-    const newItem: InventoryItem = { 
-      name: "New Item", 
-      quantity: 1, 
-      description: "", 
+    const newItem: InventoryItem = {
+      name: "New Item",
+      quantity: 1,
+      description: "",
       type: "normal",
-      symbol: "📦" 
+      symbol: "📦",
     };
     const updated = [...localInventory, newItem];
     setLocalInventory(updated);
@@ -800,7 +1341,9 @@ function InventoryEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white">🎒 Inventory ({localInventory.length} items)</h4>
+        <h4 className="text-lg font-bold text-gray-900 dark:text-white">
+          🎒 Inventory ({localInventory.length} items)
+        </h4>
         <button
           onClick={addItem}
           className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
@@ -809,21 +1352,34 @@ function InventoryEditor({
         </button>
       </div>
       <div className="space-y-3">
-        {localInventory.map((item, index) => (
+        {localInventory.map((item, index) =>
           editingInventoryIndex === index ? (
-            <div key={index} className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg">
+            <div
+              key={index}
+              className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg"
+            >
               <div className="space-y-3">
                 <input
                   type="text"
-                  value={editInventoryItem.name || ''}
-                  onChange={(e) => setEditInventoryItem({ ...editInventoryItem, name: e.target.value })}
+                  value={editInventoryItem.name || ""}
+                  onChange={(e) =>
+                    setEditInventoryItem({
+                      ...editInventoryItem,
+                      name: e.target.value,
+                    })
+                  }
                   placeholder="Item name"
                   className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                 />
                 <input
                   type="text"
-                  value={editInventoryItem.symbol || ''}
-                  onChange={(e) => setEditInventoryItem({ ...editInventoryItem, symbol: e.target.value })}
+                  value={editInventoryItem.symbol || ""}
+                  onChange={(e) =>
+                    setEditInventoryItem({
+                      ...editInventoryItem,
+                      symbol: e.target.value,
+                    })
+                  }
                   placeholder="Symbol"
                   className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                 />
@@ -831,21 +1387,40 @@ function InventoryEditor({
                   <input
                     type="number"
                     value={editInventoryItem.quantity ?? 1}
-                    onChange={(e) => setEditInventoryItem({ ...editInventoryItem, quantity: parseInt(e.target.value) || 1 })}
+                    onChange={(e) =>
+                      setEditInventoryItem({
+                        ...editInventoryItem,
+                        quantity: parseInt(e.target.value) || 1,
+                      })
+                    }
                     placeholder="Quantity"
                     className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <input
                     type="text"
-                    value={editInventoryItem.type || ''}
-                    onChange={(e) => setEditInventoryItem({ ...editInventoryItem, type: e.target.value as 'normal' | 'consumable' | 'story' | 'misc' })}
+                    value={editInventoryItem.type || ""}
+                    onChange={(e) =>
+                      setEditInventoryItem({
+                        ...editInventoryItem,
+                        type: e.target.value as
+                          | "normal"
+                          | "consumable"
+                          | "story"
+                          | "misc",
+                      })
+                    }
                     placeholder="Type"
                     className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                 </div>
                 <textarea
-                  value={editInventoryItem.description || ''}
-                  onChange={(e) => setEditInventoryItem({ ...editInventoryItem, description: e.target.value })}
+                  value={editInventoryItem.description || ""}
+                  onChange={(e) =>
+                    setEditInventoryItem({
+                      ...editInventoryItem,
+                      description: e.target.value,
+                    })
+                  }
                   placeholder="Description"
                   className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   rows={3}
@@ -874,15 +1449,18 @@ function InventoryEditor({
               onDragOver={(e) => handleInventoryDragOver(e, index)}
               onDragEnd={handleInventoryDragEnd}
               className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
-                draggedInventoryIndex === index ? 'opacity-50' : ''
+                draggedInventoryIndex === index ? "opacity-50" : ""
               }`}
             >
               <span className="text-gray-400 select-none">⋮⋮</span>
               <div className="flex-1">
                 <div className="font-medium text-gray-900 dark:text-white">
-                  {item.symbol} {item.name} x{item.quantity} {item.type && `(${item.type})`}
+                  {item.symbol} {item.name} x{item.quantity}{" "}
+                  {item.type && `(${item.type})`}
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">{item.description}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {item.description}
+                </div>
               </div>
               <div className="flex flex-col gap-1">
                 <button
@@ -916,18 +1494,18 @@ function InventoryEditor({
               </button>
             </div>
           )
-        ))}
+        )}
       </div>
     </div>
   );
 }
 
 // Lore Editor
-function LoreEditor({ 
-  lore, 
+function LoreEditor({
+  lore,
   plotBeats,
-  onUpdate 
-}: { 
+  onUpdate,
+}: {
   lore: StoryLore[];
   plotBeats: PlotBeat[];
   onUpdate: (lore: StoryLore[]) => void;
@@ -947,12 +1525,12 @@ function LoreEditor({
   const handleLoreDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     if (draggedLoreIndex === null || draggedLoreIndex === index) return;
-    
+
     const items = [...localLore];
     const draggedItem = items[draggedLoreIndex];
     items.splice(draggedLoreIndex, 1);
     items.splice(index, 0, draggedItem);
-    
+
     setLocalLore(items);
     setDraggedLoreIndex(index);
     onUpdate(items);
@@ -1039,7 +1617,9 @@ function LoreEditor({
       return;
     }
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         addNotification("Not authenticated", "failure");
         return;
@@ -1047,7 +1627,7 @@ function LoreEditor({
 
       const compressed = await compressImage(file, 320, 180, 0.8);
 
-      const ext = file.name.split('.').pop();
+      const ext = file.name.split(".").pop();
       const fileName = `${Date.now()}-lore-thumb.${ext}`;
       const filePath = `${session.user.id}/lore-thumbnails/${fileName}`;
 
@@ -1075,7 +1655,9 @@ function LoreEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white">📜 Lore Entries ({localLore.length})</h4>
+        <h4 className="text-lg font-bold text-gray-900 dark:text-white">
+          📜 Lore Entries ({localLore.length})
+        </h4>
         <button
           onClick={addLore}
           className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
@@ -1084,34 +1666,51 @@ function LoreEditor({
         </button>
       </div>
       <div className="space-y-3">
-        {localLore.map((loreItem, index) => (
+        {localLore.map((loreItem, index) =>
           editingLoreIndex === index ? (
-            <div key={index} className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg">
+            <div
+              key={index}
+              className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg"
+            >
               <div className="space-y-3">
                 <input
                   type="text"
-                  value={editLore.title || ''}
-                  onChange={(e) => setEditLore({ ...editLore, title: e.target.value })}
+                  value={editLore.title || ""}
+                  onChange={(e) =>
+                    setEditLore({ ...editLore, title: e.target.value })
+                  }
                   placeholder="Lore title"
                   className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white font-semibold"
                 />
                 <textarea
-                  value={editLore.content || ''}
-                  onChange={(e) => setEditLore({ ...editLore, content: e.target.value })}
+                  value={editLore.content || ""}
+                  onChange={(e) =>
+                    setEditLore({ ...editLore, content: e.target.value })
+                  }
                   placeholder="Lore content (supports Markdown)"
                   className="w-full h-32 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Thumbnail URL (optional)</label>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      Thumbnail URL (optional)
+                    </label>
                     <input
                       type="url"
-                      value={editLore.thumbnailUrl || ''}
-                      onChange={(e) => setEditLore({ ...editLore, thumbnailUrl: e.target.value })}
+                      value={editLore.thumbnailUrl || ""}
+                      onChange={(e) =>
+                        setEditLore({
+                          ...editLore,
+                          thumbnailUrl: e.target.value,
+                        })
+                      }
                       placeholder="https://..."
                       className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Shown in lore list and detail if provided (ideal ~320×180px, max 5MB).</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Shown in lore list and detail if provided (ideal
+                      ~320×180px, max 5MB).
+                    </p>
                     <div className="mt-2 flex items-center gap-2">
                       <input
                         id={`upload-lore-thumb-edit-${index}`}
@@ -1131,7 +1730,9 @@ function LoreEditor({
                       </label>
                       {editLore.thumbnailUrl && (
                         <button
-                          onClick={() => setEditLore({ ...editLore, thumbnailUrl: '' })}
+                          onClick={() =>
+                            setEditLore({ ...editLore, thumbnailUrl: "" })
+                          }
                           className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
                         >
                           Remove
@@ -1143,7 +1744,7 @@ function LoreEditor({
                     {editLore.thumbnailUrl ? (
                       <img
                         src={editLore.thumbnailUrl}
-                        alt={editLore.title || ''}
+                        alt={editLore.title || ""}
                         className="w-24 h-24 object-cover rounded border border-gray-300 dark:border-gray-600"
                       />
                     ) : (
@@ -1158,7 +1759,9 @@ function LoreEditor({
                     <input
                       type="checkbox"
                       checked={editLore.secrtet ?? false}
-                      onChange={(e) => setEditLore({ ...editLore, secrtet: e.target.checked })}
+                      onChange={(e) =>
+                        setEditLore({ ...editLore, secrtet: e.target.checked })
+                      }
                       className="rounded"
                     />
                     <span>🔒 Secret Lore (hidden until discovered)</span>
@@ -1167,7 +1770,9 @@ function LoreEditor({
                     <input
                       type="checkbox"
                       checked={editLore.on !== false}
-                      onChange={(e) => setEditLore({ ...editLore, on: e.target.checked })}
+                      onChange={(e) =>
+                        setEditLore({ ...editLore, on: e.target.checked })
+                      }
                       className="rounded"
                     />
                     <span>✅ Enabled</span>
@@ -1187,15 +1792,21 @@ function LoreEditor({
                           placeholder="e.g., 'Found the Ancient Map'"
                           className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+                            if (e.key === "Enter") {
                               const input = e.currentTarget;
                               const value = input.value.trim();
-                              if (value && !(editLore.on_triggers || []).includes(value)) {
+                              if (
+                                value &&
+                                !(editLore.on_triggers || []).includes(value)
+                              ) {
                                 setEditLore({
                                   ...editLore,
-                                  on_triggers: [...(editLore.on_triggers || []), value]
+                                  on_triggers: [
+                                    ...(editLore.on_triggers || []),
+                                    value,
+                                  ],
                                 });
-                                input.value = '';
+                                input.value = "";
                               }
                             }
                           }}
@@ -1203,15 +1814,24 @@ function LoreEditor({
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {(editLore.on_triggers || []).map((trigger, idx) => (
-                          <span key={idx} className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs flex items-center gap-1">
+                          <span
+                            key={idx}
+                            className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs flex items-center gap-1"
+                          >
                             ✅ {trigger}
                             <button
-                              onClick={() => setEditLore({
-                                ...editLore,
-                                on_triggers: (editLore.on_triggers || []).filter((_, i) => i !== idx)
-                              })}
+                              onClick={() =>
+                                setEditLore({
+                                  ...editLore,
+                                  on_triggers: (
+                                    editLore.on_triggers || []
+                                  ).filter((_, i) => i !== idx),
+                                })
+                              }
                               className="hover:text-green-900 dark:hover:text-green-100"
-                            >×</button>
+                            >
+                              ×
+                            </button>
                           </span>
                         ))}
                       </div>
@@ -1229,15 +1849,21 @@ function LoreEditor({
                           placeholder="e.g., 'Destroyed the Map'"
                           className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+                            if (e.key === "Enter") {
                               const input = e.currentTarget;
                               const value = input.value.trim();
-                              if (value && !(editLore.off_triggers || []).includes(value)) {
+                              if (
+                                value &&
+                                !(editLore.off_triggers || []).includes(value)
+                              ) {
                                 setEditLore({
                                   ...editLore,
-                                  off_triggers: [...(editLore.off_triggers || []), value]
+                                  off_triggers: [
+                                    ...(editLore.off_triggers || []),
+                                    value,
+                                  ],
                                 });
-                                input.value = '';
+                                input.value = "";
                               }
                             }
                           }}
@@ -1245,15 +1871,24 @@ function LoreEditor({
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {(editLore.off_triggers || []).map((trigger, idx) => (
-                          <span key={idx} className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-xs flex items-center gap-1">
+                          <span
+                            key={idx}
+                            className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-xs flex items-center gap-1"
+                          >
                             ❌ {trigger}
                             <button
-                              onClick={() => setEditLore({
-                                ...editLore,
-                                off_triggers: (editLore.off_triggers || []).filter((_, i) => i !== idx)
-                              })}
+                              onClick={() =>
+                                setEditLore({
+                                  ...editLore,
+                                  off_triggers: (
+                                    editLore.off_triggers || []
+                                  ).filter((_, i) => i !== idx),
+                                })
+                              }
                               className="hover:text-red-900 dark:hover:text-red-100"
-                            >×</button>
+                            >
+                              ×
+                            </button>
                           </span>
                         ))}
                       </div>
@@ -1269,25 +1904,34 @@ function LoreEditor({
                     </label>
                     <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                       {plotBeats.length === 0 ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">No plot beats yet.</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                          No plot beats yet.
+                        </p>
                       ) : (
                         plotBeats.map((beat, beatIndex) => (
-                          <label key={beatIndex} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer">
+                          <label
+                            key={beatIndex}
+                            className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                          >
                             <input
                               type="checkbox"
-                              checked={(editLore.beats_trigger || []).includes(beatIndex)}
+                              checked={(editLore.beats_trigger || []).includes(
+                                beatIndex
+                              )}
                               onChange={(e) => {
                                 const current = editLore.beats_trigger || [];
                                 setEditLore({
                                   ...editLore,
                                   beats_trigger: e.target.checked
                                     ? [...current, beatIndex]
-                                    : current.filter(i => i !== beatIndex),
+                                    : current.filter((i) => i !== beatIndex),
                                 });
                               }}
                               className="w-4 h-4 text-green-600 rounded"
                             />
-                            <span className="text-xs text-gray-900 dark:text-white">{beat.title || `Beat ${beatIndex + 1}`}</span>
+                            <span className="text-xs text-gray-900 dark:text-white">
+                              {beat.title || `Beat ${beatIndex + 1}`}
+                            </span>
                           </label>
                         ))
                       )}
@@ -1299,25 +1943,34 @@ function LoreEditor({
                     </label>
                     <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                       {plotBeats.length === 0 ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">No plot beats yet.</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                          No plot beats yet.
+                        </p>
                       ) : (
                         plotBeats.map((beat, beatIndex) => (
-                          <label key={beatIndex} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer">
+                          <label
+                            key={beatIndex}
+                            className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                          >
                             <input
                               type="checkbox"
-                              checked={(editLore.beats_untrigger || []).includes(beatIndex)}
+                              checked={(
+                                editLore.beats_untrigger || []
+                              ).includes(beatIndex)}
                               onChange={(e) => {
                                 const current = editLore.beats_untrigger || [];
                                 setEditLore({
                                   ...editLore,
                                   beats_untrigger: e.target.checked
                                     ? [...current, beatIndex]
-                                    : current.filter(i => i !== beatIndex),
+                                    : current.filter((i) => i !== beatIndex),
                                 });
                               }}
                               className="w-4 h-4 text-red-600 rounded"
                             />
-                            <span className="text-xs text-gray-900 dark:text-white">{beat.title || `Beat ${beatIndex + 1}`}</span>
+                            <span className="text-xs text-gray-900 dark:text-white">
+                              {beat.title || `Beat ${beatIndex + 1}`}
+                            </span>
                           </label>
                         ))
                       )}
@@ -1349,13 +2002,14 @@ function LoreEditor({
               onDragOver={(e) => handleLoreDragOver(e, index)}
               onDragEnd={handleLoreDragEnd}
               className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
-                draggedLoreIndex === index ? 'opacity-50' : ''
+                draggedLoreIndex === index ? "opacity-50" : ""
               }`}
             >
               <span className="text-gray-400 select-none">⋮⋮</span>
               <div className="flex-1">
                 <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                  {loreItem.secrtet && '🔒 '}{loreItem.title}
+                  {loreItem.secrtet && "🔒 "}
+                  {loreItem.title}
                   {/* On/Off Toggle */}
                   <button
                     onClick={(e) => {
@@ -1366,8 +2020,8 @@ function LoreEditor({
                       onUpdate(updated);
                     }}
                     className={`px-2 py-1 rounded-full text-xs font-semibold transition-colors ${
-                      loreItem.on 
-                        ? "bg-green-600 text-white hover:bg-green-700" 
+                      loreItem.on
+                        ? "bg-green-600 text-white hover:bg-green-700"
                         : "bg-gray-400 text-white hover:bg-gray-500"
                     }`}
                     title={loreItem.on ? "Lore is enabled" : "Lore is disabled"}
@@ -1382,27 +2036,39 @@ function LoreEditor({
                     className="mt-2 w-20 h-20 object-cover rounded border border-gray-300 dark:border-gray-600"
                   />
                 )}
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{loreItem.content}</div>
-                {(loreItem.on_triggers && loreItem.on_triggers.length > 0) && (
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                  {loreItem.content}
+                </div>
+                {loreItem.on_triggers && loreItem.on_triggers.length > 0 && (
                   <div className="text-xs text-green-700 dark:text-green-400 mt-1">
-                    <strong>✅ ON Triggers:</strong> {loreItem.on_triggers.join(', ')}
+                    <strong>✅ ON Triggers:</strong>{" "}
+                    {loreItem.on_triggers.join(", ")}
                   </div>
                 )}
-                {(loreItem.off_triggers && loreItem.off_triggers.length > 0) && (
+                {loreItem.off_triggers && loreItem.off_triggers.length > 0 && (
                   <div className="text-xs text-red-700 dark:text-red-400 mt-1">
-                    <strong>❌ OFF Triggers:</strong> {loreItem.off_triggers.join(', ')}
+                    <strong>❌ OFF Triggers:</strong>{" "}
+                    {loreItem.off_triggers.join(", ")}
                   </div>
                 )}
-                {(loreItem.beats_trigger && loreItem.beats_trigger.length > 0) && (
-                  <div className="text-xs text-green-700 dark:text-green-400 mt-1">
-                    <strong>✅ Beats turning ON:</strong> {loreItem.beats_trigger.map(i => plotBeats[i]?.title || `Beat ${i + 1}`).join(', ')}
-                  </div>
-                )}
-                {(loreItem.beats_untrigger && loreItem.beats_untrigger.length > 0) && (
-                  <div className="text-xs text-red-700 dark:text-red-400 mt-1">
-                    <strong>❌ Beats turning OFF:</strong> {loreItem.beats_untrigger.map(i => plotBeats[i]?.title || `Beat ${i + 1}`).join(', ')}
-                  </div>
-                )}
+                {loreItem.beats_trigger &&
+                  loreItem.beats_trigger.length > 0 && (
+                    <div className="text-xs text-green-700 dark:text-green-400 mt-1">
+                      <strong>✅ Beats turning ON:</strong>{" "}
+                      {loreItem.beats_trigger
+                        .map((i) => plotBeats[i]?.title || `Beat ${i + 1}`)
+                        .join(", ")}
+                    </div>
+                  )}
+                {loreItem.beats_untrigger &&
+                  loreItem.beats_untrigger.length > 0 && (
+                    <div className="text-xs text-red-700 dark:text-red-400 mt-1">
+                      <strong>❌ Beats turning OFF:</strong>{" "}
+                      {loreItem.beats_untrigger
+                        .map((i) => plotBeats[i]?.title || `Beat ${i + 1}`)
+                        .join(", ")}
+                    </div>
+                  )}
               </div>
               <div className="flex flex-col gap-1">
                 <button
@@ -1436,32 +2102,40 @@ function LoreEditor({
               </button>
             </div>
           )
-        ))}
+        )}
       </div>
     </div>
   );
 }
 
 // Story Meta Editor
-function StoryMetaEditor({ 
-  plotBeats, 
+function StoryMetaEditor({
+  plotBeats,
   memory,
   premise,
   authorNotes,
-  onUpdate 
-}: { 
-  plotBeats: PlotBeat[]; 
+  onUpdate,
+}: {
+  plotBeats: PlotBeat[];
   memory: string[];
   premise: string;
   authorNotes?: string;
   onUpdate: (updates: Partial<StoryData>) => void;
 }) {
-  const [localPlotBeats, setLocalPlotBeats] = useState<PlotBeat[]>([...plotBeats]);
-  const [localAuthorNotes, setLocalAuthorNotes] = useState<string>(authorNotes || "");
+  const [localPlotBeats, setLocalPlotBeats] = useState<PlotBeat[]>([
+    ...plotBeats,
+  ]);
+  const [localAuthorNotes, setLocalAuthorNotes] = useState<string>(
+    authorNotes || ""
+  );
   const [localMemory, setLocalMemory] = useState<string[]>([...memory]);
   const [newMemoryEntry, setNewMemoryEntry] = useState<string>("");
-  const [draggedPlotBeatIndex, setDraggedPlotBeatIndex] = useState<number | null>(null);
-  const [editingPlotBeatIndex, setEditingPlotBeatIndex] = useState<number | null>(null);
+  const [draggedPlotBeatIndex, setDraggedPlotBeatIndex] = useState<
+    number | null
+  >(null);
+  const [editingPlotBeatIndex, setEditingPlotBeatIndex] = useState<
+    number | null
+  >(null);
   const [editPlotBeat, setEditPlotBeat] = useState<Partial<PlotBeat>>({});
 
   const updateBeat = (index: number, field: keyof PlotBeat, value: any) => {
@@ -1472,7 +2146,11 @@ function StoryMetaEditor({
   };
 
   const addBeat = () => {
-    const newBeat: PlotBeat = { title: "New plot beat", content: "Description...", fulfilled: false };
+    const newBeat: PlotBeat = {
+      title: "New plot beat",
+      content: "Description...",
+      fulfilled: false,
+    };
     const updated = [...localPlotBeats, newBeat];
     setLocalPlotBeats(updated);
     onUpdate({ plot_beats: updated });
@@ -1496,7 +2174,7 @@ function StoryMetaEditor({
     const draggedItem = newPlotBeats[draggedPlotBeatIndex];
     newPlotBeats.splice(draggedPlotBeatIndex, 1);
     newPlotBeats.splice(index, 0, draggedItem);
-    
+
     setLocalPlotBeats(newPlotBeats);
     setDraggedPlotBeatIndex(index);
     onUpdate({ plot_beats: newPlotBeats });
@@ -1509,7 +2187,10 @@ function StoryMetaEditor({
   const movePlotBeatUp = (index: number) => {
     if (index === 0) return;
     const newPlotBeats = [...localPlotBeats];
-    [newPlotBeats[index - 1], newPlotBeats[index]] = [newPlotBeats[index], newPlotBeats[index - 1]];
+    [newPlotBeats[index - 1], newPlotBeats[index]] = [
+      newPlotBeats[index],
+      newPlotBeats[index - 1],
+    ];
     setLocalPlotBeats(newPlotBeats);
     onUpdate({ plot_beats: newPlotBeats });
   };
@@ -1517,7 +2198,10 @@ function StoryMetaEditor({
   const movePlotBeatDown = (index: number) => {
     if (index === localPlotBeats.length - 1) return;
     const newPlotBeats = [...localPlotBeats];
-    [newPlotBeats[index], newPlotBeats[index + 1]] = [newPlotBeats[index + 1], newPlotBeats[index]];
+    [newPlotBeats[index], newPlotBeats[index + 1]] = [
+      newPlotBeats[index + 1],
+      newPlotBeats[index],
+    ];
     setLocalPlotBeats(newPlotBeats);
     onUpdate({ plot_beats: newPlotBeats });
   };
@@ -1533,7 +2217,11 @@ function StoryMetaEditor({
   };
 
   const saveEditPlotBeat = () => {
-    if (editingPlotBeatIndex !== null && editPlotBeat.title && editPlotBeat.content) {
+    if (
+      editingPlotBeatIndex !== null &&
+      editPlotBeat.title &&
+      editPlotBeat.content
+    ) {
       const updated = [...localPlotBeats];
       updated[editingPlotBeatIndex] = editPlotBeat as PlotBeat;
       setLocalPlotBeats(updated);
@@ -1548,7 +2236,9 @@ function StoryMetaEditor({
       {/* Plot Beats */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white">📖 Plot Beats</h4>
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white">
+            📖 Plot Beats
+          </h4>
           <button
             onClick={addBeat}
             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
@@ -1556,7 +2246,9 @@ function StoryMetaEditor({
             + Add Beat
           </button>
         </div>
-        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">💡 Drag and drop to reorder (or use arrow buttons on mobile)</p>
+        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+          💡 Drag and drop to reorder (or use arrow buttons on mobile)
+        </p>
         <div className="space-y-3">
           {localPlotBeats.map((beat, index) => (
             <div
@@ -1566,27 +2258,61 @@ function StoryMetaEditor({
               onDragOver={(e) => handlePlotBeatDragOver(e, index)}
               onDragEnd={handlePlotBeatDragEnd}
               className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-opacity ${
-                editingPlotBeatIndex === index ? '' : 'cursor-move'
-              } ${draggedPlotBeatIndex === index ? 'opacity-50' : 'opacity-100'}`}
+                editingPlotBeatIndex === index ? "" : "cursor-move"
+              } ${
+                draggedPlotBeatIndex === index ? "opacity-50" : "opacity-100"
+              }`}
             >
               {editingPlotBeatIndex === index ? (
                 // Edit mode
                 <div className="space-y-3">
-                  <h5 className="text-sm font-bold text-gray-900 dark:text-white">✏️ Editing Plot Beat</h5>
+                  <h5 className="text-sm font-bold text-gray-900 dark:text-white">
+                    ✏️ Editing Plot Beat
+                  </h5>
                   <input
                     type="text"
                     value={editPlotBeat.title || ""}
-                    onChange={(e) => setEditPlotBeat({ ...editPlotBeat, title: e.target.value })}
+                    onChange={(e) =>
+                      setEditPlotBeat({
+                        ...editPlotBeat,
+                        title: e.target.value,
+                      })
+                    }
                     placeholder="Title"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <textarea
                     value={editPlotBeat.content || ""}
-                    onChange={(e) => setEditPlotBeat({ ...editPlotBeat, content: e.target.value })}
+                    onChange={(e) =>
+                      setEditPlotBeat({
+                        ...editPlotBeat,
+                        content: e.target.value,
+                      })
+                    }
                     placeholder="Content"
                     rows={3}
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
                   />
+                  <div>
+                    <input
+                      type="number"
+                      value={editPlotBeat.points ?? ""}
+                      onChange={(e) =>
+                        setEditPlotBeat({
+                          ...editPlotBeat,
+                          points: e.target.value
+                            ? parseInt(e.target.value)
+                            : undefined,
+                        })
+                      }
+                      placeholder="Points (default: 25)"
+                      min="0"
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      💰 Custom points reward
+                    </p>
+                  </div>
                   <div className="flex gap-2">
                     <button
                       onClick={saveEditPlotBeat}
@@ -1606,15 +2332,28 @@ function StoryMetaEditor({
               ) : (
                 // View mode
                 <div className="flex items-start gap-3">
-                  <div className="text-xl cursor-grab active:cursor-grabbing select-none pt-1">⋮⋮</div>
+                  <div className="text-xl cursor-grab active:cursor-grabbing select-none pt-1">
+                    ⋮⋮
+                  </div>
                   <div className="flex-1">
-                    <div className="font-bold text-gray-900 dark:text-white mb-1">{beat.title}</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">{beat.content}</div>
+                    <div className="font-bold text-gray-900 dark:text-white mb-1">
+                      {beat.title}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                      {beat.content}
+                    </div>
+                    {beat.points !== undefined && (
+                      <div className="text-xs text-orange-600 dark:text-orange-400 mb-2 font-semibold">
+                        💰 {beat.points} points
+                      </div>
+                    )}
                     <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                       <input
                         type="checkbox"
                         checked={beat.fulfilled || false}
-                        onChange={(e) => updateBeat(index, 'fulfilled', e.target.checked)}
+                        onChange={(e) =>
+                          updateBeat(index, "fulfilled", e.target.checked)
+                        }
                         className="rounded"
                       />
                       <span>✓ Fulfilled</span>
@@ -1674,13 +2413,16 @@ function StoryMetaEditor({
           className="w-full h-32 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
         />
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          💡 These notes help guide the AI in maintaining story consistency and tone
+          💡 These notes help guide the AI in maintaining story consistency and
+          tone
         </p>
       </div>
 
       {/* Memory Entries (Editable) */}
       <div>
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3">🧠 Memory Entries ({localMemory.length})</h4>
+        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
+          🧠 Memory Entries ({localMemory.length})
+        </h4>
         <div className="space-y-3">
           <div className="flex gap-2">
             <input
@@ -1706,7 +2448,10 @@ function StoryMetaEditor({
           </div>
           <div className="max-h-60 overflow-y-auto space-y-2">
             {localMemory.map((entry, index) => (
-              <div key={index} className="p-3 bg-gray-50 dark:bg-gray-700 rounded text-sm text-gray-700 dark:text-gray-300 flex justify-between items-center">
+              <div
+                key={index}
+                className="p-3 bg-gray-50 dark:bg-gray-700 rounded text-sm text-gray-700 dark:text-gray-300 flex justify-between items-center"
+              >
                 <span className="pr-2 flex-1">{entry}</span>
                 <button
                   onClick={() => {
@@ -1721,7 +2466,9 @@ function StoryMetaEditor({
               </div>
             ))}
             {localMemory.length === 0 && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 italic">No memory entries yet.</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                No memory entries yet.
+              </p>
             )}
           </div>
         </div>
@@ -1736,11 +2483,11 @@ interface MenuProps extends StoryData {
   onUpdateStoryData: (updates: Partial<StoryData>) => void;
 }
 
-export default function MenuPage({ 
-  storyDbId, 
+export default function MenuPage({
+  storyDbId,
   onSaveProgress,
   onUpdateStoryData,
-  ...storyData 
+  ...storyData
 }: MenuProps) {
   const router = useRouter();
   const { addNotification } = useNotification();
@@ -1751,7 +2498,7 @@ export default function MenuPage({
   const [showSettings, setShowSettings] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [playerNotes, setPlayerNotes] = useState(storyData.player_notes || "");
-  
+
   // Settings form state
   const [settingsForm, setSettingsForm] = useState<BasicSettingsForm>({
     story_name: storyData.story_name,
@@ -1763,7 +2510,7 @@ export default function MenuPage({
     momentum: storyData.momentum,
     maxMomentum: storyData.maxMomentum,
   });
-  
+
   // Advanced editing states
   const [editingStats, setEditingStats] = useState(false);
   const [editingResources, setEditingResources] = useState(false);
@@ -1771,7 +2518,9 @@ export default function MenuPage({
   const [editingAchievements, setEditingAchievements] = useState(false);
   const [editingLore, setEditingLore] = useState(false);
   const [editingPlotBeats, setEditingPlotBeats] = useState(false);
-  const [activeTab, setActiveTab] = useState<'basic' | 'stats' | 'inventory' | 'lore' | 'story'>('basic');
+  const [activeTab, setActiveTab] = useState<
+    "basic" | "stats" | "inventory" | "quests" | "lore" | "story"
+  >("basic");
 
   const handleSaveProgress = async () => {
     setSaving(true);
@@ -1832,7 +2581,10 @@ export default function MenuPage({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${storyData.story_name.replace(/[^a-z0-9]/gi, "_")}_${Date.now()}.json`;
+      a.download = `${storyData.story_name.replace(
+        /[^a-z0-9]/gi,
+        "_"
+      )}_${Date.now()}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1851,7 +2603,9 @@ export default function MenuPage({
 
     setDeleting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         throw new Error("Not authenticated");
       }
@@ -1859,7 +2613,7 @@ export default function MenuPage({
       const response = await fetch(`/api/stories/${storyDbId}`, {
         method: "DELETE",
         headers: {
-          "Authorization": `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
@@ -1876,7 +2630,11 @@ export default function MenuPage({
   };
 
   const handleReturnToExplorer = () => {
-    if (confirm("Are you sure you want to leave? Make sure your progress is saved!")) {
+    if (
+      confirm(
+        "Are you sure you want to leave? Make sure your progress is saved!"
+      )
+    ) {
       router.push("/explorer");
     }
   };
@@ -1884,7 +2642,9 @@ export default function MenuPage({
   const calculateStoryProgress = () => {
     const totalParts = storyData.scene.parts.length;
     const totalBeats = storyData.plot_beats.length;
-    const fulfilledBeats = storyData.plot_beats.filter((b) => b.fulfilled).length;
+    const fulfilledBeats = storyData.plot_beats.filter(
+      (b) => b.fulfilled
+    ).length;
     const achievementCount = storyData.achievements.length;
 
     return {
@@ -1892,12 +2652,14 @@ export default function MenuPage({
       totalBeats,
       fulfilledBeats,
       achievementCount,
-      progress: totalBeats > 0 ? Math.round((fulfilledBeats / totalBeats) * 100) : 0,
+      progress:
+        totalBeats > 0 ? Math.round((fulfilledBeats / totalBeats) * 100) : 0,
     };
   };
 
   const stats = calculateStoryProgress();
-  const totalEarnedPoints = (storyData.earnedPointsFromBeats || []).reduce((a, b) => a + b, 0) +
+  const totalEarnedPoints =
+    (storyData.earnedPointsFromBeats || []).reduce((a, b) => a + b, 0) +
     (storyData.earnedPointsFromChapters || []).reduce((a, b) => a + b, 0);
   const availablePoints = storyData.points;
 
@@ -1918,31 +2680,39 @@ export default function MenuPage({
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
           📊 Story Progress
         </h3>
-        
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
             <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
               {stats.totalParts}
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Story Parts</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+              Story Parts
+            </p>
           </div>
           <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
             <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
               {stats.fulfilledBeats}/{stats.totalBeats}
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Plot Beats</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+              Plot Beats
+            </p>
           </div>
           <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
             <p className="text-3xl font-bold text-green-600 dark:text-green-400">
               {stats.achievementCount}
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Achievements</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+              Achievements
+            </p>
           </div>
           <div className="text-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
             <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">
               {stats.progress}%
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Completion</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+              Completion
+            </p>
           </div>
         </div>
 
@@ -1957,20 +2727,36 @@ export default function MenuPage({
         {/* Points & Momentum Summary */}
         <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-center">
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Available Points</p>
-            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{availablePoints}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+              Available Points
+            </p>
+            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+              {availablePoints}
+            </p>
           </div>
           <div className="p-4 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-center">
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total Earned</p>
-            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{totalEarnedPoints}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+              Total Earned
+            </p>
+            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+              {totalEarnedPoints}
+            </p>
           </div>
           <div className="p-4 rounded-lg bg-pink-50 dark:bg-pink-900/20 text-center">
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Spent / Used</p>
-            <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">{Math.max(totalEarnedPoints - availablePoints, 0)}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+              Spent / Used
+            </p>
+            <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">
+              {Math.max(totalEarnedPoints - availablePoints, 0)}
+            </p>
           </div>
           <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-center">
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Momentum</p>
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{storyData.momentum}/{storyData.maxMomentum}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+              Momentum
+            </p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {storyData.momentum}/{storyData.maxMomentum}
+            </p>
           </div>
         </div>
       </div>
@@ -2042,9 +2828,24 @@ export default function MenuPage({
             onClick={() => setShowSettings(true)}
             className="flex items-center justify-center gap-3 px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
             </svg>
             <span>Story Settings</span>
           </button>
@@ -2062,8 +2863,18 @@ export default function MenuPage({
               </>
             ) : (
               <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                  />
                 </svg>
                 <span>Save Progress</span>
               </>
@@ -2083,8 +2894,18 @@ export default function MenuPage({
               </>
             ) : (
               <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
                 </svg>
                 <span>Export Story</span>
               </>
@@ -2096,8 +2917,18 @@ export default function MenuPage({
             onClick={handleReturnToExplorer}
             className="flex items-center justify-center gap-3 px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
             </svg>
             <span>Return to Explorer</span>
           </button>
@@ -2108,8 +2939,18 @@ export default function MenuPage({
             disabled={deleting || !storyDbId}
             className="flex items-center justify-center gap-3 px-6 py-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
             <span>Delete Story</span>
           </button>
@@ -2124,31 +2965,41 @@ export default function MenuPage({
 
         <div className="space-y-3 text-sm">
           <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-            <span className="text-gray-600 dark:text-gray-400">Story Name:</span>
+            <span className="text-gray-600 dark:text-gray-400">
+              Story Name:
+            </span>
             <span className="font-semibold text-gray-900 dark:text-white">
               {storyData.story_name}
             </span>
           </div>
           <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-            <span className="text-gray-600 dark:text-gray-400">Player Name:</span>
+            <span className="text-gray-600 dark:text-gray-400">
+              Player Name:
+            </span>
             <span className="font-semibold text-gray-900 dark:text-white">
               {storyData.player_name}
             </span>
           </div>
           <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-            <span className="text-gray-600 dark:text-gray-400">Total Memory Entries:</span>
+            <span className="text-gray-600 dark:text-gray-400">
+              Total Memory Entries:
+            </span>
             <span className="font-semibold text-gray-900 dark:text-white">
               {storyData.memory.length}
             </span>
           </div>
           <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-            <span className="text-gray-600 dark:text-gray-400">Inventory Items:</span>
+            <span className="text-gray-600 dark:text-gray-400">
+              Inventory Items:
+            </span>
             <span className="font-semibold text-gray-900 dark:text-white">
               {storyData.inventory.length}
             </span>
           </div>
           <div className="flex justify-between py-2">
-            <span className="text-gray-600 dark:text-gray-400">Lore Entries:</span>
+            <span className="text-gray-600 dark:text-gray-400">
+              Lore Entries:
+            </span>
             <span className="font-semibold text-gray-900 dark:text-white">
               {storyData.lore.length}
             </span>
@@ -2164,7 +3015,8 @@ export default function MenuPage({
               ⚠️ Delete Story?
             </h3>
             <p className="text-gray-700 dark:text-gray-300 mb-6">
-              Are you sure you want to permanently delete this story? This action cannot be undone.
+              Are you sure you want to permanently delete this story? This
+              action cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
@@ -2206,8 +3058,18 @@ export default function MenuPage({
                 onClick={() => setShowSettings(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -2215,19 +3077,20 @@ export default function MenuPage({
             {/* Tabs */}
             <div className="flex gap-2 px-6 pt-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
               {[
-                { id: 'basic', label: '📝 Basic', icon: '📝' },
-                { id: 'stats', label: '📊 Stats & Resources', icon: '📊' },
-                { id: 'inventory', label: '🎒 Inventory', icon: '🎒' },
-                { id: 'lore', label: '📜 Lore', icon: '📜' },
-                { id: 'story', label: '📖 Story', icon: '📖' },
+                { id: "basic", label: "📝 Basic", icon: "📝" },
+                { id: "stats", label: "📊 Stats & Resources", icon: "📊" },
+                { id: "inventory", label: "🎒 Inventory", icon: "🎒" },
+                { id: "quests", label: "📜 Quests", icon: "📜" },
+                { id: "lore", label: "📚 Lore", icon: "📚" },
+                { id: "story", label: "📖 Story", icon: "📖" },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`px-4 py-2 font-semibold rounded-t-lg transition-colors whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? "bg-purple-600 text-white"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                   }`}
                 >
                   {tab.label}
@@ -2237,39 +3100,43 @@ export default function MenuPage({
 
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto p-6">
-              {activeTab === 'basic' && (
-                <BasicSettings 
-                  form={settingsForm} 
-                  onChange={setSettingsForm} 
-                />
+              {activeTab === "basic" && (
+                <BasicSettings form={settingsForm} onChange={setSettingsForm} />
               )}
-              
-              {activeTab === 'stats' && (
-                <StatsResourcesEditor 
+
+              {activeTab === "stats" && (
+                <StatsResourcesEditor
                   stats={storyData.stats}
                   resources={storyData.resources}
                   achievements={storyData.achievements}
                   onUpdate={(updates) => onUpdateStoryData(updates)}
                 />
               )}
-              
-              {activeTab === 'inventory' && (
-                <InventoryEditor 
+
+              {activeTab === "inventory" && (
+                <InventoryEditor
                   inventory={storyData.inventory}
                   onUpdate={(inventory) => onUpdateStoryData({ inventory })}
                 />
               )}
-              
-              {activeTab === 'lore' && (
-                <LoreEditor 
+
+              {activeTab === "quests" && (
+                <QuestEditor
+                  quests={storyData.quests || []}
+                  onUpdate={(quests) => onUpdateStoryData({ quests })}
+                />
+              )}
+
+              {activeTab === "lore" && (
+                <LoreEditor
                   lore={storyData.lore}
                   plotBeats={storyData.plot_beats}
                   onUpdate={(lore) => onUpdateStoryData({ lore })}
                 />
               )}
-              
-              {activeTab === 'story' && (
-                <StoryMetaEditor 
+
+              {activeTab === "story" && (
+                <StoryMetaEditor
                   plotBeats={storyData.plot_beats}
                   memory={storyData.memory}
                   premise={storyData.premise}

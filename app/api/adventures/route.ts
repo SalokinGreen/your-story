@@ -137,6 +137,8 @@ export async function GET(request: NextRequest) {
       isFeatured: item.is_featured,
       visibility: item.visibility,
       storyTemplate: item.story_template,
+      selectedPreset: item.selected_preset,
+      presets: item.presets,
     }));
 
     return NextResponse.json({ adventures }, { status: 200 });
@@ -190,6 +192,8 @@ export async function POST(request: NextRequest) {
       estimatedDuration,
       isPublished,
       storyTemplate,
+      selectedPreset,
+      presets,
     } = body;
 
     // Validate that the authorId matches the authenticated user
@@ -226,6 +230,8 @@ export async function POST(request: NextRequest) {
           is_published: isPublished || false,
           is_featured: false,
           story_template: storyTemplate,
+          selected_preset: selectedPreset || null,
+          presets: presets || null,
           popularity: 0,
           rating: 0,
           play_count: 0,

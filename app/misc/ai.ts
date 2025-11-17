@@ -1,4 +1,9 @@
-import { ScenePart, StoryData, Choice, UPGRADE_COSTS } from "@/app/misc/structs";
+import {
+  ScenePart,
+  StoryData,
+  Choice,
+  UPGRADE_COSTS,
+} from "@/app/misc/structs";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -12,20 +17,22 @@ export interface BuildPromptInput {
 
 // Cleans text by removing problematic characters and normalizing whitespace
 function cleanString(text: string): string {
-  return text
-    // Remove null bytes and other control characters (except newlines and tabs)
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    // Normalize different types of whitespace to standard space
-    .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g, ' ')
-    // Replace multiple spaces with single space
-    .replace(/ {2,}/g, ' ')
-    // Replace more than 2 consecutive newlines with exactly 2
-    .replace(/\n{3,}/g, '\n\n')
-    // Trim spaces at start/end of lines
-    .replace(/[ \t]+$/gm, '')
-    .replace(/^[ \t]+/gm, '')
-    // Trim overall
-    .trim();
+  return (
+    text
+      // Remove null bytes and other control characters (except newlines and tabs)
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+      // Normalize different types of whitespace to standard space
+      .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g, " ")
+      // Replace multiple spaces with single space
+      .replace(/ {2,}/g, " ")
+      // Replace more than 2 consecutive newlines with exactly 2
+      .replace(/\n{3,}/g, "\n\n")
+      // Trim spaces at start/end of lines
+      .replace(/[ \t]+$/gm, "")
+      .replace(/^[ \t]+/gm, "")
+      // Trim overall
+      .trim()
+  );
 }
 
 export function buildMessages({ storyData }: BuildPromptInput): ChatMessage[] {
@@ -54,8 +61,6 @@ Story prose here. Write your narrative content between these tags.
 /command1
 /command2
 </commands>
-!!! END CHAPTER !!! (Optional to end the current chapter)
-!!! END STORY !!! (Optional to end the story)
 !!! GAME OVER !!! (Optional to indicate game over)
 \`\`\`
 
@@ -84,14 +89,12 @@ Item Types:
 
 Commands:
 - /add_item: item name | description | type | quantity - Adds a new item to the player's inventory. Type must be: normal, consumable, story, or misc. Example: /add_item: Health Potion | Restores vitality | consumable | 3
-- /modify_item: item name(amount) - Adds amount (can be negative for removal) to the quantity of an item in the player's inventory. Remove the item if quantity reaches zero.
-- /modify_resource: resource name(amount) - Modifies a player's resource by the given amount.
 - /trigger_achievement: achievement title - Triggers/unlocks an existing achievement from the player's achievement list. Only use titles that exist in the Achievements section below.
 - /mark_beat: beat index - Marks a story beat as fulfilled. IMPORTANT: Only mark a beat as fulfilled after ALL events, objectives, and key moments described in that beat's content have been completed in the narrative. Do not mark it early.
-- /edit_beat_title: new title (index) - Edits the title of a story beat at the given index.
-- /edit_beat_content: new content (index) - Edits the content of a story beat at the given index.
-- /add_beat: title | content - Adds a new story beat with the given title and content.
-- /remove_beat: beat index - Removes a story beat at the given index.
+- /create_quest: title | short description | full description | points - Creates a new quest and makes it active. Example: /create_quest: Find the Lost Amulet | Locate the ancient amulet | Search the old ruins for the legendary amulet of power | 10
+- /activate_quest: quest title - Makes an inactive quest active/visible to the player.
+- /complete_quest: quest title - Marks an active quest as fulfilled and awards points.
+- /deactivate_quest: quest title - Makes an active quest inactive/hidden from the player.
 
 Plot Beat Guidelines:
 - Each plot beat represents a significant story milestone with multiple scenes and events.
@@ -105,53 +108,59 @@ Progression System:
 - Players earn upgrade points from story progression: ${UPGRADE_COSTS.BEAT_REWARD} points per completed story beat, ${UPGRADE_COSTS.CHAPTER_REWARD} points per completed chapter.
 - Points are automatically awarded when you use /mark_beat or end a chapter with "!!! END CHAPTER !!!".
 - Players spend points in the Upgrades shop to increase stats, expand resource maximums, or add custom items.
-- Balance story progression rewards - complete meaningful beats with /mark_beat to grant points for character growth.`
+- Balance story progression rewards - complete meaningful beats with /mark_beat to grant points for character growth.`;
 
-const recentScene = storyData.scene.parts.at(-1)?.content ?? storyData.starting_content;
-const memory_cap = 20000; // Max memory size in characters
-// Remove duplicate entries from memory
-let addedItems = new Set<string>();
-const new_memory = storyData.memory.filter((item, index) => 
-{
-  if (addedItems.has(item)) {
-    return false;
-  } else {
-    addedItems.add(item);
-    return true;
+  const recentScene =
+    storyData.scene.parts.at(-1)?.content ?? storyData.starting_content;
+  const memory_cap = 20000; // Max memory size in characters
+  // Remove duplicate entries from memory
+  let addedItems = new Set<string>();
+  const new_memory = storyData.memory.filter((item, index) => {
+    if (addedItems.has(item)) {
+      return false;
+    } else {
+      addedItems.add(item);
+      return true;
+    }
+  });
+  storyData.memory = new_memory;
+  // Trim memory if too large
+  let totalMemoryLength = storyData.memory.reduce(
+    (acc, entry) => acc + entry.length,
+    0
+  );
+  while (totalMemoryLength > memory_cap && storyData.memory.length > 0) {
+    const removed = storyData.memory.shift();
+    if (removed) {
+      totalMemoryLength -= removed.length;
+    }
   }
-});
-storyData.memory = new_memory;
-// Trim memory if too large
-let totalMemoryLength = storyData.memory.reduce((acc, entry) => acc + entry.length, 0);
-while (totalMemoryLength > memory_cap && storyData.memory.length > 0) {
-  const removed = storyData.memory.shift();
-  if (removed) {
-    totalMemoryLength -= removed.length;
-  }
-}
   const info = cleanString(storyDataToString(storyData));
   let context: ChatMessage[] = [
     { role: "system", content: system },
-    { role: "user", content: info }
+    { role: "user", content: info },
   ];
-  
+
   // For very first interaction
   if (storyData.scene.parts.length === 1) {
-    context.push({ role: "assistant", content: cleanString(storyData.starting_content) });
+    context.push({
+      role: "assistant",
+      content: cleanString(storyData.starting_content),
+    });
     context.push({ role: "user", content: cleanString(recentScene) });
   } else {
     // For ongoing stories, only include the last 6 scene parts to avoid context overflow
     // This keeps recent context while staying under token limits
     const MAX_RECENT_PARTS = 12;
     const recentParts = storyData.scene.parts.slice(-MAX_RECENT_PARTS);
-    
-    recentParts.forEach(part => {
+
+    recentParts.forEach((part) => {
       const role = part.user ? "user" : "assistant";
       context.push({ role: role, content: cleanString(part.content) });
     });
   }
-  
-  return context
+
+  return context;
 }
 export function storyDataToString(storyData: StoryData): string {
   let result = `# Story Name: ${storyData.story_name}\n`;
@@ -159,70 +168,111 @@ export function storyDataToString(storyData: StoryData): string {
 
   result += `## Player: ${storyData.player_name}\n`;
   result += `${storyData.player_summary}\n\n`;
-  
+
   result += `## Stats:\n`;
-  result += storyData.stats.map(stat => `- ${stat.name}: ${stat.value}% (${stat.description})`).join("\n") + "\n\n";
-  
+  result +=
+    storyData.stats
+      .map((stat) => `- ${stat.name}: ${stat.value}% (${stat.description})`)
+      .join("\n") + "\n\n";
+
   result += `## Resources:\n`;
-  result += storyData.resources.map(resource => `- ${resource.name}: ${resource.value}/${resource.maxValue} (${resource.description})`).join("\n") + "\n\n";
-  
+  result +=
+    storyData.resources
+      .map(
+        (resource) =>
+          `- ${resource.name}: ${resource.value}/${resource.maxValue} (${resource.description})`
+      )
+      .join("\n") + "\n\n";
+
   result += `## Inventory:\n`;
-  result += storyData.inventory.map(item => `- ${item.name} x${item.quantity}: ${item.description}`).join("\n") + "\n\n";
-  
+  result +=
+    storyData.inventory
+      .map((item) => `- ${item.name} x${item.quantity}: ${item.description}`)
+      .join("\n") + "\n\n";
+
   // Only show locked achievements (available to unlock)
-  const lockedAchievements = storyData.achievements.filter(ach => !ach.dateAchieved);
+  const lockedAchievements = storyData.achievements.filter(
+    (ach) => !ach.dateAchieved
+  );
   if (lockedAchievements.length > 0) {
     result += `## Achievements Available to Unlock:\n`;
-    result += lockedAchievements.map(ach => 
-      `- ${ach.title}: ${ach.ai_hint || ach.description}`
-    ).join("\n") + "\n\n";
+    result +=
+      lockedAchievements
+        .map((ach) => `- ${ach.title}: ${ach.ai_hint || ach.description}`)
+        .join("\n") + "\n\n";
   }
-  
+
   result += `## Plot Beats:\n`;
-  
+
   // Find the first unfulfilled beat (current beat)
-  const currentBeatIndex = storyData.plot_beats.findIndex(beat => !beat.fulfilled);
-  
-  // Show previous completed beats (just titles)
-  if (currentBeatIndex > 0) {
-    result += `\n### Previous Plot Beats (Completed):\n`;
-    for (let i = 0; i < currentBeatIndex; i++) {
-      result += `- ${i + 1}. ${storyData.plot_beats[i].title}\n`;
-    }
-  }
-  
-  // Show last beat (with full content)
-  if (currentBeatIndex > 0) {
-    const lastBeat = storyData.plot_beats[currentBeatIndex - 1];
-    result += `\n### Last Plot Beat\n#### ${currentBeatIndex}. ${lastBeat.title}\n${lastBeat.content}\n`;
-  }
-  
+  const currentBeatIndex = storyData.plot_beats.findIndex(
+    (beat) => !beat.fulfilled
+  );
+
   // Show current beat (with full content)
-  if (currentBeatIndex !== -1 && currentBeatIndex < storyData.plot_beats.length) {
+  if (
+    currentBeatIndex !== -1 &&
+    currentBeatIndex < storyData.plot_beats.length
+  ) {
     const currentBeat = storyData.plot_beats[currentBeatIndex];
-    result += `\n### Current Plot Beat\n#### ${currentBeatIndex + 1}. ${currentBeat.title}\n${currentBeat.content}\n`;
+    result += `\n### Current Plot Beat\n#### ${currentBeatIndex + 1}. ${
+      currentBeat.title
+    }\n${currentBeat.content}\n`;
   }
-  
+
   // Show next beat (with full content)
-  if (currentBeatIndex !== -1 && currentBeatIndex + 1 < storyData.plot_beats.length) {
+  if (
+    currentBeatIndex !== -1 &&
+    currentBeatIndex + 1 < storyData.plot_beats.length
+  ) {
     const nextBeat = storyData.plot_beats[currentBeatIndex + 1];
-    result += `\n### Next Plot Beat\n#### ${currentBeatIndex + 2}. ${nextBeat.title}\n${nextBeat.content}\n`;
+    result += `\n### Next Plot Beat\n#### ${currentBeatIndex + 2}. ${
+      nextBeat.title
+    }\n${nextBeat.content}\n`;
   }
-  
+
   // Show future beats (just titles)
-  if (currentBeatIndex !== -1 && currentBeatIndex + 2 < storyData.plot_beats.length) {
+  if (
+    currentBeatIndex !== -1 &&
+    currentBeatIndex + 2 < storyData.plot_beats.length
+  ) {
     result += `\n### Future Plot Beats:\n`;
     for (let i = currentBeatIndex + 2; i < storyData.plot_beats.length; i++) {
       result += `- ${i + 1}. ${storyData.plot_beats[i].title}\n`;
     }
   }
- 
+
   result += `## Memory:\n`;
   storyData.memory.forEach((mem, index) => {
     result += `- ${mem}\n`;
   });
+
+  // Quests
+  if (storyData.quests && storyData.quests.length > 0) {
+    const activeQuests = storyData.quests.filter(
+      (q) => q.active && !q.fulfilled
+    );
+    const inactiveQuests = storyData.quests.filter(
+      (q) => !q.active && !q.fulfilled
+    );
+
+    if (activeQuests.length > 0) {
+      result += `\n## Active Quests:\n`;
+      activeQuests.forEach((quest) => {
+        result += `- ${quest.title}: ${quest.description} (${quest.points} points)\n`;
+      });
+    }
+
+    if (inactiveQuests.length > 0) {
+      result += `\n## Inactive Quests (hidden from player, you can activate with /activate_quest):\n`;
+      inactiveQuests.forEach((quest) => {
+        result += `- ${quest.title}: ${quest.description}\n`;
+      });
+    }
+  }
+
   // Lore - only include entries that are turned ON
-  const activeLore = storyData.lore.filter(lore => lore.on !== false);
+  const activeLore = storyData.lore.filter((lore) => lore.on !== false);
   if (activeLore.length > 0) {
     result += `\n## Lore Entries:\n`;
     activeLore.forEach((lore, index) => {
@@ -237,168 +287,182 @@ export function storyDataToString(storyData: StoryData): string {
   if (storyData.player_notes) {
     result += `${storyData.player_notes}\n\n`;
   }
-  
-    console.log("storyDataToString result:", result);
-  return result;
 
+  console.log("storyDataToString result:", result);
+  return result;
 }
 export function outputToScenePart(text: string): ScenePart {
-    // Helper: extract inner text of a simple XML-like block
-    const extractBlock = (tag: string, src: string): string | null => {
-      // Use String.raw so backslashes are preserved for the RegExp constructor
-      const re = new RegExp(String.raw`<${tag}[^>]*>([\s\S]*?)<\/${tag}>`, "i");
-      const m = src.match(re);
-      if (m?.[1]) return m[1];
-      // Fallback: naive search, case-insensitive
-      const lower = src.toLowerCase();
-      const openTag = `<${tag.toLowerCase()}`;
-      const closeTag = `</${tag.toLowerCase()}>`;
-      const openIdx = lower.indexOf(openTag);
-      if (openIdx === -1) return null;
-      const gtIdx = lower.indexOf('>', openIdx);
-      if (gtIdx === -1) return null;
-      const closeIdx = lower.indexOf(closeTag, gtIdx + 1);
-      if (closeIdx === -1) return null;
-      return src.substring(gtIdx + 1, closeIdx);
-    };
+  // Helper: extract inner text of a simple XML-like block
+  const extractBlock = (tag: string, src: string): string | null => {
+    // Use String.raw so backslashes are preserved for the RegExp constructor
+    const re = new RegExp(String.raw`<${tag}[^>]*>([\s\S]*?)<\/${tag}>`, "i");
+    const m = src.match(re);
+    if (m?.[1]) return m[1];
+    // Fallback: naive search, case-insensitive
+    const lower = src.toLowerCase();
+    const openTag = `<${tag.toLowerCase()}`;
+    const closeTag = `</${tag.toLowerCase()}>`;
+    const openIdx = lower.indexOf(openTag);
+    if (openIdx === -1) return null;
+    const gtIdx = lower.indexOf(">", openIdx);
+    if (gtIdx === -1) return null;
+    const closeIdx = lower.indexOf(closeTag, gtIdx + 1);
+    if (closeIdx === -1) return null;
+    return src.substring(gtIdx + 1, closeIdx);
+  };
 
-    // Helper: extract story content even when tags are missing
-    const extractStoryContent = (src: string): string => {
-      // Try to extract from <story> tags first
-      const storyBlock = extractBlock("story", src);
-      if (storyBlock) return storyBlock;
+  // Helper: extract story content even when tags are missing
+  const extractStoryContent = (src: string): string => {
+    // Try to extract from <story> tags first
+    const storyBlock = extractBlock("story", src);
+    if (storyBlock) return storyBlock;
 
-      // If no <story> tags, try to extract everything before <memory>, <choices>, or <commands> tags
-      const lowerSrc = src.toLowerCase();
-      let endIndex = src.length;
-      
-      // Find the first occurrence of any structured tag
-      const tagMatches = [
-        { tag: '<memory', index: lowerSrc.indexOf('<memory') },
-        { tag: '<choices', index: lowerSrc.indexOf('<choices') },
-        { tag: '<commands', index: lowerSrc.indexOf('<commands') },
-        { tag: '!!! end chapter !!!', index: lowerSrc.indexOf('!!! end chapter !!!') },
-        { tag: '!!! end story !!!', index: lowerSrc.indexOf('!!! end story !!!') },
-        { tag: '!!! game over !!!', index: lowerSrc.indexOf('!!! game over !!!') }
-      ].filter(m => m.index !== -1);
+    // If no <story> tags, try to extract everything before <memory>, <choices>, or <commands> tags
+    const lowerSrc = src.toLowerCase();
+    let endIndex = src.length;
 
-      if (tagMatches.length > 0) {
-        endIndex = Math.min(...tagMatches.map(m => m.index));
+    // Find the first occurrence of any structured tag
+    const tagMatches = [
+      { tag: "<memory", index: lowerSrc.indexOf("<memory") },
+      { tag: "<choices", index: lowerSrc.indexOf("<choices") },
+      { tag: "<commands", index: lowerSrc.indexOf("<commands") },
+      {
+        tag: "!!! end chapter !!!",
+        index: lowerSrc.indexOf("!!! end chapter !!!"),
+      },
+      {
+        tag: "!!! end story !!!",
+        index: lowerSrc.indexOf("!!! end story !!!"),
+      },
+      {
+        tag: "!!! game over !!!",
+        index: lowerSrc.indexOf("!!! game over !!!"),
+      },
+    ].filter((m) => m.index !== -1);
+
+    if (tagMatches.length > 0) {
+      endIndex = Math.min(...tagMatches.map((m) => m.index));
+    }
+
+    // Extract everything up to that point as story content
+    return src.substring(0, endIndex).trim();
+  };
+
+  const parseChoice = (line: string): Choice => {
+    // Extract metadata from angle brackets: <use_skill: ...; use_item: ...; etc>
+    const metaMatch = line.match(/<([^>]+)>/);
+    const text = line.replace(/\s*<[^>]*>\s*$/, "").trim();
+
+    const choice: Choice = { text };
+
+    if (metaMatch) {
+      const metadata = metaMatch[1];
+
+      // Parse use_skill: name (DC number)
+      const skillMatch = metadata.match(
+        /use_skill:\s*([^(;]+?)(?:\s*\(DC\s*(\d+)\))?(?:;|$)/i
+      );
+      if (skillMatch) {
+        const skillName = skillMatch[1].trim();
+        if (skillName.toLowerCase() !== "none") {
+          choice.skill_used = skillName;
+          if (skillMatch[2]) {
+            choice.skill_dc = parseInt(skillMatch[2], 10);
+          }
+        }
       }
 
-      // Extract everything up to that point as story content
-      return src.substring(0, endIndex).trim();
-    };
-
-    const parseChoice = (line: string): Choice => {
-      // Extract metadata from angle brackets: <use_skill: ...; use_item: ...; etc>
-      const metaMatch = line.match(/<([^>]+)>/);
-      const text = line.replace(/\s*<[^>]*>\s*$/, "").trim();
-      
-      const choice: Choice = { text };
-      
-      if (metaMatch) {
-        const metadata = metaMatch[1];
-        
-        // Parse use_skill: name (DC number)
-        const skillMatch = metadata.match(/use_skill:\s*([^(;]+?)(?:\s*\(DC\s*(\d+)\))?(?:;|$)/i);
-        if (skillMatch) {
-          const skillName = skillMatch[1].trim();
-          if (skillName.toLowerCase() !== 'none') {
-            choice.skill_used = skillName;
-            if (skillMatch[2]) {
-              choice.skill_dc = parseInt(skillMatch[2], 10);
-            }
-          }
-        }
-        
-        // Parse use_resource: name
-        const resourceMatch = metadata.match(/use_resource:\s*([^;]+?)(?:;|$)/i);
-        if (resourceMatch) {
-          const resourceName = resourceMatch[1].trim();
-          if (resourceName.toLowerCase() !== 'none') {
-            choice.resource_used = resourceName;
-          }
-        }
-        
-        // Parse risk_resource: name
-        const riskMatch = metadata.match(/risk_resource:\s*([^;]+?)(?:;|$)/i);
-        if (riskMatch) {
-          const riskName = riskMatch[1].trim();
-          if (riskName.toLowerCase() !== 'none') {
-            choice.risked_resource = riskName;
-          }
-        }
-        
-        // Parse use_item: name
-        const itemMatch = metadata.match(/use_item:\s*([^;]+?)(?:;|$)/i);
-        if (itemMatch) {
-          const itemName = itemMatch[1].trim();
-          if (itemName.toLowerCase() !== 'none') {
-            choice.item_used = itemName;
-          }
-        }
-        
-        // Parse item_loss: true/false
-        const lossMatch = metadata.match(/item_loss:\s*(true|false)/i);
-        if (lossMatch) {
-          choice.item_loss = lossMatch[1].toLowerCase() === 'true';
+      // Parse use_resource: name
+      const resourceMatch = metadata.match(/use_resource:\s*([^;]+?)(?:;|$)/i);
+      if (resourceMatch) {
+        const resourceName = resourceMatch[1].trim();
+        if (resourceName.toLowerCase() !== "none") {
+          choice.resource_used = resourceName;
         }
       }
-      
-      return choice;
-    };
 
-    const blockToChoiceList = (block: string | null): Choice[] => {
-      if (!block) return [];
-      return block
+      // Parse risk_resource: name
+      const riskMatch = metadata.match(/risk_resource:\s*([^;]+?)(?:;|$)/i);
+      if (riskMatch) {
+        const riskName = riskMatch[1].trim();
+        if (riskName.toLowerCase() !== "none") {
+          choice.risked_resource = riskName;
+        }
+      }
+
+      // Parse use_item: name
+      const itemMatch = metadata.match(/use_item:\s*([^;]+?)(?:;|$)/i);
+      if (itemMatch) {
+        const itemName = itemMatch[1].trim();
+        if (itemName.toLowerCase() !== "none") {
+          choice.item_used = itemName;
+        }
+      }
+
+      // Parse item_loss: true/false
+      const lossMatch = metadata.match(/item_loss:\s*(true|false)/i);
+      if (lossMatch) {
+        choice.item_loss = lossMatch[1].toLowerCase() === "true";
+      }
+    }
+
+    return choice;
+  };
+
+  const blockToChoiceList = (block: string | null): Choice[] => {
+    if (!block) return [];
+    return (
+      block
         .split(/\r?\n/)
         .map((l) => l.trim())
         // strip common bullet prefixes: -, *, •
         .map((l) => l.replace(/^[\-\*\u2022]\s+/, ""))
         .filter((l) => l.length > 0)
-        .map(parseChoice);
-    };
+        .map(parseChoice)
+    );
+  };
 
-    const blockToList = (block: string | null): string[] => {
-      if (!block) return [];
-      return block
+  const blockToList = (block: string | null): string[] => {
+    if (!block) return [];
+    return (
+      block
         .split(/\r?\n/)
         .map((l) => l.trim())
         // strip common bullet prefixes: -, *, •
         .map((l) => l.replace(/^[\-\*\u2022]\s+/, ""))
-        .filter((l) => l.length > 0);
-    };
+        .filter((l) => l.length > 0)
+    );
+  };
 
-    const story = extractStoryContent(text);
-    const memoryBlock = extractBlock("memory", text);
-    const choicesBlock = extractBlock("choices", text);
-    const commandsBlock = extractBlock("commands", text);
+  const story = extractStoryContent(text);
+  const memoryBlock = extractBlock("memory", text);
+  const choicesBlock = extractBlock("choices", text);
+  const commandsBlock = extractBlock("commands", text);
 
-    const content = story.trim();
-    const memoryEntries = blockToList(memoryBlock);
-    const choices = blockToChoiceList(choicesBlock);
-    const commands = blockToList(commandsBlock);
-    
-    // Check for markers
-    const endChapter = /!!!\s*END\s+CHAPTER\s*!!!/i.test(text);
-    const endStory = /!!!\s*END\s+STORY\s*!!!/i.test(text);
-    const gameOver = /!!!\s*GAME\s+OVER\s*!!!/i.test(text);
+  const content = story.trim();
+  const memoryEntries = blockToList(memoryBlock);
+  const choices = blockToChoiceList(choicesBlock);
+  const commands = blockToList(commandsBlock);
 
-    const part: ScenePart = {
-      content: content,
-      imageUrl: "",
-      user: false,
-      role: "assistant",
-      ...(memoryEntries.length ? { memoryEntries } : {}),
-      ...(choices.length ? { choices } : {}),
-      ...(commands.length ? { commands } : {}),
-      ...(endChapter ? { endChapter: true } : {}),
-      ...(endStory ? { endStory: true } : {}),
-      ...(gameOver ? { gameOver: true } : {})
-    };
+  // Check for markers
+  const endChapter = /!!!\s*END\s+CHAPTER\s*!!!/i.test(text);
+  const endStory = /!!!\s*END\s+STORY\s*!!!/i.test(text);
+  const gameOver = /!!!\s*GAME\s+OVER\s*!!!/i.test(text);
 
-    return part;
+  const part: ScenePart = {
+    content: content,
+    imageUrl: "",
+    user: false,
+    role: "assistant",
+    ...(memoryEntries.length ? { memoryEntries } : {}),
+    ...(choices.length ? { choices } : {}),
+    ...(commands.length ? { commands } : {}),
+    ...(endChapter ? { endChapter: true } : {}),
+    ...(endStory ? { endStory: true } : {}),
+    ...(gameOver ? { gameOver: true } : {}),
+  };
+
+  return part;
 }
 
 // Back-compat alias used by the API route

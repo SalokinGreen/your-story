@@ -1,6 +1,13 @@
 ﻿"use client";
 
-import { Scene, StoryData, Choices, Choice, UPGRADE_COSTS } from "../misc/structs";
+import {
+  Scene,
+  StoryData,
+  Choices,
+  Choice,
+  UPGRADE_COSTS,
+  Preset,
+} from "../misc/structs";
 import Story from "./story";
 import StatsPage from "./stats";
 import LorePage from "./lore";
@@ -11,6 +18,7 @@ import { useNotification } from "../misc/NotificationContext";
 import { useAuth } from "../misc/AuthContext";
 import { supabase } from "../misc/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
+import { DEFAULT_PRESET } from "../misc/presets";
 enum StoryState {
   STORY = "STORY",
   STATS = "STATS",
@@ -33,17 +41,26 @@ function processCommands(
     const trimmed = command.trim();
 
     // /add_item: item name | description | type | quantity
-    const addItemMatch = trimmed.match(/^\/add_item:\s*(.+?)\|(.+?)\|(normal|consumable|story|misc)\|(\d+)$/i);
+    const addItemMatch = trimmed.match(
+      /^\/add_item:\s*(.+?)\|(.+?)\|(normal|consumable|story|misc)\|(\d+)$/i
+    );
     if (addItemMatch) {
       const itemName = addItemMatch[1].trim();
       const description = addItemMatch[2].trim();
-      const itemType = addItemMatch[3].trim().toLowerCase() as 'normal' | 'consumable' | 'story' | 'misc';
+      const itemType = addItemMatch[3].trim().toLowerCase() as
+        | "normal"
+        | "consumable"
+        | "story"
+        | "misc";
       const quantity = parseInt(addItemMatch[4], 10);
 
       const existingItem = storyData.inventory.find((i) => i.name === itemName);
       if (existingItem) {
         existingItem.quantity += quantity;
-        addNotification(`Added ${quantity} ${itemName} (${existingItem.quantity} total)`, "info");
+        addNotification(
+          `Added ${quantity} ${itemName} (${existingItem.quantity} total)`,
+          "info"
+        );
       } else {
         storyData.inventory.push({
           name: itemName,
@@ -54,7 +71,10 @@ function processCommands(
           resource: "",
           symbol: "📦",
         });
-        addNotification(`Added ${quantity} ${itemName} to inventory`, "success");
+        addNotification(
+          `Added ${quantity} ${itemName} to inventory`,
+          "success"
+        );
       }
       continue;
     }
@@ -92,47 +112,6 @@ function processCommands(
           symbol: "📦",
         });
         addNotification(`Added ${amount} ${itemName} to inventory`, "info");
-      }
-      continue;
-    }
-
-    // /modify_stat: stat name(amount)
-    const statMatch = trimmed.match(/^\/modify_stat:\s*(.+?)\(([+-]?\d+)\)$/i);
-    if (statMatch) {
-      const statName = statMatch[1].trim();
-      const amount = parseInt(statMatch[2], 10);
-
-      const stat = storyData.stats.find((s) => s.name === statName);
-      if (stat) {
-        const oldValue = stat.value;
-        stat.value = Math.max(0, Math.min(100, stat.value + amount));
-        addNotification(
-          `${statName}: ${oldValue} → ${stat.value}`,
-          amount > 0 ? "success" : "warning"
-        );
-      }
-      continue;
-    }
-
-    // /modify_resource: resource name(amount)
-    const resourceMatch = trimmed.match(
-      /^\/modify_resource:\s*(.+?)\(([+-]?\d+)\)$/i
-    );
-    if (resourceMatch) {
-      const resourceName = resourceMatch[1].trim();
-      const amount = parseInt(resourceMatch[2], 10);
-
-      const resource = storyData.resources.find((r) => r.name === resourceName);
-      if (resource) {
-        const oldValue = resource.value;
-        resource.value = Math.max(
-          0,
-          Math.min(resource.maxValue, resource.value + amount)
-        );
-        addNotification(
-          `${resourceName}: ${oldValue} → ${resource.value}/${resource.maxValue}`,
-          amount > 0 ? "success" : "warning"
-        );
       }
       continue;
     }
@@ -178,13 +157,15 @@ function processCommands(
       if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
         storyData.plot_beats[beatIndex].fulfilled = true;
         addNotification(`📖 Story beat ${beatIndex + 1} completed`, "success");
-        
-        // Award points for completing a new beat
+
+        // Award points for completing a new beat (use custom points if set, otherwise default)
         if (!storyData.earnedPointsFromBeats.includes(beatIndex)) {
           storyData.earnedPointsFromBeats.push(beatIndex);
-          storyData.points += UPGRADE_COSTS.BEAT_REWARD;
+          const pointsAwarded =
+            storyData.plot_beats[beatIndex].points ?? UPGRADE_COSTS.BEAT_REWARD;
+          storyData.points += pointsAwarded;
           addNotification(
-            `💰 Earned ${UPGRADE_COSTS.BEAT_REWARD} points! Total: ${storyData.points}`,
+            `💰 Earned ${pointsAwarded} points! Total: ${storyData.points}`,
             "success"
           );
         }
@@ -192,8 +173,96 @@ function processCommands(
       continue;
     }
 
+    // /create_quest: title | short description | full description | points
+    const createQuestMatch = trimmed.match(
+      /^\/create_quest:\s*(.+?)\|(.+?)\|(.+?)\|(\d+)$/i
+    );
+    if (createQuestMatch) {
+      const title = createQuestMatch[1].trim();
+      const shortDesc = createQuestMatch[2].trim();
+      const fullDesc = createQuestMatch[3].trim();
+      const points = parseInt(createQuestMatch[4], 10);
+
+      if (!storyData.quests) storyData.quests = [];
+      if (!storyData.earnedPointsFromQuests)
+        storyData.earnedPointsFromQuests = [];
+
+      const newQuest = {
+        id: `quest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title,
+        shortDescription: shortDesc,
+        description: fullDesc,
+        active: true,
+        fulfilled: false,
+        points,
+        createdAt: new Date(),
+      };
+
+      storyData.quests.push(newQuest);
+      addNotification(`📜 New quest: ${title}`, "success");
+      continue;
+    }
+
+    // /activate_quest: quest title
+    const activateQuestMatch = trimmed.match(/^\/activate_quest:\s*(.+)$/i);
+    if (activateQuestMatch) {
+      const questTitle = activateQuestMatch[1].trim();
+      if (!storyData.quests) storyData.quests = [];
+
+      const quest = storyData.quests.find((q) => q.title === questTitle);
+      if (quest) {
+        quest.active = true;
+        addNotification(`📜 Quest activated: ${questTitle}`, "info");
+      }
+      continue;
+    }
+
+    // /complete_quest: quest title
+    const completeQuestMatch = trimmed.match(/^\/complete_quest:\s*(.+)$/i);
+    if (completeQuestMatch) {
+      const questTitle = completeQuestMatch[1].trim();
+      if (!storyData.quests) storyData.quests = [];
+      if (!storyData.earnedPointsFromQuests)
+        storyData.earnedPointsFromQuests = [];
+
+      const quest = storyData.quests.find((q) => q.title === questTitle);
+      if (quest && !quest.fulfilled) {
+        quest.fulfilled = true;
+
+        // Award points if not already awarded
+        if (!storyData.earnedPointsFromQuests.includes(quest.id)) {
+          storyData.earnedPointsFromQuests.push(quest.id);
+          storyData.points += quest.points;
+          addNotification(`✅ Quest completed: ${questTitle}`, "success");
+          addNotification(
+            `💰 Earned ${quest.points} points! Total: ${storyData.points}`,
+            "success"
+          );
+        } else {
+          addNotification(`✅ Quest completed: ${questTitle}`, "success");
+        }
+      }
+      continue;
+    }
+
+    // /deactivate_quest: quest title
+    const deactivateQuestMatch = trimmed.match(/^\/deactivate_quest:\s*(.+)$/i);
+    if (deactivateQuestMatch) {
+      const questTitle = deactivateQuestMatch[1].trim();
+      if (!storyData.quests) storyData.quests = [];
+
+      const quest = storyData.quests.find((q) => q.title === questTitle);
+      if (quest) {
+        quest.active = false;
+        addNotification(`📜 Quest deactivated: ${questTitle}`, "info");
+      }
+      continue;
+    }
+
     // /edit_beat_title: new title (index)
-    const editBeatTitleMatch = trimmed.match(/^\/edit_beat_title:\s*(.+?)\((\d+)\)$/i);
+    const editBeatTitleMatch = trimmed.match(
+      /^\/edit_beat_title:\s*(.+?)\((\d+)\)$/i
+    );
     if (editBeatTitleMatch) {
       const newTitle = editBeatTitleMatch[1].trim();
       const beatIndex = parseInt(editBeatTitleMatch[2], 10);
@@ -205,13 +274,18 @@ function processCommands(
     }
 
     // /edit_beat_content: new content (index)
-    const editBeatContentMatch = trimmed.match(/^\/edit_beat_content:\s*(.+?)\((\d+)\)$/i);
+    const editBeatContentMatch = trimmed.match(
+      /^\/edit_beat_content:\s*(.+?)\((\d+)\)$/i
+    );
     if (editBeatContentMatch) {
       const newContent = editBeatContentMatch[1].trim();
       const beatIndex = parseInt(editBeatContentMatch[2], 10);
       if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
         storyData.plot_beats[beatIndex].content = newContent;
-        addNotification(`📖 Story beat ${beatIndex + 1} content updated`, "info");
+        addNotification(
+          `📖 Story beat ${beatIndex + 1} content updated`,
+          "info"
+        );
       }
       continue;
     }
@@ -226,10 +300,7 @@ function processCommands(
         content: content,
         fulfilled: false,
       });
-      addNotification(
-        `📖 New story beat added: ${title}`,
-        "success"
-      );
+      addNotification(`📖 New story beat added: ${title}`, "success");
       continue;
     }
 
@@ -323,8 +394,8 @@ function trimStoryData(data: StoryData): StoryData {
     ...data,
     scene: {
       ...data.scene,
-      parts: data.scene.parts.slice(-MAX_PERSISTED_PARTS)
-    }
+      parts: data.scene.parts.slice(-MAX_PERSISTED_PARTS),
+    },
   };
 }
 
@@ -352,6 +423,8 @@ function StoryPageContent() {
   const [loadingStory, setLoadingStory] = useState(true);
   const [started, setStarted] = useState(false);
   const [canRetry, setCanRetry] = useState(false);
+  const [showPresetSelection, setShowPresetSelection] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
   const memory_cap = 20000; // Max memory size in characters
   // Load story from database on mount
   useEffect(() => {
@@ -394,24 +467,25 @@ function StoryPageContent() {
         // story.storyData is already parsed JSONB from database
         const loadedStoryData: StoryData = story.storyData;
 
+        // Initialize quest arrays if they don't exist (for backwards compatibility)
+        if (!loadedStoryData.quests) loadedStoryData.quests = [];
+        if (!loadedStoryData.earnedPointsFromQuests)
+          loadedStoryData.earnedPointsFromQuests = [];
+
         // Process lore triggers on load to initialize lore visibility
         // Combine all existing scene content to check for trigger words
         const allContent = loadedStoryData.scene.parts
-          .map(part => part.content)
-          .join(' ');
+          .map((part) => part.content)
+          .join(" ");
         processLoreTriggers(loadedStoryData, allContent, addNotification);
 
         setStoryData(loadedStoryData);
 
-        // Initialize story if no parts yet
+        // Initialize story if no parts yet - show preset selection
         if (loadedStoryData.scene.parts.length === 0) {
-          loadedStoryData.scene.parts.push({
-            content: loadedStoryData.starting_content,
-            imageUrl: "",
-            user: false,
-            role: "assistant",
-            choices: [{ text: "Start Story" }],
-          });
+          setShowPresetSelection(true);
+          setLoadingStory(false);
+          return;
         }
 
         // Set up UI state from loaded story
@@ -438,15 +512,90 @@ function StoryPageContent() {
     loadStory();
   }, [storyId, addNotification]);
 
+  // Apply preset and start story
+  const handlePresetSelect = async (preset: Preset) => {
+    if (!storyData) return;
+
+    const updatedStoryData = { ...storyData };
+
+    // Apply preset to story data (skip if custom)
+    if (preset.id !== "custom") {
+      if (preset.playerSummary)
+        updatedStoryData.player_summary = preset.playerSummary;
+      if (preset.stats.length > 0)
+        updatedStoryData.stats = JSON.parse(JSON.stringify(preset.stats));
+      if (preset.resources.length > 0)
+        updatedStoryData.resources = JSON.parse(
+          JSON.stringify(preset.resources)
+        );
+      if (preset.inventory.length > 0)
+        updatedStoryData.inventory = JSON.parse(
+          JSON.stringify(preset.inventory)
+        );
+      if (preset.authorNotes)
+        updatedStoryData.author_notes = preset.authorNotes;
+    }
+
+    // Add starting scene part
+    updatedStoryData.scene.parts.push({
+      content: updatedStoryData.starting_content,
+      imageUrl: "",
+      user: false,
+      role: "assistant",
+      choices: [{ text: "Start Story" }],
+    });
+
+    // Update story in database with preset applied
+    if (storyDbId) {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        };
+        if (session?.access_token) {
+          headers["Authorization"] = `Bearer ${session.access_token}`;
+        }
+
+        const response = await fetch(`/api/stories/${storyDbId}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({
+            storyData: updatedStoryData,
+            selectedPreset: preset.id,
+          }),
+        });
+
+        if (!response.ok) {
+          console.error("Failed to save preset selection");
+        }
+      } catch (error) {
+        console.error("Error saving preset:", error);
+      }
+    }
+
+    // Update local state
+    setStoryData(updatedStoryData);
+    setStoryText(updatedStoryData.starting_content);
+    setChoices({ choices: [{ text: "Start Story" }] });
+    setInput({ "Start Story": false });
+    setStarted(true);
+    setShowPresetSelection(false);
+    setSelectedPreset(preset);
+
+    addNotification(`Character preset "${preset.name}" applied! 🎭`, "success");
+  };
+
   // Save story progress to database (debounced)
   async function saveProgress(updatedStoryData: StoryData) {
     if (!storyDbId) return;
-    
+
     // Clear existing timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    
+
     // Debounce: only save after 3 seconds of no activity
     saveTimeoutRef.current = setTimeout(async () => {
       try {
@@ -493,10 +642,7 @@ function StoryPageContent() {
       (acc, entry) => acc + entry.length,
       0
     );
-    while (
-      totalMemoryLength > memory_cap &&
-      storyData.memory.length > 0
-    ) {
+    while (totalMemoryLength > memory_cap && storyData.memory.length > 0) {
       const removed = storyData.memory.shift();
       if (removed) {
         totalMemoryLength -= removed.length;
@@ -535,8 +681,8 @@ function StoryPageContent() {
 
     // Build minimal payload for AI
     const MAX_CONTENT_LENGTH = 2000;
-    
-    const recentParts = storyData.scene.parts.slice(-6).map(part => ({
+
+    const recentParts = storyData.scene.parts.slice(-6).map((part) => ({
       content: part.content.substring(0, MAX_CONTENT_LENGTH),
       user: part.user,
       role: part.role,
@@ -555,16 +701,16 @@ function StoryPageContent() {
       momentum: storyData.momentum,
       maxMomentum: storyData.maxMomentum,
       points: storyData.points,
-      plot_beats: storyData.plot_beats.map(beat => ({
+      plot_beats: storyData.plot_beats.map((beat) => ({
         title: beat.title.substring(0, 100),
         content: beat.content.substring(0, 300),
         fulfilled: beat.fulfilled,
       })),
-      memory: storyData.memory.slice(-20).map(m => m.substring(0, 300)),
+      memory: storyData.memory.slice(-20).map((m) => m.substring(0, 300)),
       lore: storyData.lore
-        .filter(l => l.on !== false)
+        .filter((l) => l.on !== false)
         .slice(0, 15)
-        .map(l => ({
+        .map((l) => ({
           title: l.title.substring(0, 100),
           content: l.content.substring(0, 500),
           on: l.on,
@@ -584,11 +730,13 @@ function StoryPageContent() {
     };
 
     const payloadSize = JSON.stringify(payload).length;
-    console.log(`Custom input payload size: ${(payloadSize / 1024).toFixed(2)} KB`);
-    
+    console.log(
+      `Custom input payload size: ${(payloadSize / 1024).toFixed(2)} KB`
+    );
+
     if (payloadSize > 4 * 1024 * 1024) {
       addNotification("❌ Story data too large for generation.", "failure");
-      console.error('Payload exceeds 4MB limit:', payloadSize);
+      console.error("Payload exceeds 4MB limit:", payloadSize);
       setLoading(false);
       return;
     }
@@ -613,11 +761,8 @@ function StoryPageContent() {
         }
 
         const text = await res.text();
-        if (!text || text.trim() === '') {
-          addNotification(
-            `❌ Empty response from server`,
-            "failure"
-          );
+        if (!text || text.trim() === "") {
+          addNotification(`❌ Empty response from server`, "failure");
           setLoading(false);
           return;
         }
@@ -626,11 +771,8 @@ function StoryPageContent() {
         try {
           data = JSON.parse(text);
         } catch (e) {
-          console.error('Failed to parse response:', text);
-          addNotification(
-            `❌ Invalid JSON response from server`,
-            "failure"
-          );
+          console.error("Failed to parse response:", text);
+          addNotification(`❌ Invalid JSON response from server`, "failure");
           setLoading(false);
           return;
         }
@@ -696,10 +838,7 @@ function StoryPageContent() {
       })
       .catch((err) => {
         console.error("Custom input error:", err);
-        addNotification(
-          `❌ Error generating story: ${err.message}`,
-          "failure"
-        );
+        addNotification(`❌ Error generating story: ${err.message}`, "failure");
         setLoading(false);
       });
   }
@@ -733,10 +872,10 @@ function StoryPageContent() {
     }
 
     let dice_roll = Math.floor(Math.random() * 100) + 1;
-    
+
     // Build detailed RPG-style choice text with brackets
     let choiceDetails: string[] = [];
-    
+
     // Track state changes for display
     let itemQuantityBefore = 0;
     let itemQuantityAfter = 0;
@@ -746,29 +885,35 @@ function StoryPageContent() {
     let resourceLostBefore = 0;
     let resourceLostAfter = 0;
     let skillCheckResult = "";
-    
+
     // Process item usage
     if (choice.item_used) {
       const item = storyData.inventory.find((i) => i.name === choice.item_used);
       const item_exists = item !== undefined;
-      
+
       if (item_exists && item) {
         itemQuantityBefore = item.quantity;
-        const itemType = item.type || 'normal';
-        
+        const itemType = item.type || "normal";
+
         // Handle advantage based on item type
-        if (itemType === 'misc') {
+        if (itemType === "misc") {
           // Misc items don't give advantage, but prevent disadvantage
-          addNotification(`Used item: ${choice.item_used} (No disadvantage)`, "info");
+          addNotification(
+            `Used item: ${choice.item_used} (No disadvantage)`,
+            "info"
+          );
         } else {
           // Normal, consumable, and story items give advantage
-          addNotification(`Used item: ${choice.item_used} (Advantage!)`, "info");
+          addNotification(
+            `Used item: ${choice.item_used} (Advantage!)`,
+            "info"
+          );
           const second_roll = Math.floor(Math.random() * 100) + 1;
           if (second_roll < dice_roll) {
             dice_roll = second_roll;
           }
         }
-        
+
         if (momentumMode === "reroll") {
           // Reroll: roll two more times and take the best
           const reroll1 = Math.floor(Math.random() * 100) + 1;
@@ -779,10 +924,10 @@ function StoryPageContent() {
             "success"
           );
         }
-        
+
         // Handle item consumption based on type
         // Consumable: Always consumed when used
-        if (itemType === 'consumable') {
+        if (itemType === "consumable") {
           const itemIndex = storyData.inventory.findIndex(
             (i) => i.name === choice.item_used
           );
@@ -869,7 +1014,7 @@ function StoryPageContent() {
       } else {
         const total = dice_roll + statValue;
         const dc_passed = dice_roll === 100 || total >= dc;
-        
+
         if (dc_passed) {
           skillCheckResult = "success";
           addNotification(
@@ -927,15 +1072,20 @@ function StoryPageContent() {
 
           // Handle item breakage on failure (only for 'normal' type items)
           if (choice.item_used) {
-            const item = storyData.inventory.find((i) => i.name === choice.item_used);
-            const itemType = item?.type || 'normal';
-            
+            const item = storyData.inventory.find(
+              (i) => i.name === choice.item_used
+            );
+            const itemType = item?.type || "normal";
+
             // Only normal items break on failure (not consumable, story, or misc)
-            if (itemType === 'normal' && item) {
+            if (itemType === "normal" && item) {
               const itemIndex = storyData.inventory.findIndex(
                 (i) => i.name === choice.item_used
               );
-              if (itemIndex !== -1 && itemQuantityAfter === itemQuantityBefore) {
+              if (
+                itemIndex !== -1 &&
+                itemQuantityAfter === itemQuantityBefore
+              ) {
                 // Only break if not already consumed
                 if (storyData.inventory[itemIndex].quantity > 1) {
                   storyData.inventory[itemIndex].quantity--;
@@ -954,36 +1104,50 @@ function StoryPageContent() {
           }
         }
       }
-      
+
       // Build skill check line
       choiceDetails.push(`[ ${choice.skill_used}: ${skillCheckResult} ]`);
     }
-    
+
     // Build item usage line
     if (choice.item_used && itemQuantityBefore > 0) {
       if (itemBroken) {
-        choiceDetails.push(`[ Item used: ${choice.item_used}; x${itemQuantityBefore} → broken ]`);
+        choiceDetails.push(
+          `[ Item used: ${choice.item_used}; x${itemQuantityBefore} → broken ]`
+        );
       } else if (choice.item_loss) {
-        choiceDetails.push(`[ Item used: ${choice.item_used}; x${itemQuantityBefore} → ${itemQuantityAfter} ]`);
+        choiceDetails.push(
+          `[ Item used: ${choice.item_used}; x${itemQuantityBefore} → ${itemQuantityAfter} ]`
+        );
       } else {
-        choiceDetails.push(`[ Item used: ${choice.item_used}; x${itemQuantityBefore} ]`);
+        choiceDetails.push(
+          `[ Item used: ${choice.item_used}; x${itemQuantityBefore} ]`
+        );
       }
     }
-    
+
     // Build resource usage line
     if (choice.resource_used && resourceUsedBefore > 0) {
-      const resource = storyData.resources.find((r) => r.name === choice.resource_used);
+      const resource = storyData.resources.find(
+        (r) => r.name === choice.resource_used
+      );
       const maxValue = resource?.maxValue || 100;
-      choiceDetails.push(`[ Resource used: ${choice.resource_used} ${resourceUsedBefore} → ${resourceUsedAfter}/${maxValue} ]`);
+      choiceDetails.push(
+        `[ Resource used: ${choice.resource_used} ${resourceUsedBefore} → ${resourceUsedAfter}/${maxValue} ]`
+      );
     }
-    
+
     // Build resource lost line (only if actually lost)
     if (resourceLostBefore > 0 && resourceLostAfter < resourceLostBefore) {
-      const resource = storyData.resources.find((r) => r.name === choice.risked_resource);
+      const resource = storyData.resources.find(
+        (r) => r.name === choice.risked_resource
+      );
       const maxValue = resource?.maxValue || 100;
-      choiceDetails.push(`[ Resource lost: ${choice.risked_resource} ${resourceLostBefore} → ${resourceLostAfter}/${maxValue} ]`);
+      choiceDetails.push(
+        `[ Resource lost: ${choice.risked_resource} ${resourceLostBefore} → ${resourceLostAfter}/${maxValue} ]`
+      );
     }
-    
+
     // Construct final choice text
     let text = "";
     if (choiceDetails.length > 0) {
@@ -1016,9 +1180,9 @@ function StoryPageContent() {
     // Build minimal payload - only send what the AI needs to generate the next part
     // The AI uses buildMessages() which only needs recent context + current state
     const MAX_CONTENT_LENGTH = 2000;
-    
+
     // Only send last 6 scene parts with just content, user flag, and role
-    const recentParts = storyData.scene.parts.slice(-6).map(part => ({
+    const recentParts = storyData.scene.parts.slice(-6).map((part) => ({
       content: part.content.substring(0, MAX_CONTENT_LENGTH),
       user: part.user,
       role: part.role,
@@ -1040,16 +1204,16 @@ function StoryPageContent() {
       maxMomentum: storyData.maxMomentum,
       points: storyData.points,
       // Trimmed narrative context
-      plot_beats: storyData.plot_beats.map(beat => ({
+      plot_beats: storyData.plot_beats.map((beat) => ({
         title: beat.title.substring(0, 100),
         content: beat.content.substring(0, 300),
         fulfilled: beat.fulfilled,
       })),
-      memory: storyData.memory.slice(-20).map(m => m.substring(0, 300)),
+      memory: storyData.memory.slice(-20).map((m) => m.substring(0, 300)),
       lore: storyData.lore
-        .filter(l => l.on !== false) // Only send lore that is ON
+        .filter((l) => l.on !== false) // Only send lore that is ON
         .slice(0, 15)
-        .map(l => ({
+        .map((l) => ({
           title: l.title.substring(0, 100),
           content: l.content.substring(0, 500),
           on: l.on,
@@ -1072,10 +1236,10 @@ function StoryPageContent() {
 
     const payloadSize = JSON.stringify(payload).length;
     console.log(`Payload size: ${(payloadSize / 1024).toFixed(2)} KB`);
-    
+
     if (payloadSize > 4 * 1024 * 1024) {
       addNotification("❌ Story data too large for generation.", "failure");
-      console.error('Payload exceeds 4MB limit:', payloadSize);
+      console.error("Payload exceeds 4MB limit:", payloadSize);
       setLoading(false);
       return;
     }
@@ -1106,11 +1270,8 @@ function StoryPageContent() {
         }
 
         const text = await res.text();
-        if (!text || text.trim() === '') {
-          addNotification(
-            `❌ Empty response from server`,
-            "failure"
-          );
+        if (!text || text.trim() === "") {
+          addNotification(`❌ Empty response from server`, "failure");
           setLoading(false);
           setChoices({
             choices:
@@ -1124,11 +1285,8 @@ function StoryPageContent() {
         try {
           data = JSON.parse(text);
         } catch (e) {
-          console.error('Failed to parse response:', text);
-          addNotification(
-            `❌ Invalid JSON response from server`,
-            "failure"
-          );
+          console.error("Failed to parse response:", text);
+          addNotification(`❌ Invalid JSON response from server`, "failure");
           setLoading(false);
           setChoices({
             choices:
@@ -1203,7 +1361,7 @@ function StoryPageContent() {
         processLoreTriggers(storyData, data.part.content, addNotification);
 
         storyData.scene.parts.push(data.part);
-        
+
         // Check for chapter completion and award points
         if (data.part.content.includes("!!! END CHAPTER !!!")) {
           const currentChapter = storyData.chapters.length;
@@ -1216,7 +1374,7 @@ function StoryPageContent() {
             );
           }
         }
-        
+
         setStoryData({ ...storyData });
         setStoryText(data.part.content);
         setChoices({ choices: data.part.choices || [] });
@@ -1255,7 +1413,7 @@ function StoryPageContent() {
 
   async function handleRetry() {
     if (!storyData || loading) return;
-    
+
     // Check if last part is an AI response
     const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
     if (!lastPart || lastPart.user) {
@@ -1271,13 +1429,14 @@ function StoryPageContent() {
 
     setLoading(true);
     setCanRetry(false);
-    
+
     // Remove the last AI response
     storyData.scene.parts.pop();
-    
+
     // Get the user choice part
-    const userChoicePart = storyData.scene.parts[storyData.scene.parts.length - 1];
-    
+    const userChoicePart =
+      storyData.scene.parts[storyData.scene.parts.length - 1];
+
     // Restore choices from user's choice part
     if (userChoicePart.choices) {
       setChoices({ choices: userChoicePart.choices });
@@ -1297,7 +1456,7 @@ function StoryPageContent() {
 
     // Build minimal payload
     const MAX_CONTENT_LENGTH = 2000;
-    const recentParts = storyData.scene.parts.slice(-6).map(part => ({
+    const recentParts = storyData.scene.parts.slice(-6).map((part) => ({
       content: part.content.substring(0, MAX_CONTENT_LENGTH),
       user: part.user,
       role: part.role,
@@ -1316,16 +1475,16 @@ function StoryPageContent() {
       momentum: storyData.momentum,
       maxMomentum: storyData.maxMomentum,
       points: storyData.points,
-      plot_beats: storyData.plot_beats.map(beat => ({
+      plot_beats: storyData.plot_beats.map((beat) => ({
         title: beat.title.substring(0, 100),
         content: beat.content.substring(0, 300),
         fulfilled: beat.fulfilled,
       })),
-      memory: storyData.memory.slice(-20).map(m => m.substring(0, 300)),
+      memory: storyData.memory.slice(-20).map((m) => m.substring(0, 300)),
       lore: storyData.lore
-        .filter(l => l.on !== false)
+        .filter((l) => l.on !== false)
         .slice(0, 15)
-        .map(l => ({
+        .map((l) => ({
           title: l.title.substring(0, 100),
           content: l.content.substring(0, 500),
           on: l.on,
@@ -1357,7 +1516,7 @@ function StoryPageContent() {
         }
 
         const text = await res.text();
-        if (!text || text.trim() === '') {
+        if (!text || text.trim() === "") {
           addNotification(`❌ Empty response from server`, "failure");
           setLoading(false);
           setCanRetry(true);
@@ -1375,14 +1534,20 @@ function StoryPageContent() {
         }
 
         if (!res.ok) {
-          addNotification(`Error: ${data.error || "Failed to generate story"}`, "failure");
+          addNotification(
+            `Error: ${data.error || "Failed to generate story"}`,
+            "failure"
+          );
           setLoading(false);
           setCanRetry(true);
           return;
         }
 
         if (data.meta?.tokensDeducted) {
-          addNotification(`✓ Used ${data.meta.tokensDeducted} tokens (retry)`, "success");
+          addNotification(
+            `✓ Used ${data.meta.tokensDeducted} tokens (retry)`,
+            "success"
+          );
         }
 
         if (data.part.commands && data.part.commands.length > 0) {
@@ -1395,7 +1560,7 @@ function StoryPageContent() {
 
         processLoreTriggers(storyData, data.part.content, addNotification);
         storyData.scene.parts.push(data.part);
-        
+
         if (data.part.content.includes("!!! END CHAPTER !!!")) {
           const currentChapter = storyData.chapters.length;
           if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
@@ -1407,7 +1572,7 @@ function StoryPageContent() {
             );
           }
         }
-        
+
         setStoryData({ ...storyData });
         setStoryText(data.part.content);
         setChoices({ choices: data.part.choices || [] });
@@ -1473,6 +1638,108 @@ function StoryPageContent() {
               className="mt-4 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
             >
               Browse Adventures
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show preset selection before starting story
+  if (showPresetSelection && storyData) {
+    const availablePresets = [
+      DEFAULT_PRESET,
+      ...(storyData.presets || []).filter((p) => p.id !== "custom"),
+    ];
+
+    return (
+      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 mb-6">
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+              {storyData.story_name}
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Choose your character preset to begin your adventure
+            </p>
+          </div>
+
+          {/* Preset Selection */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+            <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+              🎭 Select Your Character
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Choose a character archetype to start with pre-configured stats,
+              items, and resources, or create your own custom character.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {availablePresets.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => handlePresetSelect(preset)}
+                  className={`border-2 rounded-xl p-4 text-left transition-all hover:shadow-lg ${
+                    preset.id === "custom"
+                      ? "border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 hover:border-purple-400 dark:hover:border-purple-600"
+                      : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/30 hover:border-purple-400 dark:hover:border-purple-600"
+                  }`}
+                >
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-3xl">{preset.icon}</span>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                        {preset.name}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {preset.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  {preset.id !== "custom" && (
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {preset.stats && preset.stats.length > 0 && (
+                        <span className="px-2 py-1 bg-blue-200 dark:bg-blue-800/50 text-blue-800 dark:text-blue-200 rounded-full">
+                          {preset.stats.length} Stats
+                        </span>
+                      )}
+                      {preset.resources && preset.resources.length > 0 && (
+                        <span className="px-2 py-1 bg-green-200 dark:bg-green-800/50 text-green-800 dark:text-green-200 rounded-full">
+                          {preset.resources.length} Resources
+                        </span>
+                      )}
+                      {preset.inventory && preset.inventory.length > 0 && (
+                        <span className="px-2 py-1 bg-yellow-200 dark:bg-yellow-800/50 text-yellow-800 dark:text-yellow-200 rounded-full">
+                          {preset.inventory.length} Items
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {preset.id === "custom" && (
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="px-2 py-1 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full">
+                        Default Stats
+                      </span>
+                      <span className="px-2 py-1 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full">
+                        Starting Items
+                      </span>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Back Button */}
+          <div className="mt-6">
+            <button
+              onClick={() => router.push("/library")}
+              className="px-6 py-3 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
+            >
+              ← Back to Library
             </button>
           </div>
         </div>
@@ -1565,10 +1832,7 @@ function StoryPageContent() {
         {currentState === StoryState.STATS && <StatsPage {...storyData} />}
         {currentState === StoryState.LORE && <LorePage {...storyData} />}
         {currentState === StoryState.UPGRADES && (
-          <UpgradesPage
-            storyData={storyData}
-            onPurchase={handlePurchase}
-          />
+          <UpgradesPage storyData={storyData} onPurchase={handlePurchase} />
         )}
         {currentState === StoryState.MENU && (
           <MenuPage
