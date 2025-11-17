@@ -95,6 +95,7 @@ Commands:
 - /activate_quest: quest title - Makes an inactive quest active/visible to the player.
 - /complete_quest: quest title - Marks an active quest as fulfilled and awards points.
 - /deactivate_quest: quest title - Makes an active quest inactive/hidden from the player.
+- /create_lore: title | content | on_triggers | off_triggers - Creates a new lore entry. Triggers are comma-separated keywords. Set on_triggers to empty if lore should be visible from start. Example: /create_lore: The Ancient Order | A secret society of mages | ancient,order,mages | disbanded,destroyed
 
 Plot Beat Guidelines:
 - Each plot beat represents a significant story milestone with multiple scenes and events.

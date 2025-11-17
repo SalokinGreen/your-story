@@ -11,6 +11,7 @@ import {
 import Story from "./story";
 import StatsPage from "./stats";
 import LorePage from "./lore";
+import QuestsPage from "./quests";
 import MenuPage from "./menu";
 import UpgradesPage from "./upgrades";
 import { useState, useEffect, useRef, Suspense } from "react";
@@ -24,12 +25,13 @@ enum StoryState {
   STATS = "STATS",
   INVENTORY = "INVENTORY",
   LORE = "LORE",
+  QUESTS = "QUESTS",
   ACHIEVEMENTS = "ACHIEVEMENTS",
   UPGRADES = "UPGRADES",
   MENU = "MENU",
 }
 
-function processCommands(
+export function processCommands(
   commands: string[],
   storyData: StoryData,
   addNotification: (
@@ -42,7 +44,7 @@ function processCommands(
 
     // /add_item: item name | description | type | quantity
     const addItemMatch = trimmed.match(
-      /^\/add_item:\s*(.+?)\|(.+?)\|(normal|consumable|story|misc)\|(\d+)$/i
+      /^\/add_item:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(normal|consumable|story|misc)\s*\|\s*(\d+)$/i
     );
     if (addItemMatch) {
       const itemName = addItemMatch[1].trim();
@@ -126,8 +128,13 @@ function processCommands(
       );
       if (existing && !existing.dateAchieved) {
         existing.dateAchieved = new Date();
+        storyData.points += existing.points;
         addNotification(
           `🏆 Achievement Unlocked: ${achievementTitle}`,
+          "success"
+        );
+        addNotification(
+          `💰 Earned ${existing.points} points! Total: ${storyData.points}`,
           "success"
         );
       }
@@ -175,7 +182,7 @@ function processCommands(
 
     // /create_quest: title | short description | full description | points
     const createQuestMatch = trimmed.match(
-      /^\/create_quest:\s*(.+?)\|(.+?)\|(.+?)\|(\d+)$/i
+      /^\/create_quest:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)$/i
     );
     if (createQuestMatch) {
       const title = createQuestMatch[1].trim();
@@ -255,6 +262,46 @@ function processCommands(
       if (quest) {
         quest.active = false;
         addNotification(`📜 Quest deactivated: ${questTitle}`, "info");
+      }
+      continue;
+    }
+
+    // /create_lore: title | content | on_triggers | off_triggers
+    const createLoreMatch = trimmed.match(
+      /^\/create_lore:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
+    );
+    if (createLoreMatch) {
+      const loreTitle = createLoreMatch[1].trim();
+      const loreContent = createLoreMatch[2].trim();
+      const onTriggers = createLoreMatch[3].trim();
+      const offTriggers = createLoreMatch[4].trim();
+
+      if (!storyData.lore) storyData.lore = [];
+
+      // Check if lore entry already exists
+      const existingLore = storyData.lore.find((l) => l.title === loreTitle);
+      if (existingLore) {
+        addNotification(`📚 Lore "${loreTitle}" already exists`, "warning");
+      } else {
+        const onTriggerArray = onTriggers
+          ? onTriggers.split(",").map((t) => t.trim()).filter((t) => t.length > 0)
+          : [];
+        const offTriggerArray = offTriggers
+          ? offTriggers.split(",").map((t) => t.trim()).filter((t) => t.length > 0)
+          : [];
+
+        storyData.lore.push({
+          title: loreTitle,
+          content: loreContent,
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          on_triggers: onTriggerArray,
+          off_triggers: offTriggerArray,
+          on: onTriggerArray.length === 0, // If no triggers, show from start
+        });
+        addNotification(`📚 New lore entry created: ${loreTitle}`, "success");
       }
       continue;
     }
@@ -1790,6 +1837,16 @@ function StoryPageContent() {
               📜 Lore
             </button>
             <button
+              onClick={() => setCurrentState(StoryState.QUESTS)}
+              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md ${
+                currentState === StoryState.QUESTS
+                  ? "bg-linear-to-r from-blue-600 to-blue-800 text-white ring-2 ring-blue-400 shadow-lg"
+                  : "bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+              }`}
+            >
+              🎯 Quests
+            </button>
+            <button
               onClick={() => setCurrentState(StoryState.UPGRADES)}
               className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md ${
                 currentState === StoryState.UPGRADES
@@ -1831,6 +1888,7 @@ function StoryPageContent() {
         )}
         {currentState === StoryState.STATS && <StatsPage {...storyData} />}
         {currentState === StoryState.LORE && <LorePage {...storyData} />}
+        {currentState === StoryState.QUESTS && <QuestsPage {...storyData} />}
         {currentState === StoryState.UPGRADES && (
           <UpgradesPage storyData={storyData} onPurchase={handlePurchase} />
         )}

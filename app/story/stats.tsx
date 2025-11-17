@@ -355,51 +355,6 @@ export default function StatsPage(storyData: StoryData) {
               )}
             </div>
           )}
-
-          {/* Chapter Progress */}
-          <div>
-            <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-              <span className="text-2xl">📖</span>
-              Story Progress
-            </h3>
-            <div className="p-6 rounded-lg bg-linear-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800">
-              <div className="flex flex-row items-center justify-between mb-3">
-                <span className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
-                  Chapter {storyData.currentChapter + 1} of{" "}
-                  {storyData.max_chapters}
-                </span>
-                <span className="text-sm sm:text-base font-bold text-purple-600 dark:text-purple-400">
-                  {Math.round(
-                    ((storyData.currentChapter + 1) / storyData.max_chapters) *
-                      100
-                  )}
-                  %
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
-                <div
-                  className="bg-linear-to-r from-purple-500 via-pink-500 to-purple-600 h-3 rounded-full transition-all duration-300 shadow-sm"
-                  style={{
-                    width: `${
-                      ((storyData.currentChapter + 1) /
-                        storyData.max_chapters) *
-                      100
-                    }%`,
-                  }}
-                />
-              </div>
-              {storyData.chapters[storyData.currentChapter] && (
-                <div className="border-t border-purple-200 dark:border-purple-700 pt-4">
-                  <p className="text-sm sm:text-base font-bold text-gray-900 dark:text-white mb-2">
-                    {storyData.chapters[storyData.currentChapter].title}
-                  </p>
-                  <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">
-                    {storyData.chapters[storyData.currentChapter].summary}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>

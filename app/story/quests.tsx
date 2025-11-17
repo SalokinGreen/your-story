@@ -1,0 +1,239 @@
+"use client";
+
+import { StoryData } from "../misc/structs";
+import { useState } from "react";
+
+export default function QuestsPage(storyData: StoryData) {
+  const [expandedQuestId, setExpandedQuestId] = useState<string | null>(null);
+
+  if (!storyData.quests || storyData.quests.length === 0) {
+    return (
+      <div className="w-full">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+            📜 Quests
+          </h2>
+          <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-700/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
+            <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
+              No quests have been created yet
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const activeQuests = storyData.quests.filter((q) => q.active);
+  const inactiveQuests = storyData.quests.filter((q) => !q.active);
+  const completedQuests = activeQuests.filter((q) => q.fulfilled);
+  const ongoingQuests = activeQuests.filter((q) => !q.fulfilled);
+
+  const toggleQuestActive = (questId: string) => {
+    const quest = storyData.quests?.find((q) => q.id === questId);
+    if (quest) {
+      quest.active = !quest.active;
+      // Force re-render by updating state
+      setExpandedQuestId(null);
+    }
+  };
+
+  const toggleExpanded = (questId: string) => {
+    setExpandedQuestId(expandedQuestId === questId ? null : questId);
+  };
+
+  return (
+    <div className="w-full">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+        <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+          📜 Quests
+        </h2>
+
+        {/* Active Ongoing Quests */}
+        {ongoingQuests.length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
+              <span className="text-2xl">🎯</span>
+              Active Quests ({ongoingQuests.length})
+            </h3>
+            <div className="space-y-3">
+              {ongoingQuests.map((quest) => (
+                <div
+                  key={quest.id}
+                  className="flex flex-col gap-3 p-4 rounded-lg border-2 border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 transition-all"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white">
+                          {quest.title}
+                        </h4>
+                        <span className="px-2 py-0.5 bg-blue-200 dark:bg-blue-800/50 text-blue-800 dark:text-blue-200 rounded-full text-xs font-bold shrink-0">
+                          {quest.points} pts
+                        </span>
+                      </div>
+                      <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 mb-2">
+                        {quest.shortDescription}
+                      </p>
+                      {expandedQuestId === quest.id &&
+                        quest.description !== quest.shortDescription && (
+                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 italic mt-2 p-3 bg-white dark:bg-gray-700 rounded border border-blue-200 dark:border-blue-800">
+                            {quest.description}
+                          </p>
+                        )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2 border-t border-blue-200 dark:border-blue-700">
+                    {quest.description !== quest.shortDescription && (
+                      <button
+                        onClick={() => toggleExpanded(quest.id)}
+                        className="px-3 py-1 text-sm bg-blue-200 dark:bg-blue-800 hover:bg-blue-300 dark:hover:bg-blue-700 text-blue-900 dark:text-blue-100 rounded-lg transition-colors"
+                      >
+                        {expandedQuestId === quest.id
+                          ? "Show Less"
+                          : "Show Details"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => toggleQuestActive(quest.id)}
+                      className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
+                    >
+                      👁️ Hide Quest
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Completed Quests */}
+        {completedQuests.length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
+              <span className="text-2xl">✅</span>
+              Completed Quests ({completedQuests.length})
+            </h3>
+            <div className="space-y-3">
+              {completedQuests.map((quest) => (
+                <div
+                  key={quest.id}
+                  className="flex flex-col gap-3 p-4 rounded-lg border-2 border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20 shadow-md transition-all"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-green-500 text-xl shrink-0">
+                          ✓
+                        </span>
+                        <h4 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white line-through">
+                          {quest.title}
+                        </h4>
+                        <span className="px-2 py-0.5 bg-green-200 dark:bg-green-800/50 text-green-800 dark:text-green-200 rounded-full text-xs font-bold shrink-0">
+                          {quest.points} pts
+                        </span>
+                      </div>
+                      <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                        {quest.shortDescription}
+                      </p>
+                      {expandedQuestId === quest.id &&
+                        quest.description !== quest.shortDescription && (
+                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 italic mt-2 p-3 bg-white dark:bg-gray-700 rounded border border-green-200 dark:border-green-800">
+                            {quest.description}
+                          </p>
+                        )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2 border-t border-green-200 dark:border-green-700">
+                    {quest.description !== quest.shortDescription && (
+                      <button
+                        onClick={() => toggleExpanded(quest.id)}
+                        className="px-3 py-1 text-sm bg-green-200 dark:bg-green-800 hover:bg-green-300 dark:hover:bg-green-700 text-green-900 dark:text-green-100 rounded-lg transition-colors"
+                      >
+                        {expandedQuestId === quest.id
+                          ? "Show Less"
+                          : "Show Details"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => toggleQuestActive(quest.id)}
+                      className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
+                    >
+                      👁️ Hide Quest
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Inactive/Hidden Quests */}
+        {inactiveQuests.length > 0 && (
+          <div>
+            <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
+              <span className="text-2xl">👁️‍🗨️</span>
+              Hidden Quests ({inactiveQuests.length})
+            </h3>
+            <div className="space-y-3">
+              {inactiveQuests.map((quest) => (
+                <div
+                  key={quest.id}
+                  className="flex flex-col gap-3 p-4 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30 opacity-70 transition-all"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4
+                          className={`font-bold text-base sm:text-lg text-gray-900 dark:text-white ${
+                            quest.fulfilled ? "line-through" : ""
+                          }`}
+                        >
+                          {quest.title}
+                        </h4>
+                        <span className="px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-full text-xs font-bold shrink-0">
+                          {quest.points} pts
+                        </span>
+                        {quest.fulfilled && (
+                          <span className="text-green-500 text-xl shrink-0">
+                            ✓
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                        {quest.shortDescription}
+                      </p>
+                      {expandedQuestId === quest.id &&
+                        quest.description !== quest.shortDescription && (
+                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 italic mt-2 p-3 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                            {quest.description}
+                          </p>
+                        )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                    {quest.description !== quest.shortDescription && (
+                      <button
+                        onClick={() => toggleExpanded(quest.id)}
+                        className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
+                      >
+                        {expandedQuestId === quest.id
+                          ? "Show Less"
+                          : "Show Details"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => toggleQuestActive(quest.id)}
+                      className="px-3 py-1 text-sm bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg transition-colors"
+                    >
+                      👁️ Show Quest
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
