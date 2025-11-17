@@ -135,7 +135,7 @@ interface InventoryItem {
   name: string;          // e.g., "Healing Potion"
   quantity: number;      // How many you have
   description: string;
-  type: string;          // e.g., "consumable", "equipment"
+  type: 'normal' | 'consumable' | 'story' | 'misc';  // Strict type union
   stat: string;          // Related stat (if any)
   resource: string;      // Related resource (if any)
   symbol: string;
@@ -143,12 +143,19 @@ interface InventoryItem {
 }
 ```
 
+**Item Types**:
+
+1. **normal**: Gives advantage when used. Doesn't get consumed on use, but breaks on skill check failure.
+2. **consumable**: Gives advantage when used. Gets consumed immediately when used, regardless of success or failure.
+3. **story**: Gives advantage when used. Never breaks and never gets consumed. Important quest items.
+4. **misc**: Doesn't give advantage, but prevents disadvantage from not having an item. Never breaks or gets consumed.
+
 **Mechanics**:
 
-1. **Item Present**: Roll with **advantage** (roll twice, take lower)
-2. **Item Missing**: Roll with **disadvantage** (roll twice, take higher)
-3. **Item Loss**: Consumed regardless of success/failure
-4. **Failure Loss**: Only lost if check fails
+1. **Item Present (normal/consumable/story)**: Roll with **advantage** (roll twice, take lower)
+2. **Item Present (misc)**: No advantage, but no disadvantage penalty
+3. **Item Missing**: Roll with **disadvantage** (roll twice, take higher)
+4. **Consumption**: consumable items used immediately; normal items break on failure; story/misc never lost
 
 **Example Flow**:
 ```typescript
@@ -173,7 +180,8 @@ Disadvantage → Use 62 (worse)
 ```typescript
 interface Achievement {
   title: string;
-  description: string;
+  description: string;   // User-facing description (can be vague)
+  ai_hint?: string;      // Optional precise hint for AI on when to trigger
   dateAchieved: Date | null;
   points: number;
   symbol: string;
@@ -181,11 +189,54 @@ interface Achievement {
 }
 ```
 
+**Two-Description System**:
+- **description**: Shown to players (can be mysterious to encourage discovery)
+- **ai_hint**: Precise triggering conditions for AI (optional, used in AI prompts)
+- Example: description: "???" vs ai_hint: "Trigger when player defeats the red dragon"
+
 **Unlocking**:
-- AI issues command: `/add_achievement: Dragon Slayer`
+- AI issues command: `/trigger_achievement: Dragon Slayer`
 - Shows toast: "🏆 Achievement Unlocked: Dragon Slayer"
 - Prevents duplicates
 - Stored in `storyData.achievements`
+
+### Lore Entries
+
+**Purpose**: Dynamic world-building content that can be revealed/hidden based on story events.
+
+**Structure**:
+```typescript
+interface StoryLore {
+  title: string;
+  content: string;       // Supports Markdown
+  thumbnailUrl?: string;
+  secrtet?: boolean;     // Hidden until discovered
+  on: boolean;           // Currently visible to player and AI
+  on_triggers: string[]; // Words that enable this lore
+  off_triggers: string[]; // Words that disable this lore
+  beats_trigger: number[]; // Beat indices that enable this lore
+  beats_untrigger: number[]; // Beat indices that disable this lore
+}
+```
+
+**Dynamic Visibility**:
+- Lore entries can be turned on/off based on story events
+- **Trigger Words**: When AI response contains trigger word, lore is enabled
+- **Beat Triggers**: When specific plot beats are fulfilled, lore is enabled/disabled
+- Only enabled lore (`on: true`) is shown to player and sent to AI
+- Useful for revealing backstory, hints, or changing world state
+
+**Example**:
+```typescript
+{
+  title: "Ancient Map",
+  on: false,
+  on_triggers: ["Found the Ancient Map", "discovered the map"],
+  off_triggers: ["Destroyed the Map"],
+  beats_trigger: [3, 5], // Enable when beat 3 or 5 is fulfilled
+  beats_untrigger: [8]   // Disable when beat 8 is fulfilled
+}
+```
 
 ## Skill Checks
 
@@ -303,12 +354,32 @@ The AI can modify game state using commands in the `<commands>` block.
 
 ```
 <commands>
+/add_item: item name | description | type | quantity
 /modify_item: item name(amount)
 /modify_stat: stat name(amount)
 /modify_resource: resource name(amount)
-/add_achievement: achievement title
+/trigger_achievement: achievement title
+/mark_beat: beat index
+/modify_momentum: amount
 </commands>
 ```
+
+### /add_item: name | description | type | quantity
+
+**Add New Items**:
+```
+/add_item: Health Potion | Restores vitality | consumable | 3
+```
+- Adds 3 Health Potions to inventory with description and type
+- Type must be one of: normal, consumable, story, misc
+- Creates new item or adds to existing quantity
+- Notification: "Added 3 Health Potion to inventory"
+
+**Item Types**:
+- **normal**: Advantage on use, breaks on failure
+- **consumable**: Advantage on use, consumed immediately
+- **story**: Advantage on use, never breaks/consumed
+- **misc**: Prevents disadvantage, never breaks/consumed
 
 ### /modify_item: name(amount)
 
@@ -362,15 +433,17 @@ The AI can modify game state using commands in the `<commands>` block.
 - Decreases Stamina by 15
 - Notification: "Stamina: 80 → 65/100" (yellow)
 
-### /add_achievement: title
+### /trigger_achievement: title
 
 ```
-/add_achievement: First Blood
+/trigger_achievement: First Blood
 ```
-- Creates new achievement
+- Unlocks existing achievement from adventure's achievement list
 - Ignores duplicates
 - Notification: "🏆 Achievement Unlocked: First Blood" (green)
 - Displayed in achievements list with unlock date
+- Sets dateAchieved to current time
+- Awards progression points based on achievement.points value
 
 ### /modify_momentum: amount
 
@@ -398,10 +471,45 @@ The AI can modify game state using commands in the `<commands>` block.
 - Remember: Players earn momentum automatically from strong rolls
 
 ### /mark_beat: index
-- Sets dateAchieved to current time
-- Default: 10 points, 🏆 symbol
-- Notification: "🏆 Achievement Unlocked: First Blood"
-- Prevents duplicates
+
+```
+/mark_beat: 2
+```
+- Marks plot beat at index (0-based) as fulfilled
+- Awards ${UPGRADE_COSTS.BEAT_REWARD} progression points
+- Notification: "📖 Plot Beat Fulfilled: [Beat Title]"
+- Use only when beat's objectives are fully completed
+
+**Other Beat Commands**:
+- `/edit_beat_title: new title (index)` - Changes beat title
+- `/edit_beat_content: new content (index)` - Changes beat content  
+- `/add_beat: title | content` - Adds new story beat
+- `/remove_beat: index` - Removes beat at index
+
+## Player Input Options
+
+### Standard Choices
+
+Players select from AI-generated choices with metadata:
+```
+- Sneak past the guard <use_skill: Stealth (DC 75); use_item: Cloak>
+```
+
+### Custom Input
+
+Players can submit free-form text instead of selecting a choice:
+- Toggle "Add Custom Input" button in story UI
+- Enter any text action or dialogue
+- AI responds to custom input without predefined mechanics
+- Useful for creative solutions, roleplay, or unexpected actions
+
+### Retry System
+
+Players can retry the last AI response:
+- "Retry" button appears after AI generates response
+- Removes last AI output and regenerates with same context
+- Useful if AI response doesn't match expectations
+- Limited to most recent response only
 
 ## Failure Penalties
 

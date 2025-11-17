@@ -8,8 +8,11 @@ export default function LorePage(storyData: StoryData) {
   const [selectedLore, setSelectedLore] = useState<StoryLore | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Filter lore based on search term
+  // Filter lore based on search term AND visibility (only show entries that are ON)
   const filteredLore = storyData.lore.filter((loreItem) => {
+    // Hide lore entries that are turned OFF
+    if (loreItem.on === false) return false;
+    
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return (
@@ -20,7 +23,7 @@ export default function LorePage(storyData: StoryData) {
     );
   });
 
-  // Separate secret and non-secret lore
+  // Separate secret and non-secret lore (both must be ON to be visible)
   const visibleLore = filteredLore.filter((lore) => !lore.secrtet);
   const secretLore = filteredLore.filter((lore) => lore.secrtet);
 

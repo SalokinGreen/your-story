@@ -7,15 +7,22 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 ### Core Pages
 
 - app/page.tsx: Landing page with auth form/user profile display.
-- app/story/page.tsx: Story shell. Loads StoryData from database or starter stories, manages story state, renders <Story />.
-- app/story/story.tsx: Presentational story component. Receives full StoryData via spread props, renders scenes with choices.
+- app/story/page.tsx: Story shell. Loads StoryData from database or starter stories, manages story state, renders <Story />. Includes handleCustomInput for free-form text submission.
+- app/story/story.tsx: Presentational story component. Receives full StoryData via spread props, renders scenes with choices. Includes custom input toggle, retry button, and momentum mode selection.
 - app/story/stats.tsx: Stats display component showing character stats, resources, inventory, achievements.
+- app/story/lore.tsx: Lore display component, filters by `on` state (only shows active lore).
+- app/story/menu.tsx: In-game editor for story state (stats, resources, inventory, achievements, lore, plot beats). Feature parity with creator for all systems.
+- app/story/upgrades.tsx: Character upgrade shop for spending progression points.
 - app/library/page.tsx: Library page showing user's stories and adventures with authenticated fetch.
+- app/creator/page.tsx: Adventure creation interface with full editing capabilities for all story elements.
 - app/profile/[userId]/page.tsx: User profile page with token balance, adventures, public stories, and admin controls (always at bottom).
 
 ### Data Models
 
 - app/misc/structs.ts: Canonical TypeScript interfaces (StoryData, Scene, ScenePart, Chapter, Stat, Resource, InventoryItem, Achievement, StoryLore, Choices, Adventure, Story, etc.). Single source of truth for shapes.
+  - **Achievement**: Includes optional `ai_hint` field for precise AI triggering conditions separate from user-facing descriptions.
+  - **InventoryItem**: Strict type union 'normal' | 'consumable' | 'story' | 'misc' with specific behaviors per type.
+  - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `beats_trigger` (number[]), `beats_untrigger` (number[]) for dynamic visibility.
 - app/misc/starter_stories.ts: Example datasets for testing and development.
 
 ### Auth & Tokens
@@ -29,7 +36,11 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 
 ### AI Integration
 
-- app/misc/ai.ts: AI prompt builder and response parser. buildMessages constructs chat history; outputToScenePart parses LLM output (XML tags: <story>, <memory>, <choices>).
+- app/misc/ai.ts: AI prompt builder and response parser. buildMessages constructs chat history; outputToScenePart parses LLM output (XML tags: <story>, <memory>, <choices>, <commands>).
+  - **Lore filtering**: Only sends lore entries where `on !== false` to AI.
+  - **Achievement display**: Shows only locked achievements using `ai_hint || description` for precise triggering.
+  - **Robust parsing**: Handles responses with or without `<story>` tags via fallback extraction logic.
+  - **Item types**: Provides AI with type-specific behavior descriptions (normal, consumable, story, misc).
 - app/api/story/next/route.ts: POST endpoint calling DeepSeek Chat Completions API; deducts tokens via service role; returns { part: ScenePart, meta: { model, usage, balance } }.
 
 ### API Routes
@@ -148,9 +159,16 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 
 ## Working with story state
 
-- Current state is module-scoped in app/story/page.tsx (StoryState, scene) and not reactive. If implementing interactions, convert to React state (useState/useReducer) or a small context provider at app/story/.
+- Current state is module-scoped in app/story/page.tsx (StoryState, scene) and managed via useState hooks.
 - To advance the story, append a ScenePart to StoryData.scene.parts and render the last part. Use structs.ts types to maintain shape integrity.
-- Choices are currently hardcoded in app/story/story.tsx; if you generalize, add a choices field to StoryData or derive from Chapters/PlotBeats.
+- **Lore triggers**: processLoreTriggers function checks trigger words and beat indices to dynamically enable/disable lore entries.
+- **Item types**:
+  - normal: Advantage on use, breaks on failure
+  - consumable: Advantage on use, consumed immediately
+  - story: Advantage on use, never breaks/consumed (quest items)
+  - misc: Prevents disadvantage, never breaks/consumed
+- **Custom input**: handleCustomInput function allows free-form text submission to AI without predefined choices.
+- **Retry system**: handleRetry removes last AI response and regenerates with same context.
 
 ## Extending the app
 
@@ -170,6 +188,9 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Token balance with aggregate counts: app/misc/tokens.ts (getUserTokenBalance)
 - Authentication patterns: app/misc/getAuthToken.ts (authenticatedFetch)
 - Admin controls example: app/components/AdminControls.tsx
+- Lore trigger system: app/story/page.tsx (processLoreTriggers)
+- Custom input handling: app/story/page.tsx (handleCustomInput)
+- Achievement with ai_hint: app/creator/page.tsx and app/story/menu.tsx (achievement editors)
 
 ## Guardrails for AI edits
 

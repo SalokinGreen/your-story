@@ -29,7 +29,7 @@ export interface InventoryItem {
     name: string;
     quantity: number;
     description: string;
-    type?: string;
+    type: 'normal' | 'consumable' | 'story' | 'misc';
     stat?: string;
     resource?: string;
     symbol: string;
@@ -39,6 +39,7 @@ export interface InventoryItem {
 export interface Achievement {
     title: string;
     description: string;
+    ai_hint?: string; // Optional precise hint for AI on when to trigger this achievement
     dateAchieved: Date | null;
     points: number;
     symbol: string;
@@ -51,7 +52,12 @@ export interface StoryLore {
     relatedLocations: string[];
     secrtet: boolean;
     keys: string[];
+    on_triggers?: string[];
+    off_triggers?: string[];
     thumbnailUrl?: string;
+    on?: boolean;
+    beats_trigger?: number[];
+    beats_untrigger?: number[];
 }
 export interface Chapter {
     title: string;

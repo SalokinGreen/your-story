@@ -229,15 +229,18 @@ function AdventureCreatorContent() {
     secrtet: false,
     keys: [],
     thumbnailUrl: "",
+    on: true,
+    beats_trigger: [],
+    beats_untrigger: [],
   });
-  const [newLoreCharacter, setNewLoreCharacter] = useState("");
-  const [newLoreLocation, setNewLoreLocation] = useState("");
+  const [newLoreOnTrigger, setNewLoreOnTrigger] = useState("");
+  const [newLoreOffTrigger, setNewLoreOffTrigger] = useState("");
   const [newLoreKey, setNewLoreKey] = useState("");
   const [draggedLoreIndex, setDraggedLoreIndex] = useState<number | null>(null);
   const [editingLoreIndex, setEditingLoreIndex] = useState<number | null>(null);
   const [editLore, setEditLore] = useState<Partial<StoryLore>>({});
-  const [editLoreCharacter, setEditLoreCharacter] = useState("");
-  const [editLoreLocation, setEditLoreLocation] = useState("");
+  const [editLoreOnTrigger, setEditLoreOnTrigger] = useState("");
+  const [editLoreOffTrigger, setEditLoreOffTrigger] = useState("");
   const [editLoreKey, setEditLoreKey] = useState("");
 
   // Achievements
@@ -844,23 +847,23 @@ function AdventureCreatorContent() {
     }
   };
 
-  const addLoreCharacter = () => {
-    if (newLoreCharacter.trim() && !newLore.relatedCharacters?.includes(newLoreCharacter.trim())) {
+  const addLoreOnTrigger = () => {
+    if (newLoreOnTrigger.trim() && !newLore.on_triggers?.includes(newLoreOnTrigger.trim())) {
       setNewLore({
         ...newLore,
-        relatedCharacters: [...(newLore.relatedCharacters || []), newLoreCharacter.trim()],
+        on_triggers: [...(newLore.on_triggers || []), newLoreOnTrigger.trim()],
       });
-      setNewLoreCharacter("");
+      setNewLoreOnTrigger("");
     }
   };
 
-  const addLoreLocation = () => {
-    if (newLoreLocation.trim() && !newLore.relatedLocations?.includes(newLoreLocation.trim())) {
+  const addLoreOffTrigger = () => {
+    if (newLoreOffTrigger.trim() && !newLore.off_triggers?.includes(newLoreOffTrigger.trim())) {
       setNewLore({
         ...newLore,
-        relatedLocations: [...(newLore.relatedLocations || []), newLoreLocation.trim()],
+        off_triggers: [...(newLore.off_triggers || []), newLoreOffTrigger.trim()],
       });
-      setNewLoreLocation("");
+      setNewLoreOffTrigger("");
     }
   };
 
@@ -885,6 +888,9 @@ function AdventureCreatorContent() {
         secrtet: false,
         keys: [],
         thumbnailUrl: "",
+        on: true,
+        beats_trigger: [],
+        beats_untrigger: [],
       });
     }
   };
@@ -896,8 +902,8 @@ function AdventureCreatorContent() {
   const startEditLore = (index: number) => {
     setEditingLoreIndex(index);
     setEditLore({ ...lore[index] });
-    setEditLoreCharacter("");
-    setEditLoreLocation("");
+    setEditLoreOnTrigger("");
+    setEditLoreOffTrigger("");
     setEditLoreKey("");
   };
 
@@ -916,23 +922,23 @@ function AdventureCreatorContent() {
     }
   };
 
-  const addEditLoreCharacter = () => {
-    if (editLoreCharacter.trim() && !editLore.relatedCharacters?.includes(editLoreCharacter.trim())) {
+  const addEditLoreOnTrigger = () => {
+    if (editLoreOnTrigger.trim() && !editLore.on_triggers?.includes(editLoreOnTrigger.trim())) {
       setEditLore({
         ...editLore,
-        relatedCharacters: [...(editLore.relatedCharacters || []), editLoreCharacter.trim()],
+        on_triggers: [...(editLore.on_triggers || []), editLoreOnTrigger.trim()],
       });
-      setEditLoreCharacter("");
+      setEditLoreOnTrigger("");
     }
   };
 
-  const addEditLoreLocation = () => {
-    if (editLoreLocation.trim() && !editLore.relatedLocations?.includes(editLoreLocation.trim())) {
+  const addEditLoreOffTrigger = () => {
+    if (editLoreOffTrigger.trim() && !editLore.off_triggers?.includes(editLoreOffTrigger.trim())) {
       setEditLore({
         ...editLore,
-        relatedLocations: [...(editLore.relatedLocations || []), editLoreLocation.trim()],
+        off_triggers: [...(editLore.off_triggers || []), editLoreOffTrigger.trim()],
       });
-      setEditLoreLocation("");
+      setEditLoreOffTrigger("");
     }
   };
 
@@ -1950,13 +1956,12 @@ function AdventureCreatorContent() {
                   </label>
                   <select
                     value={newItem.type}
-                    onChange={(e) => setNewItem({ ...newItem, type: e.target.value })}
+                    onChange={(e) => setNewItem({ ...newItem, type: e.target.value as 'normal' | 'consumable' | 'story' | 'misc' })}
                     className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
-                    <option value="weapon">Weapon</option>
-                    <option value="armor">Armor</option>
+                    <option value="normal">Normal Item</option>
                     <option value="consumable">Consumable</option>
-                    <option value="quest">Quest Item</option>
+                    <option value="story">Story Item</option>
                     <option value="misc">Miscellaneous</option>
                   </select>
                 </div>
@@ -2125,7 +2130,7 @@ function AdventureCreatorContent() {
           <div className="space-y-6">
             <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4">
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Lore entries provide background information about your world. Keys determine when the lore is revealed during gameplay (e.g., "Ancient Ruins Discovered", "Dragon Defeated").
+                💡 <strong>Tip:</strong> Lore entries provide background information about your world. Keys determine when the lore is revealed during gameplay (e.g., "Ancient Ruins", "Dragon Defeated").
               </p>
             </div>
 
@@ -2156,17 +2161,31 @@ function AdventureCreatorContent() {
                     className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="loreSecret"
-                    checked={newLore.secrtet || false}
-                    onChange={(e) => setNewLore({ ...newLore, secrtet: e.target.checked })}
-                    className="w-4 h-4 text-purple-600 rounded"
-                  />
-                  <label htmlFor="loreSecret" className="text-sm text-gray-700 dark:text-gray-300">
-                    🔒 Hidden (only revealed when triggered by keys)
-                  </label>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="loreSecret"
+                      checked={newLore.secrtet || false}
+                      onChange={(e) => setNewLore({ ...newLore, secrtet: e.target.checked })}
+                      className="w-4 h-4 text-purple-600 rounded"
+                    />
+                    <label htmlFor="loreSecret" className="text-sm text-gray-700 dark:text-gray-300">
+                      🔒 Hidden (only revealed when triggered by keys)
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="loreOn"
+                      checked={newLore.on !== false}
+                      onChange={(e) => setNewLore({ ...newLore, on: e.target.checked })}
+                      className="w-4 h-4 text-green-600 rounded"
+                    />
+                    <label htmlFor="loreOn" className="text-sm text-gray-700 dark:text-gray-300">
+                      ✅ Enabled
+                    </label>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -2226,37 +2245,37 @@ function AdventureCreatorContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Related Characters
+                    ✅ ON Triggers (Words that turn this lore ON)
                   </label>
                   <div className="flex gap-2 mb-2">
                     <input
                       type="text"
-                      value={newLoreCharacter}
-                      onChange={(e) => setNewLoreCharacter(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addLoreCharacter())}
-                      placeholder="Add character name..."
+                      value={newLoreOnTrigger}
+                      onChange={(e) => setNewLoreOnTrigger(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addLoreOnTrigger())}
+                      placeholder="e.g., 'Ancient Map'"
                       className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                     <button
-                      onClick={addLoreCharacter}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                      onClick={addLoreOnTrigger}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                     >
                       Add
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {(newLore.relatedCharacters || []).map(char => (
+                    {(newLore.on_triggers || []).map(trigger => (
                       <span
-                        key={char}
-                        className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm flex items-center gap-1"
+                        key={trigger}
+                        className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm flex items-center gap-1"
                       >
-                        {char}
+                        ✅ {trigger}
                         <button
                           onClick={() => setNewLore({
                             ...newLore,
-                            relatedCharacters: (newLore.relatedCharacters || []).filter(c => c !== char),
+                            on_triggers: (newLore.on_triggers || []).filter(t => t !== trigger),
                           })}
-                          className="hover:text-indigo-900 dark:hover:text-indigo-100"
+                          className="hover:text-green-900 dark:hover:text-green-100"
                         >
                           ×
                         </button>
@@ -2266,37 +2285,37 @@ function AdventureCreatorContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Related Locations
+                    ❌ OFF Triggers (Words that turn this lore OFF)
                   </label>
                   <div className="flex gap-2 mb-2">
                     <input
                       type="text"
-                      value={newLoreLocation}
-                      onChange={(e) => setNewLoreLocation(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addLoreLocation())}
-                      placeholder="Add location name..."
+                      value={newLoreOffTrigger}
+                      onChange={(e) => setNewLoreOffTrigger(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addLoreOffTrigger())}
+                      placeholder="e.g., 'Destroyed the Map'"
                       className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                     <button
-                      onClick={addLoreLocation}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                      onClick={addLoreOffTrigger}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
                     >
                       Add
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {(newLore.relatedLocations || []).map(loc => (
+                    {(newLore.off_triggers || []).map(trigger => (
                       <span
-                        key={loc}
-                        className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm flex items-center gap-1"
+                        key={trigger}
+                        className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-sm flex items-center gap-1"
                       >
-                        {loc}
+                        ❌ {trigger}
                         <button
                           onClick={() => setNewLore({
                             ...newLore,
-                            relatedLocations: (newLore.relatedLocations || []).filter(l => l !== loc),
+                            off_triggers: (newLore.off_triggers || []).filter(t => t !== trigger),
                           })}
-                          className="hover:text-indigo-900 dark:hover:text-indigo-100"
+                          className="hover:text-red-900 dark:hover:text-red-100"
                         >
                           ×
                         </button>
@@ -2307,7 +2326,7 @@ function AdventureCreatorContent() {
                 {newLore.secrtet && (
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      🔑 Trigger Keys (events that reveal this lore)
+                      🔑 Trigger Keys (Words that reveal this lore)
                     </label>
                     <div className="flex gap-2 mb-2">
                       <input
@@ -2315,7 +2334,7 @@ function AdventureCreatorContent() {
                         value={newLoreKey}
                         onChange={(e) => setNewLoreKey(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addLoreKey())}
-                        placeholder="e.g., 'Dragon Defeated' or 'Ancient Ruins Discovered'"
+                        placeholder="e.g., 'Dragon Defeated' or 'Ancient Ruins'"
                         className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                       <button
@@ -2346,6 +2365,69 @@ function AdventureCreatorContent() {
                     </div>
                   </div>
                 )}
+                {/* Plot Beat Triggers */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      ✅ Beats that turn this lore ON
+                    </label>
+                    <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                      {plotBeats.length === 0 ? (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">No plot beats yet. Add them in the Plot Beats step.</p>
+                      ) : (
+                        plotBeats.map((beat, beatIndex) => (
+                          <label key={beatIndex} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={(newLore.beats_trigger || []).includes(beatIndex)}
+                              onChange={(e) => {
+                                const current = newLore.beats_trigger || [];
+                                setNewLore({
+                                  ...newLore,
+                                  beats_trigger: e.target.checked
+                                    ? [...current, beatIndex]
+                                    : current.filter(i => i !== beatIndex),
+                                });
+                              }}
+                              className="w-4 h-4 text-green-600 rounded"
+                            />
+                            <span className="text-xs text-gray-900 dark:text-white">{beat.title || `Beat ${beatIndex + 1}`}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      ❌ Beats that turn this lore OFF
+                    </label>
+                    <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                      {plotBeats.length === 0 ? (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">No plot beats yet. Add them in the Plot Beats step.</p>
+                      ) : (
+                        plotBeats.map((beat, beatIndex) => (
+                          <label key={beatIndex} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={(newLore.beats_untrigger || []).includes(beatIndex)}
+                              onChange={(e) => {
+                                const current = newLore.beats_untrigger || [];
+                                setNewLore({
+                                  ...newLore,
+                                  beats_untrigger: e.target.checked
+                                    ? [...current, beatIndex]
+                                    : current.filter(i => i !== beatIndex),
+                                });
+                              }}
+                              className="w-4 h-4 text-red-600 rounded"
+                            />
+                            <span className="text-xs text-gray-900 dark:text-white">{beat.title || `Beat ${beatIndex + 1}`}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
               <button
                 onClick={addLore}
@@ -2393,17 +2475,31 @@ function AdventureCreatorContent() {
                             className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
                           />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id={`edit-lore-secret-${index}`}
-                            checked={editLore.secrtet || false}
-                            onChange={(e) => setEditLore({ ...editLore, secrtet: e.target.checked })}
-                            className="w-4 h-4 text-purple-600 rounded"
-                          />
-                          <label htmlFor={`edit-lore-secret-${index}`} className="text-sm text-gray-700 dark:text-gray-300">
-                            🔒 Hidden (only revealed when triggered by keys)
-                          </label>
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`edit-lore-secret-${index}`}
+                              checked={editLore.secrtet || false}
+                              onChange={(e) => setEditLore({ ...editLore, secrtet: e.target.checked })}
+                              className="w-4 h-4 text-purple-600 rounded"
+                            />
+                            <label htmlFor={`edit-lore-secret-${index}`} className="text-sm text-gray-700 dark:text-gray-300">
+                              Secret
+                            </label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`edit-lore-on-${index}`}
+                              checked={editLore.on !== false}
+                              onChange={(e) => setEditLore({ ...editLore, on: e.target.checked })}
+                              className="w-4 h-4 text-green-600 rounded"
+                            />
+                            <label htmlFor={`edit-lore-on-${index}`} className="text-sm text-gray-700 dark:text-gray-300">
+                              Enabled
+                            </label>
+                          </div>
                         </div>
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Thumbnail</label>
@@ -2458,45 +2554,45 @@ function AdventureCreatorContent() {
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Related Characters</label>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">✅ ON Triggers</label>
                           <div className="flex gap-2 mb-2">
                             <input
                               type="text"
-                              value={editLoreCharacter}
-                              onChange={(e) => setEditLoreCharacter(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addEditLoreCharacter())}
-                              placeholder="Add character name..."
+                              value={editLoreOnTrigger}
+                              onChange={(e) => setEditLoreOnTrigger(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addEditLoreOnTrigger())}
+                              placeholder="e.g., 'Ancient Map'"
                               className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                             />
-                            <button onClick={addEditLoreCharacter} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm">Add</button>
+                            <button onClick={addEditLoreOnTrigger} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm">Add</button>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {(editLore.relatedCharacters || []).map(char => (
-                              <span key={char} className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm flex items-center gap-1">
-                                {char}
-                                <button onClick={() => setEditLore({ ...editLore, relatedCharacters: (editLore.relatedCharacters || []).filter(c => c !== char) })} className="hover:text-indigo-900 dark:hover:text-indigo-100">×</button>
+                            {(editLore.on_triggers || []).map(trigger => (
+                              <span key={trigger} className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm flex items-center gap-1">
+                                ✅ {trigger}
+                                <button onClick={() => setEditLore({ ...editLore, on_triggers: (editLore.on_triggers || []).filter(t => t !== trigger) })} className="hover:text-green-900 dark:hover:text-green-100">×</button>
                               </span>
                             ))}
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Related Locations</label>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">❌ OFF Triggers</label>
                           <div className="flex gap-2 mb-2">
                             <input
                               type="text"
-                              value={editLoreLocation}
-                              onChange={(e) => setEditLoreLocation(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addEditLoreLocation())}
-                              placeholder="Add location name..."
+                              value={editLoreOffTrigger}
+                              onChange={(e) => setEditLoreOffTrigger(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addEditLoreOffTrigger())}
+                              placeholder="e.g., 'Destroyed the Map'"
                               className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                             />
-                            <button onClick={addEditLoreLocation} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm">Add</button>
+                            <button onClick={addEditLoreOffTrigger} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm">Add</button>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {(editLore.relatedLocations || []).map(loc => (
-                              <span key={loc} className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm flex items-center gap-1">
-                                {loc}
-                                <button onClick={() => setEditLore({ ...editLore, relatedLocations: (editLore.relatedLocations || []).filter(l => l !== loc) })} className="hover:text-indigo-900 dark:hover:text-indigo-100">×</button>
+                            {(editLore.off_triggers || []).map(trigger => (
+                              <span key={trigger} className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-sm flex items-center gap-1">
+                                ❌ {trigger}
+                                <button onClick={() => setEditLore({ ...editLore, off_triggers: (editLore.off_triggers || []).filter(t => t !== trigger) })} className="hover:text-red-900 dark:hover:text-red-100">×</button>
                               </span>
                             ))}
                           </div>
@@ -2525,6 +2621,69 @@ function AdventureCreatorContent() {
                             </div>
                           </div>
                         )}
+                        {/* Plot Beat Triggers */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                              ✅ Beats that turn this lore ON
+                            </label>
+                            <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                              {plotBeats.length === 0 ? (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 italic">No plot beats yet. Add them in the Plot Beats step.</p>
+                              ) : (
+                                plotBeats.map((beat, beatIndex) => (
+                                  <label key={beatIndex} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={(editLore.beats_trigger || []).includes(beatIndex)}
+                                      onChange={(e) => {
+                                        const current = editLore.beats_trigger || [];
+                                        setEditLore({
+                                          ...editLore,
+                                          beats_trigger: e.target.checked
+                                            ? [...current, beatIndex]
+                                            : current.filter(i => i !== beatIndex),
+                                        });
+                                      }}
+                                      className="w-4 h-4 text-green-600 rounded"
+                                    />
+                                    <span className="text-xs text-gray-900 dark:text-white">{beat.title || `Beat ${beatIndex + 1}`}</span>
+                                  </label>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                              ❌ Beats that turn this lore OFF
+                            </label>
+                            <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                              {plotBeats.length === 0 ? (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 italic">No plot beats yet. Add them in the Plot Beats step.</p>
+                              ) : (
+                                plotBeats.map((beat, beatIndex) => (
+                                  <label key={beatIndex} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={(editLore.beats_untrigger || []).includes(beatIndex)}
+                                      onChange={(e) => {
+                                        const current = editLore.beats_untrigger || [];
+                                        setEditLore({
+                                          ...editLore,
+                                          beats_untrigger: e.target.checked
+                                            ? [...current, beatIndex]
+                                            : current.filter(i => i !== beatIndex),
+                                        });
+                                      }}
+                                      className="w-4 h-4 text-red-600 rounded"
+                                    />
+                                    <span className="text-xs text-gray-900 dark:text-white">{beat.title || `Beat ${beatIndex + 1}`}</span>
+                                  </label>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
                         <div className="flex gap-2 pt-2">
                           <button
                             onClick={saveEditLore}
@@ -2551,24 +2710,51 @@ function AdventureCreatorContent() {
                           <div className="flex items-center gap-2 mb-1">
                             <div className="font-bold text-gray-900 dark:text-white">{entry.title}</div>
                             {entry.secrtet && <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">🔒 Hidden</span>}
+                            {/* On/Off Toggle */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const updated = [...lore];
+                                updated[index] = { ...entry, on: !entry.on };
+                                setLore(updated);
+                              }}
+                              className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                                entry.on 
+                                  ? "bg-green-600 text-white hover:bg-green-700" 
+                                  : "bg-gray-400 text-white hover:bg-gray-500"
+                              }`}
+                              title={entry.on ? "Lore is enabled" : "Lore is disabled"}
+                            >
+                              {entry.on ? "ON" : "OFF"}
+                            </button>
                           </div>
                           {entry.thumbnailUrl && (
                             <img src={entry.thumbnailUrl} alt="Lore thumb" className="w-24 h-24 object-cover rounded border mb-2" />
                           )}
                           <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{entry.content}</div>
-                          {entry.relatedCharacters.length > 0 && (
-                            <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                              <strong>Characters:</strong> {entry.relatedCharacters.join(', ')}
+                          {(entry.on_triggers && entry.on_triggers.length > 0) && (
+                            <div className="text-xs text-green-700 dark:text-green-400 mb-1">
+                              <strong>✅ ON Triggers:</strong> {entry.on_triggers.join(', ')}
                             </div>
                           )}
-                          {entry.relatedLocations.length > 0 && (
-                            <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                              <strong>Locations:</strong> {entry.relatedLocations.join(', ')}
+                          {(entry.off_triggers && entry.off_triggers.length > 0) && (
+                            <div className="text-xs text-red-700 dark:text-red-400 mb-1">
+                              <strong>❌ OFF Triggers:</strong> {entry.off_triggers.join(', ')}
                             </div>
                           )}
                           {entry.secrtet && entry.keys.length > 0 && (
                             <div className="text-xs text-yellow-700 dark:text-yellow-400">
                               <strong>Triggers:</strong> {entry.keys.join(', ')}
+                            </div>
+                          )}
+                          {(entry.beats_trigger && entry.beats_trigger.length > 0) && (
+                            <div className="text-xs text-green-700 dark:text-green-400 mb-1">
+                              <strong>✅ Beats turning ON:</strong> {entry.beats_trigger.map(i => plotBeats[i]?.title || `Beat ${i + 1}`).join(', ')}
+                            </div>
+                          )}
+                          {(entry.beats_untrigger && entry.beats_untrigger.length > 0) && (
+                            <div className="text-xs text-red-700 dark:text-red-400 mb-1">
+                              <strong>❌ Beats turning OFF:</strong> {entry.beats_untrigger.map(i => plotBeats[i]?.title || `Beat ${i + 1}`).join(', ')}
                             </div>
                           )}
                         </div>
@@ -2662,7 +2848,7 @@ function AdventureCreatorContent() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Description *
+                    Description * <span className="text-xs text-gray-500">(shown to players)</span>
                   </label>
                   <input
                     type="text"
@@ -2671,6 +2857,19 @@ function AdventureCreatorContent() {
                     placeholder="e.g., Defeat your first dragon"
                     className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    AI Hint <span className="text-xs text-gray-500">(optional, for precise triggering)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newAchievement.ai_hint || ''}
+                    onChange={(e) => setNewAchievement({ ...newAchievement, ai_hint: e.target.value })}
+                    placeholder="e.g., Trigger when player defeats the red dragon in the mountain lair"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">💡 Keep player description vague to encourage discovery; use AI hint for exact trigger conditions.</p>
                 </div>
               </div>
               <button
@@ -2722,11 +2921,21 @@ function AdventureCreatorContent() {
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Description *</label>
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Description * <span className="text-xs text-gray-500">(shown to players)</span></label>
                           <input
                             type="text"
                             value={editAchievement.description || ""}
                             onChange={(e) => setEditAchievement({ ...editAchievement, description: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">AI Hint <span className="text-xs text-gray-500">(optional)</span></label>
+                          <input
+                            type="text"
+                            value={editAchievement.ai_hint || ""}
+                            onChange={(e) => setEditAchievement({ ...editAchievement, ai_hint: e.target.value })}
+                            placeholder="Precise trigger conditions for AI"
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
                           />
                         </div>

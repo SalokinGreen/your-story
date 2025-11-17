@@ -14,6 +14,8 @@ interface StoryProps {
   handleChoice: () => void;
   handleSelect: (index: number) => void;
   onCustomInput?: (text: string) => void; // optional callback for free-form input
+  onRetry?: () => void; // callback to retry last AI response
+  canRetry?: boolean; // whether retry is available
 }
 
 export default function Story({
@@ -26,7 +28,9 @@ export default function Story({
   onMomentumModeChange,
   handleChoice,
   handleSelect,
-  onCustomInput
+  onCustomInput,
+  onRetry,
+  canRetry
 }: StoryProps) {
   const [freeInputEnabled, setFreeInputEnabled] = React.useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -82,14 +86,29 @@ export default function Story({
 
             </div>
           )}
+
+          {/* Retry Button */}
+          {!loading && canRetry && onRetry && (
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={onRetry}
+                className="px-4 py-2 text-sm font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Retry AI Response
+              </button>
+            </div>
+          )}
         </div>
         
         {/* Momentum Display and Controls */}
-        <div className="flex items-center justify-between w-full pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
+        <div className="flex sm:flex-col xl:flex-row l:flex-row m:flex-row gap-4 items-center justify-between w-full pt-4 border-t border-gray-200 dark:border-gray-700 mt-4 overflow-hidden">
           <div className="flex items-center gap-2">
             <span className="text-2xl">⚡</span>
             <div className="flex flex-col">
-              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 ">
                 Momentum: {storyData.momentum}/{storyData.maxMomentum}
               </span>
               <div className="flex gap-1 mt-1">

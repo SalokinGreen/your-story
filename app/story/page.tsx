@@ -32,6 +32,33 @@ function processCommands(
   for (const command of commands) {
     const trimmed = command.trim();
 
+    // /add_item: item name | description | type | quantity
+    const addItemMatch = trimmed.match(/^\/add_item:\s*(.+?)\|(.+?)\|(normal|consumable|story|misc)\|(\d+)$/i);
+    if (addItemMatch) {
+      const itemName = addItemMatch[1].trim();
+      const description = addItemMatch[2].trim();
+      const itemType = addItemMatch[3].trim().toLowerCase() as 'normal' | 'consumable' | 'story' | 'misc';
+      const quantity = parseInt(addItemMatch[4], 10);
+
+      const existingItem = storyData.inventory.find((i) => i.name === itemName);
+      if (existingItem) {
+        existingItem.quantity += quantity;
+        addNotification(`Added ${quantity} ${itemName} (${existingItem.quantity} total)`, "info");
+      } else {
+        storyData.inventory.push({
+          name: itemName,
+          quantity: quantity,
+          description: description,
+          type: itemType,
+          stat: "",
+          resource: "",
+          symbol: "📦",
+        });
+        addNotification(`Added ${quantity} ${itemName} to inventory`, "success");
+      }
+      continue;
+    }
+
     // /modify_item: item name(amount)
     const itemMatch = trimmed.match(/^\/modify_item:\s*(.+?)\(([+-]?\d+)\)$/i);
     if (itemMatch) {
@@ -219,6 +246,76 @@ function processCommands(
   }
 }
 
+// Process lore triggers based on story content and fulfilled beats
+function processLoreTriggers(
+  storyData: StoryData,
+  recentContent: string,
+  addNotification: (
+    message: string,
+    type: "success" | "failure" | "info" | "warning"
+  ) => void
+) {
+  const contentLower = recentContent.toLowerCase();
+  const fulfilledBeatIndices = storyData.plot_beats
+    .map((beat, index) => (beat.fulfilled ? index : -1))
+    .filter((index) => index !== -1);
+
+  storyData.lore.forEach((loreItem) => {
+    let shouldTurnOn = false;
+    let shouldTurnOff = false;
+
+    // Check ON triggers (words)
+    if (loreItem.on_triggers && loreItem.on_triggers.length > 0) {
+      for (const trigger of loreItem.on_triggers) {
+        if (contentLower.includes(trigger.toLowerCase())) {
+          shouldTurnOn = true;
+          break;
+        }
+      }
+    }
+
+    // Check OFF triggers (words)
+    if (loreItem.off_triggers && loreItem.off_triggers.length > 0) {
+      for (const trigger of loreItem.off_triggers) {
+        if (contentLower.includes(trigger.toLowerCase())) {
+          shouldTurnOff = true;
+          break;
+        }
+      }
+    }
+
+    // Check beat triggers for turning ON
+    if (loreItem.beats_trigger && loreItem.beats_trigger.length > 0) {
+      for (const beatIndex of loreItem.beats_trigger) {
+        if (fulfilledBeatIndices.includes(beatIndex)) {
+          shouldTurnOn = true;
+          break;
+        }
+      }
+    }
+
+    // Check beat triggers for turning OFF
+    if (loreItem.beats_untrigger && loreItem.beats_untrigger.length > 0) {
+      for (const beatIndex of loreItem.beats_untrigger) {
+        if (fulfilledBeatIndices.includes(beatIndex)) {
+          shouldTurnOff = true;
+          break;
+        }
+      }
+    }
+
+    // Apply state changes with notifications
+    if (shouldTurnOn && loreItem.on !== true) {
+      loreItem.on = true;
+      addNotification(`📜 Lore discovered: ${loreItem.title}`, "success");
+    }
+    if (shouldTurnOff && loreItem.on !== false) {
+      loreItem.on = false;
+      addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
+    }
+  });
+}
+
 // Utility: trim scene history to prevent bloat
 function trimStoryData(data: StoryData): StoryData {
   const MAX_PERSISTED_PARTS = 10; // Keep last 10 scene parts
@@ -254,6 +351,7 @@ function StoryPageContent() {
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [loadingStory, setLoadingStory] = useState(true);
   const [started, setStarted] = useState(false);
+  const [canRetry, setCanRetry] = useState(false);
   const memory_cap = 20000; // Max memory size in characters
   // Load story from database on mount
   useEffect(() => {
@@ -295,6 +393,13 @@ function StoryPageContent() {
 
         // story.storyData is already parsed JSONB from database
         const loadedStoryData: StoryData = story.storyData;
+
+        // Process lore triggers on load to initialize lore visibility
+        // Combine all existing scene content to check for trigger words
+        const allContent = loadedStoryData.scene.parts
+          .map(part => part.content)
+          .join(' ');
+        processLoreTriggers(loadedStoryData, allContent, addNotification);
 
         setStoryData(loadedStoryData);
 
@@ -401,6 +506,204 @@ function StoryPageContent() {
     setStoryData(updatedStory);
   }
 
+  async function handleCustomInput(customText: string) {
+    if (!storyData) return;
+    if (!user) {
+      addNotification("Please sign in to continue the story", "warning");
+      return;
+    }
+
+    setLoading(true);
+
+    // Add user's custom input to scene
+    storyData.scene.parts.push({
+      content: "> " + customText,
+      imageUrl: "",
+      user: true,
+      role: "user",
+      choices: [],
+    });
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      addNotification("Session expired. Please sign in again.", "failure");
+      setLoading(false);
+      return;
+    }
+
+    // Build minimal payload for AI
+    const MAX_CONTENT_LENGTH = 2000;
+    
+    const recentParts = storyData.scene.parts.slice(-6).map(part => ({
+      content: part.content.substring(0, MAX_CONTENT_LENGTH),
+      user: part.user,
+      role: part.role,
+    }));
+
+    const minimalStoryData: any = {
+      story_name: storyData.story_name,
+      premise: storyData.premise?.substring(0, 1500) || "",
+      player_name: storyData.player_name,
+      player_summary: storyData.player_summary?.substring(0, 800) || "",
+      starting_content: storyData.starting_content?.substring(0, 1500) || "",
+      stats: storyData.stats,
+      resources: storyData.resources,
+      inventory: storyData.inventory,
+      achievements: storyData.achievements,
+      momentum: storyData.momentum,
+      maxMomentum: storyData.maxMomentum,
+      points: storyData.points,
+      plot_beats: storyData.plot_beats.map(beat => ({
+        title: beat.title.substring(0, 100),
+        content: beat.content.substring(0, 300),
+        fulfilled: beat.fulfilled,
+      })),
+      memory: storyData.memory.slice(-20).map(m => m.substring(0, 300)),
+      lore: storyData.lore
+        .filter(l => l.on !== false)
+        .slice(0, 15)
+        .map(l => ({
+          title: l.title.substring(0, 100),
+          content: l.content.substring(0, 500),
+          on: l.on,
+        })),
+      author_notes: storyData.author_notes?.substring(0, 1500) || "",
+      player_notes: storyData.player_notes?.substring(0, 800) || "",
+      chapters: storyData.chapters,
+      currentChapter: storyData.currentChapter,
+      scene: {
+        parts: recentParts,
+      },
+    };
+
+    const payload = {
+      storyData: minimalStoryData,
+      userChoice: null, // No specific choice, just custom text
+    };
+
+    const payloadSize = JSON.stringify(payload).length;
+    console.log(`Custom input payload size: ${(payloadSize / 1024).toFixed(2)} KB`);
+    
+    if (payloadSize > 4 * 1024 * 1024) {
+      addNotification("❌ Story data too large for generation.", "failure");
+      console.error('Payload exceeds 4MB limit:', payloadSize);
+      setLoading(false);
+      return;
+    }
+
+    await fetch("/api/story/next", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(payload),
+    })
+      .then(async (res) => {
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          addNotification(
+            `❌ Invalid response from server (expected JSON)`,
+            "failure"
+          );
+          setLoading(false);
+          return;
+        }
+
+        const text = await res.text();
+        if (!text || text.trim() === '') {
+          addNotification(
+            `❌ Empty response from server`,
+            "failure"
+          );
+          setLoading(false);
+          return;
+        }
+
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          console.error('Failed to parse response:', text);
+          addNotification(
+            `❌ Invalid JSON response from server`,
+            "failure"
+          );
+          setLoading(false);
+          return;
+        }
+
+        if (res.status === 402) {
+          addNotification(`❌ ${data.error}`, "failure");
+          if (data.balance) {
+            addNotification(
+              `Your balance: ${data.balance.tradable} tradable, ${data.balance.locked} locked`,
+              "info"
+            );
+          }
+          setLoading(false);
+          return;
+        }
+
+        if (res.status === 401) {
+          addNotification(
+            `🔒 ${data.error || "Authentication required"}`,
+            "failure"
+          );
+          setLoading(false);
+          return;
+        }
+
+        if (!res.ok) {
+          addNotification(
+            `Error: ${data.error || "Failed to generate story"}`,
+            "failure"
+          );
+          setLoading(false);
+          return;
+        }
+
+        if (data.meta?.tokensDeducted) {
+          addNotification(
+            `✓ Used ${data.meta.tokensDeducted} tokens`,
+            "success"
+          );
+          if (data.meta.remainingBalance) {
+            addNotification(
+              `Balance: ${data.meta.remainingBalance.total} tokens remaining (${data.meta.remainingBalance.tradable} tradable)`,
+              "info"
+            );
+          }
+        }
+
+        if (data.part.commands && data.part.commands.length > 0) {
+          processCommands(data.part.commands, storyData, addNotification);
+        }
+
+        if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
+          storyData.memory.push(...data.part.memoryEntries);
+        }
+
+        processLoreTriggers(storyData, data.part.content, addNotification);
+
+        storyData.scene.parts.push(data.part);
+        setStoryData({ ...storyData });
+        setCanRetry(true);
+        setChoices({ choices: data.part.choices || [] });
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Custom input error:", err);
+        addNotification(
+          `❌ Error generating story: ${err.message}`,
+          "failure"
+        );
+        setLoading(false);
+      });
+  }
+
   async function handleChoice() {
     if (!storyData) return;
     const choice = choices.choices.find((c) => input[c.text]);
@@ -430,19 +733,42 @@ function StoryPageContent() {
     }
 
     let dice_roll = Math.floor(Math.random() * 100) + 1;
-    let extra = "";
-    let text = "> " + choices.choices[key].text;
-
+    
+    // Build detailed RPG-style choice text with brackets
+    let choiceDetails: string[] = [];
+    
+    // Track state changes for display
+    let itemQuantityBefore = 0;
+    let itemQuantityAfter = 0;
+    let itemBroken = false;
+    let resourceUsedBefore = 0;
+    let resourceUsedAfter = 0;
+    let resourceLostBefore = 0;
+    let resourceLostAfter = 0;
+    let skillCheckResult = "";
+    
+    // Process item usage
     if (choice.item_used) {
       const item = storyData.inventory.find((i) => i.name === choice.item_used);
       const item_exists = item !== undefined;
-      if (item_exists) {
-        extra += `; item used (${choice.item_used})`;
-        addNotification(`Used item: ${choice.item_used} (Advantage!)`, "info");
-        const second_roll = Math.floor(Math.random() * 100) + 1;
-        if (second_roll < dice_roll) {
-          dice_roll = second_roll;
+      
+      if (item_exists && item) {
+        itemQuantityBefore = item.quantity;
+        const itemType = item.type || 'normal';
+        
+        // Handle advantage based on item type
+        if (itemType === 'misc') {
+          // Misc items don't give advantage, but prevent disadvantage
+          addNotification(`Used item: ${choice.item_used} (No disadvantage)`, "info");
+        } else {
+          // Normal, consumable, and story items give advantage
+          addNotification(`Used item: ${choice.item_used} (Advantage!)`, "info");
+          const second_roll = Math.floor(Math.random() * 100) + 1;
+          if (second_roll < dice_roll) {
+            dice_roll = second_roll;
+          }
         }
+        
         if (momentumMode === "reroll") {
           // Reroll: roll two more times and take the best
           const reroll1 = Math.floor(Math.random() * 100) + 1;
@@ -453,21 +779,29 @@ function StoryPageContent() {
             "success"
           );
         }
-        if (choice.item_loss) {
-          addNotification(`Lost item: ${choice.item_used}`, "warning");
+        
+        // Handle item consumption based on type
+        // Consumable: Always consumed when used
+        if (itemType === 'consumable') {
           const itemIndex = storyData.inventory.findIndex(
             (i) => i.name === choice.item_used
           );
           if (itemIndex !== -1) {
             if (storyData.inventory[itemIndex].quantity > 1) {
               storyData.inventory[itemIndex].quantity--;
+              itemQuantityAfter = storyData.inventory[itemIndex].quantity;
             } else {
               storyData.inventory.splice(itemIndex, 1);
+              itemQuantityAfter = 0;
+              itemBroken = true;
             }
           }
+        } else {
+          // Normal, story, misc: Not consumed on use (but normal can break on failure)
+          itemQuantityAfter = itemQuantityBefore;
         }
       } else {
-        extra += `; item missing (${choice.item_used})`;
+        // Item missing - disadvantage
         addNotification(
           `Missing item: ${choice.item_used} (Disadvantage!)`,
           "warning"
@@ -496,13 +830,16 @@ function StoryPageContent() {
       addNotification(`🎲 Reroll used! Better roll: ${dice_roll}`, "success");
     }
 
+    // Process resource usage
     if (choice.resource_used) {
       const resource = storyData.resources.find(
         (r) => r.name === choice.resource_used
       );
       if (resource) {
+        resourceUsedBefore = resource.value;
         const usage = Math.max(1, Math.floor(resource.maxValue * 0.1));
         resource.value = Math.max(0, resource.value - usage);
+        resourceUsedAfter = resource.value;
         addNotification(
           `Used ${usage} ${choice.resource_used} (${resource.value}/${resource.maxValue} remaining)`,
           "info"
@@ -515,23 +852,7 @@ function StoryPageContent() {
       }
     }
 
-    if (choice.risked_resource) {
-      const resource = storyData.resources.find(
-        (r) => r.name === choice.risked_resource
-      );
-      if (resource) {
-        addNotification(
-          `Risked ${choice.risked_resource} (${resource.value}/${resource.maxValue})`,
-          "warning"
-        );
-      } else {
-        addNotification(
-          `Resource not found: ${choice.risked_resource}`,
-          "warning"
-        );
-      }
-    }
-
+    // Handle skill check
     if (choice.skill_used) {
       const statValue =
         storyData.stats.find((stat) => stat.name === choice.skill_used)
@@ -540,7 +861,7 @@ function StoryPageContent() {
 
       // Handle guaranteed success
       if (momentumMode === "guarantee") {
-        text += " <Guaranteed Success" + extra + ">";
+        skillCheckResult = "success";
         addNotification(
           `✓ Guaranteed Success! (${choice.skill_used}: Auto-success with 2 Momentum)`,
           "success"
@@ -548,8 +869,9 @@ function StoryPageContent() {
       } else {
         const total = dice_roll + statValue;
         const dc_passed = dice_roll === 100 || total >= dc;
+        
         if (dc_passed) {
-          text += " <Success" + extra + ">";
+          skillCheckResult = "success";
           addNotification(
             `✓ Check Passed! (${choice.skill_used}: ${dice_roll} + ${statValue} = ${total} ≥ ${dc})`,
             "success"
@@ -580,19 +902,22 @@ function StoryPageContent() {
             }
           }
         } else {
-          text += " <Failure" + extra + ">";
+          skillCheckResult = "failure";
           addNotification(
             `✗ Check Failed! (${choice.skill_used}: ${dice_roll} + ${statValue} = ${total} < ${dc})`,
             "failure"
           );
 
+          // Handle risked resource loss on failure
           if (choice.risked_resource) {
             const resource = storyData.resources.find(
               (r) => r.name === choice.risked_resource
             );
             if (resource) {
+              resourceLostBefore = resource.value;
               const loss = Math.max(1, Math.floor(resource.maxValue * 0.2));
               resource.value = Math.max(0, resource.value - loss);
+              resourceLostAfter = resource.value;
               addNotification(
                 `Lost ${loss} ${choice.risked_resource} from failure! (${resource.value}/${resource.maxValue} remaining)`,
                 "failure"
@@ -600,28 +925,72 @@ function StoryPageContent() {
             }
           }
 
-          if (choice.item_loss && choice.item_used) {
-            const itemIndex = storyData.inventory.findIndex(
-              (i) => i.name === choice.item_used
-            );
-            if (itemIndex !== -1) {
-              if (storyData.inventory[itemIndex].quantity > 1) {
-                storyData.inventory[itemIndex].quantity--;
-              } else {
-                storyData.inventory.splice(itemIndex, 1);
-              }
-              addNotification(
-                `Lost ${choice.item_used} from failure!`,
-                "failure"
+          // Handle item breakage on failure (only for 'normal' type items)
+          if (choice.item_used) {
+            const item = storyData.inventory.find((i) => i.name === choice.item_used);
+            const itemType = item?.type || 'normal';
+            
+            // Only normal items break on failure (not consumable, story, or misc)
+            if (itemType === 'normal' && item) {
+              const itemIndex = storyData.inventory.findIndex(
+                (i) => i.name === choice.item_used
               );
+              if (itemIndex !== -1 && itemQuantityAfter === itemQuantityBefore) {
+                // Only break if not already consumed
+                if (storyData.inventory[itemIndex].quantity > 1) {
+                  storyData.inventory[itemIndex].quantity--;
+                  itemQuantityAfter = storyData.inventory[itemIndex].quantity;
+                } else {
+                  storyData.inventory.splice(itemIndex, 1);
+                  itemQuantityAfter = 0;
+                  itemBroken = true;
+                }
+                addNotification(
+                  `${choice.item_used} broke from failure!`,
+                  "failure"
+                );
+              }
             }
           }
         }
       }
-    } else {
-      text += " <No Skill Used" + extra + ">";
+      
+      // Build skill check line
+      choiceDetails.push(`[ ${choice.skill_used}: ${skillCheckResult} ]`);
     }
-
+    
+    // Build item usage line
+    if (choice.item_used && itemQuantityBefore > 0) {
+      if (itemBroken) {
+        choiceDetails.push(`[ Item used: ${choice.item_used}; x${itemQuantityBefore} → broken ]`);
+      } else if (choice.item_loss) {
+        choiceDetails.push(`[ Item used: ${choice.item_used}; x${itemQuantityBefore} → ${itemQuantityAfter} ]`);
+      } else {
+        choiceDetails.push(`[ Item used: ${choice.item_used}; x${itemQuantityBefore} ]`);
+      }
+    }
+    
+    // Build resource usage line
+    if (choice.resource_used && resourceUsedBefore > 0) {
+      const resource = storyData.resources.find((r) => r.name === choice.resource_used);
+      const maxValue = resource?.maxValue || 100;
+      choiceDetails.push(`[ Resource used: ${choice.resource_used} ${resourceUsedBefore} → ${resourceUsedAfter}/${maxValue} ]`);
+    }
+    
+    // Build resource lost line (only if actually lost)
+    if (resourceLostBefore > 0 && resourceLostAfter < resourceLostBefore) {
+      const resource = storyData.resources.find((r) => r.name === choice.risked_resource);
+      const maxValue = resource?.maxValue || 100;
+      choiceDetails.push(`[ Resource lost: ${choice.risked_resource} ${resourceLostBefore} → ${resourceLostAfter}/${maxValue} ]`);
+    }
+    
+    // Construct final choice text
+    let text = "";
+    if (choiceDetails.length > 0) {
+      text = choiceDetails.join("\n") + "\n";
+    }
+    text += "> " + choices.choices[key].text;
+    console.log("Final choice text:", text);
     // Reset momentum mode after use
     setMomentumMode("none");
 
@@ -677,10 +1046,14 @@ function StoryPageContent() {
         fulfilled: beat.fulfilled,
       })),
       memory: storyData.memory.slice(-20).map(m => m.substring(0, 300)),
-      lore: storyData.lore.slice(0, 15).map(l => ({
-        title: l.title.substring(0, 100),
-        content: l.content.substring(0, 500),
-      })),
+      lore: storyData.lore
+        .filter(l => l.on !== false) // Only send lore that is ON
+        .slice(0, 15)
+        .map(l => ({
+          title: l.title.substring(0, 100),
+          content: l.content.substring(0, 500),
+          on: l.on,
+        })),
       author_notes: storyData.author_notes?.substring(0, 1500) || "",
       player_notes: storyData.player_notes?.substring(0, 800) || "",
       // Chapter info
@@ -826,6 +1199,9 @@ function StoryPageContent() {
           storyData.memory.push(...data.part.memoryEntries);
         }
 
+        // Process lore triggers based on new content
+        processLoreTriggers(storyData, data.part.content, addNotification);
+
         storyData.scene.parts.push(data.part);
         
         // Check for chapter completion and award points
@@ -845,6 +1221,7 @@ function StoryPageContent() {
         setStoryText(data.part.content);
         setChoices({ choices: data.part.choices || [] });
         setLoading(false);
+        setCanRetry(true); // Enable retry after successful AI response
 
         // Save progress to database
         await saveProgress(storyData);
@@ -874,6 +1251,178 @@ function StoryPageContent() {
       }
     });
     setInput({ ...newInput });
+  }
+
+  async function handleRetry() {
+    if (!storyData || loading) return;
+    
+    // Check if last part is an AI response
+    const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
+    if (!lastPart || lastPart.user) {
+      addNotification("Nothing to retry", "warning");
+      return;
+    }
+
+    // Find the user's choice (second to last part)
+    if (storyData.scene.parts.length < 2) {
+      addNotification("Cannot retry initial story", "warning");
+      return;
+    }
+
+    setLoading(true);
+    setCanRetry(false);
+    
+    // Remove the last AI response
+    storyData.scene.parts.pop();
+    
+    // Get the user choice part
+    const userChoicePart = storyData.scene.parts[storyData.scene.parts.length - 1];
+    
+    // Restore choices from user's choice part
+    if (userChoicePart.choices) {
+      setChoices({ choices: userChoicePart.choices });
+    }
+
+    addNotification("Regenerating response...", "info");
+
+    // Regenerate from current state
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      addNotification("Session expired. Please sign in again.", "failure");
+      setLoading(false);
+      return;
+    }
+
+    // Build minimal payload
+    const MAX_CONTENT_LENGTH = 2000;
+    const recentParts = storyData.scene.parts.slice(-6).map(part => ({
+      content: part.content.substring(0, MAX_CONTENT_LENGTH),
+      user: part.user,
+      role: part.role,
+    }));
+
+    const minimalStoryData: any = {
+      story_name: storyData.story_name,
+      premise: storyData.premise?.substring(0, 1500) || "",
+      player_name: storyData.player_name,
+      player_summary: storyData.player_summary?.substring(0, 800) || "",
+      starting_content: storyData.starting_content?.substring(0, 1500) || "",
+      stats: storyData.stats,
+      resources: storyData.resources,
+      inventory: storyData.inventory,
+      achievements: storyData.achievements,
+      momentum: storyData.momentum,
+      maxMomentum: storyData.maxMomentum,
+      points: storyData.points,
+      plot_beats: storyData.plot_beats.map(beat => ({
+        title: beat.title.substring(0, 100),
+        content: beat.content.substring(0, 300),
+        fulfilled: beat.fulfilled,
+      })),
+      memory: storyData.memory.slice(-20).map(m => m.substring(0, 300)),
+      lore: storyData.lore
+        .filter(l => l.on !== false)
+        .slice(0, 15)
+        .map(l => ({
+          title: l.title.substring(0, 100),
+          content: l.content.substring(0, 500),
+          on: l.on,
+        })),
+      author_notes: storyData.author_notes?.substring(0, 1500) || "",
+      player_notes: storyData.player_notes?.substring(0, 800) || "",
+      chapters: storyData.chapters,
+      currentChapter: storyData.currentChapter,
+      scene: { parts: recentParts },
+    };
+
+    const payload = { storyData: minimalStoryData };
+
+    await fetch("/api/story/next", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(payload),
+    })
+      .then(async (res) => {
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          addNotification(`❌ Invalid response from server`, "failure");
+          setLoading(false);
+          setCanRetry(true);
+          return;
+        }
+
+        const text = await res.text();
+        if (!text || text.trim() === '') {
+          addNotification(`❌ Empty response from server`, "failure");
+          setLoading(false);
+          setCanRetry(true);
+          return;
+        }
+
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          addNotification(`❌ Invalid JSON response`, "failure");
+          setLoading(false);
+          setCanRetry(true);
+          return;
+        }
+
+        if (!res.ok) {
+          addNotification(`Error: ${data.error || "Failed to generate story"}`, "failure");
+          setLoading(false);
+          setCanRetry(true);
+          return;
+        }
+
+        if (data.meta?.tokensDeducted) {
+          addNotification(`✓ Used ${data.meta.tokensDeducted} tokens (retry)`, "success");
+        }
+
+        if (data.part.commands && data.part.commands.length > 0) {
+          processCommands(data.part.commands, storyData, addNotification);
+        }
+
+        if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
+          storyData.memory.push(...data.part.memoryEntries);
+        }
+
+        processLoreTriggers(storyData, data.part.content, addNotification);
+        storyData.scene.parts.push(data.part);
+        
+        if (data.part.content.includes("!!! END CHAPTER !!!")) {
+          const currentChapter = storyData.chapters.length;
+          if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
+            storyData.earnedPointsFromChapters.push(currentChapter);
+            storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
+            addNotification(
+              `🎉 Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+              "success"
+            );
+          }
+        }
+        
+        setStoryData({ ...storyData });
+        setStoryText(data.part.content);
+        setChoices({ choices: data.part.choices || [] });
+        setLoading(false);
+        setCanRetry(true);
+        addNotification("✓ Response regenerated", "success");
+
+        await saveProgress(storyData);
+      })
+      .catch((error) => {
+        console.error("Error retrying story:", error);
+        addNotification("Network error. Please try again.", "failure");
+        setLoading(false);
+        setCanRetry(true);
+      });
   }
 
   async function handlePurchase(cost: number, callback: () => void) {
@@ -1008,6 +1557,9 @@ function StoryPageContent() {
             onMomentumModeChange={setMomentumMode}
             handleChoice={handleChoice}
             handleSelect={handleSelect}
+            onCustomInput={handleCustomInput}
+            onRetry={handleRetry}
+            canRetry={canRetry}
           />
         )}
         {currentState === StoryState.STATS && <StatsPage {...storyData} />}

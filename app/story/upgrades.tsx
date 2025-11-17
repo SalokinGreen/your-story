@@ -13,6 +13,7 @@ export default function UpgradesPage({ storyData, onPurchase }: UpgradesPageProp
   const [selectedResource, setSelectedResource] = useState<string>("");
   const [newItemName, setNewItemName] = useState("");
   const [newItemDescription, setNewItemDescription] = useState("");
+  const [newItemType, setNewItemType] = useState<'normal' | 'consumable' | 'story' | 'misc'>("normal");
 
   const handleStatUpgrade = () => {
     if (!selectedStat) return;
@@ -45,11 +46,12 @@ export default function UpgradesPage({ storyData, onPurchase }: UpgradesPageProp
         name: newItemName,
         quantity: 1,
         description: newItemDescription || "A useful item",
-        type: "misc",
+        type: newItemType,
         symbol: "📦"
       });
       setNewItemName("");
       setNewItemDescription("");
+      setNewItemType("normal");
     });
   };
 
@@ -215,6 +217,22 @@ export default function UpgradesPage({ storyData, onPurchase }: UpgradesPageProp
                   rows={2}
                   maxLength={200}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                  Item Type
+                </label>
+                <select
+                  value={newItemType}
+                  onChange={(e) => setNewItemType(e.target.value as 'normal' | 'consumable' | 'story' | 'misc')}
+                  className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400"
+                >
+                  <option value="normal">Normal (Advantage, breaks on fail)</option>
+                  <option value="consumable">Consumable (Advantage, used immediately)</option>
+                  <option value="story">Story Item (Advantage, never breaks)</option>
+                  <option value="misc">Misc (No advantage, never breaks)</option>
+                </select>
               </div>
             </div>
 

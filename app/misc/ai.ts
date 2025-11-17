@@ -32,9 +32,12 @@ export function buildMessages({ storyData }: BuildPromptInput): ChatMessage[] {
   const system = `You are a helpful, creative narrative engine for a choice-driven, text-only adventure game.
 Stay in character and respond in the style of an interactive fiction game. You're the narrator and the characters.
 
-Output Format:
+CRITICAL: Always use the exact XML-style tags in your response. Your output MUST follow this structure:
+
+Output Format (REQUIRED):
+\`\`\`
 <story>
-Story prose here.
+Story prose here. Write your narrative content between these tags.
 </story>
 
 <memory> (Optional)
@@ -54,6 +57,9 @@ Story prose here.
 !!! END CHAPTER !!! (Optional to end the current chapter)
 !!! END STORY !!! (Optional to end the story)
 !!! GAME OVER !!! (Optional to indicate game over)
+\`\`\`
+
+IMPORTANT: The <story></story> tags are MANDATORY. Never write story text without wrapping it in <story> tags. All narrative content must be enclosed in <story></story> tags.
 
 Choice Syntax:
 - ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; risk_resource: resource name or none; use_item: item name or none; item_loss: true or false>
@@ -70,7 +76,14 @@ Guidelines:
 - Adapt the story based on the player's previous choices and current state.
 - DC system: Roll (1-100) + Stat Value ≥ DC. For average stats (~50): DC 50 is trivial, DC 100 is easy, DC 120 is medium, DC 140 is hard, DC 160+ is very hard, DC 200+ is impossible.
 
+Item Types:
+- normal: Gives advantage when used. Doesn't get consumed on use, but breaks on skill check failure.
+- consumable: Gives advantage when used. Gets consumed immediately when used, regardless of success or failure.
+- story: Gives advantage when used. Never breaks and never gets consumed. Important quest items.
+- misc: Doesn't give advantage, but prevents disadvantage from not having an item. Never breaks or gets consumed.
+
 Commands:
+- /add_item: item name | description | type | quantity - Adds a new item to the player's inventory. Type must be: normal, consumable, story, or misc. Example: /add_item: Health Potion | Restores vitality | consumable | 3
 - /modify_item: item name(amount) - Adds amount (can be negative for removal) to the quantity of an item in the player's inventory. Remove the item if quantity reaches zero.
 - /modify_resource: resource name(amount) - Modifies a player's resource by the given amount.
 - /trigger_achievement: achievement title - Triggers/unlocks an existing achievement from the player's achievement list. Only use titles that exist in the Achievements section below.
@@ -156,10 +169,12 @@ export function storyDataToString(storyData: StoryData): string {
   result += `## Inventory:\n`;
   result += storyData.inventory.map(item => `- ${item.name} x${item.quantity}: ${item.description}`).join("\n") + "\n\n";
   
-  if (storyData.achievements && storyData.achievements.length > 0) {
-    result += `## Achievements:\n`;
-    result += storyData.achievements.map(ach => 
-      `- ${ach.symbol} ${ach.title} (${ach.points} pts)${ach.dateAchieved ? ' ✓ UNLOCKED' : ' 🔒 LOCKED'}: ${ach.description}`
+  // Only show locked achievements (available to unlock)
+  const lockedAchievements = storyData.achievements.filter(ach => !ach.dateAchieved);
+  if (lockedAchievements.length > 0) {
+    result += `## Achievements Available to Unlock:\n`;
+    result += lockedAchievements.map(ach => 
+      `- ${ach.title}: ${ach.ai_hint || ach.description}`
     ).join("\n") + "\n\n";
   }
   
@@ -206,11 +221,14 @@ export function storyDataToString(storyData: StoryData): string {
   storyData.memory.forEach((mem, index) => {
     result += `- ${mem}\n`;
   });
-  // Lore
-  result += `\n## Lore Entries:\n`;
-  storyData.lore.forEach((lore, index) => {
-    result += `----\nLore: ${lore.title}\n${lore.content}\n`;
-  });
+  // Lore - only include entries that are turned ON
+  const activeLore = storyData.lore.filter(lore => lore.on !== false);
+  if (activeLore.length > 0) {
+    result += `\n## Lore Entries:\n`;
+    activeLore.forEach((lore, index) => {
+      result += `----\nLore: ${lore.title}\n${lore.content}\n`;
+    });
+  }
   result += `\n## Author Notes (AI instructions from the author of the story):\n`;
   if (storyData.author_notes) {
     result += `${storyData.author_notes}\n\n`;
@@ -242,6 +260,34 @@ export function outputToScenePart(text: string): ScenePart {
       const closeIdx = lower.indexOf(closeTag, gtIdx + 1);
       if (closeIdx === -1) return null;
       return src.substring(gtIdx + 1, closeIdx);
+    };
+
+    // Helper: extract story content even when tags are missing
+    const extractStoryContent = (src: string): string => {
+      // Try to extract from <story> tags first
+      const storyBlock = extractBlock("story", src);
+      if (storyBlock) return storyBlock;
+
+      // If no <story> tags, try to extract everything before <memory>, <choices>, or <commands> tags
+      const lowerSrc = src.toLowerCase();
+      let endIndex = src.length;
+      
+      // Find the first occurrence of any structured tag
+      const tagMatches = [
+        { tag: '<memory', index: lowerSrc.indexOf('<memory') },
+        { tag: '<choices', index: lowerSrc.indexOf('<choices') },
+        { tag: '<commands', index: lowerSrc.indexOf('<commands') },
+        { tag: '!!! end chapter !!!', index: lowerSrc.indexOf('!!! end chapter !!!') },
+        { tag: '!!! end story !!!', index: lowerSrc.indexOf('!!! end story !!!') },
+        { tag: '!!! game over !!!', index: lowerSrc.indexOf('!!! game over !!!') }
+      ].filter(m => m.index !== -1);
+
+      if (tagMatches.length > 0) {
+        endIndex = Math.min(...tagMatches.map(m => m.index));
+      }
+
+      // Extract everything up to that point as story content
+      return src.substring(0, endIndex).trim();
     };
 
     const parseChoice = (line: string): Choice => {
@@ -324,12 +370,12 @@ export function outputToScenePart(text: string): ScenePart {
         .filter((l) => l.length > 0);
     };
 
-    const story = extractBlock("story", text);
+    const story = extractStoryContent(text);
     const memoryBlock = extractBlock("memory", text);
     const choicesBlock = extractBlock("choices", text);
     const commandsBlock = extractBlock("commands", text);
 
-    const content = (story ?? text).trim();
+    const content = story.trim();
     const memoryEntries = blockToList(memoryBlock);
     const choices = blockToChoiceList(choicesBlock);
     const commands = blockToList(commandsBlock);

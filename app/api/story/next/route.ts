@@ -151,7 +151,6 @@ export async function POST(req: NextRequest) {
       }),
       signal: controller.signal,
     });
-
     clearTimeout(timeoutId);
     console.log("Deepseek response status:", resp.status);
     
@@ -168,6 +167,7 @@ export async function POST(req: NextRequest) {
     console.log("Deepseek response received. Choices:", data.choices?.length || 0);
     
     const content = data.choices?.[0]?.message?.content ?? "";
+    console.log("Content:", content);
     console.log("Content length:", content.length);
     console.log("Content preview:", content.substring(0, 200));
     
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
 
     // Get updated balance
     const updatedBalance = await getUserTokenBalance(userId, supabaseAdmin);
-
+    
     return NextResponse.json({
       part,
       meta: { 
