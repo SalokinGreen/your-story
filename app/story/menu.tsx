@@ -17,6 +17,7 @@ import { supabase } from "../misc/supabase";
 import { compressImage } from "../misc/imageCompression";
 import CustomVoiceManager from "../components/CustomVoiceManager";
 import { AI_MODELS } from "../misc/ai_prices";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 // Basic Settings Component
 interface BasicSettingsForm {
@@ -2495,7 +2496,6 @@ export default function MenuPage({
   const { addNotification } = useNotification();
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -2523,6 +2523,20 @@ export default function MenuPage({
   const [activeTab, setActiveTab] = useState<
     "basic" | "stats" | "inventory" | "quests" | "lore" | "story" | "tts"
   >("basic");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    icon?: string;
+    confirmText?: string;
+    confirmButtonClass?: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   const handleSaveProgress = async () => {
     setSaving(true);
@@ -2632,13 +2646,19 @@ export default function MenuPage({
   };
 
   const handleReturnToExplorer = () => {
-    if (
-      confirm(
-        "Are you sure you want to leave? Make sure your progress is saved!"
-      )
-    ) {
-      router.push("/explorer");
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Leave Story",
+      message:
+        "Are you sure you want to leave? Make sure your progress is saved!",
+      icon: "⚠️",
+      confirmText: "Leave",
+      confirmButtonClass: "bg-gray-600 hover:bg-gray-700",
+      onConfirm: () => {
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        router.push("/explorer");
+      },
+    });
   };
 
   const calculateStoryProgress = () => {
@@ -2818,6 +2838,225 @@ export default function MenuPage({
         )}
       </div>
 
+      {/* Replay & Restart Card */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+          🔄 Replay & Restart
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Start your adventure anew with different options
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Restart Story (Full Reset) */}
+          <button
+            onClick={() => {
+              setConfirmDialog({
+                isOpen: true,
+                title: "Restart Story",
+                message:
+                  "Are you sure you want to restart this story? All progress will be lost!",
+                icon: "🔄",
+                confirmText: "Restart",
+                confirmButtonClass: "bg-blue-600 hover:bg-blue-700",
+                onConfirm: async () => {
+                  setConfirmDialog({ ...confirmDialog, isOpen: false });
+                  if (!storyDbId) return;
+
+                  try {
+                    const {
+                      data: { session },
+                    } = await supabase.auth.getSession();
+                    if (!session) {
+                      addNotification("Please sign in to restart", "warning");
+                      return;
+                    }
+
+                    // Full reset - clear everything
+                    const resetStoryData = {
+                      ...storyData,
+                      scene: { parts: [] },
+                      memory: [],
+                      currentChapter: 0,
+                      chapters: [],
+                      momentum: storyData.momentum,
+                      points: 0,
+                      earnedPointsFromBeats: [],
+                      earnedPointsFromChapters: [],
+                      earnedPointsFromQuests: [],
+                      plot_beats: storyData.plot_beats.map((b) => ({
+                        ...b,
+                        fulfilled: false,
+                      })),
+                      achievements: storyData.achievements.map((a) => ({
+                        ...a,
+                        dateAchieved: null,
+                      })),
+                      quests:
+                        storyData.quests?.map((q) => ({
+                          ...q,
+                          fulfilled: false,
+                          active: false,
+                        })) || [],
+                      lore: storyData.lore.map((l) => ({
+                        ...l,
+                        on:
+                          l.on_triggers && l.on_triggers.length > 0
+                            ? false
+                            : true,
+                      })),
+                      newGamePlusMode: false,
+                    };
+
+                    await fetch(`/api/stories/${storyDbId}`, {
+                      method: "PATCH",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${session.access_token}`,
+                      },
+                      body: JSON.stringify({ storyData: resetStoryData }),
+                    });
+
+                    addNotification("Story restarted! Reloading...", "success");
+                    window.location.reload();
+                  } catch (error) {
+                    console.error("Error restarting story:", error);
+                    addNotification("Failed to restart story", "failure");
+                  }
+                },
+              });
+            }}
+            className="flex flex-col items-center justify-center gap-2 px-6 py-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+          >
+            <span className="text-3xl">🔄</span>
+            <div className="text-center">
+              <div className="font-bold">Restart Story</div>
+              <div className="text-xs opacity-80 mt-1">
+                Fresh start, lose all progress
+              </div>
+            </div>
+          </button>
+
+          {/* New Game Plus */}
+          <button
+            onClick={() => {
+              setConfirmDialog({
+                isOpen: true,
+                title: "New Game Plus",
+                message:
+                  "Start New Game Plus? You'll keep achievements, stats, resources, and items, plus get bonus rewards!",
+                icon: "⭐",
+                confirmText: "Start NG+",
+                confirmButtonClass:
+                  "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700",
+                onConfirm: async () => {
+                  setConfirmDialog({ ...confirmDialog, isOpen: false });
+                  if (!storyDbId) return;
+
+                  try {
+                    const {
+                      data: { session },
+                    } = await supabase.auth.getSession();
+                    if (!session) {
+                      addNotification(
+                        "Please sign in for New Game Plus",
+                        "warning"
+                      );
+                      return;
+                    }
+
+                    const ngPlusCount = (storyData.newGamePlusCount || 0) + 1;
+                    const bonusPoints = ngPlusCount * 50;
+                    const bonusMomentum = Math.min(ngPlusCount, 3);
+
+                    // Reset with NG+ bonuses
+                    const ngPlusStoryData = {
+                      ...storyData,
+                      scene: { parts: [] },
+                      memory: [],
+                      currentChapter: 0,
+                      chapters: [],
+                      momentum: storyData.momentum,
+                      maxMomentum: storyData.maxMomentum + bonusMomentum,
+                      points: bonusPoints,
+                      earnedPointsFromBeats: [],
+                      earnedPointsFromChapters: [],
+                      earnedPointsFromQuests: [],
+                      plot_beats: storyData.plot_beats.map((b) => ({
+                        ...b,
+                        fulfilled: false,
+                      })),
+                      // Keep achievements, stats, resources, and inventory!
+                      achievements: storyData.achievements,
+                      stats: storyData.stats, // Keep stats
+                      resources: storyData.resources, // Keep resources
+                      inventory: storyData.inventory, // Keep inventory
+                      quests:
+                        storyData.quests?.map((q) => ({
+                          ...q,
+                          fulfilled: false,
+                          active: false,
+                        })) || [],
+                      lore: storyData.lore.map((l) => ({
+                        ...l,
+                        on:
+                          l.on_triggers && l.on_triggers.length > 0
+                            ? false
+                            : true,
+                      })),
+                      newGamePlusCount: ngPlusCount,
+                      newGamePlusMode: true,
+                    };
+
+                    await fetch(`/api/stories/${storyDbId}`, {
+                      method: "PATCH",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${session.access_token}`,
+                      },
+                      body: JSON.stringify({ storyData: ngPlusStoryData }),
+                    });
+
+                    addNotification(
+                      `New Game Plus ${ngPlusCount} activated! +${bonusPoints} points, +${bonusMomentum} max momentum`,
+                      "success"
+                    );
+                    window.location.reload();
+                  } catch (error) {
+                    console.error("Error starting NG+:", error);
+                    addNotification("Failed to start New Game Plus", "failure");
+                  }
+                },
+              });
+            }}
+            className="flex flex-col items-center justify-center gap-2 px-6 py-6 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+          >
+            <span className="text-3xl">⭐</span>
+            <div className="text-center">
+              <div className="font-bold">New Game Plus</div>
+              <div className="text-xs opacity-80 mt-1">
+                Keep achievements + bonus rewards
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* NG+ Status Badge */}
+        {storyData.newGamePlusCount && storyData.newGamePlusCount > 0 && (
+          <div className="mt-4 p-3 bg-linear-to-r from-amber-50 to-purple-50 dark:from-amber-900/20 dark:to-purple-900/20 rounded-lg border border-amber-200 dark:border-amber-800 text-center">
+            <div className="font-bold text-sm text-amber-900 dark:text-amber-200">
+              ⭐ Current Run: New Game Plus #{storyData.newGamePlusCount}
+            </div>
+            <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+              {storyData.newGamePlusMode
+                ? "Active NG+ bonuses"
+                : "Completed playthroughs"}
+              : {storyData.newGamePlusCount}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Actions Card */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
@@ -2937,7 +3176,51 @@ export default function MenuPage({
 
           {/* Delete Story */}
           <button
-            onClick={() => setShowDeleteConfirm(true)}
+            onClick={() => {
+              setConfirmDialog({
+                isOpen: true,
+                title: "Delete Story?",
+                message:
+                  "Are you sure you want to permanently delete this story? This action cannot be undone.",
+                icon: "⚠️",
+                confirmText: "Delete Forever",
+                confirmButtonClass: "bg-red-600 hover:bg-red-700",
+                onConfirm: async () => {
+                  setConfirmDialog({ ...confirmDialog, isOpen: false });
+                  if (!storyDbId) return;
+
+                  setDeleting(true);
+                  try {
+                    const {
+                      data: { session },
+                    } = await supabase.auth.getSession();
+                    if (!session) {
+                      throw new Error("Not authenticated");
+                    }
+
+                    const response = await fetch(`/api/stories/${storyDbId}`, {
+                      method: "DELETE",
+                      headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                      },
+                    });
+
+                    if (!response.ok) {
+                      throw new Error("Failed to delete story");
+                    }
+
+                    addNotification("Story deleted", "info");
+                    router.push("/explorer");
+                  } catch (error: any) {
+                    addNotification(
+                      error.message || "Failed to delete story",
+                      "failure"
+                    );
+                    setDeleting(false);
+                  }
+                },
+              });
+            }}
             disabled={deleting || !storyDbId}
             className="flex items-center justify-center gap-3 px-6 py-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md"
           >
@@ -3008,44 +3291,6 @@ export default function MenuPage({
           </div>
         </div>
       </div>
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-md w-full border border-gray-200 dark:border-gray-700">
-            <h3 className="text-xl font-bold text-red-600 dark:text-red-400 mb-4">
-              ⚠️ Delete Story?
-            </h3>
-            <p className="text-gray-700 dark:text-gray-300 mb-6">
-              Are you sure you want to permanently delete this story? This
-              action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={deleting}
-                className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteStory}
-                disabled={deleting}
-                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
-              >
-                {deleting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  "Delete Forever"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Comprehensive Settings Modal */}
       {showSettings && (
@@ -3360,6 +3605,18 @@ export default function MenuPage({
           </div>
         </div>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        icon={confirmDialog.icon}
+        confirmText={confirmDialog.confirmText}
+        confirmButtonClass={confirmDialog.confirmButtonClass}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
     </div>
   );
 }

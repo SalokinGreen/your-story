@@ -20,6 +20,7 @@ import { useAuth } from "../misc/AuthContext";
 import { supabase } from "../misc/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
 import { DEFAULT_PRESET } from "../misc/presets";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -28,14 +29,17 @@ function getSecureRandomInt(min: number, max: number): number {
   const bytesNeeded = Math.ceil(Math.log2(range) / 8);
   const maxValue = Math.pow(256, bytesNeeded);
   const randomValues = new Uint8Array(bytesNeeded);
-  
+
   // Rejection sampling to avoid modulo bias
   let randomNumber;
   do {
     crypto.getRandomValues(randomValues);
-    randomNumber = randomValues.reduce((acc, val, i) => acc + val * Math.pow(256, i), 0);
+    randomNumber = randomValues.reduce(
+      (acc, val, i) => acc + val * Math.pow(256, i),
+      0
+    );
   } while (randomNumber >= maxValue - (maxValue % range));
-  
+
   return min + (randomNumber % range);
 }
 
@@ -497,6 +501,20 @@ function StoryPageContent() {
   const [canRetry, setCanRetry] = useState(false);
   const [showPresetSelection, setShowPresetSelection] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    icon?: string;
+    confirmText?: string;
+    confirmButtonClass?: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
   const memory_cap = 20000; // Max memory size in characters
   // Load story from database on mount
   useEffect(() => {
@@ -1747,6 +1765,10 @@ function StoryPageContent() {
     );
   }
 
+  // Check for game over state
+  const isGameOver =
+    storyData?.scene.parts.some((part) => part.gameOver) || false;
+
   if (!storyData) {
     return (
       <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
@@ -1761,6 +1783,398 @@ function StoryPageContent() {
             >
               Browse Adventures
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Game Over Screen
+  if (isGameOver && storyData) {
+    const achievedCount = storyData.achievements.filter(
+      (a) => a.dateAchieved
+    ).length;
+    const totalAchievements = storyData.achievements.length;
+    const completedBeats = storyData.plot_beats.filter(
+      (b) => b.fulfilled
+    ).length;
+    const totalBeats = storyData.plot_beats.length;
+    const completedQuests =
+      storyData.quests?.filter((q) => q.fulfilled).length || 0;
+    const totalQuests = storyData.quests?.length || 0;
+
+    return (
+      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Game Over Header */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6 text-center">
+            <h1 className="text-5xl font-bold mb-4">🎭 Game Over 🎭</h1>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              {storyData.story_name}
+            </h2>
+            <p className="text-lg text-gray-600 dark:text-gray-400">
+              {storyData.player_name}'s journey has concluded
+            </p>
+          </div>
+
+          {/* Stats Summary */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6">
+            <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
+              📊 Final Statistics
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-3xl">🏆</span>
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Achievements
+                  </span>
+                </div>
+                <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                  {achievedCount} / {totalAchievements}
+                </div>
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  {totalAchievements > 0
+                    ? Math.round((achievedCount / totalAchievements) * 100)
+                    : 0}
+                  % Complete
+                </div>
+              </div>
+
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-3xl">📖</span>
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Story Beats
+                  </span>
+                </div>
+                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                  {completedBeats} / {totalBeats}
+                </div>
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  {totalBeats > 0
+                    ? Math.round((completedBeats / totalBeats) * 100)
+                    : 0}
+                  % Complete
+                </div>
+              </div>
+
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-3xl">🎯</span>
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Quests
+                  </span>
+                </div>
+                <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                  {completedQuests} / {totalQuests}
+                </div>
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  {totalQuests > 0
+                    ? Math.round((completedQuests / totalQuests) * 100)
+                    : 0}
+                  % Complete
+                </div>
+              </div>
+
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-3xl">💰</span>
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Total Points
+                  </span>
+                </div>
+                <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
+                  {storyData.points}
+                </div>
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  Progression Points Earned
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Achievements */}
+          {achievedCount > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6">
+              <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
+                🏆 Achievements Earned
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {storyData.achievements
+                  .filter((a) => a.dateAchieved)
+                  .map((achievement, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-3xl">{achievement.symbol}</span>
+                        <div>
+                          <div className="font-bold text-gray-900 dark:text-white">
+                            {achievement.title}
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {achievement.description}
+                          </div>
+                          <div className="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-1">
+                            +{achievement.points} points
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
+            <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white text-center">
+              What's Next?
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                onClick={() => {
+                  setConfirmDialog({
+                    isOpen: true,
+                    title: "Replay Story",
+                    message:
+                      "Start this adventure from the beginning? All progress will be lost.",
+                    icon: "🔄",
+                    confirmText: "Replay",
+                    confirmButtonClass: "bg-blue-600 hover:bg-blue-700",
+                    onConfirm: async () => {
+                      setConfirmDialog({ ...confirmDialog, isOpen: false });
+                      // Replay same story - reset to beginning
+                      if (!storyDbId) return;
+                      try {
+                        const {
+                          data: { session },
+                        } = await supabase.auth.getSession();
+                        if (!session) {
+                          addNotification(
+                            "Please sign in to replay",
+                            "warning"
+                          );
+                          return;
+                        }
+
+                        // Reset story to initial state but keep adventure template
+                        const resetStoryData: StoryData = {
+                          ...storyData,
+                          scene: { parts: [] },
+                          memory: [],
+                          currentChapter: 0,
+                          chapters: [],
+                          momentum: storyData.momentum,
+                          points: 0,
+                          earnedPointsFromBeats: [],
+                          earnedPointsFromChapters: [],
+                          earnedPointsFromQuests: [],
+                          plot_beats: storyData.plot_beats.map((b) => ({
+                            ...b,
+                            fulfilled: false,
+                          })),
+                          achievements: storyData.achievements.map((a) => ({
+                            ...a,
+                            dateAchieved: null,
+                          })),
+                          quests:
+                            storyData.quests?.map((q) => ({
+                              ...q,
+                              fulfilled: false,
+                              active: false,
+                            })) || [],
+                          lore: storyData.lore.map((l) => ({
+                            ...l,
+                            on:
+                              l.on_triggers && l.on_triggers.length > 0
+                                ? false
+                                : true,
+                          })),
+                        };
+
+                        await fetch(`/api/stories/${storyDbId}`, {
+                          method: "PATCH",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${session.access_token}`,
+                          },
+                          body: JSON.stringify({ storyData: resetStoryData }),
+                        });
+
+                        addNotification(
+                          "Story reset! Starting fresh...",
+                          "success"
+                        );
+                        router.push(`/story?storyId=${storyDbId}`);
+                        window.location.reload();
+                      } catch (error) {
+                        console.error("Error replaying story:", error);
+                        addNotification("Failed to replay story", "failure");
+                      }
+                    },
+                  });
+                }}
+                className="px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
+              >
+                <span className="text-2xl">🔄</span>
+                <div className="text-left">
+                  <div>Replay Story</div>
+                  <div className="text-xs opacity-80">
+                    Start from the beginning
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setConfirmDialog({
+                    isOpen: true,
+                    title: "New Game Plus",
+                    message:
+                      "Start a New Game Plus run? You'll keep all achievements, stats, resources, and items, plus earn bonus rewards!",
+                    icon: "⭐",
+                    confirmText: "Start NG+",
+                    confirmButtonClass:
+                      "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700",
+                    onConfirm: async () => {
+                      setConfirmDialog({ ...confirmDialog, isOpen: false });
+                      // New Game Plus - keep achievements and increase difficulty
+                      if (!storyDbId) return;
+                      try {
+                        const {
+                          data: { session },
+                        } = await supabase.auth.getSession();
+                        if (!session) {
+                          addNotification(
+                            "Please sign in for New Game Plus",
+                            "warning"
+                          );
+                          return;
+                        }
+
+                        const ngPlusCount =
+                          (storyData.newGamePlusCount || 0) + 1;
+                        const bonusPoints = ngPlusCount * 50; // 50 points per NG+ run
+                        const bonusMomentum = Math.min(ngPlusCount, 3); // Up to +3 max momentum
+
+                        // Reset story but keep achievements, stats, resources, and inventory
+                        const ngPlusStoryData: StoryData = {
+                          ...storyData,
+                          scene: { parts: [] },
+                          memory: [],
+                          currentChapter: 0,
+                          chapters: [],
+                          momentum: storyData.momentum,
+                          maxMomentum: storyData.maxMomentum + bonusMomentum,
+                          points: bonusPoints, // Start with bonus points
+                          earnedPointsFromBeats: [],
+                          earnedPointsFromChapters: [],
+                          earnedPointsFromQuests: [],
+                          plot_beats: storyData.plot_beats.map((b) => ({
+                            ...b,
+                            fulfilled: false,
+                          })),
+                          // Keep achievements, stats, resources, and inventory!
+                          achievements: storyData.achievements,
+                          stats: storyData.stats, // Keep stats
+                          resources: storyData.resources, // Keep resources
+                          inventory: storyData.inventory, // Keep inventory
+                          quests:
+                            storyData.quests?.map((q) => ({
+                              ...q,
+                              fulfilled: false,
+                              active: false,
+                            })) || [],
+                          lore: storyData.lore.map((l) => ({
+                            ...l,
+                            on:
+                              l.on_triggers && l.on_triggers.length > 0
+                                ? false
+                                : true,
+                          })),
+                          newGamePlusCount: ngPlusCount,
+                          newGamePlusMode: true,
+                        };
+
+                        await fetch(`/api/stories/${storyDbId}`, {
+                          method: "PATCH",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${session.access_token}`,
+                          },
+                          body: JSON.stringify({ storyData: ngPlusStoryData }),
+                        });
+
+                        addNotification(
+                          `New Game Plus ${ngPlusCount} activated! +${bonusPoints} points, +${bonusMomentum} max momentum`,
+                          "success"
+                        );
+                        router.push(`/story?storyId=${storyDbId}`);
+                        window.location.reload();
+                      } catch (error) {
+                        console.error("Error starting NG+:", error);
+                        addNotification(
+                          "Failed to start New Game Plus",
+                          "failure"
+                        );
+                      }
+                    },
+                  });
+                }}
+                className="px-6 py-4 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
+              >
+                <span className="text-2xl">⭐</span>
+                <div className="text-left">
+                  <div>New Game Plus</div>
+                  <div className="text-xs opacity-80">
+                    Keep achievements + bonuses
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => router.push("/library")}
+                className="px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
+              >
+                <span className="text-2xl">📚</span>
+                <div className="text-left">
+                  <div>Return to Library</div>
+                  <div className="text-xs opacity-80">
+                    View all your stories
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => router.push("/explorer")}
+                className="px-6 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
+              >
+                <span className="text-2xl">🗺️</span>
+                <div className="text-left">
+                  <div>Explore Adventures</div>
+                  <div className="text-xs opacity-80">
+                    Start a new adventure
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {storyData.newGamePlusCount && storyData.newGamePlusCount > 0 && (
+              <div className="mt-6 p-4 bg-linear-to-r from-amber-50 to-purple-50 dark:from-amber-900/20 dark:to-purple-900/20 rounded-lg border border-amber-200 dark:border-amber-800 text-center">
+                <div className="font-bold text-lg text-amber-900 dark:text-amber-200">
+                  ⭐ New Game Plus: Run #{storyData.newGamePlusCount}
+                </div>
+                <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  Completed {storyData.newGamePlusCount}{" "}
+                  {storyData.newGamePlusCount === 1
+                    ? "playthrough"
+                    : "playthroughs"}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1976,6 +2390,18 @@ function StoryPageContent() {
           />
         )}
       </main>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        icon={confirmDialog.icon}
+        confirmText={confirmDialog.confirmText}
+        confirmButtonClass={confirmDialog.confirmButtonClass}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
     </div>
   );
 }

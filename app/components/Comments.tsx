@@ -5,13 +5,17 @@ import { useAuth } from "@/app/misc/AuthContext";
 import { Comment } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 interface CommentsProps {
   adventureId: string;
   initialComments?: Comment[];
 }
 
-export default function Comments({ adventureId, initialComments = [] }: CommentsProps) {
+export default function Comments({
+  adventureId,
+  initialComments = [],
+}: CommentsProps) {
   const { user } = useAuth();
   const { addNotification } = useNotification();
   const [comments, setComments] = useState<Comment[]>(initialComments);
@@ -21,6 +25,21 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "likes">("newest");
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    icon?: string;
+    confirmText?: string;
+    cancelText?: string;
+    confirmButtonClass?: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   // Fetch comments from API
   useEffect(() => {
@@ -29,20 +48,24 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
 
   const fetchComments = async () => {
     try {
-      const response = await fetch(`/api/comments?adventureId=${adventureId}&sortBy=${sortBy}`);
+      const response = await fetch(
+        `/api/comments?adventureId=${adventureId}&sortBy=${sortBy}`
+      );
       if (response.ok) {
         const data = await response.json();
         console.log("Fetched comments:", data.comments);
-        setComments(data.comments.map((c: any) => ({
-          ...c,
-          createdAt: new Date(c.created_at),
-          updatedAt: c.updated_at ? new Date(c.updated_at) : undefined,
-          adventureId: c.adventure_id,
-          userId: c.user_id,
-          userName: c.user_name,
-          userAvatar: c.user_avatar,
-          likedBy: c.liked_by || [],
-        })));
+        setComments(
+          data.comments.map((c: any) => ({
+            ...c,
+            createdAt: new Date(c.created_at),
+            updatedAt: c.updated_at ? new Date(c.updated_at) : undefined,
+            adventureId: c.adventure_id,
+            userId: c.user_id,
+            userName: c.user_name,
+            userAvatar: c.user_avatar,
+            likedBy: c.liked_by || [],
+          }))
+        );
       }
     } catch (error) {
       console.error("Error fetching comments:", error);
@@ -53,7 +76,7 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
       addNotification("Please sign in to comment", "warning");
       return;
@@ -68,7 +91,9 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
 
     try {
       // Get auth token
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         addNotification("Please sign in to comment", "warning");
         setSubmitting(false);
@@ -78,7 +103,7 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
       // Fetch user's profile to get avatar
       const profileResponse = await fetch(`/api/profiles/${user.id}`, {
         headers: {
-          "Authorization": `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
@@ -88,13 +113,16 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
         userAvatar = profileData.avatar_url || null;
       }
 
-      const userName = user.user_metadata?.display_name || user.email?.split("@")[0] || "Anonymous";
+      const userName =
+        user.user_metadata?.display_name ||
+        user.email?.split("@")[0] ||
+        "Anonymous";
 
       const response = await fetch("/api/comments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           adventureId,
@@ -131,7 +159,7 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
       return;
     }
 
-    const comment = comments.find(c => c.id === commentId);
+    const comment = comments.find((c) => c.id === commentId);
     if (!comment) return;
 
     const hasLiked = comment.likedBy?.includes(user.id);
@@ -139,7 +167,9 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
 
     try {
       // Get auth token
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         addNotification("Please sign in to like comments", "warning");
         return;
@@ -149,7 +179,7 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ action }),
       });
@@ -166,35 +196,45 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
   };
 
   const handleDelete = async (commentId: string) => {
-    if (!confirm("Are you sure you want to delete this comment?")) {
-      return;
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Comment?",
+      message:
+        "Are you sure you want to delete this comment? This cannot be undone.",
+      icon: "🗑️",
+      confirmText: "Delete",
+      confirmButtonClass: "bg-red-600 hover:bg-red-700",
+      onConfirm: async () => {
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        try {
+          // Get auth token
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (!session) {
+            addNotification("Please sign in to delete comments", "warning");
+            return;
+          }
 
-    try {
-      // Get auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        addNotification("Please sign in to delete comments", "warning");
-        return;
-      }
+          const response = await fetch(`/api/comments/${commentId}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
 
-      const response = await fetch(`/api/comments/${commentId}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (response.ok) {
-        addNotification("Comment deleted", "success");
-        await fetchComments(); // Refresh comments
-      } else {
-        addNotification("Failed to delete comment", "failure");
-      }
-    } catch (error) {
-      console.error("Error deleting comment:", error);
-      addNotification("Failed to delete comment", "failure");
-    }
+          if (response.ok) {
+            addNotification("Comment deleted", "success");
+            await fetchComments(); // Refresh comments
+          } else {
+            addNotification("Failed to delete comment", "failure");
+          }
+        } catch (error) {
+          console.error("Error deleting comment:", error);
+          addNotification("Failed to delete comment", "failure");
+        }
+      },
+    });
   };
 
   const formatDate = (date: Date) => {
@@ -220,7 +260,9 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
         </h3>
         <select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as "newest" | "oldest" | "likes")}
+          onChange={(e) =>
+            setSortBy(e.target.value as "newest" | "oldest" | "likes")
+          }
           className="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold"
         >
           <option value="newest">Newest First</option>
@@ -231,7 +273,10 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
 
       {/* Comment Form */}
       {user ? (
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-xl border-2 border-gray-300 dark:border-gray-600 p-6 shadow-lg">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white dark:bg-gray-800 rounded-xl border-2 border-gray-300 dark:border-gray-600 p-6 shadow-lg"
+        >
           <div className="mb-4">
             <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
               Add a comment
@@ -265,7 +310,13 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
                   onMouseLeave={() => setHoveredStar(null)}
                   className="text-3xl transition-transform hover:scale-110 w-10 text-center"
                 >
-                  {(hoveredStar !== null ? star <= hoveredStar : star <= (rating || 0)) ? "⭐" : "☆"}
+                  {(
+                    hoveredStar !== null
+                      ? star <= hoveredStar
+                      : star <= (rating || 0)
+                  )
+                    ? "⭐"
+                    : "☆"}
                 </button>
               ))}
               {rating && (
@@ -327,7 +378,12 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <img
-                    src={comment.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.userName)}&background=random&size=128`}
+                    src={
+                      comment.userAvatar ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        comment.userName
+                      )}&background=random&size=128`
+                    }
                     alt={comment.userName}
                     className="w-10 h-10 rounded-full object-cover border-2 border-purple-400"
                   />
@@ -373,13 +429,26 @@ export default function Comments({ adventureId, initialComments = [] }: Comments
                       : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                   }`}
                 >
-                  {comment.likedBy?.includes(user?.id || "") ? "❤️" : "🤍"} {comment.likes}
+                  {comment.likedBy?.includes(user?.id || "") ? "❤️" : "🤍"}{" "}
+                  {comment.likes}
                 </button>
               </div>
             </div>
           ))
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        icon={confirmDialog.icon}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        confirmButtonClass={confirmDialog.confirmButtonClass}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
     </div>
   );
 }

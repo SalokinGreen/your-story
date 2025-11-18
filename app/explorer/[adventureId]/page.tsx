@@ -6,6 +6,7 @@ import { Adventure } from "@/app/misc/structs";
 import { useAuth } from "@/app/misc/AuthContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import Comments from "@/app/components/Comments";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { supabase } from "@/app/misc/supabase";
 
 export default function AdventureDetailPage() {
@@ -23,6 +24,21 @@ export default function AdventureDetailPage() {
     "stats" | "achievements" | "upgrades"
   >("stats");
   const [selectedPresetId, setSelectedPresetId] = useState<string>("custom");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    icon?: string;
+    confirmText?: string;
+    cancelText?: string;
+    confirmButtonClass?: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   const adventureId = params?.adventureId as string;
   const isAuthor = user && adventure && adventure.authorId === user.id;
@@ -118,44 +134,48 @@ export default function AdventureDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this adventure? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Adventure?",
+      message:
+        "Are you sure you want to delete this adventure? This action cannot be undone.",
+      icon: "🗑️",
+      confirmText: "Delete Adventure",
+      confirmButtonClass: "bg-red-600 hover:bg-red-700",
+      onConfirm: async () => {
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        try {
+          setDeleting(true);
 
-    try {
-      setDeleting(true);
+          // Get auth token
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (!session) {
+            throw new Error("Not authenticated");
+          }
 
-      // Get auth token
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("Not authenticated");
-      }
+          const response = await fetch(`/api/adventures/${adventureId}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
 
-      const response = await fetch(`/api/adventures/${adventureId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || "Failed to delete adventure");
+          }
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete adventure");
-      }
-
-      addNotification("Adventure deleted successfully", "success");
-      router.push("/explorer");
-    } catch (error: any) {
-      console.error("Error deleting adventure:", error);
-      addNotification(`Failed to delete: ${error.message}`, "failure");
-      setDeleting(false);
-    }
+          addNotification("Adventure deleted successfully", "success");
+          router.push("/explorer");
+        } catch (error: any) {
+          console.error("Error deleting adventure:", error);
+          addNotification(`Failed to delete: ${error.message}`, "failure");
+          setDeleting(false);
+        }
+      },
+    });
   };
 
   if (loading) {
@@ -1304,6 +1324,18 @@ export default function AdventureDetailPage() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        icon={confirmDialog.icon}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        confirmButtonClass={confirmDialog.confirmButtonClass}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
     </div>
   );
 }

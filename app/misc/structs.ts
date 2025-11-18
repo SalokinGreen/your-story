@@ -150,6 +150,8 @@ export interface StoryData {
   selected_preset?: string; // ID of the preset used
   presets?: Preset[]; // Adventure-specific character presets
   upgradeSettings?: UpgradeSettings; // Customizable upgrade system
+  newGamePlusCount?: number; // Number of NG+ runs completed
+  newGamePlusMode?: boolean; // Whether current run is NG+
 }
 
 // Upgrade system configuration

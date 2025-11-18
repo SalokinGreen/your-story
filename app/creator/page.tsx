@@ -20,6 +20,7 @@ import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
 import { compressImage } from "@/app/misc/imageCompression";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
   DEFAULT_PRESET,
   getPresetById,
@@ -91,6 +92,21 @@ function AdventureCreatorContent() {
   const [bannerUrl, setBannerUrl] = useState("");
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    icon?: string;
+    confirmText?: string;
+    cancelText?: string;
+    confirmButtonClass?: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   // Load adventure data if editing
   useEffect(() => {
@@ -1917,15 +1933,27 @@ function AdventureCreatorContent() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm(`Delete "${preset.name}" preset?`)) {
-                              setPresets(
-                                presets.filter((p) => p.id !== preset.id)
-                              );
-                              if (selectedPreset === preset.id) {
-                                setSelectedPreset("custom");
-                              }
-                              addNotification("Preset deleted", "success");
-                            }
+                            setConfirmDialog({
+                              isOpen: true,
+                              title: "Delete Preset?",
+                              message: `Delete "${preset.name}" preset? This cannot be undone.`,
+                              icon: "🗑️",
+                              confirmText: "Delete",
+                              confirmButtonClass: "bg-red-600 hover:bg-red-700",
+                              onConfirm: () => {
+                                setConfirmDialog({
+                                  ...confirmDialog,
+                                  isOpen: false,
+                                });
+                                setPresets(
+                                  presets.filter((p) => p.id !== preset.id)
+                                );
+                                if (selectedPreset === preset.id) {
+                                  setSelectedPreset("custom");
+                                }
+                                addNotification("Preset deleted", "success");
+                              },
+                            });
                           }}
                           className="flex-1 px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold rounded transition-colors"
                         >
@@ -4978,10 +5006,25 @@ function AdventureCreatorContent() {
                           </button>
                           <button
                             onClick={() => {
-                              if (confirm(`Remove quest "${quest.title}"?`)) {
-                                setQuests(quests.filter((_, i) => i !== index));
-                                addNotification("Quest removed", "success");
-                              }
+                              setConfirmDialog({
+                                isOpen: true,
+                                title: "Remove Quest?",
+                                message: `Remove quest "${quest.title}"? This cannot be undone.`,
+                                icon: "🗑️",
+                                confirmText: "Remove",
+                                confirmButtonClass:
+                                  "bg-red-600 hover:bg-red-700",
+                                onConfirm: () => {
+                                  setConfirmDialog({
+                                    ...confirmDialog,
+                                    isOpen: false,
+                                  });
+                                  setQuests(
+                                    quests.filter((_, i) => i !== index)
+                                  );
+                                  addNotification("Quest removed", "success");
+                                },
+                              });
                             }}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
                           >
@@ -6021,6 +6064,18 @@ function AdventureCreatorContent() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        icon={confirmDialog.icon}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        confirmButtonClass={confirmDialog.confirmButtonClass}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
     </div>
   );
 }
