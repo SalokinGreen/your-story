@@ -62,8 +62,8 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
-  Zeus: {
-    name: "Zeus",
+  Poseidon: {
+    name: "Poseidon",
     original_model: "GLM 4.6",
     model: "z-ai/glm-4.6",
     maxTokens: 200000,
@@ -77,8 +77,8 @@ export const AI_MODELS = {
       "A robust model designed for handling extensive context and delivering powerful performance, making it suitable for complex storytelling and detailed narratives.",
     bannerUrl: undefined,
   },
-  Athena: {
-    name: "Athena",
+  Apollo: {
+    name: "Apollo",
     original_model: "GPT-4o Mini 100K",
     model: "gpt-4o-mini",
     maxTokens: 100000,
@@ -90,6 +90,66 @@ export const AI_MODELS = {
     weaknesses: ["creativity"],
     description:
       "A highly intelligent model that excels in understanding and generating coherent content, ideal for users prioritizing smarts and affordability.",
+    bannerUrl: undefined,
+  },
+  Chronos: {
+    name: "Chronos",
+    original_model: "Qwen3 235B A22B Instruct 2507",
+    model: "qwen/qwen3-235b-a22b-2507",
+    maxTokens: 200000,
+    maxOutputTokens: 2000,
+    provider: "openrouter",
+    cost: 5,
+    finetunes: [],
+    strengths: ["long context", "powerful"],
+    weaknesses: ["price", "nsfw"],
+    description:
+      "A powerful model capable of handling long contexts, making it suitable for detailed and complex storytelling tasks.",
+    bannerUrl: undefined,
+  },
+  Thalia: {
+    name: "Thalia",
+    original_model: "mistral-nemo",
+    model: "mistralai/mistral-nemo",
+    maxTokens: 128000,
+    maxOutputTokens: 2000,
+    provider: "openrouter",
+    cost: 1,
+    finetunes: [],
+    strengths: ["cost-effective"],
+    weaknesses: ["creativity", "smarts"],
+    description:
+      "A cost-effective model that balances performance and affordability, ideal for users seeking value without compromising too much on quality.",
+    bannerUrl: undefined,
+  },
+  Athena: {
+    name: "Athena",
+    original_model: "gpt-oss-120b",
+    model: "openai/gpt-oss-120b",
+    maxTokens: 131000,
+    maxOutputTokens: 2000,
+    provider: "openrouter",
+    cost: 4,
+    finetunes: [],
+    strengths: ["powerful", "nsfw"],
+    weaknesses: ["price"],
+    description:
+      "A powerful open-source model with 120 billion parameters, suitable for tasks requiring high computational power and detailed content generation.",
+    bannerUrl: undefined,
+  },
+  Zeus: {
+    name: "Zeus",
+    original_model: "Gemini 2.5 Pro",
+    model: "google/gemini-2.5-pro",
+    maxTokens: 200000,
+    maxOutputTokens: 2000,
+    provider: "openrouter",
+    cost: 25,
+    finetunes: [],
+    strengths: ["long context", "powerful", "creativity"],
+    weaknesses: ["price"],
+    description:
+      "The premium model in the lineup, offering unparalleled performance, creativity, and the ability to handle extensive contexts, making it ideal for the most demanding storytelling tasks.",
     bannerUrl: undefined,
   },
 } as const;

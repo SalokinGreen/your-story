@@ -19,6 +19,76 @@ import CustomVoiceManager from "../components/CustomVoiceManager";
 import { AI_MODELS } from "../misc/ai_prices";
 import ConfirmDialog from "../components/ConfirmDialog";
 
+// AI Model Selector Component with state management
+function AIModelSelector({ addNotification }: { addNotification: (message: string, type: "success" | "failure" | "warning") => void }) {
+  const [currentModelKey, setCurrentModelKey] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("aiModel") || "Prometheus";
+    }
+    return "Prometheus";
+  });
+
+  const currentModel = AI_MODELS[currentModelKey as keyof typeof AI_MODELS] || AI_MODELS.Prometheus;
+
+  const handleModelChange = (newModelKey: string) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aiModel", newModelKey);
+      setCurrentModelKey(newModelKey);
+      const newModel = AI_MODELS[newModelKey as keyof typeof AI_MODELS];
+      addNotification(
+        `🤖 Model changed to ${newModel.name}`,
+        "success"
+      );
+    }
+  };
+
+  return (
+    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
+      <label className="block p-4 pb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
+        🤖 AI Model Selection
+      </label>
+      
+      <div className="px-4 pb-4">
+        {/* Current Model Banner */}
+        <div className="bg-linear-to-r from-purple-600 to-blue-600 rounded-lg p-4 text-white mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <div className="text-xl font-bold">{currentModel.name}</div>
+              <div className="text-sm text-purple-100">{currentModel.original_model}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold">{currentModel.cost}</div>
+              <div className="text-xs text-purple-100">coins/gen</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-sm">
+            <div>
+              <span className="text-purple-100">Context:</span>{" "}
+              <span className="font-semibold">{(currentModel.maxTokens / 1000).toFixed(0)}K tokens</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Model Selection Dropdown */}
+        <select
+          value={currentModelKey}
+          onChange={(e) => handleModelChange(e.target.value)}
+          className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+        >
+          {Object.entries(AI_MODELS).map(([key, config]) => (
+            <option key={key} value={key}>
+              {config.name} - {config.original_model} ({config.cost} coin{config.cost > 1 ? "s" : ""}, {(config.maxTokens / 1000).toFixed(0)}K context)
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+          Select the AI model used for story generation. Different models have unique strengths and context sizes.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // Basic Settings Component
 interface BasicSettingsForm {
   story_name: string;
@@ -3399,43 +3469,8 @@ export default function MenuPage({
                   </h4>
 
                   <div className="space-y-4">
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                        🤖 AI Model Selection
-                      </label>
-                      <select
-                        value={
-                          typeof window !== "undefined"
-                            ? localStorage.getItem("aiModel") ||
-                              "deep-seek/deepseek-chat-120"
-                            : "deep-seek/deepseek-chat-120"
-                        }
-                        onChange={(e) => {
-                          if (typeof window !== "undefined") {
-                            localStorage.setItem("aiModel", e.target.value);
-                            addNotification(
-                              `🤖 Model changed to ${
-                                e.target.options[e.target.selectedIndex].text
-                              }`,
-                              "success"
-                            );
-                          }
-                        }}
-                        className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      >
-                        {Object.entries(AI_MODELS).map(([key, config]) => (
-                          <option key={key} value={key}>
-                            {config.name} ({config.cost} coin
-                            {config.cost > 1 ? "s" : ""})
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                        Select the AI model used for story generation. Different
-                        models may have different writing styles and response
-                        times.
-                      </p>
-                    </div>
+                    {/* AI Model Selection with Enhanced Details */}
+                    <AIModelSelector addNotification={addNotification} />
 
                     <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
                       <input

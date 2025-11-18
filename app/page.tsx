@@ -271,7 +271,8 @@ export default function Home() {
             🤖 AI Models
           </h2>
           <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-            Choose from our curated selection of AI models, each with unique strengths and characteristics for your storytelling needs.
+            Choose from our curated selection of AI models, each with unique
+            strengths and characteristics for your storytelling needs.
           </p>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -283,7 +284,9 @@ export default function Home() {
                 {/* Model Header */}
                 <div className="bg-linear-to-r from-purple-600 to-blue-600 p-4 text-white">
                   <h3 className="text-2xl font-bold mb-1">{model.name}</h3>
-                  <p className="text-sm text-purple-100">{model.original_model}</p>
+                  <p className="text-sm text-purple-100">
+                    {model.original_model}
+                  </p>
                 </div>
 
                 {/* Model Details */}
@@ -354,12 +357,15 @@ export default function Home() {
           {/* Info Note */}
           <div className="mt-8 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
             <p className="text-sm text-purple-900 dark:text-purple-200 text-center">
-              💡 <strong>Pro Tip:</strong> You can select your preferred AI model in the story menu during gameplay. Each model offers unique storytelling characteristics!
+              💡 <strong>Pro Tip:</strong> You can select your preferred AI
+              model in the story menu during gameplay. Each model offers unique
+              storytelling characteristics!
             </p>
           </div>
           <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <p className="text-sm text-blue-900 dark:text-blue-200 text-center">
-              🎙️ <strong>Text-to-Speech:</strong> Each TTS generation costs 3 coins and runs through Speechify for high-quality voice narration.
+              🎙️ <strong>Text-to-Speech:</strong> Each TTS generation costs 3
+              coins and runs through Speechify for high-quality voice narration.
             </p>
           </div>
         </div>
