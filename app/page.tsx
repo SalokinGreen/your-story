@@ -7,6 +7,7 @@ import { useAuth } from "./misc/AuthContext";
 import AuthForm from "./components/AuthForm";
 import UserProfile from "./components/UserProfile";
 import { Adventure } from "./misc/structs";
+import { AI_MODELS, AIModelKey } from "./misc/ai_prices";
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -261,6 +262,105 @@ export default function Home() {
             >
               Browse All Adventures →
             </button>
+          </div>
+        </div>
+
+        {/* AI Models Overview Section */}
+        <div className="w-full max-w-5xl mb-12">
+          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
+            🤖 AI Models
+          </h2>
+          <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
+            Choose from our curated selection of AI models, each with unique strengths and characteristics for your storytelling needs.
+          </p>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Object.entries(AI_MODELS).map(([key, model]) => (
+              <div
+                key={key}
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:scale-105 transition-transform"
+              >
+                {/* Model Header */}
+                <div className="bg-linear-to-r from-purple-600 to-blue-600 p-4 text-white">
+                  <h3 className="text-2xl font-bold mb-1">{model.name}</h3>
+                  <p className="text-sm text-purple-100">{model.original_model}</p>
+                </div>
+
+                {/* Model Details */}
+                <div className="p-6 space-y-4">
+                  {/* Description */}
+                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                    {model.description}
+                  </p>
+
+                  {/* Stats */}
+                  <div className="flex justify-between items-center text-sm">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                        {model.cost}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        Coins/Gen
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {(model.maxTokens / 1000).toFixed(0)}K
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        Max Tokens
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Strengths */}
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase">
+                      Strengths
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {model.strengths.map((strength, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-semibold"
+                        >
+                          ✓ {strength}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Weaknesses */}
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase">
+                      Weaknesses
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {model.weaknesses.map((weakness, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-semibold"
+                        >
+                          ⚠ {weakness}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Info Note */}
+          <div className="mt-8 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+            <p className="text-sm text-purple-900 dark:text-purple-200 text-center">
+              💡 <strong>Pro Tip:</strong> You can select your preferred AI model in the story menu during gameplay. Each model offers unique storytelling characteristics!
+            </p>
+          </div>
+          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm text-blue-900 dark:text-blue-200 text-center">
+              🎙️ <strong>Text-to-Speech:</strong> Each TTS generation costs 3 coins and runs through Speechify for high-quality voice narration.
+            </p>
           </div>
         </div>
 
