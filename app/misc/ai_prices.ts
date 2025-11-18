@@ -79,7 +79,7 @@ export const AI_MODELS = {
   },
   Apollo: {
     name: "Apollo",
-    original_model: "GPT-4o Mini 100K",
+    original_model: "GPT-4o Mini",
     model: "gpt-4o-mini",
     maxTokens: 100000,
     maxOutputTokens: 2000,
