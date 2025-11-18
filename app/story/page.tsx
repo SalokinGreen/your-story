@@ -20,6 +20,25 @@ import { useAuth } from "../misc/AuthContext";
 import { supabase } from "../misc/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
 import { DEFAULT_PRESET } from "../misc/presets";
+
+// Cryptographically secure random number generator
+// Returns a random integer between min (inclusive) and max (inclusive)
+function getSecureRandomInt(min: number, max: number): number {
+  const range = max - min + 1;
+  const bytesNeeded = Math.ceil(Math.log2(range) / 8);
+  const maxValue = Math.pow(256, bytesNeeded);
+  const randomValues = new Uint8Array(bytesNeeded);
+  
+  // Rejection sampling to avoid modulo bias
+  let randomNumber;
+  do {
+    crypto.getRandomValues(randomValues);
+    randomNumber = randomValues.reduce((acc, val, i) => acc + val * Math.pow(256, i), 0);
+  } while (randomNumber >= maxValue - (maxValue % range));
+  
+  return min + (randomNumber % range);
+}
+
 enum StoryState {
   STORY = "STORY",
   STATS = "STATS",
@@ -928,7 +947,7 @@ function StoryPageContent() {
       );
     }
 
-    let dice_roll = Math.floor(Math.random() * 100) + 1;
+    let dice_roll = getSecureRandomInt(1, 100);
 
     // Build detailed RPG-style choice text with brackets
     let choiceDetails: string[] = [];
@@ -964,7 +983,7 @@ function StoryPageContent() {
             `Used item: ${choice.item_used} (Advantage!)`,
             "info"
           );
-          const second_roll = Math.floor(Math.random() * 100) + 1;
+          const second_roll = getSecureRandomInt(1, 100);
           if (second_roll < dice_roll) {
             dice_roll = second_roll;
           }
@@ -972,8 +991,8 @@ function StoryPageContent() {
 
         if (momentumMode === "reroll") {
           // Reroll: roll two more times and take the best
-          const reroll1 = Math.floor(Math.random() * 100) + 1;
-          const reroll2 = Math.floor(Math.random() * 100) + 1;
+          const reroll1 = getSecureRandomInt(1, 100);
+          const reroll2 = getSecureRandomInt(1, 100);
           dice_roll = Math.min(dice_roll, reroll1, reroll2);
           addNotification(
             `🎲 Reroll used! Best of 3 rolls: ${dice_roll}`,
@@ -1007,14 +1026,14 @@ function StoryPageContent() {
           `Missing item: ${choice.item_used} (Disadvantage!)`,
           "warning"
         );
-        const second_roll = Math.floor(Math.random() * 100) + 1;
+        const second_roll = getSecureRandomInt(1, 100);
         if (second_roll > dice_roll) {
           dice_roll = second_roll;
         }
         if (momentumMode === "reroll") {
           // Reroll still helps with disadvantage
-          const reroll1 = Math.floor(Math.random() * 100) + 1;
-          const reroll2 = Math.floor(Math.random() * 100) + 1;
+          const reroll1 = getSecureRandomInt(1, 100);
+          const reroll2 = getSecureRandomInt(1, 100);
           dice_roll = Math.min(dice_roll, reroll1, reroll2);
           addNotification(
             `🎲 Reroll used! Best of 3 rolls: ${dice_roll}`,
@@ -1024,7 +1043,7 @@ function StoryPageContent() {
       }
     } else if (momentumMode === "reroll") {
       // No item - just reroll
-      const reroll = Math.floor(Math.random() * 100) + 1;
+      const reroll = getSecureRandomInt(1, 100);
       if (reroll < dice_roll) {
         dice_roll = reroll;
       }

@@ -117,8 +117,8 @@ Plot Beat Guidelines:
 - After marking a beat complete, the next beat becomes current. Reference it to smoothly transition the narrative forward.
 
 Progression System:
-- Players earn upgrade points from story progression: ${UPGRADE_COSTS.BEAT_REWARD} points per completed story beat, ${UPGRADE_COSTS.CHAPTER_REWARD} points per completed chapter.
-- Points are automatically awarded when you use /mark_beat or end a chapter with "!!! END CHAPTER !!!".
+- Players earn upgrade points from story progression: ${UPGRADE_COSTS.BEAT_REWARD} points per completed story beat.
+- Points are automatically awarded when you use /mark_beat.
 - Players spend points in the Upgrades shop to increase stats, expand resource maximums, or add custom items.
 - Balance story progression rewards - complete meaningful beats with /mark_beat to grant points for character growth.`;
 
