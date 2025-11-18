@@ -3425,7 +3425,7 @@ export default function MenuPage({
                       >
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
-                            {config.name} ({config.cost} coins
+                            {config.name} ({config.cost} coin
                             {config.cost > 1 ? "s" : ""})
                           </option>
                         ))}
