@@ -4285,8 +4285,8 @@ function AdventureCreatorContent() {
                           {achievement.points} points
                         </div>
                       </div>
-                      <div className="flex flex-col items-center  gap-2 ml-3">
-                        <div className="flex flex-row items-center gap-1 ml-3">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-row items-center gap-1">
                           <button
                             onClick={() => moveAchievementUp(index)}
                             disabled={index === 0}
@@ -4295,8 +4295,6 @@ function AdventureCreatorContent() {
                           >
                             ▲
                           </button>
-                        </div>
-                        <div className="flex flex-row items-center gap-1 ml-3">
                           <button
                             onClick={() => moveAchievementDown(index)}
                             disabled={index === achievements.length - 1}
@@ -4305,6 +4303,8 @@ function AdventureCreatorContent() {
                           >
                             ▼
                           </button>
+                        </div>
+                        <div className="flex flex-row items-center gap-1">
                           <button
                             onClick={() => startEditAchievement(index)}
                             className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"

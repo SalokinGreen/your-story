@@ -33,6 +33,10 @@ Create a `.env.local` file in the project root:
 DEEPSEEK_API_KEY=your_deepseek_api_key_here
 DEEPSEEK_MODEL=deepseek-chat
 
+# OR OpenRouter (Optional)
+OPENROUTER_API_KEY=your_openrouter_key
+DEFAULT_AI_MODEL=anthropic/claude-3-sonnet
+
 # Supabase (Server-side)
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_KEY=your_supabase_anon_key

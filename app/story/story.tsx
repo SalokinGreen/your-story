@@ -130,7 +130,7 @@ export default function Story({
         </div>
 
         {/* Momentum Display and Controls */}
-        <div className="flex sm:flex-col xl:flex-row l:flex-row m:flex-row gap-4 items-center justify-between w-full pt-4 border-t border-gray-200 dark:border-gray-700 mt-4 overflow-hidden">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between w-full pt-4 border-t border-gray-200 dark:border-gray-700 mt-4 overflow-hidden">
           <div className="flex items-center gap-2">
             <span className="text-2xl">⚡</span>
             <div className="flex flex-col">

@@ -45,7 +45,15 @@ This app now includes a minimal server route that calls DeepSeek's Chat Completi
 	- `userChoice` (string, optional) — the player's selected choice text
 - Response body:
 	- `part` (ScenePart) — assistant-generated continuation
-	- `meta` — model/usage info from DeepSeek
+	- `meta` — model/usage info from DeepSeek/OpenRouter
+
+### Token System
+
+The app uses a token-based economy for AI generations:
+- Each story continuation costs **1 token**.
+- Tokens are tracked in the database (`tokens` and `token_ownerships` tables).
+- Tokens become **tradable** 1 month after minting (see `docs/token_database.md`).
+- The system automatically burns the newest (locked) tokens first when generating content.
 
 Folders and Library endpoints:
 - `GET/POST /api/folders` — list and create folders (auth required)
@@ -58,6 +66,11 @@ Environment variables (create a `.env.local`):
 DEEPSEEK_API_KEY=your_api_key_here
 # Optional, defaults to deepseek-chat
 DEEPSEEK_MODEL=deepseek-chat
+
+# OpenRouter (Optional - overrides DeepSeek if configured)
+OPENROUTER_API_KEY=your_openrouter_key
+# DEFAULT_AI_MODEL can be used to specify a model for OpenRouter
+DEFAULT_AI_MODEL=anthropic/claude-3-sonnet
 
 # Supabase
 SUPABASE_URL=your_supabase_project_url

@@ -133,7 +133,14 @@ Content-Type: application/json
 {
   storyData: StoryData;      // Current game state
   userChoice?: string;       // Optional: player's choice text
+  model?: string;            // Optional: specific model to use (e.g., "anthropic/claude-3-sonnet")
+  useRawContext?: boolean;   // Optional: use raw AI output in context (default: false)
 }
+```
+
+**Notes:**
+- `model`: If provided, overrides the default model. Useful for testing different models via OpenRouter.
+- `useRawContext`: If true, the history context sent to the AI will use the raw, unparsed output from previous turns. This preserves XML tags and hidden reasoning, potentially improving continuity.
 ```
 
 **StoryData Structure:**
