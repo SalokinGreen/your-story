@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  ReactNode,
+} from "react";
 
 export type NotificationType = "success" | "failure" | "info" | "warning";
 
@@ -13,25 +20,31 @@ export interface Notification {
 
 interface NotificationContextType {
   notifications: Notification[];
-  addNotification: (message: string, type: NotificationType, duration?: number) => void;
+  addNotification: (
+    message: string,
+    type: NotificationType,
+    duration?: number
+  ) => void;
   removeNotification: (id: string) => void;
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+const NotificationContext = createContext<NotificationContextType | undefined>(
+  undefined
+);
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [queue, setQueue] = useState<Omit<Notification, 'id'>[]>([]);
+  const [queue, setQueue] = useState<Omit<Notification, "id">[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const processQueue = useCallback(() => {
     if (isProcessing || queue.length === 0) return;
-    
+
     setIsProcessing(true);
     const nextNotification = queue[0];
     const id = Math.random().toString(36).substring(2, 9);
     const notification: Notification = { id, ...nextNotification };
-    
+
     setNotifications((prev) => [...prev, notification]);
     setQueue((prev) => prev.slice(1));
 
@@ -54,16 +67,21 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [queue, isProcessing, processQueue]);
 
-  const addNotification = useCallback((message: string, type: NotificationType, duration = 4000) => {
-    setQueue((prev) => [...prev, { message, type, duration }]);
-  }, []);
+  const addNotification = useCallback(
+    (message: string, type: NotificationType, duration = 4000) => {
+      setQueue((prev) => [...prev, { message, type, duration }]);
+    },
+    []
+  );
 
   const removeNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
   return (
-    <NotificationContext.Provider value={{ notifications, addNotification, removeNotification }}>
+    <NotificationContext.Provider
+      value={{ notifications, addNotification, removeNotification }}
+    >
       {children}
     </NotificationContext.Provider>
   );

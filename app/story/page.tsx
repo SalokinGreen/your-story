@@ -518,7 +518,7 @@ function StoryPageContent() {
     onConfirm: () => {},
   });
   const memory_cap = 20000; // Max memory size in characters
-  
+
   // Fetch token balance on mount
   useEffect(() => {
     async function fetchBalance() {
@@ -538,7 +538,7 @@ function StoryPageContent() {
     }
     fetchBalance();
   }, []);
-  
+
   // Load story from database on mount
   useEffect(() => {
     if (!storyId) {
