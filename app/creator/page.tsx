@@ -28,7 +28,10 @@ import {
   applyPreset,
 } from "@/app/misc/presets";
 import CreatorAIChat from "@/app/components/CreatorAIChat";
-
+import {
+  saveLocalAdventure,
+  getLocalAdventure,
+} from "@/app/misc/localAdventureManager";
 type CreatorStep =
   | "basic"
   | "preset"
@@ -1375,6 +1378,99 @@ function AdventureCreatorContent() {
 
   const removeAchievement = (index: number) => {
     setAchievements(achievements.filter((_, i) => i !== index));
+  };
+
+  const handleSaveLocally = () => {
+    // Validation
+    if (!title.trim()) {
+      addNotification("Please enter a title", "warning");
+      setCurrentStep("basic");
+      return;
+    }
+    if (!premise.trim() || !startingContent.trim()) {
+      addNotification("Please fill in the story setup", "warning");
+      setCurrentStep("premise");
+      return;
+    }
+
+    // Build the story data
+    const storyData: Partial<StoryData> = {
+      story_name: title,
+      premise,
+      player_name: playerName || "Hero",
+      player_summary: playerSummary || "An adventurer",
+      starting_content: startingContent,
+      plot_beats: plotBeats,
+      memory: [],
+      max_chapters: maxChapters,
+      currentChapter: 0,
+      chapters: [],
+      scene: { parts: [] },
+      stats,
+      resources,
+      inventory,
+      achievements,
+      lore,
+      quests,
+      earnedPointsFromQuests: [],
+      momentum,
+      maxMomentum,
+      points,
+      earnedPointsFromBeats: [],
+      earnedPointsFromChapters: [],
+      author_notes: authorNotes,
+      selected_preset: selectedPreset,
+      presets: presets,
+      upgradeSettings: upgradeSettings,
+    };
+
+    // Save complete adventure template to localStorage
+    try {
+      const adventureTemplate = {
+        title,
+        shortDescription,
+        description,
+        thumbnailUrl: thumbnailUrl || null,
+        bannerUrl: bannerUrl || null,
+        tags,
+        difficulty: difficulty.toLowerCase(),
+        visibility: visibility.toLowerCase(),
+        estimatedDuration: "1-2 hours",
+        storyTemplate: storyData,
+        selectedPreset: selectedPreset,
+        presets: presets,
+        savedAt: Date.now(),
+      };
+
+      const localKey = `your-story:local-adventure:${Date.now()}`;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          localKey,
+          JSON.stringify(adventureTemplate)
+        );
+      }
+
+      addNotification(
+        "✨ Adventure saved locally! You can import it later.",
+        "success"
+      );
+
+      // Optionally download as JSON file
+      const blob = new Blob([JSON.stringify(adventureTemplate, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${title.toLowerCase().replace(/\s+/g, "-")}-adventure.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error("Error saving locally:", error);
+      addNotification(`Failed to save locally: ${error.message}`, "failure");
+    }
   };
 
   const handleDiscardChanges = () => {
@@ -6198,13 +6294,22 @@ function AdventureCreatorContent() {
           </div>
 
           {currentStep === "preview" ? (
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-6 py-2 bg-linear-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold rounded-lg transition-all shadow-md hover:shadow-lg"
-            >
-              {saving ? "Publishing..." : "🚀 Publish Adventure"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveLocally}
+                disabled={saving}
+                className="px-6 py-2 bg-white dark:bg-gray-700 border-2 border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 font-bold rounded-lg transition-all shadow-md hover:shadow-lg"
+              >
+                💾 Save Locally
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-6 py-2 bg-linear-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold rounded-lg transition-all shadow-md hover:shadow-lg"
+              >
+                {saving ? "Publishing..." : "🚀 Publish Adventure"}
+              </button>
+            </div>
           ) : (
             <button
               onClick={() => {

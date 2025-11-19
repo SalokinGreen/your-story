@@ -7,8 +7,6 @@ import { useNotification } from "@/app/misc/NotificationContext";
 interface ProfileData {
   avatar_url?: string;
   bio?: string;
-  location?: string;
-  website?: string;
 }
 
 interface EditProfileProps {
@@ -24,8 +22,6 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
   const [uploading, setUploading] = useState(false);
   
   const [bio, setBio] = useState(currentProfile.bio || "");
-  const [location, setLocation] = useState(currentProfile.location || "");
-  const [website, setWebsite] = useState(currentProfile.website || "");
   const [avatarUrl, setAvatarUrl] = useState(currentProfile.avatar_url || "");
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,8 +111,6 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
         body: JSON.stringify({
           avatar_url: avatarUrl || null,
           bio: bio.trim() || null,
-          location: location.trim() || null,
-          website: website.trim() || null,
         }),
       });
 
@@ -141,8 +135,6 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
 
   const handleCancel = () => {
     setBio(currentProfile.bio || "");
-    setLocation(currentProfile.location || "");
-    setWebsite(currentProfile.website || "");
     setAvatarUrl(currentProfile.avatar_url || "");
     setIsEditing(false);
   };
@@ -204,39 +196,6 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
           <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
             {bio.length}/500 characters
           </p>
-        </div>
-
-        {/* Location */}
-        <div>
-          <label htmlFor="location" className="block font-semibold mb-2">
-            Location
-          </label>
-          <input
-            id="location"
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="City, Country"
-            maxLength={100}
-            className="w-full border-2 border-blue-600 dark:border-blue-400 p-2 bg-white dark:bg-black"
-            disabled={loading}
-          />
-        </div>
-
-        {/* Website */}
-        <div>
-          <label htmlFor="website" className="block font-semibold mb-2">
-            Website
-          </label>
-          <input
-            id="website"
-            type="url"
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-            placeholder="https://example.com"
-            className="w-full border-2 border-blue-600 dark:border-blue-400 p-2 bg-white dark:bg-black"
-            disabled={loading}
-          />
         </div>
 
         {/* Buttons */}

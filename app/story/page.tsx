@@ -559,6 +559,43 @@ function StoryPageContent() {
 
     async function loadStory() {
       try {
+        // Check if this is a local story
+        if (storyId?.startsWith("local_")) {
+          const { getLocalStory } = await import("@/app/misc/localStoryManager");
+          const localStory = await getLocalStory(storyId);
+          
+          if (!localStory) {
+            throw new Error("Local story not found");
+          }
+
+          console.log("Local story loaded:", localStory);
+          setStoryDbId(localStory.id);
+          setStoryData(localStory.storyData);
+
+          // Initialize story if no parts yet - show preset selection
+          if (localStory.storyData.scene.parts.length === 0) {
+            setShowPresetSelection(true);
+            setLoadingStory(false);
+            return;
+          }
+
+          // Set up UI state from loaded story
+          const lastPart =
+            localStory.storyData.scene.parts[localStory.storyData.scene.parts.length - 1];
+          setStoryText(lastPart.content);
+          setChoices({ choices: lastPart.choices || [] });
+
+          const inputs =
+            lastPart.choices?.reduce(
+              (acc, choice) => ({ ...acc, [choice.text]: false }),
+              {} as Record<string, boolean>
+            ) || {};
+          setInput(inputs);
+          setStarted(true);
+          setLoadingStory(false);
+          return;
+        }
+
         // Get auth token
         const {
           data: { session },
@@ -702,27 +739,33 @@ function StoryPageContent() {
     // Update story in database with preset applied
     if (storyDbId) {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const headers: HeadersInit = {
-          "Content-Type": "application/json",
-        };
-        if (session?.access_token) {
-          headers["Authorization"] = `Bearer ${session.access_token}`;
-        }
+        if (storyDbId.startsWith("local_")) {
+          const { saveLocalStory } = await import("@/app/misc/localStoryManager");
+          updatedStoryData.selected_preset = preset.id;
+          await saveLocalStory(storyDbId, updatedStoryData);
+        } else {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          const headers: HeadersInit = {
+            "Content-Type": "application/json",
+          };
+          if (session?.access_token) {
+            headers["Authorization"] = `Bearer ${session.access_token}`;
+          }
 
-        const response = await fetch(`/api/stories/${storyDbId}`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify({
-            storyData: updatedStoryData,
-            selectedPreset: preset.id,
-          }),
-        });
+          const response = await fetch(`/api/stories/${storyDbId}`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({
+              storyData: updatedStoryData,
+              selectedPreset: preset.id,
+            }),
+          });
 
-        if (!response.ok) {
-          console.error("Failed to save preset selection");
+          if (!response.ok) {
+            console.error("Failed to save preset selection");
+          }
         }
       } catch (error) {
         console.error("Error saving preset:", error);
@@ -753,6 +796,16 @@ function StoryPageContent() {
     // Debounce: only save after 3 seconds of no activity
     saveTimeoutRef.current = setTimeout(async () => {
       try {
+        // Handle local story saving
+        if (storyDbId.startsWith("local_")) {
+          const { saveLocalStory } = await import("@/app/misc/localStoryManager");
+          // Trim scene history before saving to reduce data size
+          const trimmedData = trimStoryData(updatedStoryData);
+          await saveLocalStory(storyDbId, trimmedData);
+          console.log("Local story saved");
+          return;
+        }
+
         const {
           data: { session },
         } = await supabase.auth.getSession();

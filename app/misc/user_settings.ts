@@ -4,6 +4,7 @@ export interface UserSettings {
   user_id: string;
   byok_enabled: boolean;
   is_subscriber: boolean;
+  save_stories_locally?: boolean;
   custom_model_config?: {
     modelId?: string;
     name?: string;
@@ -22,15 +23,26 @@ export async function getUserSettings(
     .from("user_settings")
     .select("*")
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
-    // If error is PGRST116 (no rows), return null or default
-    if (error.code === "PGRST116") {
-      return null;
-    }
     console.error("Error fetching user settings:", error);
     return null;
+  }
+
+  if (!data) {
+    // Create new settings if not found
+    const { data: newData, error: insertError } = await supabase
+      .from("user_settings")
+      .insert([{ user_id: userId }])
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("Error creating user settings:", insertError);
+      return null;
+    }
+    return newData as UserSettings;
   }
 
   return data as UserSettings;

@@ -104,14 +104,14 @@ export async function PATCH(
     );
   }
 
-  let body: { avatar_url?: string; bio?: string; location?: string; website?: string };
+  let body: { avatar_url?: string; bio?: string };
   try {
     body = await req.json();
   } catch (e) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { avatar_url, bio, location, website } = body;
+  const { avatar_url, bio } = body;
 
   if (bio && bio.length > 500) {
     return NextResponse.json({ error: "Bio must be 500 characters or less" }, { status: 400 });
@@ -124,8 +124,6 @@ export async function PATCH(
         id: userId,
         avatar_url,
         bio,
-        location,
-        website,
         updated_at: new Date().toISOString()
       })
       .select()

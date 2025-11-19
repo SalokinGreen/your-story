@@ -11,7 +11,9 @@ import GiftTokenForm from "@/app/components/GiftTokenForm";
 import AdminControls from "@/app/components/AdminControls";
 import EditDisplayName from "@/app/components/EditDisplayName";
 import EditProfile from "@/app/components/EditProfile";
+import UserOptions from "@/app/components/UserOptions";
 import { Adventure, Story } from "@/app/misc/structs";
+import LocalStoryList from "@/app/components/LocalStoryList";
 
 interface ProfileUser {
   id: string;
@@ -24,8 +26,6 @@ interface ProfileUser {
 interface ProfileData {
   avatar_url?: string;
   bio?: string;
-  location?: string;
-  website?: string;
 }
 
 export default function ProfilePage() {
@@ -38,10 +38,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [userIsAdmin, setUserIsAdmin] = useState(false);
   const [adventures, setAdventures] = useState<Adventure[]>([]);
-  const [publicStories, setPublicStories] = useState<Story[]>([]);
   const [loadingAdventures, setLoadingAdventures] = useState(true);
-  const [loadingStories, setLoadingStories] = useState(true);
-  const [activeTab, setActiveTab] = useState<"adventures" | "stories">("adventures");
 
   const userId = params?.userId as string;
   const isOwnProfile = currentUser?.id === userId;
@@ -56,7 +53,6 @@ export default function ProfilePage() {
 
     loadProfile();
     loadAdventures();
-    loadPublicStories();
   }, [userId, currentUser, authLoading]);
 
   const loadProfile = async () => {
@@ -109,21 +105,28 @@ export default function ProfilePage() {
       }
 
       // Fetch token balance via API (uses service role for accuracy)
-      const balanceResponse = await fetch(`/api/tokens/balance?userId=${userId}`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-      
+      const balanceResponse = await fetch(
+        `/api/tokens/balance?userId=${userId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
       console.log("Balance API response status:", balanceResponse.status);
-      
+
       if (balanceResponse.ok) {
         const { balance: tokenBalance } = await balanceResponse.json();
         console.log("Balance fetched from API:", tokenBalance);
         setBalance(tokenBalance);
       } else {
         const errorText = await balanceResponse.text();
-        console.error("Failed to fetch token balance:", balanceResponse.status, errorText);
+        console.error(
+          "Failed to fetch token balance:",
+          balanceResponse.status,
+          errorText
+        );
       }
 
       // Check if current user is admin (client-side check using auth context)
@@ -159,51 +162,24 @@ export default function ProfilePage() {
     }
   };
 
-  const loadPublicStories = async () => {
-    setLoadingStories(true);
-    try {
-      // Get session token for authenticated request
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        console.error("No session found");
-        setLoadingStories(false);
-        return;
-      }
-
-      const response = await fetch(`/api/stories?userId=${userId}&isPublic=true`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-      if (response.ok) {
-        const { stories: userStories } = await response.json();
-        setPublicStories(userStories);
-      } else {
-        console.error("Error loading stories:", await response.text());
-      }
-    } catch (error) {
-      console.error("Error loading stories:", error);
-    } finally {
-      setLoadingStories(false);
-    }
-  };
-
   const handleRefresh = () => {
     loadProfile();
     loadAdventures();
-    loadPublicStories();
   };
 
   const getDifficultyColor = (difficulty: string) => {
     const lower = difficulty.toLowerCase();
     switch (lower) {
-      case "easy": return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800";
-      case "medium": return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800";
-      case "hard": return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800";
-      case "expert": return "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800";
-      default: return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800";
+      case "easy":
+        return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800";
+      case "medium":
+        return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800";
+      case "hard":
+        return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800";
+      case "expert":
+        return "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800";
+      default:
+        return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800";
     }
   };
 
@@ -219,7 +195,9 @@ export default function ProfilePage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
         <div className="text-center bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-900 dark:text-white">User Not Found</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-900 dark:text-white">
+            User Not Found
+          </h1>
           <button
             onClick={() => router.push("/")}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors shadow-md"
@@ -302,31 +280,6 @@ export default function ProfilePage() {
                     </p>
                   </div>
                 )}
-                {profileData.location && (
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                      Location
-                    </p>
-                    <p className="text-gray-800 dark:text-gray-200">
-                      📍 {profileData.location}
-                    </p>
-                  </div>
-                )}
-                {profileData.website && (
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                      Website
-                    </p>
-                    <a
-                      href={profileData.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                    >
-                      🔗 {profileData.website}
-                    </a>
-                  </div>
-                )}
               </div>
             )}
 
@@ -342,9 +295,19 @@ export default function ProfilePage() {
             )}
           </div>
 
+          {/* User Options (only for own profile) */}
+          {isOwnProfile && (
+            <>
+              <UserOptions />
+              <div className="mt-6">
+                <LocalStoryList />
+              </div>
+            </>
+          )}
+
           {/* Token Balance */}
           {balance && <TokenBalanceDisplay balance={balance} loading={false} />}
-             {/* Refresh Button */}
+          {/* Refresh Button */}
           <div className="flex justify-center">
             <button
               onClick={handleRefresh}
@@ -362,146 +325,78 @@ export default function ProfilePage() {
             />
           )}
 
-          {/* Adventures and Stories Tabs */}
+          {/* Adventures Section */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            {/* Tab Headers */}
-            <div className="flex border-b border-gray-200 dark:border-gray-700">
-              <button
-                onClick={() => setActiveTab("adventures")}
-                className={`flex-1 px-6 py-4 font-semibold transition-colors ${
-                  activeTab === "adventures"
-                    ? "bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                }`}
-              >
+            <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-purple-50 dark:bg-purple-900/30">
+              <h2 className="text-xl font-bold text-purple-600 dark:text-purple-400 flex items-center gap-2">
                 🎮 Adventures ({adventures.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("stories")}
-                className={`flex-1 px-6 py-4 font-semibold transition-colors ${
-                  activeTab === "stories"
-                    ? "bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                }`}
-              >
-                📖 Public Stories ({publicStories.length})
-              </button>
+              </h2>
             </div>
 
-            {/* Tab Content */}
             <div className="p-6">
-              {activeTab === "adventures" && (
-                <div>
-                  {loadingAdventures ? (
-                    <div className="flex justify-center py-12">
-                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent"></div>
-                    </div>
-                  ) : adventures.length === 0 ? (
-                    <div className="text-center py-12">
-                      <p className="text-gray-600 dark:text-gray-400 text-lg mb-4">
-                        {isOwnProfile
-                          ? "You haven't created any adventures yet."
-                          : "This user hasn't created any adventures yet."}
-                      </p>
-                      {isOwnProfile && (
-                        <button
-                          onClick={() => router.push("/creator")}
-                          className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all"
-                        >
-                          Create Your First Adventure
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {adventures.map((adventure) => (
-                        <div
-                          key={adventure.id}
-                          onClick={() => router.push(`/explorer/${adventure.id}`)}
-                          className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer border border-gray-200 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-2 flex-1">
-                              {adventure.title}
-                            </h3>
-                            {adventure.isFeatured && (
-                              <span className="text-yellow-500 ml-2">⭐</span>
-                            )}
-                          </div>
-                          <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
-                            {adventure.shortDescription}
-                          </p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`px-2 py-1 rounded-full text-xs font-bold border capitalize ${getDifficultyColor(adventure.difficulty)}`}>
-                              {adventure.difficulty}
-                            </span>
-                            <span className="text-xs text-gray-600 dark:text-gray-400">
-                              ⭐ {adventure.rating?.toFixed(1) || "N/A"}
-                            </span>
-                            <span className="text-xs text-gray-600 dark:text-gray-400">
-                              🎮 {adventure.playCount} plays
-                            </span>
-                          </div>
-                          {!adventure.isPublished && (
-                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                              <span className="text-xs font-semibold text-orange-600 dark:text-orange-400">
-                                📝 Draft
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+              {loadingAdventures ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent"></div>
+                </div>
+              ) : adventures.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-600 dark:text-gray-400 text-lg mb-4">
+                    {isOwnProfile
+                      ? "You haven't created any adventures yet."
+                      : "This user hasn't created any adventures yet."}
+                  </p>
+                  {isOwnProfile && (
+                    <button
+                      onClick={() => router.push("/creator")}
+                      className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all"
+                    >
+                      Create Your First Adventure
+                    </button>
                   )}
                 </div>
-              )}
-
-              {activeTab === "stories" && (
-                <div>
-                  {loadingStories ? (
-                    <div className="flex justify-center py-12">
-                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent"></div>
-                    </div>
-                  ) : publicStories.length === 0 ? (
-                    <div className="text-center py-12">
-                      <p className="text-gray-600 dark:text-gray-400 text-lg">
-                        {isOwnProfile
-                          ? "You don't have any public stories yet."
-                          : "This user hasn't shared any public stories yet."}
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {adventures.map((adventure) => (
+                    <div
+                      key={adventure.id}
+                      onClick={() => router.push(`/explorer/${adventure.id}`)}
+                      className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer border border-gray-200 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-2 flex-1">
+                          {adventure.title}
+                        </h3>
+                        {adventure.isFeatured && (
+                          <span className="text-yellow-500 ml-2">⭐</span>
+                        )}
+                      </div>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
+                        {adventure.shortDescription}
                       </p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {publicStories.map((story) => (
-                        <div
-                          key={story.id}
-                          onClick={() => router.push(`/story?storyId=${story.id}`)}
-                          className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-5 hover:shadow-lg transition-all cursor-pointer border border-gray-200 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-bold border capitalize ${getDifficultyColor(
+                            adventure.difficulty
+                          )}`}
                         >
-                          <div className="flex items-start justify-between mb-3">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-2 flex-1">
-                              {story.storyName}
-                            </h3>
-                            {story.isCompleted && (
-                              <span className="text-green-500 ml-2" title="Completed">
-                                ✓
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                            <span>
-                              📅 {new Date(story.updatedAt).toLocaleDateString()}
-                            </span>
-                            {story.adventureId && (
-                              <span className="text-purple-600 dark:text-purple-400">
-                                🎮 From Adventure
-                              </span>
-                            )}
-                          </div>
+                          {adventure.difficulty}
+                        </span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          ⭐ {adventure.rating?.toFixed(1) || "N/A"}
+                        </span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          🎮 {adventure.playCount} plays
+                        </span>
+                      </div>
+                      {!adventure.isPublished && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                          <span className="text-xs font-semibold text-orange-600 dark:text-orange-400">
+                            📝 Draft
+                          </span>
                         </div>
-                      ))}
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
             </div>
@@ -517,8 +412,6 @@ export default function ProfilePage() {
               onSuccess={handleRefresh}
             />
           )}
-
-         
         </div>
       </div>
     </div>

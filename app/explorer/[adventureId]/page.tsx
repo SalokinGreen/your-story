@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Adventure } from "@/app/misc/structs";
+import { Adventure, StoryData } from "@/app/misc/structs";
 import { useAuth } from "@/app/misc/AuthContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import Comments from "@/app/components/Comments";
@@ -80,6 +80,20 @@ export default function AdventureDetailPage() {
     }
   };
 
+  const [saveLocally, setSaveLocally] = useState(false);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      if (!user) return;
+      const { getUserSettings } = await import("@/app/misc/user_settings");
+      const settings = await getUserSettings(user.id, supabase);
+      if (settings) {
+        setSaveLocally(settings.save_stories_locally || false);
+      }
+    };
+    fetchSettings();
+  }, [user]);
+
   const handleStartAdventure = async () => {
     if (!user) {
       addNotification("Please sign in to start an adventure", "warning");
@@ -101,6 +115,24 @@ export default function AdventureDetailPage() {
 
     try {
       setStartingAdventure(true);
+
+      if (saveLocally) {
+        // Create local story
+        const { saveLocalStory } = await import("@/app/misc/localStoryManager");
+        const localId = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        const newStoryData = {
+          ...adventure.storyTemplate,
+          story_name: `${adventure.title} - ${new Date().toLocaleDateString()}`,
+          player_name: user.user_metadata?.display_name || "Player",
+        } as unknown as StoryData; // Cast to StoryData as template should be valid
+
+        await saveLocalStory(localId, newStoryData);
+        
+        addNotification("Adventure started offline! 📂", "success");
+        router.push(`/story?storyId=${localId}`);
+        return;
+      }
 
       // Get auth token
       const {

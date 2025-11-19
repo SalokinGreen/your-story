@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     byok_enabled BOOLEAN DEFAULT false,
     is_subscriber BOOLEAN DEFAULT false,
+    save_stories_locally BOOLEAN DEFAULT false,
     custom_model_config JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
