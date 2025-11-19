@@ -10,6 +10,11 @@ import { authenticatedFetch } from "@/app/misc/getAuthToken";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { isEncrypted } from "@/app/misc/encryption";
 import EncryptionMigration from "@/app/components/EncryptionMigration";
+import {
+  listLocalStories,
+  LocalStory,
+  deleteLocalStory,
+} from "@/app/misc/localStoryManager";
 
 interface Story {
   id: string;
@@ -44,7 +49,9 @@ export default function LibraryPage() {
   const { addNotification } = useNotification();
   const [view, setView] = useState<LibraryView>("stories");
   const [stories, setStories] = useState<Story[]>([]);
+  const [localStories, setLocalStories] = useState<LocalStory[]>([]);
   const [adventures, setAdventures] = useState<Adventure[]>([]);
+  const [localAdventures, setLocalAdventures] = useState<any[]>([]);
   const [folders, setFolders] = useState<StoryFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -124,6 +131,10 @@ export default function LibraryPage() {
 
         const data = await response.json();
         setStories(data.stories || []);
+
+        // Load local stories
+        const localStoriesList = await listLocalStories();
+        setLocalStories(localStoriesList);
       } else {
         // Fetch user's adventures
         const response = await authenticatedFetch(
@@ -134,6 +145,27 @@ export default function LibraryPage() {
 
         const data = await response.json();
         setAdventures(data.adventures || []);
+
+        // Load local adventures from localStorage
+        try {
+          const localAdvKeys = Object.keys(localStorage).filter((key) =>
+            key.startsWith("your-story:local-adventure:")
+          );
+          const localAdvs = localAdvKeys
+            .map((key) => {
+              try {
+                const data = JSON.parse(localStorage.getItem(key) || "{}");
+                return { ...data, id: key, isOffline: true };
+              } catch {
+                return null;
+              }
+            })
+            .filter(Boolean);
+          setLocalAdventures(localAdvs);
+        } catch (error) {
+          console.error("Error loading local adventures:", error);
+          setLocalAdventures([]);
+        }
       }
     } catch (error: any) {
       console.error("Error fetching library data:", error);
@@ -143,7 +175,10 @@ export default function LibraryPage() {
     }
   };
 
-  const handleDeleteStory = async (storyId: string) => {
+  const handleDeleteStory = async (
+    storyId: string,
+    isOffline: boolean = false
+  ) => {
     setConfirmDialog({
       isOpen: true,
       title: "Delete Story?",
@@ -157,17 +192,28 @@ export default function LibraryPage() {
         try {
           setDeleting(storyId);
 
-          const response = await authenticatedFetch(`/api/stories/${storyId}`, {
-            method: "DELETE",
-          });
+          if (isOffline) {
+            // Delete local story
+            await deleteLocalStory(storyId);
+            setLocalStories(localStories.filter((s) => s.id !== storyId));
+          } else {
+            // Delete online story
+            const response = await authenticatedFetch(
+              `/api/stories/${storyId}`,
+              {
+                method: "DELETE",
+              }
+            );
 
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || "Failed to delete story");
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || "Failed to delete story");
+            }
+
+            setStories(stories.filter((s) => s.id !== storyId));
           }
 
           addNotification("Story deleted successfully", "success");
-          setStories(stories.filter((s) => s.id !== storyId));
         } catch (error: any) {
           console.error("Error deleting story:", error);
           addNotification(`Failed to delete: ${error.message}`, "failure");
@@ -178,7 +224,10 @@ export default function LibraryPage() {
     });
   };
 
-  const handleDeleteAdventure = async (adventureId: string) => {
+  const handleDeleteAdventure = async (
+    adventureId: string,
+    isOffline: boolean = false
+  ) => {
     setConfirmDialog({
       isOpen: true,
       title: "Delete Adventure?",
@@ -192,20 +241,32 @@ export default function LibraryPage() {
         try {
           setDeleting(adventureId);
 
-          const response = await authenticatedFetch(
-            `/api/adventures/${adventureId}`,
-            {
-              method: "DELETE",
+          if (isOffline) {
+            // Delete local adventure
+            if (typeof window !== "undefined") {
+              localStorage.removeItem(adventureId);
             }
-          );
+            setLocalAdventures(
+              localAdventures.filter((a) => a.id !== adventureId)
+            );
+          } else {
+            // Delete online adventure
+            const response = await authenticatedFetch(
+              `/api/adventures/${adventureId}`,
+              {
+                method: "DELETE",
+              }
+            );
 
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || "Failed to delete adventure");
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || "Failed to delete adventure");
+            }
+
+            setAdventures(adventures.filter((a) => a.id !== adventureId));
           }
 
           addNotification("Adventure deleted successfully", "success");
-          setAdventures(adventures.filter((a) => a.id !== adventureId));
         } catch (error: any) {
           console.error("Error deleting adventure:", error);
           addNotification(`Failed to delete: ${error.message}`, "failure");
@@ -355,6 +416,42 @@ export default function LibraryPage() {
     }
   };
 
+  const handleMoveLocalStory = async (
+    storyId: string,
+    folderId: string | null
+  ) => {
+    try {
+      // Import the save function
+      const { saveLocalStory, getLocalStory } = await import(
+        "@/app/misc/localStoryManager"
+      );
+
+      // Get the local story
+      const localStory = await getLocalStory(storyId);
+      if (!localStory) {
+        throw new Error("Local story not found");
+      }
+
+      // Save with updated folder_id
+      await saveLocalStory(storyId, localStory.storyData, folderId);
+
+      // Update local state
+      setLocalStories(
+        localStories.map((s) =>
+          s.id === storyId ? { ...s, folder_id: folderId } : s
+        )
+      );
+      setMovingStory(null);
+      addNotification("Local story moved successfully", "success");
+    } catch (error: any) {
+      console.error("Error moving local story:", error);
+      addNotification(
+        `Failed to move local story: ${error.message}`,
+        "failure"
+      );
+    }
+  };
+
   // Filter and sort stories
   const filteredStories = stories
     .filter((story) => {
@@ -393,6 +490,46 @@ export default function LibraryPage() {
         case "chapter":
           const chapterA = a.story_data?.currentChapter ?? 0;
           const chapterB = b.story_data?.currentChapter ?? 0;
+          return chapterB - chapterA;
+        default:
+          return 0;
+      }
+    });
+
+  // Filter local stories
+  const filteredLocalStories = localStories
+    .filter((story) => {
+      // Folder filter
+      if (selectedFolder !== null) {
+        if (selectedFolder === "uncategorized") {
+          if (story.folder_id !== null) return false;
+        } else if (story.folder_id !== selectedFolder) {
+          return false;
+        }
+      }
+      // Search filter
+      if (
+        storySearch &&
+        !story.title.toLowerCase().includes(storySearch.toLowerCase())
+      ) {
+        return false;
+      }
+      // Local stories are always "in progress"
+      if (storyFilter === "completed") return false;
+      return true;
+    })
+    .sort((a, b) => {
+      switch (storySortBy) {
+        case "updated":
+        case "created":
+          return (
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          );
+        case "name":
+          return a.title.localeCompare(b.title);
+        case "chapter":
+          const chapterA = a.storyData?.currentChapter ?? 0;
+          const chapterB = b.storyData?.currentChapter ?? 0;
           return chapterB - chapterA;
         default:
           return 0;
@@ -480,9 +617,11 @@ export default function LibraryPage() {
                 : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
             }`}
           >
-            📖 My Stories ({filteredStories.length}
-            {stories.length !== filteredStories.length
-              ? ` / ${stories.length}`
+            📖 My Stories (
+            {filteredStories.length + filteredLocalStories.length}
+            {stories.length + localStories.length !==
+            filteredStories.length + filteredLocalStories.length
+              ? ` / ${stories.length + localStories.length}`
               : ""}
             )
           </button>
@@ -494,9 +633,11 @@ export default function LibraryPage() {
                 : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
             }`}
           >
-            🎮 My Adventures ({filteredAdventures.length}
-            {adventures.length !== filteredAdventures.length
-              ? ` / ${adventures.length}`
+            🎮 My Adventures (
+            {filteredAdventures.length + localAdventures.length}
+            {adventures.length + localAdventures.length !==
+            filteredAdventures.length + localAdventures.length
+              ? ` / ${adventures.length + localAdventures.length}`
               : ""}
             )
           </button>
@@ -534,7 +675,7 @@ export default function LibraryPage() {
                   }`}
                 >
                   <span className="mr-2">📚</span>
-                  All Stories ({stories.length})
+                  All Stories ({stories.length + localStories.length})
                 </button>
 
                 {/* Uncategorized */}
@@ -547,7 +688,10 @@ export default function LibraryPage() {
                   }`}
                 >
                   <span className="mr-2">📄</span>
-                  Uncategorized ({stories.filter((s) => !s.folder_id).length})
+                  Uncategorized (
+                  {stories.filter((s) => !s.folder_id).length +
+                    localStories.filter((s) => !s.folder_id).length}
+                  )
                 </button>
 
                 {/* User Folders */}
@@ -564,7 +708,10 @@ export default function LibraryPage() {
                     >
                       <span className="mr-2">{folder.icon}</span>
                       {folder.name} (
-                      {stories.filter((s) => s.folder_id === folder.id).length})
+                      {stories.filter((s) => s.folder_id === folder.id).length +
+                        localStories.filter((s) => s.folder_id === folder.id)
+                          .length}
+                      )
                     </button>
                     <div className="absolute right-2 top-2 hidden group-hover:flex gap-1">
                       <button
@@ -677,7 +824,8 @@ export default function LibraryPage() {
 
               {/* Stories List */}
               <div className="space-y-4">
-                {filteredStories.length === 0 ? (
+                {filteredStories.length === 0 &&
+                filteredLocalStories.length === 0 ? (
                   <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-700">
                     <div className="text-6xl mb-4">📖</div>
                     <h3 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
@@ -781,6 +929,58 @@ export default function LibraryPage() {
                     </div>
                   ))
                 )}
+
+                {/* Local/Offline Stories */}
+                {filteredLocalStories.map((story) => (
+                  <div
+                    key={story.id}
+                    className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
+                  >
+                    <div className="p-6">
+                      <div className="flex flex-col items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+                              {story.title}
+                            </h3>
+                            <span
+                              className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-full"
+                              title="This story is saved offline"
+                            >
+                              💾 Offline
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
+                            <span>
+                              Updated:{" "}
+                              {new Date(story.updatedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                            {story.preview}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() =>
+                              router.push(`/story?storyId=${story.id}`)
+                            }
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+                          >
+                            Continue
+                          </button>
+                          <button
+                            onClick={() => handleDeleteStory(story.id, true)}
+                            disabled={deleting === story.id}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {deleting === story.id ? "..." : "🗑️"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -985,6 +1185,90 @@ export default function LibraryPage() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Local/Offline Adventures */}
+                  {localAdventures.map((adventure) => (
+                    <div
+                      key={adventure.id}
+                      className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
+                    >
+                      {/* Thumbnail */}
+                      {adventure.thumbnailUrl ? (
+                        <div
+                          className="h-40 bg-cover bg-center"
+                          style={{
+                            backgroundImage: `url(${adventure.thumbnailUrl})`,
+                          }}
+                        />
+                      ) : (
+                        <div className="h-40 bg-linear-to-br from-gray-500 via-gray-600 to-gray-700 flex items-center justify-center">
+                          <span className="text-6xl">💾</span>
+                        </div>
+                      )}
+
+                      {/* Content */}
+                      <div className="p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex-1 truncate">
+                            {adventure.title}
+                          </h3>
+                          <span
+                            className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-full"
+                            title="This adventure is saved offline"
+                          >
+                            💾 Offline
+                          </span>
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
+                          {adventure.shortDescription}
+                        </p>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {adventure.tags?.slice(0, 3).map((tag: string) => (
+                            <span
+                              key={tag}
+                              className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-full"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                          {adventure.tags?.length > 3 && (
+                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-full">
+                              +{adventure.tags.length - 3}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                          <span>
+                            Saved:{" "}
+                            {new Date(adventure.savedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              // Could implement a preview/import feature here
+                              addNotification(
+                                "Import feature coming soon!",
+                                "warning"
+                              );
+                            }}
+                            className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                          >
+                            Import
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleDeleteAdventure(adventure.id, true)
+                            }
+                            disabled={deleting === adventure.id}
+                            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {deleting === adventure.id ? "..." : "🗑️"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1174,9 +1458,16 @@ export default function LibraryPage() {
             </h2>
             <div className="space-y-2 max-h-96 overflow-y-auto">
               <button
-                onClick={() =>
-                  movingStory && handleMoveStory(movingStory, null)
-                }
+                onClick={() => {
+                  if (!movingStory) return;
+                  // Check if it's a local story (starts with 'local-')
+                  const isLocal = movingStory.startsWith("local-");
+                  if (isLocal) {
+                    handleMoveLocalStory(movingStory, null);
+                  } else {
+                    handleMoveStory(movingStory, null);
+                  }
+                }}
                 className="w-full p-3 text-left rounded-lg border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 transition-colors"
               >
                 <span className="text-gray-700 dark:text-gray-300">
@@ -1186,9 +1477,16 @@ export default function LibraryPage() {
               {folders.map((folder) => (
                 <button
                   key={folder.id}
-                  onClick={() =>
-                    movingStory && handleMoveStory(movingStory, folder.id)
-                  }
+                  onClick={() => {
+                    if (!movingStory) return;
+                    // Check if it's a local story (starts with 'local-')
+                    const isLocal = movingStory.startsWith("local-");
+                    if (isLocal) {
+                      handleMoveLocalStory(movingStory, folder.id);
+                    } else {
+                      handleMoveStory(movingStory, folder.id);
+                    }
+                  }}
                   className="w-full p-3 text-left rounded-lg border-2 hover:border-purple-500 dark:hover:border-purple-400 transition-colors"
                   style={{
                     borderLeftColor: folder.color,

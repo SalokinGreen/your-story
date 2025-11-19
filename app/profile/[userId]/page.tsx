@@ -13,7 +13,6 @@ import EditDisplayName from "@/app/components/EditDisplayName";
 import EditProfile from "@/app/components/EditProfile";
 import UserOptions from "@/app/components/UserOptions";
 import { Adventure, Story } from "@/app/misc/structs";
-import LocalStoryList from "@/app/components/LocalStoryList";
 
 interface ProfileUser {
   id: string;
@@ -296,14 +295,7 @@ export default function ProfilePage() {
           </div>
 
           {/* User Options (only for own profile) */}
-          {isOwnProfile && (
-            <>
-              <UserOptions />
-              <div className="mt-6">
-                <LocalStoryList />
-              </div>
-            </>
-          )}
+          {isOwnProfile && <UserOptions />}
 
           {/* Token Balance */}
           {balance && <TokenBalanceDisplay balance={balance} loading={false} />}

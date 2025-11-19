@@ -10,6 +10,7 @@ export interface LocalStory {
   preview: string;
   updatedAt: Date;
   storyData: StoryData;
+  folder_id?: string | null;
 }
 
 function openDB(): Promise<IDBDatabase> {
@@ -34,18 +35,40 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveLocalStory(storyId: string, storyData: StoryData): Promise<void> {
+export async function saveLocalStory(
+  storyId: string,
+  storyData: StoryData,
+  folderId?: string | null
+): Promise<void> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const transaction = db.transaction([STORE_NAME], "readwrite");
     const store = transaction.objectStore(STORE_NAME);
+
+    // Get existing story to preserve folder_id if not explicitly provided
+    let existingFolderId: string | null | undefined = folderId;
+    if (folderId === undefined) {
+      const existingRequest = store.get(storyId);
+      await new Promise<void>((res) => {
+        existingRequest.onsuccess = () => {
+          const existing = existingRequest.result as LocalStory | undefined;
+          existingFolderId = existing?.folder_id;
+          res();
+        };
+        existingRequest.onerror = () => res();
+      });
+    }
 
     const story: LocalStory = {
       id: storyId,
       title: storyData.story_name || "Untitled Story",
-      preview: storyData.scene.parts[storyData.scene.parts.length - 1]?.content.substring(0, 100) + "..." || "",
+      preview:
+        storyData.scene.parts[
+          storyData.scene.parts.length - 1
+        ]?.content.substring(0, 100) + "..." || "",
       updatedAt: new Date(),
       storyData: storyData,
+      folder_id: existingFolderId,
     };
 
     const request = store.put(story);
@@ -55,7 +78,9 @@ export async function saveLocalStory(storyId: string, storyData: StoryData): Pro
   });
 }
 
-export async function getLocalStory(storyId: string): Promise<LocalStory | undefined> {
+export async function getLocalStory(
+  storyId: string
+): Promise<LocalStory | undefined> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([STORE_NAME], "readonly");
