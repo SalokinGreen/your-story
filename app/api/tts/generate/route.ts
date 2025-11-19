@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Speechify } from "@speechify/api-sdk";
 import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import { createClient } from "@supabase/supabase-js";
+import { getUserSettings } from "@/app/misc/user_settings";
 
 const SPEECHIFY_API_KEY = process.env.SPEECHIFY_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL!;
@@ -51,22 +52,22 @@ export async function POST(req: NextRequest) {
 
     const userId = user.id;
 
-    // Check if user has enough tokens (pass supabase client for proper access)
-    const balance = await getUserTokenBalance(userId, supabase);
-    if (!balance || balance.total < TTS_COST) {
-      return NextResponse.json(
-        {
-          error: `Insufficient tokens. You need ${TTS_COST} tokens but only have ${
-            balance?.total ?? 0
-          }.`,
-          requiredTokens: TTS_COST,
-          currentBalance: balance?.total ?? 0,
-        },
-        { status: 402 } // Payment Required
-      );
-    }
+    const { text, voiceId = "mrbeast", speechifyKey } = await req.json();
 
-    const { text, voiceId = "mrbeast" } = await req.json();
+    // Check user settings for BYOK
+    const userSettings = await getUserSettings(userId, supabase);
+    const isSubscriber = userSettings?.is_subscriber || false;
+    const byokEnabled = userSettings?.byok_enabled || false;
+
+    // Determine if we should use tokens
+    let shouldUseTokens = true;
+    let apiKeyToUse = SPEECHIFY_API_KEY;
+
+    if (isSubscriber && byokEnabled && speechifyKey) {
+        shouldUseTokens = false;
+        apiKeyToUse = speechifyKey;
+        console.log(`User ${userId} using BYOK (Speechify)`);
+    }
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return NextResponse.json(
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
 
     // Initialize Speechify client
     const speechify = new Speechify({
-      apiKey: SPEECHIFY_API_KEY,
+      apiKey: apiKeyToUse,
     });
 
     // Generate speech using SDK
@@ -107,13 +108,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Deduct tokens after successful generation
-    try {
-      await deductTokens(userId, TTS_COST, supabase);
-    } catch (deductError: any) {
-      console.error("Failed to deduct tokens:", deductError);
-      // Still return the audio since generation succeeded
-      // Log this for manual correction if needed
+    // Deduct tokens after successful generation IF using tokens
+    if (shouldUseTokens) {
+        try {
+        await deductTokens(userId, TTS_COST, supabase);
+        } catch (deductError: any) {
+        console.error("Failed to deduct tokens:", deductError);
+        // Still return the audio since generation succeeded
+        // Log this for manual correction if needed
+        }
+    } else {
+        console.log(`BYOK used, no tokens deducted for user ${userId}`);
     }
 
     // Get updated balance
@@ -129,7 +134,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "audio/mpeg",
         "Content-Length": audioBuffer.byteLength.toString(),
         "Cache-Control": "public, max-age=3600", // Cache for 1 hour
-        "X-Token-Cost": TTS_COST.toString(),
+        "X-Token-Cost": shouldUseTokens ? TTS_COST.toString() : "0",
         "X-Token-Balance": (newBalance?.total ?? 0).toString(),
       },
     });

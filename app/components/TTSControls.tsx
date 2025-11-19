@@ -141,13 +141,15 @@ export default function TTSControls({
         throw new Error("Authentication required. Please sign in to use TTS.");
       }
 
+      const speechifyKey = typeof window !== "undefined" ? localStorage.getItem("speechifyKey") : undefined;
+
       const response = await fetch("/api/tts/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text, voiceId: selectedVoice }),
+        body: JSON.stringify({ text, voiceId: selectedVoice, speechifyKey }),
       });
 
       if (!response.ok) {

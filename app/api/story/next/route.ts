@@ -8,6 +8,7 @@ import {
   getUserTokenBalance,
 } from "@/app/misc/tokens";
 import { getModelConfig } from "@/app/misc/ai_prices";
+import { getUserSettings } from "@/app/misc/user_settings";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,7 @@ interface RequestBody {
   userChoice?: string;
   model?: string; // Optional model selection
   useRawContext?: boolean; // Use raw AI output in context instead of parsed content
+  openRouterKey?: string; // BYOK key from client
 }
 
 interface AIChoice {
@@ -86,27 +88,6 @@ export async function POST(req: NextRequest) {
 
   const userId = user.id;
 
-  // Check token balance (requires 1 token)
-  const REQUIRED_TOKENS = 1;
-  const hasTokens = await hasEnoughTokens(
-    userId,
-    REQUIRED_TOKENS,
-    supabaseAdmin
-  );
-
-  if (!hasTokens) {
-    const balance = await getUserTokenBalance(userId, supabaseAdmin);
-    return NextResponse.json(
-      {
-        error: `Insufficient tokens. You need ${REQUIRED_TOKENS} tokens to generate a story continuation.`,
-        code: "INSUFFICIENT_TOKENS",
-        balance: balance,
-        required: REQUIRED_TOKENS,
-      },
-      { status: 402 } // 402 Payment Required
-    );
-  }
-
   let body: RequestBody;
   try {
     body = (await req.json()) as RequestBody;
@@ -114,7 +95,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { storyData, userChoice, model: requestedModel, useRawContext } = body;
+  const { storyData, userChoice, model: requestedModel, useRawContext, openRouterKey } = body;
   if (!storyData) {
     return NextResponse.json(
       { error: "Missing storyData in request body" },
@@ -122,10 +103,73 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Check user settings for BYOK
+  const userSettings = await getUserSettings(userId, supabaseAdmin);
+  const isSubscriber = userSettings?.is_subscriber || false;
+  const byokEnabled = userSettings?.byok_enabled || false;
+
+  // Check token balance (requires 1 token) IF not using BYOK
+  const REQUIRED_TOKENS = 1;
+  let shouldUseTokens = true;
+
+  // Only use BYOK if subscriber, BYOK is enabled in settings, and key is provided
+  if (isSubscriber && byokEnabled && openRouterKey) {
+    shouldUseTokens = false;
+    console.log(`User ${userId} using BYOK (OpenRouter)`);
+  }
+
+  if (shouldUseTokens) {
+    const hasTokens = await hasEnoughTokens(
+      userId,
+      REQUIRED_TOKENS,
+      supabaseAdmin
+    );
+
+    if (!hasTokens) {
+      const balance = await getUserTokenBalance(userId, supabaseAdmin);
+      return NextResponse.json(
+        {
+          error: `Insufficient tokens. You need ${REQUIRED_TOKENS} tokens to generate a story continuation.`,
+          code: "INSUFFICIENT_TOKENS",
+          balance: balance,
+          required: REQUIRED_TOKENS,
+        },
+        { status: 402 } // 402 Payment Required
+      );
+    }
+  }
+
   // Get model configuration
-  const modelKey =
+  // Get model configuration
+  let modelKey =
     requestedModel || process.env.DEFAULT_AI_MODEL || "deep-seek/deepseek-chat";
-  const modelConfig = getModelConfig(modelKey);
+  
+  // Handle custom model from user settings
+  let modelConfig = getModelConfig(modelKey);
+  let customModelUsed = false;
+
+  if (isSubscriber && userSettings?.custom_model_config?.modelId && modelKey === "custom") {
+    const custom = userSettings.custom_model_config;
+    modelConfig = {
+      name: custom.name || "Custom Model",
+      model: custom.modelId || "unknown",
+      provider: "openrouter", // Custom models assumed to be OpenRouter for now
+      contextWindow: custom.contextSize || 4096,
+      maxOutputTokens: custom.maxOutputTokens || 1000,
+      cost: 0, // BYOK doesn't cost tokens
+      original_model: custom.modelId || "unknown",
+      maxTokens: custom.contextSize || 4096,
+      inputPrice: 0,
+      outputPrice: 0,
+      finetunes: [],
+      strengths: [],
+      weaknesses: [],
+      description: "Custom User Model",
+    };
+    customModelUsed = true;
+    console.log("Using custom model config:", modelConfig);
+  }
+
   console.log(
     "Using model:",
     modelConfig.name,
@@ -140,12 +184,19 @@ export async function POST(req: NextRequest) {
   let apiUrl: string;
 
   if (modelConfig.provider === "openrouter") {
-    apiKey = process.env.OPENROUTER_API_KEY;
+    // Use user key if available and subscriber, otherwise fallback to system key
+    if (!shouldUseTokens && openRouterKey) {
+        apiKey = openRouterKey;
+    } else {
+        apiKey = process.env.OPENROUTER_API_KEY;
+    }
+    
     apiUrl = "https://openrouter.ai/api/v1/chat/completions";
-    console.log("OpenRouter API Key:", apiKey ? "FOUND" : "MISSING");
+    console.log("OpenRouter API Key source:", (!shouldUseTokens && openRouterKey) ? "USER (BYOK)" : "SYSTEM");
+    
     if (!apiKey) {
       return NextResponse.json(
-        { error: "Server not configured: missing OPENROUTER_API_KEY" },
+        { error: "Server not configured: missing OPENROUTER_API_KEY and no user key provided" },
         { status: 500 }
       );
     }
@@ -257,24 +308,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Deduct tokens after successful generation
-    const deductResult = await deductTokens(
-      userId,
-      REQUIRED_TOKENS,
-      supabaseAdmin
-    );
-    if (!deductResult.success) {
-      console.error(
-        "Failed to deduct tokens after generation:",
-        deductResult.error
+    // Deduct tokens after successful generation IF using tokens
+    if (shouldUseTokens) {
+      const deductResult = await deductTokens(
+        userId,
+        REQUIRED_TOKENS,
+        supabaseAdmin
       );
-      console.error("User ID:", userId);
-      console.error("Service role key configured:", !!supabaseServiceKey);
-      // Log error but don't fail the request since generation succeeded
+      if (!deductResult.success) {
+        console.error(
+          "Failed to deduct tokens after generation:",
+          deductResult.error
+        );
+        console.error("User ID:", userId);
+        console.error("Service role key configured:", !!supabaseServiceKey);
+        // Log error but don't fail the request since generation succeeded
+      } else {
+        console.log(
+          `Successfully deducted ${REQUIRED_TOKENS} tokens from user ${userId}`
+        );
+      }
     } else {
-      console.log(
-        `Successfully deducted ${REQUIRED_TOKENS} tokens from user ${userId}`
-      );
+        console.log(`BYOK used, no tokens deducted for user ${userId}`);
     }
 
     // Get updated balance
@@ -287,8 +342,8 @@ export async function POST(req: NextRequest) {
         modelName: modelConfig.name,
         provider: modelConfig.provider,
         usage: data.usage,
-        tokensDeducted: REQUIRED_TOKENS,
-        tokenCost: modelConfig.cost,
+        tokensDeducted: shouldUseTokens ? REQUIRED_TOKENS : 0,
+        tokenCost: shouldUseTokens ? modelConfig.cost : 0,
         remainingBalance: updatedBalance,
       },
     });

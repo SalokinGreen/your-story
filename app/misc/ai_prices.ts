@@ -158,10 +158,29 @@ export const AI_MODELS = {
   },
 } as const;
 
+export interface AIModelConfig {
+  name: string;
+  original_model: string;
+  model: string;
+  maxTokens: number;
+  maxOutputTokens: number;
+  provider: "openrouter" | "deepseek";
+  cost: number;
+  inputPrice: number;
+  outputPrice: number;
+  finetunes: readonly string[];
+  strengths: readonly string[];
+  weaknesses: readonly string[];
+  description: string;
+  bannerUrl?: string;
+  contextWindow?: number; // Optional for custom models
+}
+
 export type AIModelKey = keyof typeof AI_MODELS;
 
-export function getModelConfig(modelKey: string) {
+export function getModelConfig(modelKey: string): AIModelConfig {
   return (
-    AI_MODELS[modelKey as AIModelKey] || AI_MODELS["Prometheus"] // Default model
+    (AI_MODELS[modelKey as AIModelKey] as unknown as AIModelConfig) ||
+    (AI_MODELS["Prometheus"] as unknown as AIModelConfig)
   );
 }

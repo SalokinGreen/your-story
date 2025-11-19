@@ -918,6 +918,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("useRawContext") === "true"
           : false,
+      openRouterKey:
+        typeof window !== "undefined"
+          ? localStorage.getItem("openRouterKey") || undefined
+          : undefined,
     };
 
     const payloadSize = JSON.stringify(payload).length;
@@ -1467,6 +1471,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("useRawContext") === "true"
           : false,
+      openRouterKey:
+        typeof window !== "undefined"
+          ? localStorage.getItem("openRouterKey") || undefined
+          : undefined,
     };
 
     const payloadSize = JSON.stringify(payload).length;
