@@ -78,6 +78,7 @@ export interface ScenePart {
   endChapter?: boolean;
   endStory?: boolean;
   gameOver?: boolean;
+  raw?: string; // Raw AI output before parsing, used for alternative context building
 }
 export interface Choice {
   text: string;

@@ -20,7 +20,14 @@ import { AI_MODELS } from "../misc/ai_prices";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 // AI Model Selector Component with state management
-function AIModelSelector({ addNotification }: { addNotification: (message: string, type: "success" | "failure" | "warning") => void }) {
+function AIModelSelector({
+  addNotification,
+}: {
+  addNotification: (
+    message: string,
+    type: "success" | "failure" | "warning"
+  ) => void;
+}) {
   const [currentModelKey, setCurrentModelKey] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("aiModel") || "Prometheus";
@@ -28,17 +35,16 @@ function AIModelSelector({ addNotification }: { addNotification: (message: strin
     return "Prometheus";
   });
 
-  const currentModel = AI_MODELS[currentModelKey as keyof typeof AI_MODELS] || AI_MODELS.Prometheus;
+  const currentModel =
+    AI_MODELS[currentModelKey as keyof typeof AI_MODELS] ||
+    AI_MODELS.Prometheus;
 
   const handleModelChange = (newModelKey: string) => {
     if (typeof window !== "undefined") {
       localStorage.setItem("aiModel", newModelKey);
       setCurrentModelKey(newModelKey);
       const newModel = AI_MODELS[newModelKey as keyof typeof AI_MODELS];
-      addNotification(
-        `🤖 Model changed to ${newModel.name}`,
-        "success"
-      );
+      addNotification(`🤖 Model changed to ${newModel.name}`, "success");
     }
   };
 
@@ -47,14 +53,16 @@ function AIModelSelector({ addNotification }: { addNotification: (message: strin
       <label className="block p-4 pb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
         🤖 AI Model Selection
       </label>
-      
+
       <div className="px-4 pb-4">
         {/* Current Model Banner */}
         <div className="bg-linear-to-r from-purple-600 to-blue-600 rounded-lg p-4 text-white mb-4">
           <div className="flex items-center justify-between mb-2">
             <div>
               <div className="text-xl font-bold">{currentModel.name}</div>
-              <div className="text-sm text-purple-100">{currentModel.original_model}</div>
+              <div className="text-sm text-purple-100">
+                {currentModel.original_model}
+              </div>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold">{currentModel.cost}</div>
@@ -64,11 +72,13 @@ function AIModelSelector({ addNotification }: { addNotification: (message: strin
           <div className="flex items-center gap-4 text-sm">
             <div>
               <span className="text-purple-100">Context:</span>{" "}
-              <span className="font-semibold">{(currentModel.maxTokens / 1000).toFixed(0)}K tokens</span>
+              <span className="font-semibold">
+                {(currentModel.maxTokens / 1000).toFixed(0)}K tokens
+              </span>
             </div>
           </div>
         </div>
-        
+
         {/* Model Selection Dropdown */}
         <select
           value={currentModelKey}
@@ -77,12 +87,15 @@ function AIModelSelector({ addNotification }: { addNotification: (message: strin
         >
           {Object.entries(AI_MODELS).map(([key, config]) => (
             <option key={key} value={key}>
-              {config.name} - {config.original_model} ({config.cost} coin{config.cost > 1 ? "s" : ""}, {(config.maxTokens / 1000).toFixed(0)}K context)
+              {config.name} - {config.original_model} ({config.cost} coin
+              {config.cost > 1 ? "s" : ""},{" "}
+              {(config.maxTokens / 1000).toFixed(0)}K context)
             </option>
           ))}
         </select>
         <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-          Select the AI model used for story generation. Different models have unique strengths and context sizes.
+          Select the AI model used for story generation. Different models have
+          unique strengths and context sizes.
         </p>
       </div>
     </div>
@@ -2767,6 +2780,191 @@ export default function MenuPage({
         </p>
       </div>
 
+      {/* Actions Card */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+          🎮 Actions
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Settings */}
+          <button
+            onClick={() => setShowSettings(true)}
+            className="flex items-center justify-center gap-3 px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+            <span>Story Settings</span>
+          </button>
+
+          {/* Save Progress */}
+          <button
+            onClick={handleSaveProgress}
+            disabled={saving || !storyDbId}
+            className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md"
+          >
+            {saving ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                  />
+                </svg>
+                <span>Save Progress</span>
+              </>
+            )}
+          </button>
+
+          {/* Export Story */}
+          <button
+            onClick={handleExportStory}
+            disabled={exporting}
+            className="flex items-center justify-center gap-3 px-6 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md"
+          >
+            {exporting ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <span>Exporting...</span>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                <span>Export Story</span>
+              </>
+            )}
+          </button>
+
+          {/* Return to Explorer */}
+          <button
+            onClick={handleReturnToExplorer}
+            className="flex items-center justify-center gap-3 px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            <span>Return to Explorer</span>
+          </button>
+
+          {/* Delete Story */}
+          <button
+            onClick={() => {
+              setConfirmDialog({
+                isOpen: true,
+                title: "Delete Story?",
+                message:
+                  "Are you sure you want to permanently delete this story? This action cannot be undone.",
+                icon: "⚠️",
+                confirmText: "Delete Forever",
+                confirmButtonClass: "bg-red-600 hover:bg-red-700",
+                onConfirm: async () => {
+                  setConfirmDialog({ ...confirmDialog, isOpen: false });
+                  if (!storyDbId) return;
+
+                  setDeleting(true);
+                  try {
+                    const {
+                      data: { session },
+                    } = await supabase.auth.getSession();
+                    if (!session) {
+                      throw new Error("Not authenticated");
+                    }
+
+                    const response = await fetch(`/api/stories/${storyDbId}`, {
+                      method: "DELETE",
+                      headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                      },
+                    });
+
+                    if (!response.ok) {
+                      throw new Error("Failed to delete story");
+                    }
+
+                    addNotification("Story deleted", "info");
+                    router.push("/explorer");
+                  } catch (error: any) {
+                    addNotification(
+                      error.message || "Failed to delete story",
+                      "failure"
+                    );
+                    setDeleting(false);
+                  }
+                },
+              });
+            }}
+            disabled={deleting || !storyDbId}
+            className="flex items-center justify-center gap-3 px-6 py-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+            <span>Delete Story</span>
+          </button>
+        </div>
+      </div>
+
       {/* Story Progress Card */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
@@ -3127,191 +3325,6 @@ export default function MenuPage({
         )}
       </div>
 
-      {/* Actions Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-          🎮 Actions
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Settings */}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="flex items-center justify-center gap-3 px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-            <span>Story Settings</span>
-          </button>
-
-          {/* Save Progress */}
-          <button
-            onClick={handleSaveProgress}
-            disabled={saving || !storyDbId}
-            className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md"
-          >
-            {saving ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>Saving...</span>
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                  />
-                </svg>
-                <span>Save Progress</span>
-              </>
-            )}
-          </button>
-
-          {/* Export Story */}
-          <button
-            onClick={handleExportStory}
-            disabled={exporting}
-            className="flex items-center justify-center gap-3 px-6 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md"
-          >
-            {exporting ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>Exporting...</span>
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <span>Export Story</span>
-              </>
-            )}
-          </button>
-
-          {/* Return to Explorer */}
-          <button
-            onClick={handleReturnToExplorer}
-            className="flex items-center justify-center gap-3 px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-            <span>Return to Explorer</span>
-          </button>
-
-          {/* Delete Story */}
-          <button
-            onClick={() => {
-              setConfirmDialog({
-                isOpen: true,
-                title: "Delete Story?",
-                message:
-                  "Are you sure you want to permanently delete this story? This action cannot be undone.",
-                icon: "⚠️",
-                confirmText: "Delete Forever",
-                confirmButtonClass: "bg-red-600 hover:bg-red-700",
-                onConfirm: async () => {
-                  setConfirmDialog({ ...confirmDialog, isOpen: false });
-                  if (!storyDbId) return;
-
-                  setDeleting(true);
-                  try {
-                    const {
-                      data: { session },
-                    } = await supabase.auth.getSession();
-                    if (!session) {
-                      throw new Error("Not authenticated");
-                    }
-
-                    const response = await fetch(`/api/stories/${storyDbId}`, {
-                      method: "DELETE",
-                      headers: {
-                        Authorization: `Bearer ${session.access_token}`,
-                      },
-                    });
-
-                    if (!response.ok) {
-                      throw new Error("Failed to delete story");
-                    }
-
-                    addNotification("Story deleted", "info");
-                    router.push("/explorer");
-                  } catch (error: any) {
-                    addNotification(
-                      error.message || "Failed to delete story",
-                      "failure"
-                    );
-                    setDeleting(false);
-                  }
-                },
-              });
-            }}
-            disabled={deleting || !storyDbId}
-            className="flex items-center justify-center gap-3 px-6 py-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-            <span>Delete Story</span>
-          </button>
-        </div>
-      </div>
-
       {/* Story Info Card */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
@@ -3471,6 +3484,42 @@ export default function MenuPage({
                   <div className="space-y-4">
                     {/* AI Model Selection with Enhanced Details */}
                     <AIModelSelector addNotification={addNotification} />
+
+                    {/* Raw Context Toggle */}
+                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={
+                          typeof window !== "undefined" &&
+                          localStorage.getItem("useRawContext") === "true"
+                        }
+                        onChange={(e) => {
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem(
+                              "useRawContext",
+                              e.target.checked ? "true" : "false"
+                            );
+                            addNotification(
+                              e.target.checked
+                                ? "🔧 Raw context mode enabled"
+                                : "🔧 Raw context mode disabled",
+                              "success"
+                            );
+                          }
+                        }}
+                        className="w-5 h-5 rounded text-purple-600"
+                      />
+                      <div>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          Use Raw AI Output in Context
+                        </span>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Send complete AI responses back to the model instead
+                          of parsed content. Helps some AIs maintain
+                          consistency.
+                        </p>
+                      </div>
+                    </label>
 
                     <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
                       <input

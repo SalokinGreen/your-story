@@ -35,7 +35,10 @@ function cleanString(text: string): string {
   );
 }
 
-export function buildMessages({ storyData }: BuildPromptInput): ChatMessage[] {
+export function buildMessages({
+  storyData,
+  useRawContext = false,
+}: BuildPromptInput & { useRawContext?: boolean }): ChatMessage[] {
   const system = `You are a helpful, creative narrative engine for a choice-driven, text-only adventure game.
 Stay in character and respond in the style of an interactive fiction game. You're the narrator and the characters.
 
@@ -168,7 +171,10 @@ Progression System:
 
     recentParts.forEach((part) => {
       const role = part.user ? "user" : "assistant";
-      context.push({ role: role, content: cleanString(part.content) });
+      // Use raw AI output if available and useRawContext is enabled, otherwise use parsed content
+      const content =
+        useRawContext && part.raw && !part.user ? part.raw : part.content;
+      context.push({ role: role, content: cleanString(content) });
     });
   }
 
@@ -457,6 +463,7 @@ export function outputToScenePart(text: string): ScenePart {
     imageUrl: "",
     user: false,
     role: "assistant",
+    raw: text, // Preserve raw AI output for alternative context building
     ...(memoryEntries.length ? { memoryEntries } : {}),
     ...(choices.length ? { choices } : {}),
     ...(commands.length ? { commands } : {}),

@@ -6,17 +6,42 @@ import { goblin_layer } from "../app/misc/starter_stories";
 // Mock the fetch function
 global.fetch = vi.fn();
 
+// Mock Supabase
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => ({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: { user: { id: "test-user-id", email: "test@test.com" } },
+        error: null,
+      }),
+    },
+  })),
+}));
+
+// Mock token functions
+vi.mock("../app/misc/tokens", () => ({
+  hasEnoughTokens: vi.fn().mockResolvedValue(true),
+  deductTokens: vi.fn().mockResolvedValue(true),
+  getUserTokenBalance: vi
+    .fn()
+    .mockResolvedValue({ total: 100, tradable: 50, locked: 50 }),
+}));
+
 describe("POST /api/story/next", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Set required env var for tests
+    // Set required env vars for tests
     process.env.DEEPSEEK_API_KEY = "test-api-key";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_KEY = "test-anon-key";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
   });
 
   it("returns 400 when request body is invalid JSON", async () => {
     const req = new NextRequest("http://localhost:3000/api/story/next", {
       method: "POST",
       body: "not valid json",
+      headers: { Authorization: "Bearer test-token" },
     });
 
     const response = await POST(req);
@@ -30,7 +55,10 @@ describe("POST /api/story/next", () => {
     const req = new NextRequest("http://localhost:3000/api/story/next", {
       method: "POST",
       body: JSON.stringify({ userChoice: "some choice" }),
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-token",
+      },
     });
 
     const response = await POST(req);
@@ -46,7 +74,10 @@ describe("POST /api/story/next", () => {
     const req = new NextRequest("http://localhost:3000/api/story/next", {
       method: "POST",
       body: JSON.stringify({ storyData: goblin_layer }),
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-token",
+      },
     });
 
     const response = await POST(req);
@@ -67,14 +98,17 @@ describe("POST /api/story/next", () => {
     const req = new NextRequest("http://localhost:3000/api/story/next", {
       method: "POST",
       body: JSON.stringify({ storyData: goblin_layer }),
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-token",
+      },
     });
 
     const response = await POST(req);
     const data = await response.json();
 
     expect(response.status).toBe(502);
-    expect(data.error).toContain("Deepseek error");
+    expect(data.error.toLowerCase()).toContain("deepseek error");
   });
 
   it("returns ScenePart when DeepSeek API succeeds", async () => {
@@ -123,7 +157,10 @@ You enter the goblin lair. The air is thick with the smell of decay.
         storyData: goblin_layer,
         userChoice: "Enter the lair",
       }),
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-token",
+      },
     });
 
     const response = await POST(req);
@@ -152,7 +189,13 @@ You enter the goblin lair. The air is thick with the smell of decay.
         object: "chat.completion",
         created: 123,
         model: "deepseek-chat",
-        choices: [{ index: 0, message: { role: "assistant", content: "Test" }, finish_reason: "stop" }],
+        choices: [
+          {
+            index: 0,
+            message: { role: "assistant", content: "Test" },
+            finish_reason: "stop",
+          },
+        ],
         usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
       }),
     });
@@ -160,7 +203,10 @@ You enter the goblin lair. The air is thick with the smell of decay.
     const req = new NextRequest("http://localhost:3000/api/story/next", {
       method: "POST",
       body: JSON.stringify({ storyData: goblin_layer }),
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-token",
+      },
     });
 
     await POST(req);
@@ -180,7 +226,7 @@ You enter the goblin lair. The air is thick with the smell of decay.
     const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(callBody.model).toBe("deepseek-chat");
     expect(callBody.temperature).toBe(0.7);
-    expect(callBody.max_tokens).toBe(500);
+    expect(callBody.max_tokens).toBe(2000);
     expect(callBody.stream).toBe(false);
     expect(callBody.messages).toBeDefined();
     expect(callBody.messages.length).toBeGreaterThan(0);
@@ -192,14 +238,17 @@ You enter the goblin lair. The air is thick with the smell of decay.
     const req = new NextRequest("http://localhost:3000/api/story/next", {
       method: "POST",
       body: JSON.stringify({ storyData: goblin_layer }),
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-token",
+      },
     });
 
     const response = await POST(req);
     const data = await response.json();
 
     expect(response.status).toBe(500);
-    expect(data.error).toContain("Failed to call Deepseek API");
+    expect(data.error).toContain("Failed to call AI API");
     expect(data.details).toContain("Network error");
   });
 });

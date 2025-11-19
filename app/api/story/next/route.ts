@@ -15,6 +15,7 @@ interface RequestBody {
   storyData: StoryData;
   userChoice?: string;
   model?: string; // Optional model selection
+  useRawContext?: boolean; // Use raw AI output in context instead of parsed content
 }
 
 interface AIChoice {
@@ -113,7 +114,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { storyData, userChoice, model: requestedModel } = body;
+  const { storyData, userChoice, model: requestedModel, useRawContext } = body;
   if (!storyData) {
     return NextResponse.json(
       { error: "Missing storyData in request body" },
@@ -129,7 +130,9 @@ export async function POST(req: NextRequest) {
     "Using model:",
     modelConfig.name,
     "Provider:",
-    modelConfig.provider
+    modelConfig.provider,
+    "Raw context:",
+    useRawContext || false
   );
 
   // Get appropriate API key based on provider
@@ -159,7 +162,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let messages: ChatMessage[] = buildMessages({ storyData, userChoice });
+  let messages: ChatMessage[] = buildMessages({
+    storyData,
+    userChoice,
+    useRawContext,
+  });
   // Filter out duplicate messages
   messages = messages.filter(
     (msg, index, self) =>

@@ -21,6 +21,7 @@ import { supabase } from "../misc/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
 import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { authenticatedFetch } from "../misc/getAuthToken";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -501,6 +502,7 @@ function StoryPageContent() {
   const [canRetry, setCanRetry] = useState(false);
   const [showPresetSelection, setShowPresetSelection] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
+  const [tokenBalance, setTokenBalance] = useState<number | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -516,6 +518,27 @@ function StoryPageContent() {
     onConfirm: () => {},
   });
   const memory_cap = 20000; // Max memory size in characters
+  
+  // Fetch token balance on mount
+  useEffect(() => {
+    async function fetchBalance() {
+      try {
+        const response = await authenticatedFetch("/api/tokens/balance", {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setTokenBalance(data.balance.total);
+        }
+      } catch (error) {
+        console.error("Failed to fetch token balance:", error);
+      }
+    }
+    fetchBalance();
+  }, []);
+  
   // Load story from database on mount
   useEffect(() => {
     if (!storyId) {
@@ -821,6 +844,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("aiModel") || undefined
           : undefined,
+      useRawContext:
+        typeof window !== "undefined"
+          ? localStorage.getItem("useRawContext") === "true"
+          : false,
     };
 
     const payloadSize = JSON.stringify(payload).length;
@@ -1366,6 +1393,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("aiModel") || undefined
           : undefined,
+      useRawContext:
+        typeof window !== "undefined"
+          ? localStorage.getItem("useRawContext") === "true"
+          : false,
     };
 
     const payloadSize = JSON.stringify(payload).length;
@@ -1470,17 +1501,9 @@ function StoryPageContent() {
           return;
         }
 
-        if (data.meta?.tokensDeducted) {
-          addNotification(
-            `✓ Used ${data.meta.tokensDeducted} tokens`,
-            "success"
-          );
-          if (data.meta.remainingBalance) {
-            addNotification(
-              `Balance: ${data.meta.remainingBalance.total} tokens remaining (${data.meta.remainingBalance.tradable} tradable)`,
-              "info"
-            );
-          }
+        // Update token balance
+        if (data.meta?.remainingBalance?.total !== undefined) {
+          setTokenBalance(data.meta.remainingBalance.total);
         }
 
         if (data.part.commands && data.part.commands.length > 0) {
@@ -1636,6 +1659,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("aiModel") || undefined
           : undefined,
+      useRawContext:
+        typeof window !== "undefined"
+          ? localStorage.getItem("useRawContext") === "true"
+          : false,
     };
 
     await fetch("/api/story/next", {
@@ -1683,11 +1710,9 @@ function StoryPageContent() {
           return;
         }
 
-        if (data.meta?.tokensDeducted) {
-          addNotification(
-            `✓ Used ${data.meta.tokensDeducted} tokens (retry)`,
-            "success"
-          );
+        // Update token balance
+        if (data.meta?.remainingBalance?.total !== undefined) {
+          setTokenBalance(data.meta.remainingBalance.total);
         }
 
         if (data.part.commands && data.part.commands.length > 0) {
@@ -2288,9 +2313,17 @@ function StoryPageContent() {
       <main className="flex gap-6 w-full max-w-4xl mx-auto flex-col">
         {/* Story Header */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
-          <h1 className="text-3xl sm:text-4xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent text-center sm:text-left">
-            {storyData.story_name}
-          </h1>
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl sm:text-4xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              {storyData.story_name}
+            </h1>
+            {tokenBalance !== null && (
+              <div className="text-xl sm:text-2xl font-semibold text-yellow-500 dark:text-yellow-400 flex items-center gap-2">
+                <span>🪙</span>
+                <span>{tokenBalance}</span>
+              </div>
+            )}
+          </div>
         </div>
         {/* Buttons for navigation and pages */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">

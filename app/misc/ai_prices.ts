@@ -77,21 +77,6 @@ export const AI_MODELS = {
       "A robust model designed for handling extensive context and delivering powerful performance, making it suitable for complex storytelling and detailed narratives.",
     bannerUrl: undefined,
   },
-  Apollo: {
-    name: "Apollo",
-    original_model: "GPT-4o Mini",
-    model: "gpt-4o-mini",
-    maxTokens: 100000,
-    maxOutputTokens: 2000,
-    provider: "openrouter",
-    cost: 2,
-    finetunes: [],
-    strengths: ["cost-effective", "smarts", "nsfw"],
-    weaknesses: ["creativity"],
-    description:
-      "A highly intelligent model that excels in understanding and generating coherent content, ideal for users prioritizing smarts and affordability.",
-    bannerUrl: undefined,
-  },
   Chronos: {
     name: "Chronos",
     original_model: "Qwen3 235B A22B Instruct 2507",
@@ -107,21 +92,7 @@ export const AI_MODELS = {
       "A powerful model capable of handling long contexts, making it suitable for detailed and complex storytelling tasks.",
     bannerUrl: undefined,
   },
-  Thalia: {
-    name: "Thalia",
-    original_model: "mistral-nemo",
-    model: "mistralai/mistral-nemo",
-    maxTokens: 128000,
-    maxOutputTokens: 2000,
-    provider: "openrouter",
-    cost: 1,
-    finetunes: [],
-    strengths: ["cost-effective"],
-    weaknesses: ["creativity", "smarts"],
-    description:
-      "A cost-effective model that balances performance and affordability, ideal for users seeking value without compromising too much on quality.",
-    bannerUrl: undefined,
-  },
+
   Athena: {
     name: "Athena",
     original_model: "gpt-oss-120b",
