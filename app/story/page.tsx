@@ -561,9 +561,11 @@ function StoryPageContent() {
       try {
         // Check if this is a local story
         if (storyId?.startsWith("local_")) {
-          const { getLocalStory } = await import("@/app/misc/localStoryManager");
+          const { getLocalStory } = await import(
+            "@/app/misc/localStoryManager"
+          );
           const localStory = await getLocalStory(storyId);
-          
+
           if (!localStory) {
             throw new Error("Local story not found");
           }
@@ -581,7 +583,9 @@ function StoryPageContent() {
 
           // Set up UI state from loaded story
           const lastPart =
-            localStory.storyData.scene.parts[localStory.storyData.scene.parts.length - 1];
+            localStory.storyData.scene.parts[
+              localStory.storyData.scene.parts.length - 1
+            ];
           setStoryText(lastPart.content);
           setChoices({ choices: lastPart.choices || [] });
 
@@ -740,7 +744,9 @@ function StoryPageContent() {
     if (storyDbId) {
       try {
         if (storyDbId.startsWith("local_")) {
-          const { saveLocalStory } = await import("@/app/misc/localStoryManager");
+          const { saveLocalStory } = await import(
+            "@/app/misc/localStoryManager"
+          );
           updatedStoryData.selected_preset = preset.id;
           await saveLocalStory(storyDbId, updatedStoryData);
         } else {
@@ -798,7 +804,9 @@ function StoryPageContent() {
       try {
         // Handle local story saving
         if (storyDbId.startsWith("local_")) {
-          const { saveLocalStory } = await import("@/app/misc/localStoryManager");
+          const { saveLocalStory } = await import(
+            "@/app/misc/localStoryManager"
+          );
           // Trim scene history before saving to reduce data size
           const trimmedData = trimStoryData(updatedStoryData);
           await saveLocalStory(storyDbId, trimmedData);
@@ -2445,7 +2453,7 @@ function StoryPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8 pt-24">
       <main className="flex gap-6 w-full max-w-4xl mx-auto flex-col">
         {/* Story Header */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">

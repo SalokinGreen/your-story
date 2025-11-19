@@ -15,8 +15,12 @@ export default function ExplorerPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedDifficulties, setSelectedDifficulties] = useState<("easy" | "medium" | "hard" | "expert")[]>([]);
-  const [sortBy, setSortBy] = useState<"popularity" | "newest" | "rating" | "title">("popularity");
+  const [selectedDifficulties, setSelectedDifficulties] = useState<
+    ("easy" | "medium" | "hard" | "expert")[]
+  >([]);
+  const [sortBy, setSortBy] = useState<
+    "popularity" | "newest" | "rating" | "title"
+  >("popularity");
   const [showFilters, setShowFilters] = useState(false);
 
   // Fetch adventures from database
@@ -24,12 +28,14 @@ export default function ExplorerPage() {
     const fetchAdventures = async () => {
       try {
         setLoading(true);
-        
+
         // Build query params
         const params = new URLSearchParams();
         if (searchQuery) params.append("search", searchQuery);
-        if (selectedTags.length > 0) params.append("tags", selectedTags.join(","));
-        if (selectedDifficulties.length > 0) params.append("difficulty", selectedDifficulties.join(","));
+        if (selectedTags.length > 0)
+          params.append("tags", selectedTags.join(","));
+        if (selectedDifficulties.length > 0)
+          params.append("difficulty", selectedDifficulties.join(","));
         params.append("sortBy", sortBy);
 
         const response = await fetch(`/api/adventures?${params}`);
@@ -81,30 +87,35 @@ export default function ExplorerPage() {
   }, [featuredAdventures.length]);
 
   const toggleTag = (tag: string) => {
-    setSelectedTags(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
   };
 
   const toggleDifficulty = (diff: "easy" | "medium" | "hard" | "expert") => {
-    setSelectedDifficulties(prev =>
-      prev.includes(diff) ? prev.filter(d => d !== diff) : [...prev, diff]
+    setSelectedDifficulties((prev) =>
+      prev.includes(diff) ? prev.filter((d) => d !== diff) : [...prev, diff]
     );
   };
 
   const getDifficultyColor = (difficulty: string) => {
     const lower = difficulty.toLowerCase();
     switch (lower) {
-      case "easy": return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800";
-      case "medium": return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800";
-      case "hard": return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800";
-      case "expert": return "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800";
-      default: return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800";
+      case "easy":
+        return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800";
+      case "medium":
+        return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800";
+      case "hard":
+        return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800";
+      case "expert":
+        return "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800";
+      default:
+        return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800";
     }
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 pt-16">
       <div className="max-w-7xl mx-auto p-4 sm:p-8">
         {/* Header */}
         <div className="mb-8">
@@ -152,7 +163,11 @@ export default function ExplorerPage() {
                     <div className="h-full bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 p-8 sm:p-12 flex flex-col justify-center">
                       <div className="max-w-2xl">
                         <div className="flex items-center gap-2 mb-4">
-                          <span className={`px-3 py-1 rounded-full text-sm font-bold border-2 ${getDifficultyColor(adventure.difficulty)}`}>
+                          <span
+                            className={`px-3 py-1 rounded-full text-sm font-bold border-2 ${getDifficultyColor(
+                              adventure.difficulty
+                            )}`}
+                          >
                             {adventure.difficulty}
                           </span>
                           <span className="px-3 py-1 bg-white/20 text-white rounded-full text-sm font-semibold">
@@ -166,14 +181,19 @@ export default function ExplorerPage() {
                           {adventure.description}
                         </p>
                         <div className="flex flex-wrap gap-2 mb-6">
-                          {adventure.tags.slice(0, 4).map(tag => (
-                            <span key={tag} className="px-3 py-1 bg-white/20 text-white rounded-full text-sm">
+                          {adventure.tags.slice(0, 4).map((tag) => (
+                            <span
+                              key={tag}
+                              className="px-3 py-1 bg-white/20 text-white rounded-full text-sm"
+                            >
                               {tag}
                             </span>
                           ))}
                         </div>
                         <button
-                          onClick={() => router.push(`/explorer/${adventure.id}`)}
+                          onClick={() =>
+                            router.push(`/explorer/${adventure.id}`)
+                          }
                           className="px-8 py-4 bg-white text-purple-600 font-bold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105"
                         >
                           Start Adventure →
@@ -183,7 +203,7 @@ export default function ExplorerPage() {
                   </div>
                 ))}
               </div>
-              
+
               {/* Carousel Navigation */}
               <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
                 {featuredAdventures.map((_, index) => (
@@ -201,13 +221,23 @@ export default function ExplorerPage() {
 
               {/* Arrow Navigation */}
               <button
-                onClick={() => setCurrentSlide((prev) => (prev - 1 + featuredAdventures.length) % featuredAdventures.length)}
+                onClick={() =>
+                  setCurrentSlide(
+                    (prev) =>
+                      (prev - 1 + featuredAdventures.length) %
+                      featuredAdventures.length
+                  )
+                }
                 className="absolute left-4 top-1/2 transform -translate-y-1/2 p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors"
               >
                 ←
               </button>
               <button
-                onClick={() => setCurrentSlide((prev) => (prev + 1) % featuredAdventures.length)}
+                onClick={() =>
+                  setCurrentSlide(
+                    (prev) => (prev + 1) % featuredAdventures.length
+                  )
+                }
                 className="absolute right-4 top-1/2 transform -translate-y-1/2 p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors"
               >
                 →
@@ -224,7 +254,8 @@ export default function ExplorerPage() {
                 ✨ Create Your Own Story
               </h2>
               <p className="text-white/90 text-lg mb-6">
-                Have an idea for an epic adventure? Bring your imagination to life and share it with the community!
+                Have an idea for an epic adventure? Bring your imagination to
+                life and share it with the community!
               </p>
               <button
                 onClick={() => {
@@ -288,19 +319,22 @@ export default function ExplorerPage() {
                     Difficulty:
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {(["easy", "medium", "hard", "expert"] as const).map(diff => (
-                      <button
-                        key={diff}
-                        onClick={() => toggleDifficulty(diff)}
-                        className={`px-4 py-2 rounded-lg font-semibold transition-all border-2 ${
-                          selectedDifficulties.includes(diff)
-                            ? getDifficultyColor(diff) + " ring-2 ring-offset-2"
-                            : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600"
-                        }`}
-                      >
-                        {diff.charAt(0).toUpperCase() + diff.slice(1)}
-                      </button>
-                    ))}
+                    {(["easy", "medium", "hard", "expert"] as const).map(
+                      (diff) => (
+                        <button
+                          key={diff}
+                          onClick={() => toggleDifficulty(diff)}
+                          className={`px-4 py-2 rounded-lg font-semibold transition-all border-2 ${
+                            selectedDifficulties.includes(diff)
+                              ? getDifficultyColor(diff) +
+                                " ring-2 ring-offset-2"
+                              : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600"
+                          }`}
+                        >
+                          {diff.charAt(0).toUpperCase() + diff.slice(1)}
+                        </button>
+                      )
+                    )}
                   </div>
                 </div>
 
@@ -310,7 +344,7 @@ export default function ExplorerPage() {
                     Tags:
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {allTags.map(tag => (
+                    {allTags.map((tag) => (
                       <button
                         key={tag}
                         onClick={() => toggleTag(tag)}
@@ -327,7 +361,9 @@ export default function ExplorerPage() {
                 </div>
 
                 {/* Clear Filters */}
-                {(selectedTags.length > 0 || selectedDifficulties.length > 0 || searchQuery) && (
+                {(selectedTags.length > 0 ||
+                  selectedDifficulties.length > 0 ||
+                  searchQuery) && (
                   <button
                     onClick={() => {
                       setSelectedTags([]);
@@ -352,7 +388,9 @@ export default function ExplorerPage() {
           {loading ? (
             <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent mx-auto"></div>
-              <p className="text-gray-600 dark:text-gray-400 text-lg mt-4">Loading adventures...</p>
+              <p className="text-gray-600 dark:text-gray-400 text-lg mt-4">
+                Loading adventures...
+              </p>
             </div>
           ) : adventures.length === 0 ? (
             <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
@@ -362,7 +400,7 @@ export default function ExplorerPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {adventures.map(adventure => (
+              {adventures.map((adventure) => (
                 <div
                   key={adventure.id}
                   className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all hover:scale-105 cursor-pointer"
@@ -370,16 +408,26 @@ export default function ExplorerPage() {
                 >
                   {/* Thumbnail Image or Placeholder */}
                   {adventure.thumbnailUrl ? (
-                    <div 
+                    <div
                       className="h-40 bg-cover bg-center"
-                      style={{ backgroundImage: `url(${adventure.thumbnailUrl})` }}
+                      style={{
+                        backgroundImage: `url(${adventure.thumbnailUrl})`,
+                      }}
                     />
                   ) : (
                     <div className="h-40 bg-linear-to-br from-blue-400 via-purple-500 to-pink-500 flex items-center justify-center">
-                      <span className="text-6xl">{adventure.tags[0] === "Fantasy" ? "⚔️" : adventure.tags[0] === "Sci-Fi" ? "🚀" : adventure.tags[0] === "Mystery" ? "🔍" : "📖"}</span>
+                      <span className="text-6xl">
+                        {adventure.tags[0] === "Fantasy"
+                          ? "⚔️"
+                          : adventure.tags[0] === "Sci-Fi"
+                          ? "🚀"
+                          : adventure.tags[0] === "Mystery"
+                          ? "🔍"
+                          : "📖"}
+                      </span>
                     </div>
                   )}
-                  
+
                   <div className="p-5">
                     <div className="flex items-start justify-between mb-3">
                       <h3 className="text-xl font-bold text-gray-900 dark:text-white flex-1">
@@ -389,32 +437,44 @@ export default function ExplorerPage() {
                         <span className="text-yellow-500 ml-2">⭐</span>
                       )}
                     </div>
-                    
+
                     <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">
                       {adventure.shortDescription}
                     </p>
-                    
+
                     <div className="flex items-center gap-2 mb-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold border capitalize ${getDifficultyColor(adventure.difficulty)}`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-bold border capitalize ${getDifficultyColor(
+                          adventure.difficulty
+                        )}`}
+                      >
                         {adventure.difficulty}
                       </span>
                       <span className="text-xs text-gray-600 dark:text-gray-400">
                         ⏱️ {adventure.estimatedDuration}
                       </span>
                     </div>
-                    
+
                     <div className="flex flex-wrap gap-1 mb-4">
-                      {adventure.tags.slice(0, 3).map(tag => (
-                        <span key={tag} className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs">
+                      {adventure.tags.slice(0, 3).map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs"
+                        >
                           {tag}
                         </span>
                       ))}
                     </div>
-                    
+
                     <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
                       <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
                         <span>⭐ {adventure.rating?.toFixed(1)}</span>
-                        <span>👥 {adventure.playCount ? adventure.playCount.toLocaleString() : "0"}</span>
+                        <span>
+                          👥{" "}
+                          {adventure.playCount
+                            ? adventure.playCount.toLocaleString()
+                            : "0"}
+                        </span>
                       </div>
                       <span className="text-purple-600 dark:text-purple-400 font-semibold text-sm">
                         Play →

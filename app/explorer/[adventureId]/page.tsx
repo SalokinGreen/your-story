@@ -119,8 +119,10 @@ export default function AdventureDetailPage() {
       if (saveLocally) {
         // Create local story
         const { saveLocalStory } = await import("@/app/misc/localStoryManager");
-        const localId = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
+        const localId = `local_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
+
         const newStoryData = {
           ...adventure.storyTemplate,
           story_name: `${adventure.title} - ${new Date().toLocaleDateString()}`,
@@ -128,7 +130,7 @@ export default function AdventureDetailPage() {
         } as unknown as StoryData; // Cast to StoryData as template should be valid
 
         await saveLocalStory(localId, newStoryData);
-        
+
         addNotification("Adventure started offline! 📂", "success");
         router.push(`/story?storyId=${localId}`);
         return;
@@ -222,7 +224,7 @@ export default function AdventureDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center pt-16">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
       </div>
     );
@@ -230,7 +232,7 @@ export default function AdventureDetailPage() {
 
   if (!adventure) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center p-4 pt-20">
         <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 text-center">
           <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
             Adventure Not Found
@@ -250,7 +252,7 @@ export default function AdventureDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 pt-16">
       <div className="max-w-5xl mx-auto p-4 sm:p-8">
         {/* Back Button */}
         <div className="mb-6">

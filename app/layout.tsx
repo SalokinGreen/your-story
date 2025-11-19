@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "./misc/AuthContext";
 import { NotificationProvider } from "./misc/NotificationContext";
 import NotificationContainer from "./components/NotificationContainer";
+import SiteHeader from "./components/SiteHeader";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -33,7 +34,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <NotificationProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <SiteHeader />
+            {children}
+          </AuthProvider>
           <NotificationContainer />
         </NotificationProvider>
         <SpeedInsights />

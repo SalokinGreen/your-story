@@ -6215,35 +6215,23 @@ function AdventureCreatorContent() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 pt-16">
       <div className="max-w-6xl mx-auto p-4 sm:p-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl sm:text-4xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-              {editAdventureId ? "✏️ Edit Adventure" : "✨ Adventure Creator"}
-            </h1>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setIsAIMenuOpen(true)}
-                className="px-4 py-2 bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all shadow-md flex items-center gap-2"
-              >
-                <span>🤖</span> AI Assistant
-              </button>
-              <button
-                onClick={handleDiscardChanges}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md"
-              >
-                🗑️ Discard Changes
-              </button>
-              <button
-                onClick={() => router.push("/explorer")}
-                className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
-              >
-                ← Cancel
-              </button>
-            </div>
-          </div>
+        {/* Compact Header with Action Buttons */}
+        <div className="mb-4 flex items-center justify-end gap-2">
+          <button
+            onClick={() => setIsAIMenuOpen(true)}
+            className="px-3 py-1.5 sm:px-4 sm:py-2 bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2"
+          >
+            <span>🤖</span>{" "}
+            <span className="hidden sm:inline">AI Assistant</span>
+          </button>
+          <button
+            onClick={handleDiscardChanges}
+            className="px-3 py-1.5 sm:px-4 sm:py-2 bg-red-600 hover:bg-red-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-colors shadow-md"
+          >
+            <span>🗑️</span> <span className="hidden sm:inline">Discard</span>
+          </button>
         </div>
 
         {/* Progress Steps */}
@@ -6277,19 +6265,19 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Navigation */}
-        <div className="flex items-center justify-between gap-4 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 mb-8">
           <button
             onClick={() => {
               const prevIndex = Math.max(0, currentStepIndex - 1);
               setCurrentStep(steps[prevIndex].id);
             }}
             disabled={currentStepIndex === 0}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
+            className="px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
           >
             ← Previous
           </button>
 
-          <div className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center">
             Step {currentStepIndex + 1} of {steps.length}
           </div>
 
@@ -6298,16 +6286,16 @@ function AdventureCreatorContent() {
               <button
                 onClick={handleSaveLocally}
                 disabled={saving}
-                className="px-6 py-2 bg-white dark:bg-gray-700 border-2 border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 font-bold rounded-lg transition-all shadow-md hover:shadow-lg"
+                className="flex-1 sm:flex-none px-3 py-2 bg-white dark:bg-gray-700 border-2 border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
               >
-                💾 Save Locally
+                💾 Save
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-6 py-2 bg-linear-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold rounded-lg transition-all shadow-md hover:shadow-lg"
+                className="flex-1 sm:flex-none px-3 py-2 bg-linear-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
               >
-                {saving ? "Publishing..." : "🚀 Publish Adventure"}
+                {saving ? "Publishing..." : "🚀 Publish"}
               </button>
             </div>
           ) : (
@@ -6319,7 +6307,7 @@ function AdventureCreatorContent() {
                 );
                 setCurrentStep(steps[nextIndex].id);
               }}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+              className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors"
             >
               Next →
             </button>

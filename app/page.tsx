@@ -9,6 +9,454 @@ import UserProfile from "./components/UserProfile";
 import { Adventure } from "./misc/structs";
 import { AI_MODELS, AIModelKey } from "./misc/ai_prices";
 
+// InfoTabs Component
+function InfoTabs() {
+  const [activeTab, setActiveTab] = useState<"models" | "coins" | "byok">("models");
+  
+  const packages = [
+    { name: "Starter", cost: 0.99, coins: 100, bonus: 0, savings: 0 },
+    { name: "Basic", cost: 4.99, coins: 500, bonus: 50, savings: 8 },
+    { name: "Standard", cost: 9.99, coins: 1000, bonus: 150, savings: 13 },
+    { name: "Premium", cost: 19.99, coins: 2000, bonus: 400, savings: 17 },
+    { name: "Ultimate", cost: 49.99, coins: 5000, bonus: 1500, savings: 23 },
+  ];
+
+  return (
+    <div className="w-full max-w-5xl mb-12">
+      {/* Tab Navigation */}
+      <div className="flex justify-center mb-8">
+        <div className="inline-flex bg-white dark:bg-gray-800 rounded-xl shadow-lg p-1 border border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => setActiveTab("models")}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+              activeTab === "models"
+                ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            }`}
+          >
+            🤖 AI Models
+          </button>
+          <button
+            onClick={() => setActiveTab("coins")}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+              activeTab === "coins"
+                ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            }`}
+          >
+            💰 Coins Packages
+          </button>
+          <button
+            onClick={() => setActiveTab("byok")}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+              activeTab === "byok"
+                ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            }`}
+          >
+            🔑 BYOK
+          </button>
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      <div className="animate-fadeIn">
+        {activeTab === "models" && (
+          <div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
+              🤖 AI Models
+            </h2>
+            <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
+              Choose from our curated selection of AI models, each with unique
+              strengths and characteristics for your storytelling needs.
+            </p>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Object.entries(AI_MODELS).map(([key, model]) => (
+                <div
+                  key={key}
+                  className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:scale-105 transition-transform"
+                >
+                  <div className="bg-linear-to-r from-purple-600 to-blue-600 p-4 text-white">
+                    <h3 className="text-2xl font-bold mb-1">{model.name}</h3>
+                    <p className="text-sm text-purple-100">{model.original_model}</p>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                      {model.description}
+                    </p>
+                    <div className="flex justify-between items-center text-sm">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                          {model.cost}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          Coins/Gen
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                          {(model.maxTokens / 1000).toFixed(0)}K
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          Max Tokens
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase">
+                        Strengths
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {model.strengths.map((strength, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-semibold"
+                          >
+                            ✓ {strength}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase">
+                        Weaknesses
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {model.weaknesses.map((weakness, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-semibold"
+                          >
+                            ⚠ {weakness}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+              <p className="text-sm text-purple-900 dark:text-purple-200 text-center">
+                💡 <strong>Pro Tip:</strong> You can select your preferred AI
+                model in the story menu during gameplay. Each model offers unique
+                storytelling characteristics!
+              </p>
+            </div>
+            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-900 dark:text-blue-200 text-center">
+                🎙️ <strong>Text-to-Speech:</strong> Each TTS generation costs 3
+                coins and runs through Speechify for high-quality voice narration.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "coins" && (
+          <div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
+              💰 Coins Packages
+            </h2>
+            <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
+              Purchase coins to generate AI-powered story continuations. Each
+              generation costs 1 coin. Bigger packages offer better value with
+              bonus coins included!
+            </p>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+              <table className="w-full text-left">
+                <thead className="bg-linear-to-r from-blue-600 to-purple-600 text-white">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Package</th>
+                    <th className="px-6 py-4 font-semibold">Cost (USD)</th>
+                    <th className="px-6 py-4 font-semibold">Coins</th>
+                    <th className="px-6 py-4 font-semibold">Bonus</th>
+                    <th className="px-6 py-4 font-semibold">Total</th>
+                    <th className="px-6 py-4 font-semibold">Effective Rate</th>
+                    <th className="px-6 py-4 font-semibold">Savings</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {packages.map((pkg, index) => (
+                    <tr
+                      key={pkg.name}
+                      className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                        index === 2
+                          ? "bg-purple-50 dark:bg-purple-900/20 ring-2 ring-purple-500"
+                          : ""
+                      }`}
+                    >
+                      <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
+                        {pkg.name}
+                        {index === 2 && (
+                          <span className="ml-2 px-2 py-1 text-xs bg-purple-600 text-white rounded-full">
+                            POPULAR
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
+                        ${pkg.cost.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
+                        {pkg.coins.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-green-600 dark:text-green-400 font-semibold">
+                        {pkg.bonus > 0 ? `+${pkg.bonus}` : "-"}
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
+                        {(pkg.coins + pkg.bonus).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
+                        ${((pkg.cost / (pkg.coins + pkg.bonus)) * 100).toFixed(2)}
+                        /100
+                      </td>
+                      <td className="px-6 py-4">
+                        {pkg.savings > 0 ? (
+                          <span className="px-3 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full text-sm font-semibold">
+                            {pkg.savings}%
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden grid gap-4">
+              {packages.map((pkg, index) => (
+                <div
+                  key={pkg.name}
+                  className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-2 ${
+                    index === 2
+                      ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                      : "border-gray-200 dark:border-gray-700"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {pkg.name}
+                    </h3>
+                    {index === 2 && (
+                      <span className="px-3 py-1 text-xs bg-purple-600 text-white rounded-full font-semibold">
+                        POPULAR
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Cost:</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        ${pkg.cost.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Base Coins:</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {pkg.coins.toLocaleString()}
+                      </span>
+                    </div>
+                    {pkg.bonus > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Bonus:</span>
+                        <span className="font-semibold text-green-600 dark:text-green-400">
+                          +{pkg.bonus}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <span className="text-gray-600 dark:text-gray-400">Total Coins:</span>
+                      <span className="font-bold text-lg text-gray-900 dark:text-white">
+                        {(pkg.coins + pkg.bonus).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Rate:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        ${((pkg.cost / (pkg.coins + pkg.bonus)) * 100).toFixed(2)}
+                        /100
+                      </span>
+                    </div>
+                    {pkg.savings > 0 && (
+                      <div className="flex justify-center pt-2">
+                        <span className="px-4 py-2 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full text-sm font-semibold">
+                          Save {pkg.savings}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-900 dark:text-blue-200 text-center">
+                💡 <strong>Tip:</strong> Each AI story generation costs 1 Coin.
+                Coins older than 1 month can be gifted to other users!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "byok" && (
+          <div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
+              🔑 Bring Your Own Key (BYOK)
+            </h2>
+            <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
+              Take full control of your AI experience. Use your own API keys with
+              unlimited flexibility and customize every aspect of content
+              generation.
+            </p>
+
+            <div className="bg-linear-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-950 dark:via-purple-950 dark:to-pink-950 rounded-2xl shadow-2xl border-2 border-indigo-300 dark:border-indigo-700 overflow-hidden">
+              <div className="bg-linear-to-r from-indigo-600 via-purple-600 to-pink-600 p-8 text-white text-center">
+                <div className="text-5xl mb-4">🚀</div>
+                <h3 className="text-3xl sm:text-4xl font-bold mb-2">
+                  Premium BYOK Subscription
+                </h3>
+                <div className="text-4xl sm:text-5xl font-extrabold mb-2">
+                  $10<span className="text-2xl font-normal">/month</span>
+                </div>
+                <p className="text-indigo-100 text-lg">
+                  Unlimited AI generations with your own keys
+                </p>
+              </div>
+
+              <div className="p-8 sm:p-12">
+                <div className="grid md:grid-cols-2 gap-6 mb-8">
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="text-3xl">🤖</div>
+                      <h4 className="text-xl font-bold text-gray-900 dark:text-white">
+                        OpenRouter Integration
+                      </h4>
+                    </div>
+                    <ul className="space-y-3">
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          Use your own OpenRouter API key
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          Choose from <strong>100+ AI models</strong>
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          Customize <strong>context window size</strong>
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          Full model parameter control
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="text-3xl">🎙️</div>
+                      <h4 className="text-xl font-bold text-gray-900 dark:text-white">
+                        Speechify TTS
+                      </h4>
+                    </div>
+                    <ul className="space-y-3">
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          Use your own Speechify API key
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          <strong>Unlimited</strong> text-to-speech generations
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          Premium voice library access
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          No per-generation fees
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-linear-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-xl p-6 mb-6">
+                  <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 text-center">
+                    ✨ Additional Benefits
+                  </h4>
+                  <div className="grid sm:grid-cols-2 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl mb-2">💰</div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        Pay-as-you-go pricing
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Only pay for what you use
+                      </p>
+                    </div>
+                    <div>
+                      <div className="text-2xl mb-2">🔒</div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        Your keys, your data
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Complete privacy & control
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <button
+                    className="px-8 py-4 bg-linear-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white font-bold text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all transform hover:scale-105"
+                    disabled
+                  >
+                    Subscribe to BYOK - $10/month
+                  </button>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
+                    Coming Soon • Cancel anytime • No hidden fees • Full refund
+                    within 7 days
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+              <p className="text-sm text-purple-900 dark:text-purple-200 text-center">
+                <strong>💡 Perfect for power users:</strong> With BYOK, you
+                control your AI budget directly through OpenRouter and Speechify.
+                No coin limits, just pure flexibility!
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -57,31 +505,12 @@ export default function Home() {
     fetchPopular();
   }, []);
 
-  const packages = [
-    { name: "Starter", cost: 0.99, coins: 100, bonus: 0, savings: 0 },
-    { name: "Basic", cost: 4.99, coins: 500, bonus: 50, savings: 8 },
-    { name: "Standard", cost: 9.99, coins: 1000, bonus: 150, savings: 13 },
-    { name: "Premium", cost: 19.99, coins: 2000, bonus: 400, savings: 17 },
-    { name: "Ultimate", cost: 49.99, coins: 5000, bonus: 1500, savings: 23 },
-  ];
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans">
       <main className="flex w-full max-w-6xl flex-col items-center justify-center py-8 px-4 sm:py-12 sm:px-8">
         {/* Hero Section */}
         <div className="text-center mb-8 sm:mb-12">
-          <div className="mb-6 flex justify-center">
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-lg">
-              <Image
-                className="dark:invert"
-                src="/next.svg"
-                alt="Your Story logo"
-                width={120}
-                height={24}
-                priority
-              />
-            </div>
-          </div>
+          <div className="mb-6 flex justify-center"></div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-4 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
             Your Story Awaits
@@ -265,431 +694,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* AI Models Overview Section */}
-        <div className="w-full max-w-5xl mb-12">
-          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
-            🤖 AI Models
-          </h2>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-            Choose from our curated selection of AI models, each with unique
-            strengths and characteristics for your storytelling needs.
-          </p>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Object.entries(AI_MODELS).map(([key, model]) => (
-              <div
-                key={key}
-                className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:scale-105 transition-transform"
-              >
-                {/* Model Header */}
-                <div className="bg-linear-to-r from-purple-600 to-blue-600 p-4 text-white">
-                  <h3 className="text-2xl font-bold mb-1">{model.name}</h3>
-                  <p className="text-sm text-purple-100">
-                    {model.original_model}
-                  </p>
-                </div>
-
-                {/* Model Details */}
-                <div className="p-6 space-y-4">
-                  {/* Description */}
-                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                    {model.description}
-                  </p>
-
-                  {/* Stats */}
-                  <div className="flex justify-between items-center text-sm">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                        {model.cost}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Coins/Gen
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                        {(model.maxTokens / 1000).toFixed(0)}K
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Max Tokens
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Strengths */}
-                  <div>
-                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase">
-                      Strengths
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {model.strengths.map((strength, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-semibold"
-                        >
-                          ✓ {strength}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Weaknesses */}
-                  <div>
-                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase">
-                      Weaknesses
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {model.weaknesses.map((weakness, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-semibold"
-                        >
-                          ⚠ {weakness}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Info Note */}
-          <div className="mt-8 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-            <p className="text-sm text-purple-900 dark:text-purple-200 text-center">
-              💡 <strong>Pro Tip:</strong> You can select your preferred AI
-              model in the story menu during gameplay. Each model offers unique
-              storytelling characteristics!
-            </p>
-          </div>
-          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-900 dark:text-blue-200 text-center">
-              🎙️ <strong>Text-to-Speech:</strong> Each TTS generation costs 3
-              coins and runs through Speechify for high-quality voice narration.
-            </p>
-          </div>
-        </div>
-
-        {/* Coins Packages Section */}
-        <div className="w-full max-w-5xl">
-          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
-            Coins Packages
-          </h2>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-            Purchase coins to generate AI-powered story continuations. Each
-            generation costs 5 coins. Bigger packages offer better value with
-            bonus coins included!
-          </p>
-
-          {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
-            <table className="w-full text-left">
-              <thead className="bg-linear-to-r from-blue-600 to-purple-600 text-white">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Package</th>
-                  <th className="px-6 py-4 font-semibold">Cost (USD)</th>
-                  <th className="px-6 py-4 font-semibold">coins</th>
-                  <th className="px-6 py-4 font-semibold">Bonus</th>
-                  <th className="px-6 py-4 font-semibold">Total</th>
-                  <th className="px-6 py-4 font-semibold">Effective Rate</th>
-                  <th className="px-6 py-4 font-semibold">Savings</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {packages.map((pkg, index) => (
-                  <tr
-                    key={pkg.name}
-                    className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                      index === 2
-                        ? "bg-purple-50 dark:bg-purple-900/20 ring-2 ring-purple-500"
-                        : ""
-                    }`}
-                  >
-                    <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
-                      {pkg.name}
-                      {index === 2 && (
-                        <span className="ml-2 px-2 py-1 text-xs bg-purple-600 text-white rounded-full">
-                          POPULAR
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
-                      ${pkg.cost.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
-                      {pkg.coins.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-green-600 dark:text-green-400 font-semibold">
-                      {pkg.bonus > 0 ? `+${pkg.bonus}` : "-"}
-                    </td>
-                    <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
-                      {(pkg.coins + pkg.bonus).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
-                      ${((pkg.cost / (pkg.coins + pkg.bonus)) * 100).toFixed(2)}
-                      /100
-                    </td>
-                    <td className="px-6 py-4">
-                      {pkg.savings > 0 ? (
-                        <span className="px-3 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full text-sm font-semibold">
-                          {pkg.savings}%
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Cards */}
-          <div className="md:hidden grid gap-4">
-            {packages.map((pkg, index) => (
-              <div
-                key={pkg.name}
-                className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-2 ${
-                  index === 2
-                    ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                    : "border-gray-200 dark:border-gray-700"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {pkg.name}
-                  </h3>
-                  {index === 2 && (
-                    <span className="px-3 py-1 text-xs bg-purple-600 text-white rounded-full font-semibold">
-                      POPULAR
-                    </span>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Cost:
-                    </span>
-                    <span className="font-semibold text-gray-900 dark:text-white">
-                      ${pkg.cost.toFixed(2)}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Base Coins:
-                    </span>
-                    <span className="font-semibold text-gray-900 dark:text-white">
-                      {pkg.coins.toLocaleString()}
-                    </span>
-                  </div>
-
-                  {pkg.bonus > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        Bonus:
-                      </span>
-                      <span className="font-semibold text-green-600 dark:text-green-400">
-                        +{pkg.bonus}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Total Coins:
-                    </span>
-                    <span className="font-bold text-lg text-gray-900 dark:text-white">
-                      {(pkg.coins + pkg.bonus).toLocaleString()}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Rate:
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      ${((pkg.cost / (pkg.coins + pkg.bonus)) * 100).toFixed(2)}
-                      /100
-                    </span>
-                  </div>
-
-                  {pkg.savings > 0 && (
-                    <div className="flex justify-center pt-2">
-                      <span className="px-4 py-2 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full text-sm font-semibold">
-                        Save {pkg.savings}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Info Note */}
-          <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-900 dark:text-blue-200 text-center">
-              💡 <strong>Tip:</strong> Each AI story generation costs 1 Coins.
-              Coins older than 1 month can be gifted to other users!
-            </p>
-          </div>
-        </div>
-
-        {/* BYOK Subscription Section */}
-        <div className="w-full max-w-5xl mt-12">
-          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
-            🔑 Bring Your Own Key (BYOK)
-          </h2>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-            Take full control of your AI experience. Use your own API keys with
-            unlimited flexibility and customize every aspect of content
-            generation.
-          </p>
-
-          <div className="bg-linear-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-950 dark:via-purple-950 dark:to-pink-950 rounded-2xl shadow-2xl border-2 border-indigo-300 dark:border-indigo-700 overflow-hidden">
-            {/* Hero Section with Gradient */}
-            <div className="bg-linear-to-r from-indigo-600 via-purple-600 to-pink-600 p-8 text-white text-center">
-              <div className="text-5xl mb-4">🚀</div>
-              <h3 className="text-3xl sm:text-4xl font-bold mb-2">
-                Premium BYOK Subscription
-              </h3>
-              <div className="text-4xl sm:text-5xl font-extrabold mb-2">
-                $10<span className="text-2xl font-normal">/month</span>
-              </div>
-              <p className="text-indigo-100 text-lg">
-                Unlimited AI generations with your own keys
-              </p>
-            </div>
-
-            {/* Features Grid */}
-            <div className="p-8 sm:p-12">
-              <div className="grid md:grid-cols-2 gap-6 mb-8">
-                {/* OpenRouter Features */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="text-3xl">🤖</div>
-                    <h4 className="text-xl font-bold text-gray-900 dark:text-white">
-                      OpenRouter Integration
-                    </h4>
-                  </div>
-                  <ul className="space-y-3">
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500 font-bold mt-1">✓</span>
-                      <span className="text-gray-700 dark:text-gray-300">
-                        Use your own OpenRouter API key
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500 font-bold mt-1">✓</span>
-                      <span className="text-gray-700 dark:text-gray-300">
-                        Choose from <strong>100+ AI models</strong>
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500 font-bold mt-1">✓</span>
-                      <span className="text-gray-700 dark:text-gray-300">
-                        Customize <strong>context window size</strong>
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500 font-bold mt-1">✓</span>
-                      <span className="text-gray-700 dark:text-gray-300">
-                        Full model parameter control
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Speechify Features */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="text-3xl">🎙️</div>
-                    <h4 className="text-xl font-bold text-gray-900 dark:text-white">
-                      Speechify TTS
-                    </h4>
-                  </div>
-                  <ul className="space-y-3">
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500 font-bold mt-1">✓</span>
-                      <span className="text-gray-700 dark:text-gray-300">
-                        Use your own Speechify API key
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500 font-bold mt-1">✓</span>
-                      <span className="text-gray-700 dark:text-gray-300">
-                        <strong>Unlimited</strong> text-to-speech generations
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500 font-bold mt-1">✓</span>
-                      <span className="text-gray-700 dark:text-gray-300">
-                        Premium voice library access
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500 font-bold mt-1">✓</span>
-                      <span className="text-gray-700 dark:text-gray-300">
-                        No per-generation fees
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Additional Benefits */}
-              <div className="bg-linear-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-xl p-6 mb-6">
-                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 text-center">
-                  ✨ Additional Benefits
-                </h4>
-                <div className="grid sm:grid-cols-2 gap-4 text-center">
-                  <div>
-                    <div className="text-2xl mb-2">💰</div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Pay-as-you-go pricing
-                    </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      Only pay for what you use
-                    </p>
-                  </div>
-                  <div>
-                    <div className="text-2xl mb-2">🔒</div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Your keys, your data
-                    </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      Complete privacy & control
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* CTA Button */}
-              <div className="text-center">
-                <button
-                  className="px-8 py-4 bg-linear-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white font-bold text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all transform hover:scale-105"
-                  disabled
-                >
-                  Subscribe to BYOK - $10/month
-                </button>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
-                  Coming Soon • Cancel anytime • No hidden fees • Full refund
-                  within 7 days
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Comparison Note */}
-          <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-            <p className="text-sm text-purple-900 dark:text-purple-200 text-center">
-              <strong>💡 Perfect for power users:</strong> With BYOK, you
-              control your AI budget directly through OpenRouter and Speechify.
-              No coin limits, just pure flexibility!
-            </p>
-          </div>
-        </div>
+        {/* Tabbed Info Section */}
+        <InfoTabs />
 
         {/* Roadmap Carousel Section */}
         <div className="w-full max-w-5xl mt-12">

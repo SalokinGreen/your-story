@@ -209,7 +209,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 p-4 sm:p-8">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 p-4 sm:p-8 pt-20 sm:pt-24">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6 flex items-center justify-between">
           <button

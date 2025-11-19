@@ -587,7 +587,7 @@ export default function LibraryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 pt-16">
       <div className="max-w-7xl mx-auto p-4 sm:p-8">
         {/* Header */}
         <div className="mb-8">
@@ -961,6 +961,13 @@ export default function LibraryPage() {
                           </p>
                         </div>
                         <div className="flex gap-2">
+                          <button
+                            onClick={() => setMovingStory(story.id)}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+                            title="Move to folder"
+                          >
+                            📁
+                          </button>
                           <button
                             onClick={() =>
                               router.push(`/story?storyId=${story.id}`)
@@ -1460,8 +1467,8 @@ export default function LibraryPage() {
               <button
                 onClick={() => {
                   if (!movingStory) return;
-                  // Check if it's a local story (starts with 'local-')
-                  const isLocal = movingStory.startsWith("local-");
+                  // Check if it's a local story (starts with 'local_')
+                  const isLocal = movingStory.startsWith("local_");
                   if (isLocal) {
                     handleMoveLocalStory(movingStory, null);
                   } else {
@@ -1479,8 +1486,8 @@ export default function LibraryPage() {
                   key={folder.id}
                   onClick={() => {
                     if (!movingStory) return;
-                    // Check if it's a local story (starts with 'local-')
-                    const isLocal = movingStory.startsWith("local-");
+                    // Check if it's a local story (starts with 'local_')
+                    const isLocal = movingStory.startsWith("local_");
                     if (isLocal) {
                       handleMoveLocalStory(movingStory, folder.id);
                     } else {
