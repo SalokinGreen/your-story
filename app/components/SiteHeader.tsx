@@ -104,7 +104,7 @@ export default function SiteHeader() {
             onClick={() => router.push(`/profile/${user.id}`)}
             className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
-            <span className="hidden sm:block text-sm font-semibold text-gray-900 dark:text-white">
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">
               {displayName}
             </span>
             {profileData?.avatar_url ? (

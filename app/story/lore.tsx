@@ -12,14 +12,18 @@ export default function LorePage(storyData: StoryData) {
   const filteredLore = storyData.lore.filter((loreItem) => {
     // Hide lore entries that are turned OFF
     if (loreItem.on === false) return false;
-    
+
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return (
       loreItem.title.toLowerCase().includes(term) ||
       loreItem.content.toLowerCase().includes(term) ||
-      (loreItem.relatedCharacters || []).some((char) => char.toLowerCase().includes(term)) ||
-      (loreItem.relatedLocations || []).some((loc) => loc.toLowerCase().includes(term))
+      (loreItem.relatedCharacters || []).some((char) =>
+        char.toLowerCase().includes(term)
+      ) ||
+      (loreItem.relatedLocations || []).some((loc) =>
+        loc.toLowerCase().includes(term)
+      )
     );
   });
 
@@ -84,11 +88,12 @@ export default function LorePage(storyData: StoryData) {
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
             Discovered Lore
           </h3>
-          
+
           {visibleLore.length === 0 && !searchTerm && (
             <div className="text-center py-12">
               <p className="text-gray-500 dark:text-gray-400">
-                No lore discovered yet. Continue your adventure to uncover the world's secrets!
+                No lore discovered yet. Continue your adventure to uncover the
+                world's secrets!
               </p>
             </div>
           )}
