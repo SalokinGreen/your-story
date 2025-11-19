@@ -115,6 +115,7 @@ export interface Preset {
   name: string;
   description: string;
   icon: string;
+  playerName?: string; // Optional default name for the character
   playerSummary: string;
   stats: Stat[];
   resources: Resource[];

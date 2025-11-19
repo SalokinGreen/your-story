@@ -27,6 +27,7 @@ import {
   createPresetFromCurrentSettings,
   applyPreset,
 } from "@/app/misc/presets";
+import CreatorAIChat from "@/app/components/CreatorAIChat";
 
 type CreatorStep =
   | "basic"
@@ -107,6 +108,130 @@ function AdventureCreatorContent() {
     message: "",
     onConfirm: () => {},
   });
+
+  const [isAIMenuOpen, setIsAIMenuOpen] = useState(false);
+
+  const handleApplyAIChanges = (data: Partial<StoryData>) => {
+    if (data.story_name) setTitle(data.story_name);
+    if (data.premise) setPremise(data.premise);
+    if (data.player_name) setPlayerName(data.player_name);
+    if (data.player_summary) setPlayerSummary(data.player_summary);
+    if (data.starting_content) setStartingContent(data.starting_content);
+    if (data.author_notes) setAuthorNotes(data.author_notes);
+
+    if (data.stats) {
+      const newStats = [...stats];
+      data.stats.forEach((newStat) => {
+        const index = newStats.findIndex((s) => s.name === newStat.name);
+        if (index !== -1) {
+          newStats[index] = { ...newStats[index], ...newStat };
+        } else {
+          newStats.push(newStat as Stat);
+        }
+      });
+      setStats(newStats);
+    }
+
+    if (data.resources) {
+      const newResources = [...resources];
+      data.resources.forEach((newRes) => {
+        const index = newResources.findIndex((r) => r.name === newRes.name);
+        if (index !== -1) {
+          newResources[index] = { ...newResources[index], ...newRes };
+        } else {
+          newResources.push(newRes as Resource);
+        }
+      });
+      setResources(newResources);
+    }
+
+    if (data.inventory) {
+      const newInventory = [...inventory];
+      data.inventory.forEach((newItem) => {
+        const index = newInventory.findIndex((i) => i.name === newItem.name);
+        if (index !== -1) {
+          newInventory[index] = { ...newInventory[index], ...newItem };
+        } else {
+          newInventory.push(newItem as InventoryItem);
+        }
+      });
+      setInventory(newInventory);
+    }
+
+    if (data.plot_beats) {
+      const newBeats = [...plotBeats];
+      data.plot_beats.forEach((newBeat) => {
+        const index = newBeats.findIndex((b) => b.title === newBeat.title);
+        if (index !== -1) {
+          newBeats[index] = { ...newBeats[index], ...newBeat };
+        } else {
+          newBeats.push(newBeat as PlotBeat);
+        }
+      });
+      setPlotBeats(newBeats);
+    }
+
+    if (data.lore) {
+      const newLore = [...lore];
+      data.lore.forEach((l) => {
+        const index = newLore.findIndex(
+          (existing) => existing.title === l.title
+        );
+        if (index !== -1) {
+          newLore[index] = { ...newLore[index], ...l };
+        } else {
+          newLore.push(l as StoryLore);
+        }
+      });
+      setLore(newLore);
+    }
+
+    if (data.achievements) {
+      const newAchievements = [...achievements];
+      data.achievements.forEach((a) => {
+        const index = newAchievements.findIndex(
+          (existing) => existing.title === a.title
+        );
+        if (index !== -1) {
+          newAchievements[index] = { ...newAchievements[index], ...a };
+        } else {
+          newAchievements.push(a as Achievement);
+        }
+      });
+      setAchievements(newAchievements);
+    }
+
+    if (data.quests) {
+      const newQuests = [...quests];
+      data.quests.forEach((q) => {
+        const index = newQuests.findIndex(
+          (existing) => existing.title === q.title
+        );
+        if (index !== -1) {
+          newQuests[index] = { ...newQuests[index], ...q };
+        } else {
+          newQuests.push(q as Quest);
+        }
+      });
+      setQuests(newQuests);
+    }
+
+    if (data.presets) {
+      const newPresets = [...presets];
+      data.presets.forEach((p) => {
+        const index = newPresets.findIndex((existing) => existing.id === p.id);
+        if (index !== -1) {
+          newPresets[index] = { ...newPresets[index], ...p };
+        } else {
+          newPresets.push(p as Preset);
+        }
+      });
+      setPresets(newPresets);
+    }
+
+    addNotification("AI changes applied successfully!", "success");
+    setIsAIMenuOpen(false);
+  };
 
   // Load adventure data if editing
   useEffect(() => {
@@ -190,16 +315,19 @@ function AdventureCreatorContent() {
             if (saved.thumbnailUrl) setThumbnailUrl(saved.thumbnailUrl);
             if (saved.bannerUrl) setBannerUrl(saved.bannerUrl);
 
-            if (saved.selectedPreset) setSelectedPreset(saved.selectedPreset);
+            if (saved.selectedPreset !== undefined)
+              setSelectedPreset(saved.selectedPreset);
             if (Array.isArray(saved.presets)) setPresets(saved.presets);
-            if (saved.playerName) setPlayerName(saved.playerName);
-            if (saved.playerSummary) setPlayerSummary(saved.playerSummary);
-            if (saved.premise) setPremise(saved.premise);
-            if (saved.startingContent)
+            if (saved.playerName !== undefined) setPlayerName(saved.playerName);
+            if (saved.playerSummary !== undefined)
+              setPlayerSummary(saved.playerSummary);
+            if (saved.premise !== undefined) setPremise(saved.premise);
+            if (saved.startingContent !== undefined)
               setStartingContent(saved.startingContent);
             if (typeof saved.maxChapters === "number")
               setMaxChapters(saved.maxChapters);
-            if (saved.authorNotes) setAuthorNotes(saved.authorNotes);
+            if (saved.authorNotes !== undefined)
+              setAuthorNotes(saved.authorNotes);
 
             if (typeof saved.points === "number") setPoints(saved.points);
             if (typeof saved.momentum === "number") setMomentum(saved.momentum);
@@ -452,15 +580,18 @@ function AdventureCreatorContent() {
       if (saved.thumbnailUrl) setThumbnailUrl(saved.thumbnailUrl);
       if (saved.bannerUrl) setBannerUrl(saved.bannerUrl);
 
-      if (saved.selectedPreset) setSelectedPreset(saved.selectedPreset);
+      if (saved.selectedPreset !== undefined)
+        setSelectedPreset(saved.selectedPreset);
       if (Array.isArray(saved.presets)) setPresets(saved.presets);
-      if (saved.playerName) setPlayerName(saved.playerName);
-      if (saved.playerSummary) setPlayerSummary(saved.playerSummary);
-      if (saved.premise) setPremise(saved.premise);
-      if (saved.startingContent) setStartingContent(saved.startingContent);
+      if (saved.playerName !== undefined) setPlayerName(saved.playerName);
+      if (saved.playerSummary !== undefined)
+        setPlayerSummary(saved.playerSummary);
+      if (saved.premise !== undefined) setPremise(saved.premise);
+      if (saved.startingContent !== undefined)
+        setStartingContent(saved.startingContent);
       if (typeof saved.maxChapters === "number")
         setMaxChapters(saved.maxChapters);
-      if (saved.authorNotes) setAuthorNotes(saved.authorNotes);
+      if (saved.authorNotes !== undefined) setAuthorNotes(saved.authorNotes);
 
       if (typeof saved.points === "number") setPoints(saved.points);
       if (typeof saved.momentum === "number") setMomentum(saved.momentum);
@@ -1761,9 +1892,9 @@ function AdventureCreatorContent() {
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-3">
                     <p className="text-xs text-yellow-800 dark:text-yellow-200">
                       💡 <strong>Tip:</strong> The preset will copy your current
-                      Stats, Resources, Inventory, Player Summary, and Author
-                      Notes. Make sure they're configured as you want before
-                      saving!
+                      Player Name, Stats, Resources, Inventory, Player Summary,
+                      and Author Notes. Make sure they're configured as you want
+                      before saving!
                     </p>
                   </div>
 
@@ -1791,6 +1922,7 @@ function AdventureCreatorContent() {
                                     name: newPresetName,
                                     description: newPresetDescription,
                                     icon: newPresetIcon,
+                                    playerName,
                                     playerSummary,
                                     stats: JSON.parse(JSON.stringify(stats)),
                                     resources: JSON.parse(
@@ -1811,6 +1943,7 @@ function AdventureCreatorContent() {
                             newPresetName,
                             newPresetDescription,
                             newPresetIcon,
+                            playerName,
                             playerSummary,
                             stats,
                             resources,
@@ -1869,6 +2002,7 @@ function AdventureCreatorContent() {
                         if (preset.id !== "custom") {
                           applyPreset(
                             preset,
+                            setPlayerName,
                             setPlayerSummary,
                             setStats,
                             setResources,
@@ -1907,9 +2041,13 @@ function AdventureCreatorContent() {
 
                       {preset.id !== "custom" && (
                         <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                          <div>📊 {preset.stats.length} stats</div>
-                          <div>💎 {preset.resources.length} resources</div>
-                          <div>🎒 {preset.inventory.length} starting items</div>
+                          <div>📊 {preset.stats?.length || 0} stats</div>
+                          <div>
+                            💎 {preset.resources?.length || 0} resources
+                          </div>
+                          <div>
+                            🎒 {preset.inventory?.length || 0} starting items
+                          </div>
                         </div>
                       )}
                     </button>
@@ -4905,7 +5043,7 @@ function AdventureCreatorContent() {
                   ) : (
                     // View mode with drag-and-drop
                     <div
-                      key={quest.id}
+                      key={quest.id || `quest-${index}`}
                       draggable
                       onDragStart={() => setDraggedQuestIndex(index)}
                       onDragOver={(e) => {
@@ -5978,6 +6116,12 @@ function AdventureCreatorContent() {
             </h1>
             <div className="flex gap-2">
               <button
+                onClick={() => setIsAIMenuOpen(true)}
+                className="px-4 py-2 bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all shadow-md flex items-center gap-2"
+              >
+                <span>🤖</span> AI Assistant
+              </button>
+              <button
                 onClick={handleDiscardChanges}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md"
               >
@@ -6075,6 +6219,28 @@ function AdventureCreatorContent() {
         confirmButtonClass={confirmDialog.confirmButtonClass}
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
+
+      <CreatorAIChat
+        isOpen={isAIMenuOpen}
+        onClose={() => setIsAIMenuOpen(false)}
+        currentStoryData={{
+          story_name: title,
+          premise,
+          player_name: playerName,
+          player_summary: playerSummary,
+          starting_content: startingContent,
+          author_notes: authorNotes,
+          stats,
+          resources,
+          inventory,
+          plot_beats: plotBeats,
+          lore,
+          achievements,
+          quests,
+          presets,
+        }}
+        onApplyChanges={handleApplyAIChanges}
       />
     </div>
   );

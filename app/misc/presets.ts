@@ -6,7 +6,8 @@ import { Preset } from "./structs";
 export const DEFAULT_PRESET: Preset = {
   id: "custom",
   name: "Custom",
-  description: "Create your own character from scratch with no predefined attributes.",
+  description:
+    "Create your own character from scratch with no predefined attributes.",
   icon: "✨",
   playerSummary: "",
   stats: [],
@@ -16,8 +17,11 @@ export const DEFAULT_PRESET: Preset = {
 };
 
 // Get preset from adventure's preset list
-export function getPresetById(presets: Preset[], id: string): Preset | undefined {
-  return presets.find(p => p.id === id);
+export function getPresetById(
+  presets: Preset[],
+  id: string
+): Preset | undefined {
+  return presets.find((p) => p.id === id);
 }
 
 // Create a new preset from current adventure settings
@@ -25,6 +29,7 @@ export function createPresetFromCurrentSettings(
   name: string,
   description: string,
   icon: string,
+  playerName: string,
   playerSummary: string,
   stats: any[],
   resources: any[],
@@ -36,6 +41,7 @@ export function createPresetFromCurrentSettings(
     name,
     description,
     icon,
+    playerName,
     playerSummary,
     stats: JSON.parse(JSON.stringify(stats)), // Deep clone
     resources: JSON.parse(JSON.stringify(resources)),
@@ -47,6 +53,7 @@ export function createPresetFromCurrentSettings(
 // Apply a preset to current settings
 export function applyPreset(
   preset: Preset,
+  setPlayerName: (val: string) => void,
   setPlayerSummary: (val: string) => void,
   setStats: (val: any[]) => void,
   setResources: (val: any[]) => void,
@@ -58,9 +65,14 @@ export function applyPreset(
     return;
   }
 
-  if (preset.playerSummary) setPlayerSummary(preset.playerSummary);
-  if (preset.stats.length > 0) setStats(JSON.parse(JSON.stringify(preset.stats)));
-  if (preset.resources.length > 0) setResources(JSON.parse(JSON.stringify(preset.resources)));
-  if (preset.inventory.length > 0) setInventory(JSON.parse(JSON.stringify(preset.inventory)));
-  if (preset.authorNotes) setAuthorNotes(preset.authorNotes);
+  if (preset.playerName !== undefined) setPlayerName(preset.playerName);
+  if (preset.playerSummary !== undefined)
+    setPlayerSummary(preset.playerSummary);
+
+  // Always apply arrays, even if empty, to correctly reflect the preset
+  setStats(JSON.parse(JSON.stringify(preset.stats || [])));
+  setResources(JSON.parse(JSON.stringify(preset.resources || [])));
+  setInventory(JSON.parse(JSON.stringify(preset.inventory || [])));
+
+  if (preset.authorNotes !== undefined) setAuthorNotes(preset.authorNotes);
 }
