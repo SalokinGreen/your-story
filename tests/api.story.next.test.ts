@@ -27,6 +27,15 @@ vi.mock("../app/misc/tokens", () => ({
     .mockResolvedValue({ total: 100, tradable: 50, locked: 50 }),
 }));
 
+// Mock user settings
+vi.mock("../app/misc/user_settings", () => ({
+  getUserSettings: vi.fn().mockResolvedValue({
+    user_id: "test-user-id",
+    byok_enabled: false,
+    is_subscriber: false,
+  }),
+}));
+
 describe("POST /api/story/next", () => {
   beforeEach(() => {
     vi.clearAllMocks();

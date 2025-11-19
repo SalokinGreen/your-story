@@ -18,8 +18,8 @@ export default function LorePage(storyData: StoryData) {
     return (
       loreItem.title.toLowerCase().includes(term) ||
       loreItem.content.toLowerCase().includes(term) ||
-      loreItem.relatedCharacters.some((char) => char.toLowerCase().includes(term)) ||
-      loreItem.relatedLocations.some((loc) => loc.toLowerCase().includes(term))
+      (loreItem.relatedCharacters || []).some((char) => char.toLowerCase().includes(term)) ||
+      (loreItem.relatedLocations || []).some((loc) => loc.toLowerCase().includes(term))
     );
   });
 
@@ -127,12 +127,12 @@ export default function LorePage(storyData: StoryData) {
                     {loreItem.content.substring(0, 100)}...
                   </p>
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {loreItem.relatedCharacters.length > 0 && (
+                    {loreItem.relatedCharacters?.length > 0 && (
                       <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
                         👤 {loreItem.relatedCharacters.length}
                       </span>
                     )}
-                    {loreItem.relatedLocations.length > 0 && (
+                    {loreItem.relatedLocations?.length > 0 && (
                       <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
                         📍 {loreItem.relatedLocations.length}
                       </span>
@@ -235,7 +235,7 @@ export default function LorePage(storyData: StoryData) {
                 <ReactMarkdown>{selectedLore.content}</ReactMarkdown>
               </div>
 
-              {selectedLore.relatedCharacters.length > 0 && (
+              {selectedLore.relatedCharacters?.length > 0 && (
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                   <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                     👤 Related Characters
@@ -253,7 +253,7 @@ export default function LorePage(storyData: StoryData) {
                 </div>
               )}
 
-              {selectedLore.relatedLocations.length > 0 && (
+              {selectedLore.relatedLocations?.length > 0 && (
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                   <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                     📍 Related Locations
@@ -271,7 +271,7 @@ export default function LorePage(storyData: StoryData) {
                 </div>
               )}
 
-              {selectedLore.keys.length > 0 && (
+              {selectedLore.keys?.length > 0 && (
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                   <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                     🔑 Keywords
