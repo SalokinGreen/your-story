@@ -39,12 +39,17 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - Arrays (like 'inventory', 'stats', 'plot_beats', 'lore', 'achievements', 'quests', 'presets') in your JSON will be MERGED with the existing data.
   - To ADD items: Just list the new items.
   - To MODIFY items: List an item with the SAME 'name' (or 'title' or 'id') as an existing one, and your new values will overwrite the old ones.
-- Scalar fields (like 'story_name', 'premise', 'player_name') will be REPLACED.
+- Scalar fields (like 'story_name', 'premise', 'player_name', 'title', 'shortDescription', 'description') will be REPLACED.
 
-### Available Fields (StoryData):
-- story_name (string) - The in-game story title
-- short description (string) - Brief adventure description
-- long description (string) - Full adventure description
+### Available Fields:
+
+**Adventure-Level Fields** (set these to update the adventure's public-facing information):
+- title (string) - The adventure's title shown in the explorer/library
+- shortDescription (string) - Brief 1-2 sentence description for adventure cards (max ~100 chars)
+- description (string) - Full multi-paragraph description of the adventure shown on the adventure detail page
+
+**StoryData Fields** (these define the actual gameplay scenario):
+- story_name (string) - The in-game story title (shown to player during gameplay)
 - premise (string) - Story premise/conflict summary
 - player_name (string) - Default player character name
 - player_summary (string) - Player character background/description

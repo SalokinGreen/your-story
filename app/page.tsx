@@ -11,8 +11,10 @@ import { AI_MODELS, AIModelKey } from "./misc/ai_prices";
 
 // InfoTabs Component
 function InfoTabs() {
-  const [activeTab, setActiveTab] = useState<"models" | "coins" | "byok">("models");
-  
+  const [activeTab, setActiveTab] = useState<"models" | "coins" | "byok">(
+    "models"
+  );
+
   const packages = [
     { name: "Starter", cost: 0.99, coins: 100, bonus: 0, savings: 0 },
     { name: "Basic", cost: 4.99, coins: 500, bonus: 50, savings: 8 },
@@ -79,7 +81,9 @@ function InfoTabs() {
                 >
                   <div className="bg-linear-to-r from-purple-600 to-blue-600 p-4 text-white">
                     <h3 className="text-2xl font-bold mb-1">{model.name}</h3>
-                    <p className="text-sm text-purple-100">{model.original_model}</p>
+                    <p className="text-sm text-purple-100">
+                      {model.original_model}
+                    </p>
                   </div>
                   <div className="p-6 space-y-4">
                     <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
@@ -141,14 +145,15 @@ function InfoTabs() {
             <div className="mt-8 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
               <p className="text-sm text-purple-900 dark:text-purple-200 text-center">
                 💡 <strong>Pro Tip:</strong> You can select your preferred AI
-                model in the story menu during gameplay. Each model offers unique
-                storytelling characteristics!
+                model in the story menu during gameplay. Each model offers
+                unique storytelling characteristics!
               </p>
             </div>
             <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
               <p className="text-sm text-blue-900 dark:text-blue-200 text-center">
                 🎙️ <strong>Text-to-Speech:</strong> Each TTS generation costs 3
-                coins and runs through Speechify for high-quality voice narration.
+                coins and runs through Speechify for high-quality voice
+                narration.
               </p>
             </div>
           </div>
@@ -210,7 +215,10 @@ function InfoTabs() {
                         {(pkg.coins + pkg.bonus).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
-                        ${((pkg.cost / (pkg.coins + pkg.bonus)) * 100).toFixed(2)}
+                        $
+                        {((pkg.cost / (pkg.coins + pkg.bonus)) * 100).toFixed(
+                          2
+                        )}
                         /100
                       </td>
                       <td className="px-6 py-4">
@@ -251,35 +259,48 @@ function InfoTabs() {
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Cost:</span>
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Cost:
+                      </span>
                       <span className="font-semibold text-gray-900 dark:text-white">
                         ${pkg.cost.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Base Coins:</span>
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Base Coins:
+                      </span>
                       <span className="font-semibold text-gray-900 dark:text-white">
                         {pkg.coins.toLocaleString()}
                       </span>
                     </div>
                     {pkg.bonus > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Bonus:</span>
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Bonus:
+                        </span>
                         <span className="font-semibold text-green-600 dark:text-green-400">
                           +{pkg.bonus}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-                      <span className="text-gray-600 dark:text-gray-400">Total Coins:</span>
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Total Coins:
+                      </span>
                       <span className="font-bold text-lg text-gray-900 dark:text-white">
                         {(pkg.coins + pkg.bonus).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Rate:</span>
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Rate:
+                      </span>
                       <span className="text-gray-900 dark:text-white">
-                        ${((pkg.cost / (pkg.coins + pkg.bonus)) * 100).toFixed(2)}
+                        $
+                        {((pkg.cost / (pkg.coins + pkg.bonus)) * 100).toFixed(
+                          2
+                        )}
                         /100
                       </span>
                     </div>
@@ -310,8 +331,8 @@ function InfoTabs() {
               🔑 Bring Your Own Key (BYOK)
             </h2>
             <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-              Take full control of your AI experience. Use your own API keys with
-              unlimited flexibility and customize every aspect of content
+              Take full control of your AI experience. Use your own API keys
+              with unlimited flexibility and customize every aspect of content
               generation.
             </p>
 
@@ -446,8 +467,8 @@ function InfoTabs() {
             <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
               <p className="text-sm text-purple-900 dark:text-purple-200 text-center">
                 <strong>💡 Perfect for power users:</strong> With BYOK, you
-                control your AI budget directly through OpenRouter and Speechify.
-                No coin limits, just pure flexibility!
+                control your AI budget directly through OpenRouter and
+                Speechify. No coin limits, just pure flexibility!
               </p>
             </div>
           </div>

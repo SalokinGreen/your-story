@@ -399,13 +399,17 @@ function ChangeSummary({
       type: "Update",
       label: "Short Description",
       value: data.shortDescription,
+      details: data.shortDescription,
       icon: "📄",
     });
   if (data.description)
     changes.push({
       type: "Update",
       label: "Full Description",
-      value: "Updated description",
+      value:
+        data.description.length > 50
+          ? data.description.substring(0, 50) + "..."
+          : data.description,
       details: data.description,
       icon: "📋",
     });
