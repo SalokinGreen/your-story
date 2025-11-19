@@ -95,7 +95,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { storyData, userChoice, model: requestedModel, useRawContext, openRouterKey } = body;
+  const {
+    storyData,
+    userChoice,
+    model: requestedModel,
+    useRawContext,
+    openRouterKey,
+  } = body;
   if (!storyData) {
     return NextResponse.json(
       { error: "Missing storyData in request body" },
@@ -143,12 +149,16 @@ export async function POST(req: NextRequest) {
   // Get model configuration
   let modelKey =
     requestedModel || process.env.DEFAULT_AI_MODEL || "deep-seek/deepseek-chat";
-  
+
   // Handle custom model from user settings
   let modelConfig = getModelConfig(modelKey);
   let customModelUsed = false;
 
-  if (isSubscriber && userSettings?.custom_model_config?.modelId && modelKey === "custom") {
+  if (
+    isSubscriber &&
+    userSettings?.custom_model_config?.modelId &&
+    modelKey === "custom"
+  ) {
     const custom = userSettings.custom_model_config;
     modelConfig = {
       name: custom.name || "Custom Model",
@@ -186,17 +196,23 @@ export async function POST(req: NextRequest) {
   if (modelConfig.provider === "openrouter") {
     // Use user key if available and subscriber, otherwise fallback to system key
     if (!shouldUseTokens && openRouterKey) {
-        apiKey = openRouterKey;
+      apiKey = openRouterKey;
     } else {
-        apiKey = process.env.OPENROUTER_API_KEY;
+      apiKey = process.env.OPENROUTER_API_KEY;
     }
-    
+
     apiUrl = "https://openrouter.ai/api/v1/chat/completions";
-    console.log("OpenRouter API Key source:", (!shouldUseTokens && openRouterKey) ? "USER (BYOK)" : "SYSTEM");
-    
+    console.log(
+      "OpenRouter API Key source:",
+      !shouldUseTokens && openRouterKey ? "USER (BYOK)" : "SYSTEM"
+    );
+
     if (!apiKey) {
       return NextResponse.json(
-        { error: "Server not configured: missing OPENROUTER_API_KEY and no user key provided" },
+        {
+          error:
+            "Server not configured: missing OPENROUTER_API_KEY and no user key provided",
+        },
         { status: 500 }
       );
     }
@@ -217,6 +233,7 @@ export async function POST(req: NextRequest) {
     storyData,
     userChoice,
     useRawContext,
+    maxTokens: modelConfig.maxTokens,
   });
   // Filter out duplicate messages
   messages = messages.filter(
@@ -329,7 +346,7 @@ export async function POST(req: NextRequest) {
         );
       }
     } else {
-        console.log(`BYOK used, no tokens deducted for user ${userId}`);
+      console.log(`BYOK used, no tokens deducted for user ${userId}`);
     }
 
     // Get updated balance

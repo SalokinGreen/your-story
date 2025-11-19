@@ -479,18 +479,27 @@ function AdventureCreatorContent() {
     keys: [],
     thumbnailUrl: "",
     on: true,
+    alwaysOn: false,
+    trigger_lores: [],
+    untrigger_lores: [],
     beats_trigger: [],
     beats_untrigger: [],
   });
   const [newLoreOnTrigger, setNewLoreOnTrigger] = useState("");
   const [newLoreOffTrigger, setNewLoreOffTrigger] = useState("");
   const [newLoreKey, setNewLoreKey] = useState("");
+  const [newLoreAdvancedExpanded, setNewLoreAdvancedExpanded] = useState(false);
   const [draggedLoreIndex, setDraggedLoreIndex] = useState<number | null>(null);
   const [editingLoreIndex, setEditingLoreIndex] = useState<number | null>(null);
   const [editLore, setEditLore] = useState<Partial<StoryLore>>({});
   const [editLoreOnTrigger, setEditLoreOnTrigger] = useState("");
   const [editLoreOffTrigger, setEditLoreOffTrigger] = useState("");
   const [editLoreKey, setEditLoreKey] = useState("");
+  const [editLoreAdvancedExpanded, setEditLoreAdvancedExpanded] =
+    useState(false);
+  const [loreSearchQuery, setLoreSearchQuery] = useState("");
+  const [lorePage, setLorePage] = useState(1);
+  const loreItemsPerPage = 10;
 
   // Achievements
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -3293,6 +3302,23 @@ function AdventureCreatorContent() {
                       Enabled
                     </label>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="loreAlwaysOn"
+                      checked={newLore.alwaysOn || false}
+                      onChange={(e) =>
+                        setNewLore({ ...newLore, alwaysOn: e.target.checked })
+                      }
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <label
+                      htmlFor="loreAlwaysOn"
+                      className="text-sm text-gray-700 dark:text-gray-300"
+                    >
+                      🔵 Always On (ignores all triggers)
+                    </label>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -3481,135 +3507,253 @@ function AdventureCreatorContent() {
                     ))}
                   </div>
                 </div>
-                {newLore.secrtet && (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      🔑 Trigger Keys (Words that reveal this lore)
-                    </label>
-                    <div className="flex gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={newLoreKey}
-                        onChange={(e) => setNewLoreKey(e.target.value)}
-                        onKeyDown={(e) =>
-                          e.key === "Enter" &&
-                          (e.preventDefault(), addLoreKey())
-                        }
-                        placeholder="e.g., 'Dragon Defeated' or 'Ancient Ruins'"
-                        className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                      <button
-                        onClick={addLoreKey}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
-                      >
-                        Add
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {(newLore.keys || []).map((key) => (
-                        <span
-                          key={key}
-                          className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-sm flex items-center gap-1"
-                        >
-                          🔑 {key}
-                          <button
-                            onClick={() =>
-                              setNewLore({
-                                ...newLore,
-                                keys: (newLore.keys || []).filter(
-                                  (k) => k !== key
-                                ),
-                              })
-                            }
-                            className="hover:text-yellow-900 dark:hover:text-yellow-100"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Plot Beat Triggers */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      ✅ Beats that turn this lore ON
-                    </label>
-                    <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
-                      {plotBeats.length === 0 ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                          No plot beats yet. Add them in the Plot Beats step.
-                        </p>
-                      ) : (
-                        plotBeats.map((beat, beatIndex) => (
-                          <label
-                            key={beatIndex}
-                            className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={(newLore.beats_trigger || []).includes(
-                                beatIndex
-                              )}
-                              onChange={(e) => {
-                                const current = newLore.beats_trigger || [];
-                                setNewLore({
-                                  ...newLore,
-                                  beats_trigger: e.target.checked
-                                    ? [...current, beatIndex]
-                                    : current.filter((i) => i !== beatIndex),
-                                });
-                              }}
-                              className="w-4 h-4 text-green-600 rounded"
-                            />
-                            <span className="text-xs text-gray-900 dark:text-white">
-                              {beat.title || `Beat ${beatIndex + 1}`}
-                            </span>
+
+                {/* Advanced Triggers Section (Expandable) */}
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg">
+                  <button
+                    onClick={() =>
+                      setNewLoreAdvancedExpanded(!newLoreAdvancedExpanded)
+                    }
+                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      ⚙️ Advanced Section
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {newLoreAdvancedExpanded ? "▼" : "▶"}
+                    </span>
+                  </button>
+
+                  {newLoreAdvancedExpanded && (
+                    <div className="p-4 space-y-4">
+                      {/* Lore-based Triggers */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            ✅ Lores that turn this ON
                           </label>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      ❌ Beats that turn this lore OFF
-                    </label>
-                    <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
-                      {plotBeats.length === 0 ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                          No plot beats yet. Add them in the Plot Beats step.
-                        </p>
-                      ) : (
-                        plotBeats.map((beat, beatIndex) => (
-                          <label
-                            key={beatIndex}
-                            className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={(newLore.beats_untrigger || []).includes(
-                                beatIndex
-                              )}
-                              onChange={(e) => {
-                                const current = newLore.beats_untrigger || [];
-                                setNewLore({
-                                  ...newLore,
-                                  beats_untrigger: e.target.checked
-                                    ? [...current, beatIndex]
-                                    : current.filter((i) => i !== beatIndex),
-                                });
-                              }}
-                              className="w-4 h-4 text-red-600 rounded"
-                            />
-                            <span className="text-xs text-gray-900 dark:text-white">
-                              {beat.title || `Beat ${beatIndex + 1}`}
-                            </span>
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                            {lore.length === 0 ? (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                No other lore entries yet.
+                              </p>
+                            ) : (
+                              lore.map((loreEntry, loreIndex) => (
+                                <label
+                                  key={loreIndex}
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(
+                                      newLore.trigger_lores || []
+                                    ).includes(loreEntry.title)}
+                                    onChange={(e) => {
+                                      const current =
+                                        newLore.trigger_lores || [];
+                                      setNewLore({
+                                        ...newLore,
+                                        trigger_lores: e.target.checked
+                                          ? [...current, loreEntry.title]
+                                          : current.filter(
+                                              (t) => t !== loreEntry.title
+                                            ),
+                                      });
+                                    }}
+                                    className="w-4 h-4 text-green-600 rounded"
+                                  />
+                                  <span className="text-xs text-gray-900 dark:text-white">
+                                    {loreEntry.title}
+                                  </span>
+                                </label>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            ❌ Lores that turn this OFF
                           </label>
-                        ))
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                            {lore.length === 0 ? (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                No other lore entries yet.
+                              </p>
+                            ) : (
+                              lore.map((loreEntry, loreIndex) => (
+                                <label
+                                  key={loreIndex}
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(
+                                      newLore.untrigger_lores || []
+                                    ).includes(loreEntry.title)}
+                                    onChange={(e) => {
+                                      const current =
+                                        newLore.untrigger_lores || [];
+                                      setNewLore({
+                                        ...newLore,
+                                        untrigger_lores: e.target.checked
+                                          ? [...current, loreEntry.title]
+                                          : current.filter(
+                                              (t) => t !== loreEntry.title
+                                            ),
+                                      });
+                                    }}
+                                    className="w-4 h-4 text-red-600 rounded"
+                                  />
+                                  <span className="text-xs text-gray-900 dark:text-white">
+                                    {loreEntry.title}
+                                  </span>
+                                </label>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {newLore.secrtet && (
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                            🔑 Trigger Keys (Words that reveal this lore)
+                          </label>
+                          <div className="flex gap-2 mb-2">
+                            <input
+                              type="text"
+                              value={newLoreKey}
+                              onChange={(e) => setNewLoreKey(e.target.value)}
+                              onKeyDown={(e) =>
+                                e.key === "Enter" &&
+                                (e.preventDefault(), addLoreKey())
+                              }
+                              placeholder="e.g., 'Dragon Defeated' or 'Ancient Ruins'"
+                              className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            />
+                            <button
+                              onClick={addLoreKey}
+                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                            >
+                              Add
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {(newLore.keys || []).map((key) => (
+                              <span
+                                key={key}
+                                className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-sm flex items-center gap-1"
+                              >
+                                🔑 {key}
+                                <button
+                                  onClick={() =>
+                                    setNewLore({
+                                      ...newLore,
+                                      keys: (newLore.keys || []).filter(
+                                        (k) => k !== key
+                                      ),
+                                    })
+                                  }
+                                  className="hover:text-yellow-900 dark:hover:text-yellow-100"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                       )}
+                      {/* Plot Beat Triggers */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            ✅ Beats that turn this lore ON
+                          </label>
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                            {plotBeats.length === 0 ? (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                No plot beats yet. Add them in the Plot Beats
+                                step.
+                              </p>
+                            ) : (
+                              plotBeats.map((beat, beatIndex) => (
+                                <label
+                                  key={beatIndex}
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(
+                                      newLore.beats_trigger || []
+                                    ).includes(beatIndex)}
+                                    onChange={(e) => {
+                                      const current =
+                                        newLore.beats_trigger || [];
+                                      setNewLore({
+                                        ...newLore,
+                                        beats_trigger: e.target.checked
+                                          ? [...current, beatIndex]
+                                          : current.filter(
+                                              (i) => i !== beatIndex
+                                            ),
+                                      });
+                                    }}
+                                    className="w-4 h-4 text-green-600 rounded"
+                                  />
+                                  <span className="text-xs text-gray-900 dark:text-white">
+                                    {beat.title || `Beat ${beatIndex + 1}`}
+                                  </span>
+                                </label>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            ❌ Beats that turn this lore OFF
+                          </label>
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                            {plotBeats.length === 0 ? (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                No plot beats yet. Add them in the Plot Beats
+                                step.
+                              </p>
+                            ) : (
+                              plotBeats.map((beat, beatIndex) => (
+                                <label
+                                  key={beatIndex}
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(
+                                      newLore.beats_untrigger || []
+                                    ).includes(beatIndex)}
+                                    onChange={(e) => {
+                                      const current =
+                                        newLore.beats_untrigger || [];
+                                      setNewLore({
+                                        ...newLore,
+                                        beats_untrigger: e.target.checked
+                                          ? [...current, beatIndex]
+                                          : current.filter(
+                                              (i) => i !== beatIndex
+                                            ),
+                                      });
+                                    }}
+                                    className="w-4 h-4 text-red-600 rounded"
+                                  />
+                                  <span className="text-xs text-gray-900 dark:text-white">
+                                    {beat.title || `Beat ${beatIndex + 1}`}
+                                  </span>
+                                </label>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
               <button
@@ -3622,589 +3766,834 @@ function AdventureCreatorContent() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                Lore Entries ({lore.length})
-              </h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  Lore Entries ({lore.length})
+                </h3>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={loreSearchQuery}
+                    onChange={(e) => {
+                      setLoreSearchQuery(e.target.value);
+                      setLorePage(1);
+                    }}
+                    placeholder="Search lore..."
+                    className="pl-8 pr-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">
+                    🔍
+                  </span>
+                </div>
+              </div>
+
               {lore.length === 0 ? (
                 <p className="text-gray-600 dark:text-gray-400 text-sm">
                   No lore entries added yet
                 </p>
               ) : (
-                lore.map((entry, index) => (
-                  <div
-                    key={index}
-                    draggable={editingLoreIndex !== index}
-                    onDragStart={() => handleLoreDragStart(index)}
-                    onDragOver={(e) => handleLoreDragOver(e, index)}
-                    onDragEnd={handleLoreDragEnd}
-                    className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800"
-                    style={{
-                      opacity: draggedLoreIndex === index ? 0.5 : 1,
-                      cursor: editingLoreIndex === index ? "default" : "move",
-                    }}
-                  >
-                    {editingLoreIndex === index ? (
-                      // Edit mode
-                      <div className="space-y-4">
-                        <h4 className="text-md font-bold text-indigo-900 dark:text-indigo-100">
-                          ✏️ Editing Lore Entry
-                        </h4>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Title *
-                          </label>
-                          <input
-                            type="text"
-                            value={editLore.title || ""}
-                            onChange={(e) =>
-                              setEditLore({
-                                ...editLore,
-                                title: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Content *
-                          </label>
-                          <textarea
-                            value={editLore.content || ""}
-                            onChange={(e) =>
-                              setEditLore({
-                                ...editLore,
-                                content: e.target.value,
-                              })
-                            }
-                            rows={5}
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
-                          />
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              id={`edit-lore-secret-${index}`}
-                              checked={editLore.secrtet || false}
-                              onChange={(e) =>
-                                setEditLore({
-                                  ...editLore,
-                                  secrtet: e.target.checked,
-                                })
-                              }
-                              className="w-4 h-4 text-purple-600 rounded"
-                            />
-                            <label
-                              htmlFor={`edit-lore-secret-${index}`}
-                              className="text-sm text-gray-700 dark:text-gray-300"
-                            >
-                              Secret
-                            </label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              id={`edit-lore-on-${index}`}
-                              checked={editLore.on !== false}
-                              onChange={(e) =>
-                                setEditLore({
-                                  ...editLore,
-                                  on: e.target.checked,
-                                })
-                              }
-                              className="w-4 h-4 text-green-600 rounded"
-                            />
-                            <label
-                              htmlFor={`edit-lore-on-${index}`}
-                              className="text-sm text-gray-700 dark:text-gray-300"
-                            >
-                              Enabled
-                            </label>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Thumbnail
-                          </label>
-                          <div className="flex items-start gap-3">
-                            {editLore.thumbnailUrl ? (
-                              <div className="relative">
-                                <img
-                                  src={editLore.thumbnailUrl}
-                                  alt="Lore thumb"
-                                  className="w-24 h-24 object-cover rounded border"
+                (() => {
+                  const filteredLore = lore
+                    .map((entry, index) => ({ entry, originalIndex: index }))
+                    .filter(
+                      (item) =>
+                        item.entry.title
+                          .toLowerCase()
+                          .includes(loreSearchQuery.toLowerCase()) ||
+                        item.entry.content
+                          .toLowerCase()
+                          .includes(loreSearchQuery.toLowerCase())
+                    )
+                    .sort((a, b) => a.entry.title.localeCompare(b.entry.title));
+
+                  const totalPages = Math.ceil(
+                    filteredLore.length / loreItemsPerPage
+                  );
+                  const displayedLore = filteredLore.slice(
+                    (lorePage - 1) * loreItemsPerPage,
+                    lorePage * loreItemsPerPage
+                  );
+
+                  if (filteredLore.length === 0 && lore.length > 0) {
+                    return (
+                      <p className="text-gray-500 dark:text-gray-400 text-sm italic">
+                        No lore entries match your search.
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {displayedLore.map(({ entry, originalIndex: index }) => (
+                        <div
+                          key={index}
+                          draggable={false}
+                          className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800"
+                        >
+                          {editingLoreIndex === index ? (
+                            // Edit mode
+                            <div className="space-y-4">
+                              <h4 className="text-md font-bold text-indigo-900 dark:text-indigo-100">
+                                ✏️ Editing Lore Entry
+                              </h4>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                  Title *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editLore.title || ""}
+                                  onChange={(e) =>
+                                    setEditLore({
+                                      ...editLore,
+                                      title: e.target.value,
+                                    })
+                                  }
+                                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                 />
-                                <button
-                                  onClick={() =>
-                                    setEditLore({
-                                      ...editLore,
-                                      thumbnailUrl: "",
-                                    })
-                                  }
-                                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs"
-                                >
-                                  ×
-                                </button>
                               </div>
-                            ) : (
-                              <div className="w-24 h-24 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
-                                No Preview
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                  Content *
+                                </label>
+                                <textarea
+                                  value={editLore.content || ""}
+                                  onChange={(e) =>
+                                    setEditLore({
+                                      ...editLore,
+                                      content: e.target.value,
+                                    })
+                                  }
+                                  rows={5}
+                                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                                />
                               </div>
-                            )}
-                            <div>
-                              <input
-                                id={`edit-mode-lore-thumb-${index}`}
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (!file) return;
-                                  if (!file.type.startsWith("image/")) {
-                                    addNotification(
-                                      "Please select an image file",
-                                      "warning"
-                                    );
-                                    return;
-                                  }
-                                  if (file.size > 5 * 1024 * 1024) {
-                                    addNotification(
-                                      "Image must be smaller than 5MB",
-                                      "warning"
-                                    );
-                                    return;
-                                  }
-                                  try {
-                                    const {
-                                      data: { session },
-                                    } = await supabase.auth.getSession();
-                                    if (!session)
-                                      throw new Error("Not authenticated");
-                                    const ext = file.name.split(".").pop();
-                                    const fileName = `${
-                                      user!.id
-                                    }-${Date.now()}-lore-thumb.${ext}`;
-                                    const filePath = `lore-thumbnails/${fileName}`;
-                                    const { error: uploadError } =
-                                      await supabase.storage
-                                        .from("adventure-images")
-                                        .upload(filePath, file, {
-                                          cacheControl: "3600",
-                                          upsert: false,
-                                        });
-                                    if (uploadError) throw uploadError;
-                                    const { data } = supabase.storage
-                                      .from("adventure-images")
-                                      .getPublicUrl(filePath);
-                                    setEditLore({
-                                      ...editLore,
-                                      thumbnailUrl: data.publicUrl,
-                                    });
-                                    addNotification(
-                                      "Thumbnail uploaded!",
-                                      "success"
-                                    );
-                                  } catch (err: any) {
-                                    console.error("Upload failed:", err);
-                                    addNotification(
-                                      err.message || "Upload failed",
-                                      "failure"
-                                    );
-                                  }
-                                }}
-                              />
-                              <label
-                                htmlFor={`edit-mode-lore-thumb-${index}`}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer inline-block text-sm"
-                              >
-                                📸 Upload Thumbnail
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            ✅ ON Triggers
-                          </label>
-                          <div className="flex gap-2 mb-2">
-                            <input
-                              type="text"
-                              value={editLoreOnTrigger}
-                              onChange={(e) =>
-                                setEditLoreOnTrigger(e.target.value)
-                              }
-                              onKeyDown={(e) =>
-                                e.key === "Enter" &&
-                                (e.preventDefault(), addEditLoreOnTrigger())
-                              }
-                              placeholder="e.g., 'Ancient Map'"
-                              className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            />
-                            <button
-                              onClick={addEditLoreOnTrigger}
-                              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm"
-                            >
-                              Add
-                            </button>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {(editLore.on_triggers || []).map((trigger) => (
-                              <span
-                                key={trigger}
-                                className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm flex items-center gap-1"
-                              >
-                                ✅ {trigger}
-                                <button
-                                  onClick={() =>
-                                    setEditLore({
-                                      ...editLore,
-                                      on_triggers: (
-                                        editLore.on_triggers || []
-                                      ).filter((t) => t !== trigger),
-                                    })
-                                  }
-                                  className="hover:text-green-900 dark:hover:text-green-100"
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            ❌ OFF Triggers
-                          </label>
-                          <div className="flex gap-2 mb-2">
-                            <input
-                              type="text"
-                              value={editLoreOffTrigger}
-                              onChange={(e) =>
-                                setEditLoreOffTrigger(e.target.value)
-                              }
-                              onKeyDown={(e) =>
-                                e.key === "Enter" &&
-                                (e.preventDefault(), addEditLoreOffTrigger())
-                              }
-                              placeholder="e.g., 'Destroyed the Map'"
-                              className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            />
-                            <button
-                              onClick={addEditLoreOffTrigger}
-                              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm"
-                            >
-                              Add
-                            </button>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {(editLore.off_triggers || []).map((trigger) => (
-                              <span
-                                key={trigger}
-                                className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-sm flex items-center gap-1"
-                              >
-                                ❌ {trigger}
-                                <button
-                                  onClick={() =>
-                                    setEditLore({
-                                      ...editLore,
-                                      off_triggers: (
-                                        editLore.off_triggers || []
-                                      ).filter((t) => t !== trigger),
-                                    })
-                                  }
-                                  className="hover:text-red-900 dark:hover:text-red-100"
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        {editLore.secrtet && (
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                              🔑 Trigger Keys
-                            </label>
-                            <div className="flex gap-2 mb-2">
-                              <input
-                                type="text"
-                                value={editLoreKey}
-                                onChange={(e) => setEditLoreKey(e.target.value)}
-                                onKeyDown={(e) =>
-                                  e.key === "Enter" &&
-                                  (e.preventDefault(), addEditLoreKey())
-                                }
-                                placeholder="e.g., 'Dragon Defeated'"
-                                className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                              />
-                              <button
-                                onClick={addEditLoreKey}
-                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm"
-                              >
-                                Add
-                              </button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {(editLore.keys || []).map((key) => (
-                                <span
-                                  key={key}
-                                  className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-sm flex items-center gap-1"
-                                >
-                                  🔑 {key}
-                                  <button
-                                    onClick={() =>
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`edit-lore-secret-${index}`}
+                                    checked={editLore.secrtet || false}
+                                    onChange={(e) =>
                                       setEditLore({
                                         ...editLore,
-                                        keys: (editLore.keys || []).filter(
-                                          (k) => k !== key
-                                        ),
+                                        secrtet: e.target.checked,
                                       })
                                     }
-                                    className="hover:text-yellow-900 dark:hover:text-yellow-100"
+                                    className="w-4 h-4 text-purple-600 rounded"
+                                  />
+                                  <label
+                                    htmlFor={`edit-lore-secret-${index}`}
+                                    className="text-sm text-gray-700 dark:text-gray-300"
                                   >
-                                    ×
+                                    Secret
+                                  </label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`edit-lore-on-${index}`}
+                                    checked={editLore.on !== false}
+                                    onChange={(e) =>
+                                      setEditLore({
+                                        ...editLore,
+                                        on: e.target.checked,
+                                      })
+                                    }
+                                    className="w-4 h-4 text-green-600 rounded"
+                                  />
+                                  <label
+                                    htmlFor={`edit-lore-on-${index}`}
+                                    className="text-sm text-gray-700 dark:text-gray-300"
+                                  >
+                                    Enabled
+                                  </label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`edit-lore-alwaysOn-${index}`}
+                                    checked={editLore.alwaysOn || false}
+                                    onChange={(e) =>
+                                      setEditLore({
+                                        ...editLore,
+                                        alwaysOn: e.target.checked,
+                                      })
+                                    }
+                                    className="w-4 h-4 text-blue-600 rounded"
+                                  />
+                                  <label
+                                    htmlFor={`edit-lore-alwaysOn-${index}`}
+                                    className="text-sm text-gray-700 dark:text-gray-300"
+                                  >
+                                    🔵 Always On
+                                  </label>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                  Thumbnail
+                                </label>
+                                <div className="flex items-start gap-3">
+                                  {editLore.thumbnailUrl ? (
+                                    <div className="relative">
+                                      <img
+                                        src={editLore.thumbnailUrl}
+                                        alt="Lore thumb"
+                                        className="w-24 h-24 object-cover rounded border"
+                                      />
+                                      <button
+                                        onClick={() =>
+                                          setEditLore({
+                                            ...editLore,
+                                            thumbnailUrl: "",
+                                          })
+                                        }
+                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="w-24 h-24 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
+                                      No Preview
+                                    </div>
+                                  )}
+                                  <div>
+                                    <input
+                                      id={`edit-mode-lore-thumb-${index}`}
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        if (!file.type.startsWith("image/")) {
+                                          addNotification(
+                                            "Please select an image file",
+                                            "warning"
+                                          );
+                                          return;
+                                        }
+                                        if (file.size > 5 * 1024 * 1024) {
+                                          addNotification(
+                                            "Image must be smaller than 5MB",
+                                            "warning"
+                                          );
+                                          return;
+                                        }
+                                        try {
+                                          const {
+                                            data: { session },
+                                          } = await supabase.auth.getSession();
+                                          if (!session)
+                                            throw new Error(
+                                              "Not authenticated"
+                                            );
+                                          const ext = file.name
+                                            .split(".")
+                                            .pop();
+                                          const fileName = `${
+                                            user!.id
+                                          }-${Date.now()}-lore-thumb.${ext}`;
+                                          const filePath = `lore-thumbnails/${fileName}`;
+                                          const { error: uploadError } =
+                                            await supabase.storage
+                                              .from("adventure-images")
+                                              .upload(filePath, file, {
+                                                cacheControl: "3600",
+                                                upsert: false,
+                                              });
+                                          if (uploadError) throw uploadError;
+                                          const { data } = supabase.storage
+                                            .from("adventure-images")
+                                            .getPublicUrl(filePath);
+                                          setEditLore({
+                                            ...editLore,
+                                            thumbnailUrl: data.publicUrl,
+                                          });
+                                          addNotification(
+                                            "Thumbnail uploaded!",
+                                            "success"
+                                          );
+                                        } catch (err: any) {
+                                          console.error("Upload failed:", err);
+                                          addNotification(
+                                            err.message || "Upload failed",
+                                            "failure"
+                                          );
+                                        }
+                                      }}
+                                    />
+                                    <label
+                                      htmlFor={`edit-mode-lore-thumb-${index}`}
+                                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer inline-block text-sm"
+                                    >
+                                      📸 Upload Thumbnail
+                                    </label>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                  ✅ ON Triggers
+                                </label>
+                                <div className="flex gap-2 mb-2">
+                                  <input
+                                    type="text"
+                                    value={editLoreOnTrigger}
+                                    onChange={(e) =>
+                                      setEditLoreOnTrigger(e.target.value)
+                                    }
+                                    onKeyDown={(e) =>
+                                      e.key === "Enter" &&
+                                      (e.preventDefault(),
+                                      addEditLoreOnTrigger())
+                                    }
+                                    placeholder="e.g., 'Ancient Map'"
+                                    className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                  />
+                                  <button
+                                    onClick={addEditLoreOnTrigger}
+                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm"
+                                  >
+                                    Add
                                   </button>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {/* Plot Beat Triggers */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                              ✅ Beats that turn this lore ON
-                            </label>
-                            <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
-                              {plotBeats.length === 0 ? (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                                  No plot beats yet. Add them in the Plot Beats
-                                  step.
-                                </p>
-                              ) : (
-                                plotBeats.map((beat, beatIndex) => (
-                                  <label
-                                    key={beatIndex}
-                                    className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {(editLore.on_triggers || []).map(
+                                    (trigger) => (
+                                      <span
+                                        key={trigger}
+                                        className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm flex items-center gap-1"
+                                      >
+                                        ✅ {trigger}
+                                        <button
+                                          onClick={() =>
+                                            setEditLore({
+                                              ...editLore,
+                                              on_triggers: (
+                                                editLore.on_triggers || []
+                                              ).filter((t) => t !== trigger),
+                                            })
+                                          }
+                                          className="hover:text-green-900 dark:hover:text-green-100"
+                                        >
+                                          ×
+                                        </button>
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                  ❌ OFF Triggers
+                                </label>
+                                <div className="flex gap-2 mb-2">
+                                  <input
+                                    type="text"
+                                    value={editLoreOffTrigger}
+                                    onChange={(e) =>
+                                      setEditLoreOffTrigger(e.target.value)
+                                    }
+                                    onKeyDown={(e) =>
+                                      e.key === "Enter" &&
+                                      (e.preventDefault(),
+                                      addEditLoreOffTrigger())
+                                    }
+                                    placeholder="e.g., 'Destroyed the Map'"
+                                    className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                  />
+                                  <button
+                                    onClick={addEditLoreOffTrigger}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm"
                                   >
-                                    <input
-                                      type="checkbox"
-                                      checked={(
-                                        editLore.beats_trigger || []
-                                      ).includes(beatIndex)}
-                                      onChange={(e) => {
-                                        const current =
-                                          editLore.beats_trigger || [];
-                                        setEditLore({
-                                          ...editLore,
-                                          beats_trigger: e.target.checked
-                                            ? [...current, beatIndex]
-                                            : current.filter(
-                                                (i) => i !== beatIndex
-                                              ),
-                                        });
-                                      }}
-                                      className="w-4 h-4 text-green-600 rounded"
-                                    />
-                                    <span className="text-xs text-gray-900 dark:text-white">
-                                      {beat.title || `Beat ${beatIndex + 1}`}
-                                    </span>
-                                  </label>
-                                ))
-                              )}
+                                    Add
+                                  </button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {(editLore.off_triggers || []).map(
+                                    (trigger) => (
+                                      <span
+                                        key={trigger}
+                                        className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-sm flex items-center gap-1"
+                                      >
+                                        ❌ {trigger}
+                                        <button
+                                          onClick={() =>
+                                            setEditLore({
+                                              ...editLore,
+                                              off_triggers: (
+                                                editLore.off_triggers || []
+                                              ).filter((t) => t !== trigger),
+                                            })
+                                          }
+                                          className="hover:text-red-900 dark:hover:text-red-100"
+                                        >
+                                          ×
+                                        </button>
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Advanced Triggers Section (Expandable) */}
+                              <div className="border border-gray-300 dark:border-gray-600 rounded-lg">
+                                <button
+                                  onClick={() =>
+                                    setEditLoreAdvancedExpanded(
+                                      !editLoreAdvancedExpanded
+                                    )
+                                  }
+                                  className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                >
+                                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    ⚙️ Advanced Section
+                                  </span>
+                                  <span className="text-gray-500 dark:text-gray-400">
+                                    {editLoreAdvancedExpanded ? "▼" : "▶"}
+                                  </span>
+                                </button>
+
+                                {editLoreAdvancedExpanded && (
+                                  <div className="p-4 space-y-4">
+                                    {/* Lore-based Triggers */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                          ✅ Lores that turn this ON
+                                        </label>
+                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                                          {lore.filter((_, i) => i !== index)
+                                            .length === 0 ? (
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                              No other lore entries yet.
+                                            </p>
+                                          ) : (
+                                            lore
+                                              .filter((_, i) => i !== index)
+                                              .map((loreEntry, loreIndex) => (
+                                                <label
+                                                  key={loreIndex}
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                                >
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={(
+                                                      editLore.trigger_lores ||
+                                                      []
+                                                    ).includes(loreEntry.title)}
+                                                    onChange={(e) => {
+                                                      const current =
+                                                        editLore.trigger_lores ||
+                                                        [];
+                                                      setEditLore({
+                                                        ...editLore,
+                                                        trigger_lores: e.target
+                                                          .checked
+                                                          ? [
+                                                              ...current,
+                                                              loreEntry.title,
+                                                            ]
+                                                          : current.filter(
+                                                              (t) =>
+                                                                t !==
+                                                                loreEntry.title
+                                                            ),
+                                                      });
+                                                    }}
+                                                    className="w-4 h-4 text-green-600 rounded"
+                                                  />
+                                                  <span className="text-xs text-gray-900 dark:text-white">
+                                                    {loreEntry.title}
+                                                  </span>
+                                                </label>
+                                              ))
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                          ❌ Lores that turn this OFF
+                                        </label>
+                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                                          {lore.filter((_, i) => i !== index)
+                                            .length === 0 ? (
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                              No other lore entries yet.
+                                            </p>
+                                          ) : (
+                                            lore
+                                              .filter((_, i) => i !== index)
+                                              .map((loreEntry, loreIndex) => (
+                                                <label
+                                                  key={loreIndex}
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                                >
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={(
+                                                      editLore.untrigger_lores ||
+                                                      []
+                                                    ).includes(loreEntry.title)}
+                                                    onChange={(e) => {
+                                                      const current =
+                                                        editLore.untrigger_lores ||
+                                                        [];
+                                                      setEditLore({
+                                                        ...editLore,
+                                                        untrigger_lores: e
+                                                          .target.checked
+                                                          ? [
+                                                              ...current,
+                                                              loreEntry.title,
+                                                            ]
+                                                          : current.filter(
+                                                              (t) =>
+                                                                t !==
+                                                                loreEntry.title
+                                                            ),
+                                                      });
+                                                    }}
+                                                    className="w-4 h-4 text-red-600 rounded"
+                                                  />
+                                                  <span className="text-xs text-gray-900 dark:text-white">
+                                                    {loreEntry.title}
+                                                  </span>
+                                                </label>
+                                              ))
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {editLore.secrtet && (
+                                      <div>
+                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                          🔑 Trigger Keys
+                                        </label>
+                                        <div className="flex gap-2 mb-2">
+                                          <input
+                                            type="text"
+                                            value={editLoreKey}
+                                            onChange={(e) =>
+                                              setEditLoreKey(e.target.value)
+                                            }
+                                            onKeyDown={(e) =>
+                                              e.key === "Enter" &&
+                                              (e.preventDefault(),
+                                              addEditLoreKey())
+                                            }
+                                            placeholder="e.g., 'Dragon Defeated'"
+                                            className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                          />
+                                          <button
+                                            onClick={addEditLoreKey}
+                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm"
+                                          >
+                                            Add
+                                          </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                          {(editLore.keys || []).map((key) => (
+                                            <span
+                                              key={key}
+                                              className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-sm flex items-center gap-1"
+                                            >
+                                              🔑 {key}
+                                              <button
+                                                onClick={() =>
+                                                  setEditLore({
+                                                    ...editLore,
+                                                    keys: (
+                                                      editLore.keys || []
+                                                    ).filter((k) => k !== key),
+                                                  })
+                                                }
+                                                className="hover:text-yellow-900 dark:hover:text-yellow-100"
+                                              >
+                                                ×
+                                              </button>
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Plot Beat Triggers */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                          ✅ Beats that turn this lore ON
+                                        </label>
+                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                                          {plotBeats.length === 0 ? (
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                              No plot beats yet. Add them in the
+                                              Plot Beats step.
+                                            </p>
+                                          ) : (
+                                            plotBeats.map((beat, beatIndex) => (
+                                              <label
+                                                key={beatIndex}
+                                                className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={(
+                                                    editLore.beats_trigger || []
+                                                  ).includes(beatIndex)}
+                                                  onChange={(e) => {
+                                                    const current =
+                                                      editLore.beats_trigger ||
+                                                      [];
+                                                    setEditLore({
+                                                      ...editLore,
+                                                      beats_trigger: e.target
+                                                        .checked
+                                                        ? [
+                                                            ...current,
+                                                            beatIndex,
+                                                          ]
+                                                        : current.filter(
+                                                            (i) =>
+                                                              i !== beatIndex
+                                                          ),
+                                                    });
+                                                  }}
+                                                  className="w-4 h-4 text-green-600 rounded"
+                                                />
+                                                <span className="text-xs text-gray-900 dark:text-white">
+                                                  {beat.title ||
+                                                    `Beat ${beatIndex + 1}`}
+                                                </span>
+                                              </label>
+                                            ))
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                          ❌ Beats that turn this lore OFF
+                                        </label>
+                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                                          {plotBeats.length === 0 ? (
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                              No plot beats yet. Add them in the
+                                              Plot Beats step.
+                                            </p>
+                                          ) : (
+                                            plotBeats.map((beat, beatIndex) => (
+                                              <label
+                                                key={beatIndex}
+                                                className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={(
+                                                    editLore.beats_untrigger ||
+                                                    []
+                                                  ).includes(beatIndex)}
+                                                  onChange={(e) => {
+                                                    const current =
+                                                      editLore.beats_untrigger ||
+                                                      [];
+                                                    setEditLore({
+                                                      ...editLore,
+                                                      beats_untrigger: e.target
+                                                        .checked
+                                                        ? [
+                                                            ...current,
+                                                            beatIndex,
+                                                          ]
+                                                        : current.filter(
+                                                            (i) =>
+                                                              i !== beatIndex
+                                                          ),
+                                                    });
+                                                  }}
+                                                  className="w-4 h-4 text-red-600 rounded"
+                                                />
+                                                <span className="text-xs text-gray-900 dark:text-white">
+                                                  {beat.title ||
+                                                    `Beat ${beatIndex + 1}`}
+                                                </span>
+                                              </label>
+                                            ))
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex gap-2 pt-2">
+                                <button
+                                  onClick={saveEditLore}
+                                  disabled={
+                                    !editLore.title || !editLore.content
+                                  }
+                                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg"
+                                >
+                                  ✓ Save Changes
+                                </button>
+                                <button
+                                  onClick={cancelEditLore}
+                                  className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                              ❌ Beats that turn this lore OFF
-                            </label>
-                            <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
-                              {plotBeats.length === 0 ? (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                                  No plot beats yet. Add them in the Plot Beats
-                                  step.
-                                </p>
-                              ) : (
-                                plotBeats.map((beat, beatIndex) => (
-                                  <label
-                                    key={beatIndex}
-                                    className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                          ) : (
+                            // View mode with drag-and-drop
+                            <div className="flex items-start justify-between">
+                              <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing mr-3 mt-1">
+                                ⋮⋮
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div className="font-bold text-gray-900 dark:text-white">
+                                    {entry.title}
+                                  </div>
+                                  {entry.secrtet && (
+                                    <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">
+                                      🔒 Hidden
+                                    </span>
+                                  )}
+                                  {/* On/Off Toggle */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const updated = [...lore];
+                                      updated[index] = {
+                                        ...entry,
+                                        on: !entry.on,
+                                      };
+                                      setLore(updated);
+                                    }}
+                                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                                      entry.on
+                                        ? "bg-green-600 text-white hover:bg-green-700"
+                                        : "bg-gray-400 text-white hover:bg-gray-500"
+                                    }`}
+                                    title={
+                                      entry.on
+                                        ? "Lore is enabled"
+                                        : "Lore is disabled"
+                                    }
                                   >
-                                    <input
-                                      type="checkbox"
-                                      checked={(
-                                        editLore.beats_untrigger || []
-                                      ).includes(beatIndex)}
-                                      onChange={(e) => {
-                                        const current =
-                                          editLore.beats_untrigger || [];
-                                        setEditLore({
-                                          ...editLore,
-                                          beats_untrigger: e.target.checked
-                                            ? [...current, beatIndex]
-                                            : current.filter(
-                                                (i) => i !== beatIndex
-                                              ),
-                                        });
-                                      }}
-                                      className="w-4 h-4 text-red-600 rounded"
-                                    />
-                                    <span className="text-xs text-gray-900 dark:text-white">
-                                      {beat.title || `Beat ${beatIndex + 1}`}
-                                    </span>
-                                  </label>
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 pt-2">
-                          <button
-                            onClick={saveEditLore}
-                            disabled={!editLore.title || !editLore.content}
-                            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg"
-                          >
-                            ✓ Save Changes
-                          </button>
-                          <button
-                            onClick={cancelEditLore}
-                            className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      // View mode with drag-and-drop
-                      <div className="flex items-start justify-between">
-                        <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing mr-3 mt-1">
-                          ⋮⋮
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <div className="font-bold text-gray-900 dark:text-white">
-                              {entry.title}
-                            </div>
-                            {entry.secrtet && (
-                              <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">
-                                🔒 Hidden
-                              </span>
-                            )}
-                            {/* On/Off Toggle */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const updated = [...lore];
-                                updated[index] = { ...entry, on: !entry.on };
-                                setLore(updated);
-                              }}
-                              className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
-                                entry.on
-                                  ? "bg-green-600 text-white hover:bg-green-700"
-                                  : "bg-gray-400 text-white hover:bg-gray-500"
-                              }`}
-                              title={
-                                entry.on
-                                  ? "Lore is enabled"
-                                  : "Lore is disabled"
-                              }
-                            >
-                              {entry.on ? "ON" : "OFF"}
-                            </button>
-                          </div>
-                          {entry.thumbnailUrl && (
-                            <img
-                              src={entry.thumbnailUrl}
-                              alt="Lore thumb"
-                              className="w-24 h-24 object-cover rounded border mb-2"
-                            />
-                          )}
-                          <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                            {entry.content}
-                          </div>
-                          {entry.on_triggers &&
-                            entry.on_triggers.length > 0 && (
-                              <div className="text-xs text-green-700 dark:text-green-400 mb-1">
-                                <strong>✅ ON Triggers:</strong>{" "}
-                                {entry.on_triggers.join(", ")}
+                                    {entry.on ? "ON" : "OFF"}
+                                  </button>
+                                </div>
+                                {entry.thumbnailUrl && (
+                                  <img
+                                    src={entry.thumbnailUrl}
+                                    alt="Lore thumb"
+                                    className="w-24 h-24 object-cover rounded border mb-2"
+                                  />
+                                )}
+                                <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                  {entry.content}
+                                </div>
+                                {entry.on_triggers &&
+                                  entry.on_triggers.length > 0 && (
+                                    <div className="text-xs text-green-700 dark:text-green-400 mb-1">
+                                      <strong>✅ ON Triggers:</strong>{" "}
+                                      {entry.on_triggers.join(", ")}
+                                    </div>
+                                  )}
+                                {entry.off_triggers &&
+                                  entry.off_triggers.length > 0 && (
+                                    <div className="text-xs text-red-700 dark:text-red-400 mb-1">
+                                      <strong>❌ OFF Triggers:</strong>{" "}
+                                      {entry.off_triggers.join(", ")}
+                                    </div>
+                                  )}
+                                {entry.secrtet && entry.keys.length > 0 && (
+                                  <div className="text-xs text-yellow-700 dark:text-yellow-400">
+                                    <strong>Triggers:</strong>{" "}
+                                    {entry.keys.join(", ")}
+                                  </div>
+                                )}
+                                {entry.beats_trigger &&
+                                  entry.beats_trigger.length > 0 && (
+                                    <div className="text-xs text-green-700 dark:text-green-400 mb-1">
+                                      <strong>✅ Beats turning ON:</strong>{" "}
+                                      {entry.beats_trigger
+                                        .map(
+                                          (i) =>
+                                            plotBeats[i]?.title ||
+                                            `Beat ${i + 1}`
+                                        )
+                                        .join(", ")}
+                                    </div>
+                                  )}
+                                {entry.beats_untrigger &&
+                                  entry.beats_untrigger.length > 0 && (
+                                    <div className="text-xs text-red-700 dark:text-red-400 mb-1">
+                                      <strong>❌ Beats turning OFF:</strong>{" "}
+                                      {entry.beats_untrigger
+                                        .map(
+                                          (i) =>
+                                            plotBeats[i]?.title ||
+                                            `Beat ${i + 1}`
+                                        )
+                                        .join(", ")}
+                                    </div>
+                                  )}
                               </div>
-                            )}
-                          {entry.off_triggers &&
-                            entry.off_triggers.length > 0 && (
-                              <div className="text-xs text-red-700 dark:text-red-400 mb-1">
-                                <strong>❌ OFF Triggers:</strong>{" "}
-                                {entry.off_triggers.join(", ")}
+                              <div className="flex flex-col items-center  gap-2 ml-3">
+                                {/* Reordering disabled in sorted view */}
+                                <div className="flex flex-row items-center gap-1 ml-3">
+                                  <button
+                                    onClick={() => startEditLore(index)}
+                                    className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={() => removeLore(index)}
+                                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
                               </div>
-                            )}
-                          {entry.secrtet && entry.keys.length > 0 && (
-                            <div className="text-xs text-yellow-700 dark:text-yellow-400">
-                              <strong>Triggers:</strong> {entry.keys.join(", ")}
                             </div>
                           )}
-                          {entry.beats_trigger &&
-                            entry.beats_trigger.length > 0 && (
-                              <div className="text-xs text-green-700 dark:text-green-400 mb-1">
-                                <strong>✅ Beats turning ON:</strong>{" "}
-                                {entry.beats_trigger
-                                  .map(
-                                    (i) =>
-                                      plotBeats[i]?.title || `Beat ${i + 1}`
-                                  )
-                                  .join(", ")}
-                              </div>
-                            )}
-                          {entry.beats_untrigger &&
-                            entry.beats_untrigger.length > 0 && (
-                              <div className="text-xs text-red-700 dark:text-red-400 mb-1">
-                                <strong>❌ Beats turning OFF:</strong>{" "}
-                                {entry.beats_untrigger
-                                  .map(
-                                    (i) =>
-                                      plotBeats[i]?.title || `Beat ${i + 1}`
-                                  )
-                                  .join(", ")}
-                              </div>
-                            )}
                         </div>
-                        <div className="flex flex-col items-center  gap-2 ml-3">
-                          <div className="flex flex-row items-center gap-1 ml-3">
-                            <button
-                              onClick={() => moveLoreUp(index)}
-                              disabled={index === 0}
-                              className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                              title="Move up"
-                            >
-                              ▲
-                            </button>
-                            <button
-                              onClick={() => moveLoreDown(index)}
-                              disabled={index === lore.length - 1}
-                              className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                              title="Move down"
-                            >
-                              ▼
-                            </button>
-                          </div>
-                          <div className="flex flex-row items-center gap-1 ml-3">
-                            <button
-                              onClick={() => startEditLore(index)}
-                              className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() => removeLore(index)}
-                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                            >
-                              🗑️
-                            </button>
-                          </div>
+                      ))}
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-4 mt-4">
+                          <button
+                            onClick={() =>
+                              setLorePage((p) => Math.max(1, p - 1))
+                            }
+                            disabled={lorePage === 1}
+                            className="px-3 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded disabled:opacity-50 text-sm"
+                          >
+                            Previous
+                          </button>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            Page {lorePage} of {totalPages}
+                          </span>
+                          <button
+                            onClick={() =>
+                              setLorePage((p) => Math.min(totalPages, p + 1))
+                            }
+                            disabled={lorePage === totalPages}
+                            className="px-3 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded disabled:opacity-50 text-sm"
+                          >
+                            Next
+                          </button>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ))
+                      )}
+                    </>
+                  );
+                })()
               )}
             </div>
           </div>

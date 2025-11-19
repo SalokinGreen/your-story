@@ -44,13 +44,13 @@ function AIModelSelector({
   const [speechifyKey, setSpeechifyKey] = useState("");
   const [byokEnabled, setByokEnabled] = useState(false);
   const [isSubscriber, setIsSubscriber] = useState(false);
-  
+
   // Custom Model State
   const [customModelId, setCustomModelId] = useState("");
   const [customModelName, setCustomModelName] = useState("");
   const [customContextSize, setCustomContextSize] = useState(4096);
   const [customMaxOutput, setCustomMaxOutput] = useState(1000);
-  
+
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -69,12 +69,16 @@ function AIModelSelector({
           if (settings) {
             setByokEnabled(settings.byok_enabled || false);
             setIsSubscriber(settings.is_subscriber || false);
-            
+
             if (settings.custom_model_config) {
               setCustomModelId(settings.custom_model_config.modelId || "");
               setCustomModelName(settings.custom_model_config.name || "");
-              setCustomContextSize(settings.custom_model_config.contextSize || 4096);
-              setCustomMaxOutput(settings.custom_model_config.maxOutputTokens || 1000);
+              setCustomContextSize(
+                settings.custom_model_config.contextSize || 4096
+              );
+              setCustomMaxOutput(
+                settings.custom_model_config.maxOutputTokens || 1000
+              );
             }
           }
         })
@@ -85,25 +89,31 @@ function AIModelSelector({
   const handleSaveSettings = async () => {
     if (!user) return;
     setIsSaving(true);
-    
+
     // Save keys to localStorage
     if (typeof window !== "undefined") {
       localStorage.setItem("openRouterKey", openRouterKey);
       localStorage.setItem("speechifyKey", speechifyKey);
     }
 
-    const customConfig = customModelId ? {
-      modelId: customModelId,
-      name: customModelName || "Custom Model",
-      contextSize: customContextSize,
-      maxOutputTokens: customMaxOutput
-    } : undefined;
+    const customConfig = customModelId
+      ? {
+          modelId: customModelId,
+          name: customModelName || "Custom Model",
+          contextSize: customContextSize,
+          maxOutputTokens: customMaxOutput,
+        }
+      : undefined;
 
-    const { error } = await updateUserSettings(user.id, {
-      byok_enabled: byokEnabled,
-      is_subscriber: isSubscriber, // Keeping this updateable for testing purposes as requested
-      custom_model_config: customConfig
-    }, supabase);
+    const { error } = await updateUserSettings(
+      user.id,
+      {
+        byok_enabled: byokEnabled,
+        is_subscriber: isSubscriber, // Keeping this updateable for testing purposes as requested
+        custom_model_config: customConfig,
+      },
+      supabase
+    );
 
     setIsSaving(false);
 
@@ -129,31 +139,39 @@ function AIModelSelector({
     if (typeof window !== "undefined") {
       localStorage.setItem("aiModel", newModelKey);
       setCurrentModelKey(newModelKey);
-      
+
       if (newModelKey === "custom") {
-         addNotification(`🤖 Model changed to Custom Model`, "success");
+        addNotification(`🤖 Model changed to Custom Model`, "success");
       } else {
-         const newModel = AI_MODELS[newModelKey as keyof typeof AI_MODELS];
-         addNotification(`🤖 Model changed to ${newModel.name}`, "success");
+        const newModel = AI_MODELS[newModelKey as keyof typeof AI_MODELS];
+        addNotification(`🤖 Model changed to ${newModel.name}`, "success");
       }
     }
   };
 
   return (
     <div className="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
-      <label className="block p-4 pb-3 text-sm font-semibold text-gray-700 dark:text-gray-300 flex justify-between items-center">
+      <label className="p-4 pb-3 text-sm font-semibold text-gray-700 dark:text-gray-300 flex justify-between items-center">
         <span>🤖 AI Model Selection</span>
-        <button 
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
         >
-            {showAdvanced ? "Hide BYOK & Settings" : "BYOK & Settings"}
+          {showAdvanced ? "Hide BYOK & Settings" : "BYOK & Settings"}
         </button>
       </label>
 
       <div className="px-4 pb-4">
         {/* Current Model Banner */}
-        <div className={`bg-linear-to-r ${isSubscriber && byokEnabled && (openRouterKey || currentModelKey === "custom") ? "from-green-600 to-teal-600" : "from-purple-600 to-blue-600"} rounded-lg p-4 text-white mb-4`}>
+        <div
+          className={`bg-linear-to-r ${
+            isSubscriber &&
+            byokEnabled &&
+            (openRouterKey || currentModelKey === "custom")
+              ? "from-green-600 to-teal-600"
+              : "from-purple-600 to-blue-600"
+          } rounded-lg p-4 text-white mb-4`}
+        >
           <div className="flex items-center justify-between mb-2">
             <div>
               <div className="text-xl font-bold">{currentModel.name}</div>
@@ -163,10 +181,18 @@ function AIModelSelector({
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold">
-                {isSubscriber && byokEnabled && (openRouterKey || currentModelKey === "custom") ? "FREE" : currentModel.cost}
+                {isSubscriber &&
+                byokEnabled &&
+                (openRouterKey || currentModelKey === "custom")
+                  ? "FREE"
+                  : currentModel.cost}
               </div>
               <div className="text-xs text-purple-100">
-                {isSubscriber && byokEnabled && (openRouterKey || currentModelKey === "custom") ? "(BYOK)" : "coins/gen"}
+                {isSubscriber &&
+                byokEnabled &&
+                (openRouterKey || currentModelKey === "custom")
+                  ? "(BYOK)"
+                  : "coins/gen"}
               </div>
             </div>
           </div>
@@ -194,108 +220,139 @@ function AIModelSelector({
             </option>
           ))}
           {isSubscriber && byokEnabled && (
-              <option value="custom">Custom Model (BYOK)</option>
+            <option value="custom">Custom Model (BYOK)</option>
           )}
         </select>
-        
+
         {/* Advanced Settings / BYOK Section */}
         {showAdvanced && (
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600 space-y-4">
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded text-sm text-blue-800 dark:text-blue-200 mb-2">
-                    <strong>Bring Your Own Key (BYOK)</strong> allows you to use your own API keys. 
-                    When active, story generation costs <strong>0 coins</strong>. Keys are stored locally in your browser.
-                </div>
-
-                {/* Enable BYOK Toggle */}
-                <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable BYOK</span>
-                    <button 
-                        onClick={() => setByokEnabled(!byokEnabled)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${byokEnabled ? 'bg-green-600' : 'bg-gray-400'}`}
-                    >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${byokEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                </div>
-
-                {/* Subscription Status (Mock Toggle for now) */}
-                <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Subscription Status (Mock)</span>
-                    <button 
-                        onClick={() => setIsSubscriber(!isSubscriber)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isSubscriber ? 'bg-blue-600' : 'bg-gray-400'}`}
-                    >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isSubscriber ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                </div>
-
-                {/* API Keys */}
-                <div className="space-y-3">
-                    <div>
-                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">OpenRouter API Key</label>
-                        <input 
-                            type="password" 
-                            value={openRouterKey}
-                            onChange={(e) => setOpenRouterKey(e.target.value)}
-                            placeholder="sk-or-..."
-                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">Speechify API Key</label>
-                        <input 
-                            type="password" 
-                            value={speechifyKey}
-                            onChange={(e) => setSpeechifyKey(e.target.value)}
-                            placeholder="speechify-..."
-                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
-                        />
-                    </div>
-                </div>
-
-                {/* Custom Model Config */}
-                <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-600">
-                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">Custom Model Configuration</h4>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">Model ID (OpenRouter)</label>
-                        <input 
-                            type="text" 
-                            value={customModelId}
-                            onChange={(e) => setCustomModelId(e.target.value)}
-                            placeholder="anthropic/claude-3-opus"
-                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">Display Name</label>
-                            <input 
-                                type="text" 
-                                value={customModelName}
-                                onChange={(e) => setCustomModelName(e.target.value)}
-                                placeholder="Claude 3 Opus"
-                                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">Context Size</label>
-                            <input 
-                                type="number" 
-                                value={customContextSize}
-                                onChange={(e) => setCustomContextSize(parseInt(e.target.value) || 4096)}
-                                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <button 
-                    onClick={handleSaveSettings}
-                    disabled={isSaving}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm disabled:opacity-50"
-                >
-                    {isSaving ? "Saving..." : "Save Settings"}
-                </button>
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600 space-y-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded text-sm text-blue-800 dark:text-blue-200 mb-2">
+              <strong>Bring Your Own Key (BYOK)</strong> allows you to use your
+              own API keys. When active, story generation costs{" "}
+              <strong>0 coins</strong>. Keys are stored locally in your browser.
             </div>
+
+            {/* Enable BYOK Toggle */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Enable BYOK
+              </span>
+              <button
+                onClick={() => setByokEnabled(!byokEnabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  byokEnabled ? "bg-green-600" : "bg-gray-400"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    byokEnabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Subscription Status (Mock Toggle for now) */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Subscription Status (Mock)
+              </span>
+              <button
+                onClick={() => setIsSubscriber(!isSubscriber)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  isSubscriber ? "bg-blue-600" : "bg-gray-400"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isSubscriber ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* API Keys */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                  OpenRouter API Key
+                </label>
+                <input
+                  type="password"
+                  value={openRouterKey}
+                  onChange={(e) => setOpenRouterKey(e.target.value)}
+                  placeholder="sk-or-..."
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                  Speechify API Key
+                </label>
+                <input
+                  type="password"
+                  value={speechifyKey}
+                  onChange={(e) => setSpeechifyKey(e.target.value)}
+                  placeholder="speechify-..."
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Custom Model Config */}
+            <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-600">
+              <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                Custom Model Configuration
+              </h4>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                  Model ID (OpenRouter)
+                </label>
+                <input
+                  type="text"
+                  value={customModelId}
+                  onChange={(e) => setCustomModelId(e.target.value)}
+                  placeholder="anthropic/claude-3-opus"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={customModelName}
+                    onChange={(e) => setCustomModelName(e.target.value)}
+                    placeholder="Claude 3 Opus"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                    Context Size
+                  </label>
+                  <input
+                    type="number"
+                    value={customContextSize}
+                    onChange={(e) =>
+                      setCustomContextSize(parseInt(e.target.value) || 4096)
+                    }
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSaveSettings}
+              disabled={isSaving}
+              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm disabled:opacity-50"
+            >
+              {isSaving ? "Saving..." : "Save Settings"}
+            </button>
+          </div>
         )}
 
         <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
@@ -1806,6 +1863,8 @@ function LoreEditor({
   const [draggedLoreIndex, setDraggedLoreIndex] = useState<number | null>(null);
   const [editingLoreIndex, setEditingLoreIndex] = useState<number | null>(null);
   const [editLore, setEditLore] = useState<Partial<StoryLore>>({});
+  const [editLoreAdvancedExpanded, setEditLoreAdvancedExpanded] =
+    useState(false);
   const { addNotification } = useNotification();
 
   // Drag-and-drop handlers for lore
@@ -1885,8 +1944,11 @@ function LoreEditor({
       keys: [],
       thumbnailUrl: "",
       on: true,
+      alwaysOn: false,
       on_triggers: [],
       off_triggers: [],
+      trigger_lores: [],
+      untrigger_lores: [],
       beats_trigger: [],
       beats_untrigger: [],
     };
@@ -2068,6 +2130,17 @@ function LoreEditor({
                     />
                     <span>✅ Enabled</span>
                   </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={editLore.alwaysOn ?? false}
+                      onChange={(e) =>
+                        setEditLore({ ...editLore, alwaysOn: e.target.checked })
+                      }
+                      className="rounded"
+                    />
+                    <span>🔵 Always On</span>
+                  </label>
                 </div>
 
                 {/* ON/OFF Trigger Words */}
@@ -2187,86 +2260,207 @@ function LoreEditor({
                   </div>
                 </div>
 
-                {/* Plot Beat Triggers */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      ✅ Beats that turn this lore ON
-                    </label>
-                    <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
-                      {plotBeats.length === 0 ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                          No plot beats yet.
-                        </p>
-                      ) : (
-                        plotBeats.map((beat, beatIndex) => (
-                          <label
-                            key={beatIndex}
-                            className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={(editLore.beats_trigger || []).includes(
-                                beatIndex
-                              )}
-                              onChange={(e) => {
-                                const current = editLore.beats_trigger || [];
-                                setEditLore({
-                                  ...editLore,
-                                  beats_trigger: e.target.checked
-                                    ? [...current, beatIndex]
-                                    : current.filter((i) => i !== beatIndex),
-                                });
-                              }}
-                              className="w-4 h-4 text-green-600 rounded"
-                            />
-                            <span className="text-xs text-gray-900 dark:text-white">
-                              {beat.title || `Beat ${beatIndex + 1}`}
-                            </span>
+                {/* Advanced Triggers Section (Expandable) */}
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg">
+                  <button
+                    onClick={() =>
+                      setEditLoreAdvancedExpanded(!editLoreAdvancedExpanded)
+                    }
+                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      ⚙️ Advanced Section
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {editLoreAdvancedExpanded ? "▼" : "▶"}
+                    </span>
+                  </button>
+
+                  {editLoreAdvancedExpanded && (
+                    <div className="p-4 space-y-4">
+                      {/* Lore-based Triggers */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            ✅ Lores that turn this ON
                           </label>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      ❌ Beats that turn this lore OFF
-                    </label>
-                    <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
-                      {plotBeats.length === 0 ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                          No plot beats yet.
-                        </p>
-                      ) : (
-                        plotBeats.map((beat, beatIndex) => (
-                          <label
-                            key={beatIndex}
-                            className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={(
-                                editLore.beats_untrigger || []
-                              ).includes(beatIndex)}
-                              onChange={(e) => {
-                                const current = editLore.beats_untrigger || [];
-                                setEditLore({
-                                  ...editLore,
-                                  beats_untrigger: e.target.checked
-                                    ? [...current, beatIndex]
-                                    : current.filter((i) => i !== beatIndex),
-                                });
-                              }}
-                              className="w-4 h-4 text-red-600 rounded"
-                            />
-                            <span className="text-xs text-gray-900 dark:text-white">
-                              {beat.title || `Beat ${beatIndex + 1}`}
-                            </span>
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                            {localLore.filter((_, i) => i !== index).length ===
+                            0 ? (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                No other lore entries.
+                              </p>
+                            ) : (
+                              localLore
+                                .filter((_, i) => i !== index)
+                                .map((loreEntry, loreIdx) => (
+                                  <label
+                                    key={loreIdx}
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={(
+                                        editLore.trigger_lores || []
+                                      ).includes(loreEntry.title)}
+                                      onChange={(e) => {
+                                        const current =
+                                          editLore.trigger_lores || [];
+                                        setEditLore({
+                                          ...editLore,
+                                          trigger_lores: e.target.checked
+                                            ? [...current, loreEntry.title]
+                                            : current.filter(
+                                                (t) => t !== loreEntry.title
+                                              ),
+                                        });
+                                      }}
+                                      className="w-4 h-4 text-green-600 rounded"
+                                    />
+                                    <span className="text-xs text-gray-900 dark:text-white">
+                                      {loreEntry.title}
+                                    </span>
+                                  </label>
+                                ))
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            ❌ Lores that turn this OFF
                           </label>
-                        ))
-                      )}
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                            {localLore.filter((_, i) => i !== index).length ===
+                            0 ? (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                No other lore entries.
+                              </p>
+                            ) : (
+                              localLore
+                                .filter((_, i) => i !== index)
+                                .map((loreEntry, loreIdx) => (
+                                  <label
+                                    key={loreIdx}
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={(
+                                        editLore.untrigger_lores || []
+                                      ).includes(loreEntry.title)}
+                                      onChange={(e) => {
+                                        const current =
+                                          editLore.untrigger_lores || [];
+                                        setEditLore({
+                                          ...editLore,
+                                          untrigger_lores: e.target.checked
+                                            ? [...current, loreEntry.title]
+                                            : current.filter(
+                                                (t) => t !== loreEntry.title
+                                              ),
+                                        });
+                                      }}
+                                      className="w-4 h-4 text-red-600 rounded"
+                                    />
+                                    <span className="text-xs text-gray-900 dark:text-white">
+                                      {loreEntry.title}
+                                    </span>
+                                  </label>
+                                ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Plot Beat Triggers */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            ✅ Beats that turn this lore ON
+                          </label>
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                            {plotBeats.length === 0 ? (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                No plot beats yet.
+                              </p>
+                            ) : (
+                              plotBeats.map((beat, beatIndex) => (
+                                <label
+                                  key={beatIndex}
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(
+                                      editLore.beats_trigger || []
+                                    ).includes(beatIndex)}
+                                    onChange={(e) => {
+                                      const current =
+                                        editLore.beats_trigger || [];
+                                      setEditLore({
+                                        ...editLore,
+                                        beats_trigger: e.target.checked
+                                          ? [...current, beatIndex]
+                                          : current.filter(
+                                              (i) => i !== beatIndex
+                                            ),
+                                      });
+                                    }}
+                                    className="w-4 h-4 text-green-600 rounded"
+                                  />
+                                  <span className="text-xs text-gray-900 dark:text-white">
+                                    {beat.title || `Beat ${beatIndex + 1}`}
+                                  </span>
+                                </label>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            ❌ Beats that turn this lore OFF
+                          </label>
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                            {plotBeats.length === 0 ? (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                No plot beats yet.
+                              </p>
+                            ) : (
+                              plotBeats.map((beat, beatIndex) => (
+                                <label
+                                  key={beatIndex}
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(
+                                      editLore.beats_untrigger || []
+                                    ).includes(beatIndex)}
+                                    onChange={(e) => {
+                                      const current =
+                                        editLore.beats_untrigger || [];
+                                      setEditLore({
+                                        ...editLore,
+                                        beats_untrigger: e.target.checked
+                                          ? [...current, beatIndex]
+                                          : current.filter(
+                                              (i) => i !== beatIndex
+                                            ),
+                                      });
+                                    }}
+                                    className="w-4 h-4 text-red-600 rounded"
+                                  />
+                                  <span className="text-xs text-gray-900 dark:text-white">
+                                    {beat.title || `Beat ${beatIndex + 1}`}
+                                  </span>
+                                </label>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2">

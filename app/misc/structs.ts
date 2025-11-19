@@ -54,8 +54,12 @@ export interface StoryLore {
   relatedLocations: string[];
   secrtet: boolean;
   keys: string[];
-  on_triggers?: string[];
-  off_triggers?: string[];
+  alwaysOn?: boolean; // If true, lore is always visible regardless of triggers
+  enabled?: boolean; // If false, lore is never visible/checked. Defaults to true.
+  on_triggers?: string[]; // Word triggers to turn lore on
+  off_triggers?: string[]; // Word triggers to turn lore off
+  trigger_lores?: string[]; // Titles of other lores that turn this one on
+  untrigger_lores?: string[]; // Titles of other lores that turn this one off
   thumbnailUrl?: string;
   on?: boolean;
   beats_trigger?: number[];

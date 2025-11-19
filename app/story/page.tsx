@@ -27,6 +27,7 @@ import {
   decryptStoryData,
   isEncrypted,
 } from "../misc/encryption";
+import { getModelConfig } from "../misc/ai_prices";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -402,69 +403,109 @@ export function processCommands(
 // Process lore triggers based on story content and fulfilled beats
 function processLoreTriggers(
   storyData: StoryData,
-  recentContent: string,
   addNotification: (
     message: string,
     type: "success" | "failure" | "info" | "warning"
   ) => void
 ) {
-  const contentLower = recentContent.toLowerCase();
+  // Combine all content for history scan
+  const fullContent = [
+    storyData.starting_content,
+    ...storyData.scene.parts.map((p) => p.content),
+  ]
+    .join("\n")
+    .toLowerCase();
+
   const fulfilledBeatIndices = storyData.plot_beats
     .map((beat, index) => (beat.fulfilled ? index : -1))
     .filter((index) => index !== -1);
 
+  // Helper to check triggers
+  const checkTriggers = (triggers?: string[]) => {
+    if (!triggers || triggers.length === 0) return false;
+    return triggers.some((t) => fullContent.includes(t.toLowerCase()));
+  };
+
+  const checkBeats = (beats?: number[]) => {
+    if (!beats || beats.length === 0) return false;
+    return beats.some((b) => fulfilledBeatIndices.includes(b));
+  };
+
   storyData.lore.forEach((loreItem) => {
-    let shouldTurnOn = false;
-    let shouldTurnOff = false;
-
-    // Check ON triggers (words)
-    if (loreItem.on_triggers && loreItem.on_triggers.length > 0) {
-      for (const trigger of loreItem.on_triggers) {
-        if (contentLower.includes(trigger.toLowerCase())) {
-          shouldTurnOn = true;
-          break;
-        }
+    // Enabled check (default to true if undefined)
+    if (loreItem.enabled === false) {
+      if (loreItem.on) {
+        loreItem.on = false;
       }
+      return;
     }
 
-    // Check OFF triggers (words)
-    if (loreItem.off_triggers && loreItem.off_triggers.length > 0) {
-      for (const trigger of loreItem.off_triggers) {
-        if (contentLower.includes(trigger.toLowerCase())) {
-          shouldTurnOff = true;
-          break;
-        }
+    // Always On check
+    if (loreItem.alwaysOn) {
+      if (loreItem.on !== true) {
+        loreItem.on = true;
       }
+      return;
     }
 
-    // Check beat triggers for turning ON
-    if (loreItem.beats_trigger && loreItem.beats_trigger.length > 0) {
-      for (const beatIndex of loreItem.beats_trigger) {
-        if (fulfilledBeatIndices.includes(beatIndex)) {
-          shouldTurnOn = true;
-          break;
-        }
+    // Check triggers
+    const hasTextOn = checkTriggers(loreItem.on_triggers);
+    const hasBeatOn = checkBeats(loreItem.beats_trigger);
+
+    // Check lore triggers (referencing other lores)
+    let hasLoreOn = false;
+    if (loreItem.trigger_lores && loreItem.trigger_lores.length > 0) {
+      hasLoreOn = loreItem.trigger_lores.some((title) => {
+        const l = storyData.lore.find((i) => i.title === title);
+        return l?.on === true;
+      });
+    }
+
+    const shouldTurnOn = hasTextOn || hasBeatOn || hasLoreOn;
+
+    // Check suppressors
+    const hasTextOff = checkTriggers(loreItem.off_triggers);
+    const hasBeatOff = checkBeats(loreItem.beats_untrigger);
+
+    let hasLoreOff = false;
+    if (loreItem.untrigger_lores && loreItem.untrigger_lores.length > 0) {
+      hasLoreOff = loreItem.untrigger_lores.some((title) => {
+        const l = storyData.lore.find((i) => i.title === title);
+        return l?.on === true;
+      });
+    }
+
+    const shouldTurnOff = hasTextOff || hasBeatOff || hasLoreOff;
+
+    // Determine if any triggers are defined
+    const hasAnyOnTriggersDefined =
+      (loreItem.on_triggers && loreItem.on_triggers.length > 0) ||
+      (loreItem.beats_trigger && loreItem.beats_trigger.length > 0) ||
+      (loreItem.trigger_lores && loreItem.trigger_lores.length > 0);
+
+    let isActive = false;
+
+    if (!hasAnyOnTriggersDefined) {
+      // No triggers defined -> Default to ON (unless suppressed)
+      isActive = true;
+    } else {
+      // Triggers defined -> Must be triggered
+      isActive = shouldTurnOn;
+    }
+
+    // Apply suppression
+    if (shouldTurnOff) {
+      isActive = false;
+    }
+
+    // Update state
+    if (loreItem.on !== isActive) {
+      loreItem.on = isActive;
+      if (isActive) {
+        addNotification(`📜 Lore discovered: ${loreItem.title}`, "success");
+      } else {
+        addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
       }
-    }
-
-    // Check beat triggers for turning OFF
-    if (loreItem.beats_untrigger && loreItem.beats_untrigger.length > 0) {
-      for (const beatIndex of loreItem.beats_untrigger) {
-        if (fulfilledBeatIndices.includes(beatIndex)) {
-          shouldTurnOff = true;
-          break;
-        }
-      }
-    }
-
-    // Apply state changes with notifications
-    if (shouldTurnOn && loreItem.on !== true) {
-      loreItem.on = true;
-      addNotification(`📜 Lore discovered: ${loreItem.title}`, "success");
-    }
-    if (shouldTurnOff && loreItem.on !== false) {
-      loreItem.on = false;
-      addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
     }
   });
 }
@@ -522,7 +563,6 @@ function StoryPageContent() {
     message: "",
     onConfirm: () => {},
   });
-  const memory_cap = 20000; // Max memory size in characters
 
   // Fetch token balance on mount
   useEffect(() => {
@@ -668,11 +708,7 @@ function StoryPageContent() {
           loadedStoryData.earnedPointsFromQuests = [];
 
         // Process lore triggers on load to initialize lore visibility
-        // Combine all existing scene content to check for trigger words
-        const allContent = loadedStoryData.scene.parts
-          .map((part) => part.content)
-          .join(" ");
-        processLoreTriggers(loadedStoryData, allContent, addNotification);
+        processLoreTriggers(loadedStoryData, addNotification);
 
         setStoryData(loadedStoryData);
 
@@ -875,6 +911,18 @@ function StoryPageContent() {
   // Update story data in state
   function updateStoryData(updates: Partial<StoryData>) {
     if (!storyData) return;
+
+    // Get current model config for dynamic memory cap
+    const modelKey =
+      typeof window !== "undefined"
+        ? localStorage.getItem("aiModel") || "deep-seek/deepseek-chat"
+        : "deep-seek/deepseek-chat";
+    const modelConfig = getModelConfig(modelKey);
+
+    // Dynamic memory cap: 1/4 of context window (approx 4 chars per token)
+    const CHARS_PER_TOKEN = 4;
+    const memory_cap = modelConfig.maxTokens * 0.25 * CHARS_PER_TOKEN;
+
     // Remove duplicate entries from memory
     let addedItems = new Set<string>();
     const new_memory = storyData.memory.filter((item, index) => {
@@ -919,6 +967,9 @@ function StoryPageContent() {
       choices: [],
     });
 
+    // Process lore triggers after user input
+    processLoreTriggers(storyData, addNotification);
+
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -929,13 +980,36 @@ function StoryPageContent() {
     }
 
     // Build minimal payload for AI
-    const MAX_CONTENT_LENGTH = 2000;
+    const MAX_CONTENT_LENGTH = 50000; // Increased limit per part
 
-    const recentParts = storyData.scene.parts.slice(-6).map((part) => ({
-      content: part.content.substring(0, MAX_CONTENT_LENGTH),
-      user: part.user,
-      role: part.role,
-    }));
+    // Get current model config to estimate needed context
+    const modelKey =
+      typeof window !== "undefined"
+        ? localStorage.getItem("aiModel") || "deep-seek/deepseek-chat"
+        : "deep-seek/deepseek-chat";
+    const modelConfig = getModelConfig(modelKey);
+
+    // Estimate needed characters (tokens * 4). Send a bit more to be safe.
+    const neededChars = modelConfig.maxTokens * 5;
+
+    let currentChars = 0;
+    const partsToSend = [];
+
+    // Iterate backwards to gather enough context
+    for (let i = storyData.scene.parts.length - 1; i >= 0; i--) {
+      const part = storyData.scene.parts[i];
+      const content = part.content.substring(0, MAX_CONTENT_LENGTH);
+
+      partsToSend.unshift({
+        content: content,
+        user: part.user,
+        role: part.role,
+        raw: part.raw,
+      });
+
+      currentChars += content.length;
+      if (currentChars > neededChars) break;
+    }
 
     const minimalStoryData: any = {
       story_name: storyData.story_name,
@@ -955,10 +1029,9 @@ function StoryPageContent() {
         content: beat.content.substring(0, 300),
         fulfilled: beat.fulfilled,
       })),
-      memory: storyData.memory.slice(-20).map((m) => m.substring(0, 300)),
+      memory: storyData.memory, // Send full memory, server truncates
       lore: storyData.lore
         .filter((l) => l.on !== false)
-        .slice(0, 15)
         .map((l) => ({
           title: l.title.substring(0, 100),
           content: l.content.substring(0, 500),
@@ -969,7 +1042,7 @@ function StoryPageContent() {
       chapters: storyData.chapters,
       currentChapter: storyData.currentChapter,
       scene: {
-        parts: recentParts,
+        parts: partsToSend,
       },
     };
 
@@ -1089,7 +1162,7 @@ function StoryPageContent() {
           storyData.memory.push(...data.part.memoryEntries);
         }
 
-        processLoreTriggers(storyData, data.part.content, addNotification);
+        processLoreTriggers(storyData, addNotification);
 
         storyData.scene.parts.push(data.part);
         setStoryData({ ...storyData });
@@ -1465,6 +1538,9 @@ function StoryPageContent() {
 
     setChoices({ choices: [] });
 
+    // Process lore triggers after user choice
+    processLoreTriggers(storyData, addNotification);
+
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -1476,14 +1552,36 @@ function StoryPageContent() {
 
     // Build minimal payload - only send what the AI needs to generate the next part
     // The AI uses buildMessages() which only needs recent context + current state
-    const MAX_CONTENT_LENGTH = 2000;
+    const MAX_CONTENT_LENGTH = 50000;
 
-    // Only send last 6 scene parts with just content, user flag, and role
-    const recentParts = storyData.scene.parts.slice(-6).map((part) => ({
-      content: part.content.substring(0, MAX_CONTENT_LENGTH),
-      user: part.user,
-      role: part.role,
-    }));
+    // Get current model config to estimate needed context
+    const modelKey =
+      typeof window !== "undefined"
+        ? localStorage.getItem("aiModel") || "deep-seek/deepseek-chat"
+        : "deep-seek/deepseek-chat";
+    const modelConfig = getModelConfig(modelKey);
+
+    // Estimate needed characters (tokens * 4). Send a bit more to be safe.
+    const neededChars = modelConfig.maxTokens * 5;
+
+    let currentChars = 0;
+    const partsToSend = [];
+
+    // Iterate backwards to gather enough context
+    for (let i = storyData.scene.parts.length - 1; i >= 0; i--) {
+      const part = storyData.scene.parts[i];
+      const content = part.content.substring(0, MAX_CONTENT_LENGTH);
+
+      partsToSend.unshift({
+        content: content,
+        user: part.user,
+        role: part.role,
+        raw: part.raw,
+      });
+
+      currentChars += content.length;
+      if (currentChars > neededChars) break;
+    }
 
     // Build minimal story data object
     const minimalStoryData: any = {
@@ -1506,10 +1604,9 @@ function StoryPageContent() {
         content: beat.content.substring(0, 300),
         fulfilled: beat.fulfilled,
       })),
-      memory: storyData.memory.slice(-20).map((m) => m.substring(0, 300)),
+      memory: storyData.memory, // Send full memory
       lore: storyData.lore
         .filter((l) => l.on !== false) // Only send lore that is ON
-        .slice(0, 15)
         .map((l) => ({
           title: l.title.substring(0, 100),
           content: l.content.substring(0, 500),
@@ -1522,7 +1619,7 @@ function StoryPageContent() {
       currentChapter: storyData.currentChapter,
       // Recent scene parts only
       scene: {
-        parts: recentParts,
+        parts: partsToSend,
       },
     };
 
@@ -1659,7 +1756,7 @@ function StoryPageContent() {
         }
 
         // Process lore triggers based on new content
-        processLoreTriggers(storyData, data.part.content, addNotification);
+        processLoreTriggers(storyData, addNotification);
 
         storyData.scene.parts.push(data.part);
 
@@ -1756,12 +1853,36 @@ function StoryPageContent() {
     }
 
     // Build minimal payload
-    const MAX_CONTENT_LENGTH = 2000;
-    const recentParts = storyData.scene.parts.slice(-6).map((part) => ({
-      content: part.content.substring(0, MAX_CONTENT_LENGTH),
-      user: part.user,
-      role: part.role,
-    }));
+    const MAX_CONTENT_LENGTH = 50000;
+
+    // Get current model config to estimate needed context
+    const modelKey =
+      typeof window !== "undefined"
+        ? localStorage.getItem("aiModel") || "deep-seek/deepseek-chat"
+        : "deep-seek/deepseek-chat";
+    const modelConfig = getModelConfig(modelKey);
+
+    // Estimate needed characters (tokens * 4). Send a bit more to be safe.
+    const neededChars = modelConfig.maxTokens * 5;
+
+    let currentChars = 0;
+    const partsToSend = [];
+
+    // Iterate backwards to gather enough context
+    for (let i = storyData.scene.parts.length - 1; i >= 0; i--) {
+      const part = storyData.scene.parts[i];
+      const content = part.content.substring(0, MAX_CONTENT_LENGTH);
+
+      partsToSend.unshift({
+        content: content,
+        user: part.user,
+        role: part.role,
+        raw: part.raw,
+      });
+
+      currentChars += content.length;
+      if (currentChars > neededChars) break;
+    }
 
     const minimalStoryData: any = {
       story_name: storyData.story_name,
@@ -1781,10 +1902,9 @@ function StoryPageContent() {
         content: beat.content.substring(0, 300),
         fulfilled: beat.fulfilled,
       })),
-      memory: storyData.memory.slice(-20).map((m) => m.substring(0, 300)),
+      memory: storyData.memory, // Send full memory
       lore: storyData.lore
         .filter((l) => l.on !== false)
-        .slice(0, 15)
         .map((l) => ({
           title: l.title.substring(0, 100),
           content: l.content.substring(0, 500),
@@ -1794,7 +1914,7 @@ function StoryPageContent() {
       player_notes: storyData.player_notes?.substring(0, 800) || "",
       chapters: storyData.chapters,
       currentChapter: storyData.currentChapter,
-      scene: { parts: recentParts },
+      scene: { parts: partsToSend },
     };
 
     const payload = {
@@ -1867,7 +1987,7 @@ function StoryPageContent() {
           storyData.memory.push(...data.part.memoryEntries);
         }
 
-        processLoreTriggers(storyData, data.part.content, addNotification);
+        processLoreTriggers(storyData, addNotification);
         storyData.scene.parts.push(data.part);
 
         if (data.part.content.includes("!!! END CHAPTER !!!")) {

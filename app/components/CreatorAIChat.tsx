@@ -35,7 +35,7 @@ export default function CreatorAIChat({
   onApplyChanges,
 }: CreatorAIChatProps) {
   const chatKey = adventureId ? `creatorAiChat:${adventureId}` : null;
-  
+
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (typeof window !== "undefined" && chatKey) {
       const saved = localStorage.getItem(chatKey);
@@ -53,7 +53,9 @@ export default function CreatorAIChat({
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("creatorAiModel") || AI_MODELS.Prometheus.model;
+      return (
+        localStorage.getItem("creatorAiModel") || AI_MODELS.Prometheus.model
+      );
     }
     return AI_MODELS.Prometheus.model;
   });

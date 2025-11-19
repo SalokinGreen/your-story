@@ -38,7 +38,11 @@ function cleanString(text: string): string {
 export function buildMessages({
   storyData,
   useRawContext = false,
-}: BuildPromptInput & { useRawContext?: boolean }): ChatMessage[] {
+  maxTokens = 120000,
+}: BuildPromptInput & {
+  useRawContext?: boolean;
+  maxTokens?: number;
+}): ChatMessage[] {
   const system = `You are a helpful, creative narrative engine for a choice-driven, text-only adventure game.
 Stay in character and respond in the style of an interactive fiction game. You're the narrator and the characters.
 
@@ -127,7 +131,21 @@ Progression System:
 
   const recentScene =
     storyData.scene.parts.at(-1)?.content ?? storyData.starting_content;
-  const memory_cap = 20000; // Max memory size in characters
+
+  // Dynamic caps based on context window
+  // 1 token ~= 4 characters
+  const CHARS_PER_TOKEN = 4;
+  // Reserve tokens for system prompt, new generation, and other overhead (approx 2000 tokens)
+  const RESERVED_TOKENS = 2000;
+  const availableTokens = Math.max(1000, maxTokens - RESERVED_TOKENS);
+
+  // 1/4 for memory, 3/4 for story parts
+  const memoryTokens = Math.floor(availableTokens * 0.25);
+  const storyTokens = Math.floor(availableTokens * 0.75);
+
+  const memory_cap = memoryTokens * CHARS_PER_TOKEN;
+  const story_cap = storyTokens * CHARS_PER_TOKEN;
+
   // Remove duplicate entries from memory
   let addedItems = new Set<string>();
   const new_memory = storyData.memory.filter((item, index) => {
@@ -164,12 +182,28 @@ Progression System:
     });
     context.push({ role: "user", content: cleanString(recentScene) });
   } else {
-    // For ongoing stories, only include the last 6 scene parts to avoid context overflow
-    // This keeps recent context while staying under token limits
-    const MAX_RECENT_PARTS = 12;
-    const recentParts = storyData.scene.parts.slice(-MAX_RECENT_PARTS);
+    // For ongoing stories, dynamically include parts that fit within story_cap
+    const recentParts = [...storyData.scene.parts];
+    const partsToInclude: typeof recentParts = [];
+    let currentStoryLength = 0;
 
-    recentParts.forEach((part) => {
+    // Iterate backwards to keep most recent parts
+    for (let i = recentParts.length - 1; i >= 0; i--) {
+      const part = recentParts[i];
+      const content =
+        useRawContext && part.raw && !part.user ? part.raw : part.content;
+      const partLength = content.length;
+
+      if (currentStoryLength + partLength <= story_cap) {
+        partsToInclude.unshift(part);
+        currentStoryLength += partLength;
+      } else {
+        // If we can't fit this part, we stop adding older parts
+        break;
+      }
+    }
+
+    partsToInclude.forEach((part) => {
       const role = part.user ? "user" : "assistant";
       // Use raw AI output if available and useRawContext is enabled, otherwise use parsed content
       const content =

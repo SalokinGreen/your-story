@@ -77,13 +77,16 @@ When the user asks you to create or modify parts of the scenario (like "create a
   - title: Beat title/name
   - content: Detailed description of what should happen in this beat
   - fulfilled: false (always start as unfulfilled)
-- lore (Array of { title, content, secrtet, on, on_triggers, off_triggers, beats_trigger, beats_untrigger })
+- lore (Array of { title, content, secrtet, on, alwaysOn, on_triggers, off_triggers, trigger_lores, untrigger_lores, beats_trigger, beats_untrigger })
   - title: Lore entry title
   - content: Full lore text
   - secrtet: If true, lore starts hidden and must be revealed
   - on: Whether lore is currently visible (true = visible to AI/player, false = hidden)
+  - alwaysOn: If true, lore is always visible and ignores all triggers
   - on_triggers: Array of trigger words/phrases - when these appear in story, lore becomes visible
   - off_triggers: Array of trigger words/phrases - when these appear in story, lore becomes hidden
+  - trigger_lores: Array of lore titles - when those lores become visible, this lore becomes visible
+  - untrigger_lores: Array of lore titles - when those lores become visible, this lore becomes hidden
   - beats_trigger: Array of plot beat indices (0-based) - when these beats complete, lore becomes visible
   - beats_untrigger: Array of plot beat indices (0-based) - when these beats complete, lore becomes hidden
 - achievements (Array of { title, description, points, symbol, ai_hint })
