@@ -3,7 +3,7 @@ export const AI_MODELS = {
     name: "Grok 4 Fast",
     original_model: "Grok 4 Fast",
     model: "x-ai/grok-4-fast",
-    maxTokens: 100000,
+    maxTokens: 400000,
     maxOutputTokens: 2000,
     provider: "openrouter",
     strengths: ["creative", "nsfw"],
@@ -11,7 +11,7 @@ export const AI_MODELS = {
     description:
       "An imaginative model excelling in creative writing and storytelling, ideal for generating vivid narratives.",
     bannerUrl: undefined,
-    cost: 3,
+    cost: 10,
     inputPrice: 2.0,
     outputPrice: 10.0,
     finetunes: [],

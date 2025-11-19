@@ -37,8 +37,9 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - It should be wrapped in \`\`\`json ... \`\`\` code blocks.
 - You can return a PARTIAL StoryData object. Only include the fields you want to change or add.
 - Arrays (like 'inventory', 'stats', 'plot_beats', 'lore', 'achievements', 'quests', 'presets') in your JSON will be MERGED with the existing data.
-  - To ADD items: Just list the new items.
-  - To MODIFY items: List an item with the SAME 'name' (or 'title' or 'id') as an existing one, and your new values will overwrite the old ones.
+  - **IMPORTANT**: To ADD new items to an array, ONLY list the NEW items you want to add. DO NOT include existing items unless you want to modify them.
+  - To MODIFY existing items: List an item with the SAME 'name' (or 'title' or 'id') as an existing one, and your new values will overwrite the old ones.
+  - Example: If there are 3 stats already and user asks to "add a Luck stat", your JSON should ONLY contain the new Luck stat in the stats array, not all 4 stats.
 - Scalar fields (like 'story_name', 'premise', 'player_name', 'title', 'shortDescription', 'description') will be REPLACED.
 
 ### Available Fields:

@@ -6330,6 +6330,7 @@ function AdventureCreatorContent() {
       <CreatorAIChat
         isOpen={isAIMenuOpen}
         onClose={() => setIsAIMenuOpen(false)}
+        adventureId={editAdventureId || undefined}
         currentStoryData={{
           story_name: title,
           premise,
