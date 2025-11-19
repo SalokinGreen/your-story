@@ -22,6 +22,11 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { authenticatedFetch } from "../misc/getAuthToken";
+import {
+  encryptStoryData,
+  decryptStoryData,
+  isEncrypted,
+} from "../misc/encryption";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -482,7 +487,7 @@ function StoryPageContent() {
   const storyId = searchParams.get("storyId");
 
   const { addNotification } = useNotification();
-  const { user } = useAuth();
+  const { user, getEncryptionPassword } = useAuth();
   const [currentState, setCurrentState] = useState<StoryState>(
     StoryState.STORY
   );
@@ -577,8 +582,39 @@ function StoryPageContent() {
         console.log("Story loaded:", story);
         setStoryDbId(story.id);
 
-        // story.storyData is already parsed JSONB from database
-        const loadedStoryData: StoryData = story.storyData;
+        // Check if story data is encrypted
+        let loadedStoryData: StoryData;
+        if (isEncrypted(story.storyData)) {
+          console.log("Story is encrypted, attempting decryption...");
+
+          // Get user credentials for decryption
+          const password = getEncryptionPassword();
+          const email = user?.email;
+
+          if (!password || !email) {
+            throw new Error(
+              "Cannot decrypt story: credentials not available. Please sign out and sign back in."
+            );
+          }
+
+          try {
+            // Decrypt the story data
+            loadedStoryData = await decryptStoryData(
+              story.storyData,
+              email,
+              password
+            );
+            console.log("Story decrypted successfully");
+          } catch (decryptError) {
+            console.error("Decryption failed:", decryptError);
+            throw new Error(
+              "Failed to decrypt story. Your credentials may have changed."
+            );
+          }
+        } else {
+          // Story is not encrypted, use as-is
+          loadedStoryData = story.storyData;
+        }
 
         // Initialize quest arrays if they don't exist (for backwards compatibility)
         if (!loadedStoryData.quests) loadedStoryData.quests = [];
@@ -717,8 +753,38 @@ function StoryPageContent() {
         } = await supabase.auth.getSession();
         if (!session) return;
 
+        // Check for encryption credentials
+        const password = getEncryptionPassword();
+        const email = user?.email;
+
+        if (!password || !email) {
+          // No credentials available - require user to re-login for security
+          console.error(
+            "Cannot save story: encryption credentials not available"
+          );
+          addNotification(
+            "🔒 Please sign out and sign back in to enable encrypted story saving",
+            "warning"
+          );
+          return; // Abort save to prevent unencrypted data storage
+        }
+
         // Trim scene history before saving to reduce data size
         const trimmedData = trimStoryData(updatedStoryData);
+
+        // Encrypt the story data before saving
+        let dataToSave: any;
+        try {
+          dataToSave = await encryptStoryData(trimmedData, email, password);
+          console.log("Story data encrypted for saving");
+        } catch (encryptError) {
+          console.error("Encryption failed:", encryptError);
+          addNotification(
+            "❌ Failed to encrypt story data. Please sign out and sign back in.",
+            "failure"
+          );
+          return; // Abort save on encryption failure
+        }
 
         await fetch(`/api/stories/${storyDbId}`, {
           method: "PATCH",
@@ -727,11 +793,15 @@ function StoryPageContent() {
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            storyData: trimmedData,
+            storyData: dataToSave,
           }),
         });
       } catch (error) {
         console.error("Error saving progress:", error);
+        addNotification(
+          "Failed to save story progress. Please try again.",
+          "failure"
+        );
       }
     }, 3000); // 3 second debounce
   }

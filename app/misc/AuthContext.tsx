@@ -1,18 +1,64 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/app/misc/supabase";
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: string | null; emailSent?: boolean }>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (
+    email: string,
+    password: string
+  ) => Promise<{ error: string | null; emailSent?: boolean }>;
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ error: string | null }>;
   signOut: () => Promise<{ error: string | null }>;
+  getEncryptionPassword: () => string | null;
+  hasEncryptionPassword: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// SessionStorage key for encryption password
+const ENCRYPTION_PASSWORD_KEY = "__story_encryption_key";
+
+/**
+ * Securely stores the user's password in sessionStorage for encryption
+ * Only available during the current browser session
+ */
+function storeEncryptionPassword(password: string) {
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem(ENCRYPTION_PASSWORD_KEY, password);
+  }
+}
+
+/**
+ * Retrieves the stored encryption password
+ */
+function getStoredEncryptionPassword(): string | null {
+  if (typeof window !== "undefined") {
+    return sessionStorage.getItem(ENCRYPTION_PASSWORD_KEY);
+  }
+  return null;
+}
+
+/**
+ * Clears the stored encryption password
+ */
+function clearEncryptionPassword() {
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem(ENCRYPTION_PASSWORD_KEY);
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -23,12 +69,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Clear encryption password if no session
+      if (!session) {
+        clearEncryptionPassword();
+      }
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Clear encryption password on sign out
+      if (!session) {
+        clearEncryptionPassword();
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -45,6 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         return { error: error.message, emailSent: false };
       }
+
+      // Store password for encryption (will be available after email confirmation)
+      storeEncryptionPassword(password);
 
       // Do NOT auto-log in; require email confirmation instead
       return { error: null, emailSent: true };
@@ -68,6 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.user) {
         setUser(data.user);
+        // Store password for encryption
+        storeEncryptionPassword(password);
       }
 
       return { error: null };
@@ -86,6 +149,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setUser(null);
+      // Clear encryption password on sign out
+      clearEncryptionPassword();
       return { error: null };
     } catch (error) {
       console.error("Sign out error:", error);
@@ -93,8 +158,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const getEncryptionPassword = (): string | null => {
+    return getStoredEncryptionPassword();
+  };
+
+  const hasEncryptionPassword = (): boolean => {
+    return getStoredEncryptionPassword() !== null;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        signUp,
+        signIn,
+        signOut,
+        getEncryptionPassword,
+        hasEncryptionPassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

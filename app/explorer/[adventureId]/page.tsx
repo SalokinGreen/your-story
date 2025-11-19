@@ -12,7 +12,7 @@ import { supabase } from "@/app/misc/supabase";
 export default function AdventureDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, getEncryptionPassword } = useAuth();
   const { addNotification } = useNotification();
   const [adventure, setAdventure] = useState<Adventure | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,6 +88,16 @@ export default function AdventureDetailPage() {
     }
 
     if (!adventure) return;
+
+    // Check for encryption credentials
+    const password = getEncryptionPassword();
+    if (!password || !user.email) {
+      addNotification(
+        "🔒 Please sign out and sign back in to enable encrypted story saving",
+        "warning"
+      );
+      return;
+    }
 
     try {
       setStartingAdventure(true);

@@ -285,9 +285,18 @@ export interface Story {
   adventureId?: string; // Optional - can be null if adventure was deleted
   userId: string;
   storyName: string;
-  storyData: StoryData; // Full story state with progress
+  storyData: StoryData | EncryptedStoryData; // Can be plain or encrypted
   isCompleted: boolean;
   isPublic: boolean; // Allow sharing stories
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Encrypted story data format
+export interface EncryptedStoryData {
+  encrypted: true;
+  version: number;
+  data: string; // base64 encoded encrypted data
+  salt: string; // base64 encoded salt
+  iv: string; // base64 encoded IV
 }

@@ -8,6 +8,8 @@ import { Adventure } from "@/app/misc/structs";
 import { supabase } from "@/app/misc/supabase";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
+import { isEncrypted } from "@/app/misc/encryption";
+import EncryptionMigration from "@/app/components/EncryptionMigration";
 
 interface Story {
   id: string;
@@ -591,6 +593,12 @@ export default function LibraryPage() {
 
             {/* Stories Content */}
             <div className="lg:col-span-3">
+              {/* Encryption Migration Banner */}
+              <EncryptionMigration
+                stories={stories}
+                onMigrationComplete={fetchLibraryData}
+              />
+
               {/* Stories Filters */}
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-6 border border-gray-200 dark:border-gray-700">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -712,6 +720,14 @@ export default function LibraryPage() {
                               {story.is_public && (
                                 <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-semibold rounded-full">
                                   🌐 Public
+                                </span>
+                              )}
+                              {isEncrypted(story.story_data) && (
+                                <span
+                                  className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-semibold rounded-full"
+                                  title="This story is encrypted and private"
+                                >
+                                  🔒 Encrypted
                                 </span>
                               )}
                             </div>
