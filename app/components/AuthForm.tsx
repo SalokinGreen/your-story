@@ -8,7 +8,7 @@ export default function AuthForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-    const [info, setInfo] = useState("");
+  const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
   const { signUp, signIn } = useAuth();
 
@@ -38,13 +38,18 @@ export default function AuthForm() {
 
   return (
     <div className="w-full max-w-md">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5 bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-5 bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700"
+      >
         <div className="text-center">
           <h2 className="text-2xl sm:text-3xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
             {isSignUp ? "Join Your Story" : "Welcome Back"}
           </h2>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            {isSignUp ? "Create an account to start your adventure" : "Sign in to continue your journey"}
+            {isSignUp
+              ? "Create an account to start your adventure"
+              : "Sign in to continue your journey"}
           </p>
         </div>
 
@@ -61,7 +66,10 @@ export default function AuthForm() {
         )}
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="email" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          <label
+            htmlFor="email"
+            className="text-sm font-semibold text-gray-700 dark:text-gray-300"
+          >
             Email
           </label>
           <input
@@ -76,7 +84,10 @@ export default function AuthForm() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="password" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          <label
+            htmlFor="password"
+            className="text-sm font-semibold text-gray-700 dark:text-gray-300"
+          >
             Password
           </label>
           <input
@@ -90,9 +101,34 @@ export default function AuthForm() {
             placeholder="••••••••"
           />
           {isSignUp && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">Minimum 6 characters</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Minimum 6 characters
+            </p>
           )}
         </div>
+
+        {!isSignUp && (
+          <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="shrink-0">
+              <svg
+                className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="flex-1 text-xs text-blue-800 dark:text-blue-200">
+              <span className="font-semibold">🔒 Encryption enabled:</span> Your
+              password secures your stories with military-grade encryption for
+              30 days.
+            </div>
+          </div>
+        )}
 
         <button
           type="submit"
@@ -117,9 +153,13 @@ export default function AuthForm() {
                 });
                 const data = await res.json();
                 if (!res.ok) {
-                  setError(data.error || "Could not resend confirmation email.");
+                  setError(
+                    data.error || "Could not resend confirmation email."
+                  );
                 } else {
-                  setInfo("Confirmation email resent. Please check your inbox (and spam folder).");
+                  setInfo(
+                    "Confirmation email resent. Please check your inbox (and spam folder)."
+                  );
                 }
               } catch (err) {
                 setError("Network error while resending confirmation email.");
@@ -136,7 +176,9 @@ export default function AuthForm() {
           onClick={() => setIsSignUp(!isSignUp)}
           className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
         >
-          {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
+          {isSignUp
+            ? "Already have an account? Sign In"
+            : "Don't have an account? Sign Up"}
         </button>
       </form>
     </div>

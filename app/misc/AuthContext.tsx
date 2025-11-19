@@ -28,25 +28,45 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// SessionStorage key for encryption password
+// LocalStorage key for encryption password
 const ENCRYPTION_PASSWORD_KEY = "__story_encryption_key";
+const ENCRYPTION_PASSWORD_EXPIRY_KEY = "__story_encryption_key_expiry";
+const EXPIRY_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 
 /**
- * Securely stores the user's password in sessionStorage for encryption
- * Only available during the current browser session
+ * Stores the user's password in localStorage for encryption
+ * Persists across page refreshes and browser sessions
+ * Automatically expires after 30 days for security
  */
 function storeEncryptionPassword(password: string) {
   if (typeof window !== "undefined") {
-    sessionStorage.setItem(ENCRYPTION_PASSWORD_KEY, password);
+    const expiryTime = Date.now() + EXPIRY_DURATION;
+    localStorage.setItem(ENCRYPTION_PASSWORD_KEY, password);
+    localStorage.setItem(ENCRYPTION_PASSWORD_EXPIRY_KEY, expiryTime.toString());
   }
 }
 
 /**
- * Retrieves the stored encryption password
+ * Retrieves the stored encryption password if not expired
+ * Returns null if expired or not found
  */
 function getStoredEncryptionPassword(): string | null {
   if (typeof window !== "undefined") {
-    return sessionStorage.getItem(ENCRYPTION_PASSWORD_KEY);
+    const password = localStorage.getItem(ENCRYPTION_PASSWORD_KEY);
+    const expiryTime = localStorage.getItem(ENCRYPTION_PASSWORD_EXPIRY_KEY);
+
+    if (!password || !expiryTime) {
+      return null;
+    }
+
+    // Check if expired
+    if (Date.now() > parseInt(expiryTime, 10)) {
+      // Password expired, clear it
+      clearEncryptionPassword();
+      return null;
+    }
+
+    return password;
   }
   return null;
 }
@@ -56,7 +76,8 @@ function getStoredEncryptionPassword(): string | null {
  */
 function clearEncryptionPassword() {
   if (typeof window !== "undefined") {
-    sessionStorage.removeItem(ENCRYPTION_PASSWORD_KEY);
+    localStorage.removeItem(ENCRYPTION_PASSWORD_KEY);
+    localStorage.removeItem(ENCRYPTION_PASSWORD_EXPIRY_KEY);
   }
 }
 

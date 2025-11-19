@@ -552,6 +552,11 @@ function StoryPageContent() {
       return;
     }
 
+    // Wait for user to be loaded before attempting to load story
+    if (!user) {
+      return;
+    }
+
     async function loadStory() {
       try {
         // Get auth token
@@ -659,7 +664,7 @@ function StoryPageContent() {
     }
 
     loadStory();
-  }, [storyId, addNotification]);
+  }, [storyId, addNotification, user, getEncryptionPassword]);
 
   // Apply preset and start story
   const handlePresetSelect = async (preset: Preset) => {
