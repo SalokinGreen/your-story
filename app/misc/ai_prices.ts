@@ -108,7 +108,7 @@ export const AI_MODELS = {
   Athena: {
     name: "GPT-OSS 120B",
     original_model: "gpt-oss-120b",
-    model: "openai/gpt-4o",
+    model: "openai/gpt-oss-120b",
     maxTokens: 131000,
     maxOutputTokens: 2000,
     provider: "openrouter",

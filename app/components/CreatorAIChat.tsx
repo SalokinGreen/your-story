@@ -11,13 +11,25 @@ interface CreatorAIChatProps {
   isOpen: boolean;
   onClose: () => void;
   currentStoryData: Partial<StoryData>;
-  onApplyChanges: (data: Partial<StoryData>) => void;
+  adventureMetadata?: {
+    title?: string;
+    shortDescription?: string;
+    description?: string;
+  };
+  onApplyChanges: (
+    data: Partial<StoryData> & {
+      title?: string;
+      shortDescription?: string;
+      description?: string;
+    }
+  ) => void;
 }
 
 export default function CreatorAIChat({
   isOpen,
   onClose,
   currentStoryData,
+  adventureMetadata,
   onApplyChanges,
 }: CreatorAIChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -49,6 +61,7 @@ export default function CreatorAIChat({
         body: JSON.stringify({
           messages: recentMessages,
           currentStoryData: currentStoryData,
+          adventureMetadata: adventureMetadata,
           model: model,
         }),
       });
@@ -64,9 +77,10 @@ export default function CreatorAIChat({
       }
 
       const data = await response.json();
-      const assistantMsg: ChatMessage = {
+      const assistantMsg: ChatMessage & { meta?: any } = {
         role: "assistant",
         content: data.content,
+        meta: data.meta, // Include cost and usage info
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -179,7 +193,7 @@ export default function CreatorAIChat({
           {messages.map((msg, idx) => (
             <MessageItem
               key={idx}
-              message={msg}
+              message={msg as ChatMessage & { meta?: any }}
               onApplyChanges={onApplyChanges}
             />
           ))}
@@ -260,11 +274,18 @@ function MessageItem({
   message,
   onApplyChanges,
 }: {
-  message: ChatMessage;
-  onApplyChanges: (data: Partial<StoryData>) => void;
+  message: ChatMessage & { meta?: any };
+  onApplyChanges: (
+    data: Partial<StoryData> & {
+      title?: string;
+      shortDescription?: string;
+      description?: string;
+    }
+  ) => void;
 }) {
   const isUser = message.role === "user";
   const { text, data } = parseCreatorOutput(message.content);
+  const meta = message.meta;
 
   return (
     <div
@@ -280,6 +301,31 @@ function MessageItem({
         }`}
       >
         <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
+        {!isUser && meta?.cost && (
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50 flex items-center justify-between text-xs">
+            <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+                <path d="M12 18V6" />
+              </svg>
+              Generation cost
+            </span>
+            <span className="font-semibold text-amber-600 dark:text-amber-400">
+              {meta.cost} {meta.cost === 1 ? "coin" : "coins"}
+            </span>
+          </div>
+        )}
         {data && (
           <div className="mt-4 rounded-xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-gray-700/50 overflow-hidden shadow-inner">
             <div className="bg-gray-100/50 dark:bg-white/5 px-4 py-2 border-b border-gray-200 dark:border-gray-700/50 flex items-center justify-between">
@@ -321,7 +367,15 @@ function MessageItem({
   );
 }
 
-function ChangeSummary({ data }: { data: Partial<StoryData> }) {
+function ChangeSummary({
+  data,
+}: {
+  data: Partial<StoryData> & {
+    title?: string;
+    shortDescription?: string;
+    description?: string;
+  };
+}) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const changes: {
@@ -332,6 +386,31 @@ function ChangeSummary({ data }: { data: Partial<StoryData> }) {
     icon: string;
   }[] = [];
 
+  // Adventure metadata changes
+  if (data.title)
+    changes.push({
+      type: "Update",
+      label: "Adventure Title",
+      value: data.title,
+      icon: "🎯",
+    });
+  if (data.shortDescription)
+    changes.push({
+      type: "Update",
+      label: "Short Description",
+      value: data.shortDescription,
+      icon: "📄",
+    });
+  if (data.description)
+    changes.push({
+      type: "Update",
+      label: "Full Description",
+      value: "Updated description",
+      details: data.description,
+      icon: "📋",
+    });
+
+  // Story data changes
   if (data.story_name)
     changes.push({
       type: "Update",

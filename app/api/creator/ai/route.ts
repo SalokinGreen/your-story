@@ -15,6 +15,11 @@ export const runtime = "nodejs";
 interface RequestBody {
   messages: ChatMessage[];
   currentStoryData: Partial<StoryData>;
+  adventureMetadata?: {
+    title?: string;
+    shortDescription?: string;
+    description?: string;
+  };
   model?: string;
 }
 
@@ -66,10 +71,7 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
 
   if (authError || !user) {
-    return NextResponse.json(
-      { error: "Invalid session" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Invalid session" }, { status: 401 });
   }
 
   let body: RequestBody;
@@ -79,7 +81,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { messages, currentStoryData, model: requestedModel } = body;
+  const {
+    messages,
+    currentStoryData,
+    adventureMetadata,
+    model: requestedModel,
+  } = body;
 
   // Model config
   // Find model key by model string or use default
@@ -141,6 +148,7 @@ export async function POST(req: NextRequest) {
   const aiMessages = buildCreatorMessages({
     messages,
     currentStoryData,
+    adventureMetadata,
   });
 
   try {

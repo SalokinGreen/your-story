@@ -111,7 +111,20 @@ function AdventureCreatorContent() {
 
   const [isAIMenuOpen, setIsAIMenuOpen] = useState(false);
 
-  const handleApplyAIChanges = (data: Partial<StoryData>) => {
+  const handleApplyAIChanges = (
+    data: Partial<StoryData> & {
+      title?: string;
+      shortDescription?: string;
+      description?: string;
+    }
+  ) => {
+    // Apply adventure metadata
+    if (data.title !== undefined) setTitle(data.title);
+    if (data.shortDescription !== undefined)
+      setShortDescription(data.shortDescription);
+    if (data.description !== undefined) setDescription(data.description);
+
+    // Apply story data
     if (data.story_name) setTitle(data.story_name);
     if (data.premise) setPremise(data.premise);
     if (data.player_name) setPlayerName(data.player_name);
@@ -6239,6 +6252,11 @@ function AdventureCreatorContent() {
           achievements,
           quests,
           presets,
+        }}
+        adventureMetadata={{
+          title: title,
+          shortDescription: shortDescription,
+          description: description,
         }}
         onApplyChanges={handleApplyAIChanges}
       />
