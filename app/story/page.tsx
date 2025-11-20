@@ -32,6 +32,7 @@ import {
 import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
 import { DynamicIcon } from "../components/DynamicIcon";
+import { DiceVisualizer } from "../components/DiceVisualizer";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -417,7 +418,10 @@ export function processCommands(
       const beatIndex = parseInt(editBeatContentMatch[2], 10);
       if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
         storyData.plot_beats[beatIndex].content = newContent;
-        addNotification(`✨ Story beat ${beatIndex + 1} content updated`, "info");
+        addNotification(
+          `✨ Story beat ${beatIndex + 1} content updated`,
+          "info"
+        );
       }
       continue;
     }
@@ -502,6 +506,18 @@ function StoryPageContent() {
     message: "",
     onConfirm: () => {},
   });
+  const [diceRoll, setDiceRoll] = useState<{
+    show: boolean;
+    rolls: number[];
+    finalRoll: number;
+    skillName: string;
+    skillBonus: number;
+    dc: number;
+    isSuccess: boolean;
+    isCritical: boolean;
+    hasAdvantage: boolean;
+    hasDisadvantage: boolean;
+  } | null>(null);
 
   // Fetch token balance on mount
   useEffect(() => {
@@ -1090,7 +1106,10 @@ function StoryPageContent() {
         });
 
         if (data.meta?.tokensDeducted) {
-          addNotification(`✨ Used ${data.meta.tokensDeducted} tokens`, "success");
+          addNotification(
+            `✨ Used ${data.meta.tokensDeducted} tokens`,
+            "success"
+          );
           if (data.meta.remainingBalance) {
             addNotification(
               `Balance:${data.meta.remainingBalance.total}tokensremaining(${data.meta.remainingBalance.tradable}tradable)`,
@@ -1198,7 +1217,10 @@ function StoryPageContent() {
           );
         } else {
           //Normal,consumable,andstoryitemsgiveadvantage
-          addNotification(`Used item: ${choice.item_used} (Advantage!)`, "info");
+          addNotification(
+            `Used item: ${choice.item_used} (Advantage!)`,
+            "info"
+          );
           const second_roll = getSecureRandomInt(1, 100);
           logger.action("Advantagerollfromitem", {
             item: choice.item_used,
@@ -1222,7 +1244,10 @@ function StoryPageContent() {
             reroll2,
             finalRoll: dice_roll,
           });
-          addNotification(`⚡ Reroll Used! Best of 3 rolls: ${dice_roll}`, "success");
+          addNotification(
+            `⚡ Reroll Used! Best of 3 rolls: ${dice_roll}`,
+            "success"
+          );
         }
 
         // Handle item consumption based on type
@@ -1272,7 +1297,10 @@ function StoryPageContent() {
             reroll2,
             finalRoll: dice_roll,
           });
-          addNotification(`⚡ Reroll Used! Best of 3 rolls: ${dice_roll}`, "success");
+          addNotification(
+            `⚡ Reroll Used! Best of 3 rolls: ${dice_roll}`,
+            "success"
+          );
         }
       }
     } else if (momentumMode === "reroll") {
@@ -1362,6 +1390,33 @@ function StoryPageContent() {
           total,
           passed: dc_passed,
         });
+
+        // Show dice visualizer
+        const usedItem = choice.item_used
+          ? storyData.inventory.find((i) => i.name === choice.item_used)
+          : null;
+        const hasItemAdvantage =
+          !!usedItem && (usedItem.type || "normal") !== "misc";
+        const hasItemDisadvantage = !!(choice.item_used && !usedItem);
+
+        const allRolls: number[] = [dice_roll];
+
+        setDiceRoll({
+          show: true,
+          rolls: allRolls,
+          finalRoll: dice_roll,
+          skillName: choice.skill_used,
+          skillBonus: statValue,
+          dc,
+          isSuccess: dc_passed,
+          isCritical: dice_roll === 100,
+          hasAdvantage: hasItemAdvantage,
+          hasDisadvantage: hasItemDisadvantage,
+        });
+
+        // Wait for animation to complete before showing notification
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+        setDiceRoll(null);
 
         if (dc_passed) {
           skillCheckResult = "success";
@@ -2321,7 +2376,9 @@ function StoryPageContent() {
                 <DynamicIcon name="RotateCcw" className="w-8 h-8" />
                 <div className="text-left">
                   <div>Replay Story</div>
-                  <div className="text-xs opacity-80">Start from the beginning</div>
+                  <div className="text-xs opacity-80">
+                    Start from the beginning
+                  </div>
                 </div>
               </button>
 
@@ -2436,7 +2493,9 @@ function StoryPageContent() {
                 <DynamicIcon name="Library" className="w-8 h-8" />
                 <div className="text-left">
                   <div>Return to Library</div>
-                  <div className="text-xs opacity-80">View all your stories</div>
+                  <div className="text-xs opacity-80">
+                    View all your stories
+                  </div>
                 </div>
               </button>
 
@@ -2447,7 +2506,9 @@ function StoryPageContent() {
                 <DynamicIcon name="Map" className="w-8 h-8" />
                 <div className="text-left">
                   <div>Explore Adventures</div>
-                  <div className="text-xs opacity-80">Start a new adventure</div>
+                  <div className="text-xs opacity-80">
+                    Start a new adventure
+                  </div>
                 </div>
               </button>
             </div>
@@ -2712,6 +2773,21 @@ function StoryPageContent() {
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
       />
+      {/*DiceVisualizer*/}
+      {diceRoll?.show && (
+        <DiceVisualizer
+          rolls={diceRoll.rolls}
+          finalRoll={diceRoll.finalRoll}
+          skillName={diceRoll.skillName}
+          skillBonus={diceRoll.skillBonus}
+          dc={diceRoll.dc}
+          isSuccess={diceRoll.isSuccess}
+          isCritical={diceRoll.isCritical}
+          hasAdvantage={diceRoll.hasAdvantage}
+          hasDisadvantage={diceRoll.hasDisadvantage}
+          onComplete={() => setDiceRoll(null)}
+        />
+      )}
     </div>
   );
 }
