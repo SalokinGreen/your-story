@@ -1,4 +1,5 @@
 import { StoryData } from "./structs";
+import { logger } from "./logger";
 
 // Process lore triggers based on story content and fulfilled beats
 export function processLoreTriggers(
@@ -6,7 +7,8 @@ export function processLoreTriggers(
   addNotification: (
     message: string,
     type: "success" | "failure" | "info" | "warning"
-  ) => void
+  ) => void,
+  initialLoad: boolean = false
 ) {
   // Combine all content for history scan
   const fullContent = [
@@ -101,10 +103,17 @@ export function processLoreTriggers(
     // Update state
     if (loreItem.on !== isActive) {
       loreItem.on = isActive;
-      if (isActive) {
-        addNotification(`📜 Lore discovered: ${loreItem.title}`, "success");
-      } else {
-        addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
+      logger.state_change(`Lore '${loreItem.title}' changed state`, {
+        active: isActive,
+        triggers: { shouldTurnOn, shouldTurnOff, hasAnyOnTriggersDefined },
+      });
+
+      if (!initialLoad) {
+        if (isActive) {
+          addNotification(`📜 Lore discovered: ${loreItem.title}`, "success");
+        } else {
+          addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
+        }
       }
     }
   });

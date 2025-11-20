@@ -8,7 +8,7 @@ export const DEFAULT_PRESET: Preset = {
   name: "Custom",
   description:
     "Create your own character from scratch with no predefined attributes.",
-  icon: "✨",
+  icon: "Sparkles",
   playerSummary: "",
   stats: [],
   resources: [],

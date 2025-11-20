@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -8,6 +8,8 @@ import { Adventure } from "@/app/misc/structs";
 import { supabase } from "@/app/misc/supabase";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
+import { DynamicIcon } from "@/app/components/DynamicIcon";
+import { IconPicker } from "@/app/components/IconPicker";
 import { isEncrypted } from "@/app/misc/encryption";
 import EncryptionMigration from "@/app/components/EncryptionMigration";
 import {
@@ -73,7 +75,7 @@ export default function LibraryPage() {
   // Folder management states
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [newFolderIcon, setNewFolderIcon] = useState("📁");
+  const [newFolderIcon, setNewFolderIcon] = useState("Folder");
   const [newFolderColor, setNewFolderColor] = useState("#9333ea");
   const [editingFolder, setEditingFolder] = useState<StoryFolder | null>(null);
   const [movingStory, setMovingStory] = useState<string | null>(null);
@@ -184,7 +186,7 @@ export default function LibraryPage() {
       title: "Delete Story?",
       message:
         "Are you sure you want to delete this story? This action cannot be undone.",
-      icon: "🗑️",
+      icon: "Trash2",
       confirmText: "Delete Story",
       confirmButtonClass: "bg-red-600 hover:bg-red-700",
       onConfirm: async () => {
@@ -233,7 +235,7 @@ export default function LibraryPage() {
       title: "Delete Adventure?",
       message:
         "Are you sure you want to delete this adventure? This action cannot be undone.",
-      icon: "🗑️",
+      icon: "Trash2",
       confirmText: "Delete Adventure",
       confirmButtonClass: "bg-red-600 hover:bg-red-700",
       onConfirm: async () => {
@@ -304,7 +306,7 @@ export default function LibraryPage() {
       const { folder } = await response.json();
       setFolders([...folders, folder]);
       setNewFolderName("");
-      setNewFolderIcon("📁");
+      setNewFolderIcon("Folder");
       setNewFolderColor("#9333ea");
       setShowNewFolderDialog(false);
       addNotification("Folder created successfully", "success");
@@ -348,7 +350,7 @@ export default function LibraryPage() {
       title: "Delete Folder?",
       message:
         "Are you sure? Stories in this folder will not be deleted, just uncategorized.",
-      icon: "📁",
+      icon: "Folder",
       confirmText: "Delete Folder",
       confirmButtonClass: "bg-orange-600 hover:bg-orange-700",
       onConfirm: async () => {
@@ -596,11 +598,12 @@ export default function LibraryPage() {
               onClick={() => router.push("/")}
               className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
             >
-              ← Home
+              â† Home
             </button>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-            📚 My Library
+          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-3">
+            <DynamicIcon name="BookOpen" className="w-10 h-10" />
+            My Library
           </h1>
           <p className="text-gray-700 dark:text-gray-300 text-lg">
             Your stories and adventures all in one place
@@ -617,8 +620,9 @@ export default function LibraryPage() {
                 : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
             }`}
           >
-            📖 My Stories (
-            {filteredStories.length + filteredLocalStories.length}
+            ðŸ“–
+            <DynamicIcon name="Book" className="w-5 h-5 inline-block mr-2" />
+            `nMy Stories ({filteredStories.length + filteredLocalStories.length}
             {stories.length + localStories.length !==
             filteredStories.length + filteredLocalStories.length
               ? ` / ${stories.length + localStories.length}`
@@ -633,7 +637,12 @@ export default function LibraryPage() {
                 : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
             }`}
           >
-            🎮 My Adventures (
+            ðŸŽ®
+            <DynamicIcon
+              name="Gamepad2"
+              className="w-5 h-5 inline-block mr-2"
+            />
+            `nMy Adventures (
             {filteredAdventures.length + localAdventures.length}
             {adventures.length + localAdventures.length !==
             filteredAdventures.length + localAdventures.length
@@ -654,40 +663,40 @@ export default function LibraryPage() {
             <div className="lg:col-span-1">
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 sticky top-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-gray-900 dark:text-white">
-                    📁 Folders
+                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <DynamicIcon name="Folder" className="w-5 h-5" /> Folders
                   </h3>
                   <button
                     onClick={() => setShowNewFolderDialog(true)}
                     className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
                   >
-                    +
+                    <DynamicIcon name="Plus" className="w-4 h-4" />
                   </button>
                 </div>
 
                 {/* All Stories */}
                 <button
                   onClick={() => setSelectedFolder(null)}
-                  className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors ${
+                  className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors flex items-center gap-2 ${
                     selectedFolder === null
                       ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold"
                       : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                   }`}
                 >
-                  <span className="mr-2">📚</span>
+                  <DynamicIcon name="Book" className="w-4 h-4" />
                   All Stories ({stories.length + localStories.length})
                 </button>
 
                 {/* Uncategorized */}
                 <button
                   onClick={() => setSelectedFolder("uncategorized")}
-                  className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors ${
+                  className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors flex items-center gap-2 ${
                     selectedFolder === "uncategorized"
                       ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold"
                       : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                   }`}
                 >
-                  <span className="mr-2">📄</span>
+                  <DynamicIcon name="FileText" className="w-4 h-4" />
                   Uncategorized (
                   {stories.filter((s) => !s.folder_id).length +
                     localStories.filter((s) => !s.folder_id).length}
@@ -699,14 +708,14 @@ export default function LibraryPage() {
                   <div key={folder.id} className="group relative">
                     <button
                       onClick={() => setSelectedFolder(folder.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors ${
+                      className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors flex items-center gap-2 ${
                         selectedFolder === folder.id
                           ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold"
                           : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                       }`}
                       style={{ borderLeft: `4px solid ${folder.color}` }}
                     >
-                      <span className="mr-2">{folder.icon}</span>
+                      <DynamicIcon name={folder.icon} className="w-4 h-4" />
                       {folder.name} (
                       {stories.filter((s) => s.folder_id === folder.id).length +
                         localStories.filter((s) => s.folder_id === folder.id)
@@ -721,7 +730,7 @@ export default function LibraryPage() {
                         }}
                         className="p-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs"
                       >
-                        ✏️
+                        <DynamicIcon name="Edit2" className="w-3 h-3" />
                       </button>
                       <button
                         onClick={(e) => {
@@ -730,7 +739,7 @@ export default function LibraryPage() {
                         }}
                         className="p-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
                       >
-                        🗑️
+                        <DynamicIcon name="Trash2" className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
@@ -751,8 +760,9 @@ export default function LibraryPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Search */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      🔍 Search Stories
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <DynamicIcon name="Search" className="w-4 h-4" />
+                      Search Stories
                     </label>
                     <input
                       type="text"
@@ -765,8 +775,12 @@ export default function LibraryPage() {
 
                   {/* Filter */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      📊 Filter
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <DynamicIcon
+                        name="SlidersHorizontal"
+                        className="w-4 h-4"
+                      />
+                      Filter
                     </label>
                     <select
                       value={storyFilter}
@@ -786,7 +800,11 @@ export default function LibraryPage() {
                   {/* Sort */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      🔄 Sort By
+                      <DynamicIcon
+                        name="RefreshCw"
+                        className="inline-block w-4 h-4 mr-1"
+                      />
+                      Sort By
                     </label>
                     <select
                       value={storySortBy}
@@ -827,7 +845,12 @@ export default function LibraryPage() {
                 {filteredStories.length === 0 &&
                 filteredLocalStories.length === 0 ? (
                   <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-700">
-                    <div className="text-6xl mb-4">📖</div>
+                    <div className="flex justify-center mb-4">
+                      <DynamicIcon
+                        name="BookOpen"
+                        className="w-16 h-16 text-gray-400"
+                      />
+                    </div>
                     <h3 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
                       {stories.length === 0
                         ? "No Stories Yet"
@@ -861,21 +884,33 @@ export default function LibraryPage() {
                                 {story.story_name}
                               </h3>
                               {story.is_completed && (
-                                <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-semibold rounded-full">
-                                  ✓ Completed
+                                <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-semibold rounded-full flex items-center gap-1">
+                                  <DynamicIcon
+                                    name="Check"
+                                    className="w-3 h-3"
+                                  />{" "}
+                                  Completed
                                 </span>
                               )}
                               {story.is_public && (
-                                <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-semibold rounded-full">
-                                  🌐 Public
+                                <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-semibold rounded-full flex items-center gap-1">
+                                  <DynamicIcon
+                                    name="Globe"
+                                    className="w-3 h-3"
+                                  />{" "}
+                                  Public
                                 </span>
                               )}
                               {isEncrypted(story.story_data) && (
                                 <span
-                                  className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-semibold rounded-full"
+                                  className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-semibold rounded-full flex items-center gap-1"
                                   title="This story is encrypted and private"
                                 >
-                                  🔒 Encrypted
+                                  <DynamicIcon
+                                    name="Lock"
+                                    className="w-3 h-3"
+                                  />{" "}
+                                  Encrypted
                                 </span>
                               )}
                             </div>
@@ -903,10 +938,10 @@ export default function LibraryPage() {
                           <div className="flex gap-2">
                             <button
                               onClick={() => setMovingStory(story.id)}
-                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center"
                               title="Move to folder"
                             >
-                              📁
+                              <DynamicIcon name="Folder" className="w-5 h-5" />
                             </button>
                             <button
                               onClick={() =>
@@ -919,9 +954,19 @@ export default function LibraryPage() {
                             <button
                               onClick={() => handleDeleteStory(story.id)}
                               disabled={deleting === story.id}
-                              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                             >
-                              {deleting === story.id ? "..." : "🗑️"}
+                              {deleting === story.id ? (
+                                <DynamicIcon
+                                  name="Loader2"
+                                  className="w-5 h-5 animate-spin"
+                                />
+                              ) : (
+                                <DynamicIcon
+                                  name="Trash2"
+                                  className="w-5 h-5"
+                                />
+                              )}
                             </button>
                           </div>
                         </div>
@@ -944,10 +989,11 @@ export default function LibraryPage() {
                               {story.title}
                             </h3>
                             <span
-                              className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-full"
+                              className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-full flex items-center gap-1"
                               title="This story is saved offline"
                             >
-                              💾 Offline
+                              <DynamicIcon name="Save" className="w-3 h-3" />{" "}
+                              Offline
                             </span>
                           </div>
                           <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
@@ -963,10 +1009,10 @@ export default function LibraryPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => setMovingStory(story.id)}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center"
                             title="Move to folder"
                           >
-                            📁
+                            <DynamicIcon name="Folder" className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() =>
@@ -979,9 +1025,16 @@ export default function LibraryPage() {
                           <button
                             onClick={() => handleDeleteStory(story.id, true)}
                             disabled={deleting === story.id}
-                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                           >
-                            {deleting === story.id ? "..." : "🗑️"}
+                            {deleting === story.id ? (
+                              <DynamicIcon
+                                name="Loader2"
+                                className="w-5 h-5 animate-spin"
+                              />
+                            ) : (
+                              <DynamicIcon name="Trash2" className="w-5 h-5" />
+                            )}
                           </button>
                         </div>
                       </div>
@@ -998,8 +1051,9 @@ export default function LibraryPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Search */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    🔍 Search Adventures
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    <DynamicIcon name="Search" className="w-4 h-4" />
+                    Search Adventures
                   </label>
                   <input
                     type="text"
@@ -1012,8 +1066,9 @@ export default function LibraryPage() {
 
                 {/* Filter */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    📊 Filter
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    <DynamicIcon name="SlidersHorizontal" className="w-4 h-4" />
+                    Filter
                   </label>
                   <select
                     value={adventureFilter}
@@ -1033,7 +1088,11 @@ export default function LibraryPage() {
                 {/* Sort */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    🔄 Sort By
+                    <DynamicIcon
+                      name="RefreshCw"
+                      className="inline-block w-4 h-4 mr-1"
+                    />
+                    Sort By
                   </label>
                   <select
                     value={adventureSortBy}
@@ -1076,14 +1135,20 @@ export default function LibraryPage() {
               <div className="mb-4">
                 <button
                   onClick={() => router.push("/creator")}
-                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors shadow-md"
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors shadow-md flex items-center gap-2"
                 >
-                  + Create New Adventure
+                  <DynamicIcon name="Plus" className="w-5 h-5" /> Create New
+                  Adventure
                 </button>
               </div>
               {filteredAdventures.length === 0 ? (
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-700">
-                  <div className="text-6xl mb-4">🎮</div>
+                  <div className="flex justify-center mb-4">
+                    <DynamicIcon
+                      name="Gamepad2"
+                      className="w-16 h-16 text-gray-400"
+                    />
+                  </div>
                   <h3 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
                     {adventures.length === 0
                       ? "No Adventures Yet"
@@ -1120,7 +1185,10 @@ export default function LibraryPage() {
                         />
                       ) : (
                         <div className="h-40 bg-linear-to-br from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center">
-                          <span className="text-6xl">🎮</span>
+                          <DynamicIcon
+                            name="Gamepad2"
+                            className="w-16 h-16 text-white"
+                          />
                         </div>
                       )}
 
@@ -1136,7 +1204,10 @@ export default function LibraryPage() {
                             </span>
                           )}
                           {adventure.isFeatured && (
-                            <span className="text-xl">⭐</span>
+                            <DynamicIcon
+                              name="Star"
+                              className="w-5 h-5 text-yellow-500 fill-current"
+                            />
                           )}
                         </div>
                         <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
@@ -1158,11 +1229,18 @@ export default function LibraryPage() {
                           )}
                         </div>
                         <div className="flex gap-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                          <span>
-                            ⭐ {adventure.rating?.toFixed(1) || "N/A"}
+                          <span className="flex items-center gap-1">
+                            <DynamicIcon
+                              name="Star"
+                              className="w-4 h-4 text-yellow-500"
+                            />{" "}
+                            {adventure.rating?.toFixed(1) || "N/A"}
                           </span>
-                          <span>•</span>
-                          <span>👥 {adventure.playCount || 0}</span>
+                          <span>â€¢</span>
+                          <span className="flex items-center gap-1">
+                            <DynamicIcon name="Users" className="w-4 h-4" />{" "}
+                            {adventure.playCount || 0}
+                          </span>
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -1184,9 +1262,16 @@ export default function LibraryPage() {
                           <button
                             onClick={() => handleDeleteAdventure(adventure.id)}
                             disabled={deleting === adventure.id}
-                            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                           >
-                            {deleting === adventure.id ? "..." : "🗑️"}
+                            {deleting === adventure.id ? (
+                              <DynamicIcon
+                                name="Loader2"
+                                className="w-4 h-4 animate-spin"
+                              />
+                            ) : (
+                              <DynamicIcon name="Trash2" className="w-4 h-4" />
+                            )}
                           </button>
                         </div>
                       </div>
@@ -1209,7 +1294,10 @@ export default function LibraryPage() {
                         />
                       ) : (
                         <div className="h-40 bg-linear-to-br from-gray-500 via-gray-600 to-gray-700 flex items-center justify-center">
-                          <span className="text-6xl">💾</span>
+                          <DynamicIcon
+                            name="Save"
+                            className="w-16 h-16 text-white"
+                          />
                         </div>
                       )}
 
@@ -1220,10 +1308,11 @@ export default function LibraryPage() {
                             {adventure.title}
                           </h3>
                           <span
-                            className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-full"
+                            className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-full flex items-center gap-1"
                             title="This adventure is saved offline"
                           >
-                            💾 Offline
+                            <DynamicIcon name="Save" className="w-3 h-3" />{" "}
+                            Offline
                           </span>
                         </div>
                         <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
@@ -1268,9 +1357,16 @@ export default function LibraryPage() {
                               handleDeleteAdventure(adventure.id, true)
                             }
                             disabled={deleting === adventure.id}
-                            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                           >
-                            {deleting === adventure.id ? "..." : "🗑️"}
+                            {deleting === adventure.id ? (
+                              <DynamicIcon
+                                name="Loader2"
+                                className="w-4 h-4 animate-spin"
+                              />
+                            ) : (
+                              <DynamicIcon name="Trash2" className="w-4 h-4" />
+                            )}
                           </button>
                         </div>
                       </div>
@@ -1306,26 +1402,11 @@ export default function LibraryPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Icon
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {["📁", "⭐", "🎮", "📚", "🔥", "💎", "🎯", "🚀"].map(
-                    (icon) => (
-                      <button
-                        key={icon}
-                        onClick={() => setNewFolderIcon(icon)}
-                        className={`p-3 text-2xl rounded-lg border-2 transition-colors ${
-                          newFolderIcon === icon
-                            ? "border-purple-500 bg-purple-50 dark:bg-purple-900"
-                            : "border-gray-300 dark:border-gray-600 hover:border-purple-300"
-                        }`}
-                      >
-                        {icon}
-                      </button>
-                    )
-                  )}
-                </div>
+                <IconPicker
+                  label="Icon"
+                  value={newFolderIcon}
+                  onChange={setNewFolderIcon}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1344,7 +1425,7 @@ export default function LibraryPage() {
                 onClick={() => {
                   setShowNewFolderDialog(false);
                   setNewFolderName("");
-                  setNewFolderIcon("📁");
+                  setNewFolderIcon("Folder");
                   setNewFolderColor("#9333ea");
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
@@ -1393,26 +1474,11 @@ export default function LibraryPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Icon
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {["📁", "⭐", "🎮", "📚", "🔥", "💎", "🎯", "🚀"].map(
-                    (icon) => (
-                      <button
-                        key={icon}
-                        onClick={() => setNewFolderIcon(icon)}
-                        className={`p-3 text-2xl rounded-lg border-2 transition-colors ${
-                          newFolderIcon === icon
-                            ? "border-purple-500 bg-purple-50 dark:bg-purple-900"
-                            : "border-gray-300 dark:border-gray-600 hover:border-purple-300"
-                        }`}
-                      >
-                        {icon}
-                      </button>
-                    )
-                  )}
-                </div>
+                <IconPicker
+                  label="Icon"
+                  value={newFolderIcon}
+                  onChange={setNewFolderIcon}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1431,7 +1497,7 @@ export default function LibraryPage() {
                 onClick={() => {
                   setEditingFolder(null);
                   setNewFolderName("");
-                  setNewFolderIcon("📁");
+                  setNewFolderIcon("Folder");
                   setNewFolderColor("#9333ea");
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
@@ -1477,8 +1543,9 @@ export default function LibraryPage() {
                 }}
                 className="w-full p-3 text-left rounded-lg border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 transition-colors"
               >
-                <span className="text-gray-700 dark:text-gray-300">
-                  📂 Uncategorized
+                <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <DynamicIcon name="FolderOpen" className="w-5 h-5" />{" "}
+                  Uncategorized
                 </span>
               </button>
               {folders.map((folder) => (
@@ -1500,8 +1567,9 @@ export default function LibraryPage() {
                     borderLeftWidth: "4px",
                   }}
                 >
-                  <span className="text-gray-900 dark:text-white">
-                    {folder.icon} {folder.name}
+                  <span className="text-gray-900 dark:text-white flex items-center gap-2">
+                    <DynamicIcon name={folder.icon} className="w-5 h-5" />{" "}
+                    {folder.name}
                   </span>
                 </button>
               ))}

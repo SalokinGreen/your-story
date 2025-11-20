@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -28,6 +28,8 @@ import {
   applyPreset,
 } from "@/app/misc/presets";
 import CreatorAIChat from "@/app/components/CreatorAIChat";
+import { DynamicIcon } from "@/app/components/DynamicIcon";
+import { IconPicker } from "@/app/components/IconPicker";
 import {
   saveLocalAdventure,
   getLocalAdventure,
@@ -72,7 +74,7 @@ function AdventureCreatorContent() {
   const [showPresetForm, setShowPresetForm] = useState(false);
   const [newPresetName, setNewPresetName] = useState("");
   const [newPresetDescription, setNewPresetDescription] = useState("");
-  const [newPresetIcon, setNewPresetIcon] = useState("⭐");
+  const [newPresetIcon, setNewPresetIcon] = useState("Star");
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
 
   // Upgrade Settings
@@ -90,6 +92,7 @@ function AdventureCreatorContent() {
   const [visibility, setVisibility] = useState<"public" | "hidden" | "private">(
     "private"
   );
+  const [nsfw, setNsfw] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
@@ -130,6 +133,7 @@ function AdventureCreatorContent() {
     // Apply story data
     if (data.story_name) setTitle(data.story_name);
     if (data.premise) setPremise(data.premise);
+    if (data.nsfw !== undefined) setNsfw(data.nsfw);
     if (data.player_name) setPlayerName(data.player_name);
     if (data.player_summary) setPlayerSummary(data.player_summary);
     if (data.starting_content) setStartingContent(data.starting_content);
@@ -411,7 +415,7 @@ function AdventureCreatorContent() {
     name: "",
     value: 50,
     description: "",
-    symbol: "⭐",
+    symbol: "Star",
   });
   const [draggedStatIndex, setDraggedStatIndex] = useState<number | null>(null);
   const [editingStatIndex, setEditingStatIndex] = useState<number | null>(null);
@@ -424,7 +428,7 @@ function AdventureCreatorContent() {
     value: 50,
     maxValue: 100,
     description: "",
-    symbol: "💎",
+    symbol: "Gem",
   });
   const [draggedResourceIndex, setDraggedResourceIndex] = useState<
     number | null
@@ -441,7 +445,7 @@ function AdventureCreatorContent() {
     quantity: 1,
     description: "",
     type: "misc",
-    symbol: "📦",
+    symbol: "Package",
   });
   const [draggedInventoryIndex, setDraggedInventoryIndex] = useState<
     number | null
@@ -507,7 +511,7 @@ function AdventureCreatorContent() {
     title: "",
     description: "",
     points: 10,
-    symbol: "🏆",
+    symbol: "Trophy",
   });
   const [draggedAchievementIndex, setDraggedAchievementIndex] = useState<
     number | null
@@ -568,18 +572,18 @@ function AdventureCreatorContent() {
   ];
 
   const steps: { id: CreatorStep; label: string; icon: string }[] = [
-    { id: "basic", label: "Basic Info", icon: "📝" },
-    { id: "preset", label: "Character Preset", icon: "🎭" },
-    { id: "premise", label: "Story Setup", icon: "📖" },
-    { id: "stats", label: "Stats", icon: "📊" },
-    { id: "resources", label: "Resources", icon: "💎" },
-    { id: "inventory", label: "Starting Items", icon: "🎒" },
-    { id: "lore", label: "Lore", icon: "📜" },
-    { id: "achievements", label: "Achievements", icon: "🏆" },
-    { id: "quests", label: "Quests", icon: "📋" },
-    { id: "plot", label: "Plot Beats", icon: "🎬" },
-    { id: "upgrades", label: "Upgrade Settings", icon: "⬆️" },
-    { id: "preview", label: "Preview", icon: "👁️" },
+    { id: "basic", label: "Basic Info", icon: "FileText" },
+    { id: "preset", label: "Character Preset", icon: "User" },
+    { id: "premise", label: "Story Setup", icon: "BookOpen" },
+    { id: "stats", label: "Stats", icon: "BarChart2" },
+    { id: "resources", label: "Resources", icon: "Gem" },
+    { id: "inventory", label: "Starting Items", icon: "Backpack" },
+    { id: "lore", label: "Lore", icon: "Scroll" },
+    { id: "achievements", label: "Achievements", icon: "Trophy" },
+    { id: "quests", label: "Quests", icon: "ClipboardList" },
+    { id: "plot", label: "Plot Beats", icon: "Clapperboard" },
+    { id: "upgrades", label: "Upgrade Settings", icon: "ArrowUpCircle" },
+    { id: "preview", label: "Preview", icon: "Eye" },
   ];
 
   // Load draft on mount (only for new adventures, not edit mode)
@@ -664,6 +668,7 @@ function AdventureCreatorContent() {
       description,
       difficulty,
       visibility,
+      nsfw,
       tags,
       thumbnailUrl,
       bannerUrl,
@@ -705,6 +710,7 @@ function AdventureCreatorContent() {
     description,
     difficulty,
     visibility,
+    nsfw,
     tags,
     thumbnailUrl,
     bannerUrl,
@@ -832,7 +838,7 @@ function AdventureCreatorContent() {
   const addStat = () => {
     if (newStat.name && newStat.description) {
       setStats([...stats, newStat as Stat]);
-      setNewStat({ name: "", value: 50, description: "", symbol: "⭐" });
+      setNewStat({ name: "", value: 50, description: "", symbol: "Star" });
     }
   };
 
@@ -848,7 +854,7 @@ function AdventureCreatorContent() {
         value: 50,
         maxValue: 100,
         description: "",
-        symbol: "💎",
+        symbol: "Gem",
       });
     }
   };
@@ -865,7 +871,7 @@ function AdventureCreatorContent() {
         quantity: 1,
         description: "",
         type: "misc",
-        symbol: "📦",
+        symbol: "Package",
       });
     }
   };
@@ -1380,7 +1386,7 @@ function AdventureCreatorContent() {
         title: "",
         description: "",
         points: 10,
-        symbol: "🏆",
+        symbol: "Trophy",
       });
     }
   };
@@ -1433,7 +1439,7 @@ function AdventureCreatorContent() {
       upgradeSettings: upgradeSettings,
     };
 
-    // Save complete adventure template to localStorage
+    //Save complete adventure template to localStorage
     try {
       const adventureTemplate = {
         title,
@@ -1444,6 +1450,7 @@ function AdventureCreatorContent() {
         tags,
         difficulty: difficulty.toLowerCase(),
         visibility: visibility.toLowerCase(),
+        nsfw,
         estimatedDuration: "1-2 hours",
         storyTemplate: storyData,
         selectedPreset: selectedPreset,
@@ -1460,7 +1467,7 @@ function AdventureCreatorContent() {
       }
 
       addNotification(
-        "✨ Adventure saved locally! You can import it later.",
+        "Adventure saved locally! You can import it later.",
         "success"
       );
 
@@ -1494,6 +1501,7 @@ function AdventureCreatorContent() {
       setDescription("");
       setDifficulty("Medium");
       setVisibility("public");
+      setNsfw(false);
       setTags([]);
       setThumbnailUrl("");
       setBannerUrl("");
@@ -1573,7 +1581,7 @@ function AdventureCreatorContent() {
       upgradeSettings: upgradeSettings,
     };
 
-    // Save to database
+    //Save to database
     try {
       // Get auth token
       const {
@@ -1599,6 +1607,7 @@ function AdventureCreatorContent() {
         tags,
         difficulty: difficulty.toLowerCase(),
         visibility: visibility.toLowerCase(),
+        nsfw,
         estimatedDuration: "1-2 hours",
         isPublished: true,
         isFeatured: false,
@@ -1615,7 +1624,7 @@ function AdventureCreatorContent() {
 
       if (payloadSize > 4 * 1024 * 1024) {
         addNotification(
-          "⚠️ Adventure data is very large (>4MB). Consider reducing lore entries or plot beats.",
+          "Adventure data is very large (>4MB). Consider reducing lore entries or plot beats.",
           "warning"
         );
       }
@@ -1639,7 +1648,7 @@ function AdventureCreatorContent() {
 
       const { adventure } = await response.json();
       addNotification(
-        `✨ Adventure ${isEditing ? "updated" : "created"} successfully!`,
+        `Adventure ${isEditing ? "updated" : "created"} successfully!`,
         "success"
       );
 
@@ -1751,18 +1760,61 @@ function AdventureCreatorContent() {
                     onClick={() => setVisibility(vis)}
                     className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all capitalize ${
                       visibility === vis
-                        ? "bg-blue-600 text-white border-blue-600 ring-2 ring-blue-400"
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400"
+                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                     }`}
                   >
-                    {vis === "public"
-                      ? "🌍 Public"
-                      : vis === "hidden"
-                      ? "🔗 Hidden"
-                      : "🔒 Private"}
+                    {vis === "public" ? (
+                      <>
+                        <DynamicIcon
+                          name="Globe"
+                          className="w-4 h-4 inline mr-2"
+                        />
+                        Public
+                      </>
+                    ) : vis === "hidden" ? (
+                      <>
+                        <DynamicIcon
+                          name="Link"
+                          className="w-4 h-4 inline mr-2"
+                        />
+                        Hidden
+                      </>
+                    ) : (
+                      <>
+                        <DynamicIcon
+                          name="Lock"
+                          className="w-4 h-4 inline mr-2"
+                        />
+                        Private
+                      </>
+                    )}
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={nsfw}
+                    onChange={(e) => setNsfw(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
+                </div>
+                <div>
+                  <span className="block text-sm font-bold text-gray-900 dark:text-white">
+                    NSFW Content
+                  </span>
+                  <span className="block text-xs text-gray-600 dark:text-gray-400">
+                    Mark this adventure as containing Not Safe For Work content
+                    (18+)
+                  </span>
+                </div>
+              </label>
             </div>
 
             <div>
@@ -1819,7 +1871,7 @@ function AdventureCreatorContent() {
                       onClick={() => removeTag(tag)}
                       className="hover:text-purple-900 dark:hover:text-purple-100"
                     >
-                      ×
+                      <DynamicIcon name="X" className="w-3 h-3" />
                     </button>
                   </span>
                 ))}
@@ -1846,7 +1898,7 @@ function AdventureCreatorContent() {
                       onClick={() => setThumbnailUrl("")}
                       className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs font-bold"
                     >
-                      ×
+                      <DynamicIcon name="X" className="w-3 h-3" />
                     </button>
                   </div>
                 )}
@@ -1861,15 +1913,23 @@ function AdventureCreatorContent() {
                   />
                   <label
                     htmlFor="thumbnail-upload"
-                    className={`block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
+                    className={`block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
                       uploadingThumbnail ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
-                    {uploadingThumbnail
-                      ? "Uploading..."
-                      : thumbnailUrl
-                      ? "Change Thumbnail"
-                      : "📸 Upload Thumbnail"}
+                    {uploadingThumbnail ? (
+                      "Uploading..."
+                    ) : thumbnailUrl ? (
+                      "Change Thumbnail"
+                    ) : (
+                      <>
+                        <DynamicIcon
+                          name="Camera"
+                          className="w-4 h-4 inline mr-2"
+                        />
+                        Upload Thumbnail
+                      </>
+                    )}
                   </label>
                 </div>
               </div>
@@ -1895,7 +1955,7 @@ function AdventureCreatorContent() {
                       onClick={() => setBannerUrl("")}
                       className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs font-bold"
                     >
-                      ×
+                      <DynamicIcon name="X" className="w-3 h-3" />
                     </button>
                   </div>
                 )}
@@ -1910,15 +1970,23 @@ function AdventureCreatorContent() {
                   />
                   <label
                     htmlFor="banner-upload"
-                    className={`block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
+                    className={`block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
                       uploadingBanner ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
-                    {uploadingBanner
-                      ? "Uploading..."
-                      : bannerUrl
-                      ? "Change Banner"
-                      : "🖼️ Upload Banner"}
+                    {uploadingBanner ? (
+                      "Uploading..."
+                    ) : bannerUrl ? (
+                      "Change Banner"
+                    ) : (
+                      <>
+                        <DynamicIcon
+                          name="Image"
+                          className="w-4 h-4 inline mr-2"
+                        />
+                        Upload Banner
+                      </>
+                    )}
                   </label>
                 </div>
               </div>
@@ -1930,8 +1998,9 @@ function AdventureCreatorContent() {
         return (
           <div className="space-y-6">
             <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-lg p-4 mb-6">
-              <h3 className="text-lg font-bold text-blue-900 dark:text-blue-100 mb-2">
-                🎭 Character Presets
+              <h3 className="text-lg font-bold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                <DynamicIcon name="Users" className="w-5 h-5" />
+                Character Presets
               </h3>
               <p className="text-sm text-blue-800 dark:text-blue-200">
                 Create custom character presets for your adventure. Players can
@@ -1951,7 +2020,7 @@ function AdventureCreatorContent() {
                   setEditingPresetId(null);
                   setNewPresetName("");
                   setNewPresetDescription("");
-                  setNewPresetIcon("⭐");
+                  setNewPresetIcon("Star");
                 }}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
               >
@@ -1997,19 +2066,19 @@ function AdventureCreatorContent() {
                     <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
                       Icon *
                     </label>
-                    <input
-                      type="text"
+                    <IconPicker
                       value={newPresetIcon}
-                      onChange={(e) => setNewPresetIcon(e.target.value)}
-                      placeholder="Enter an emoji"
-                      className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 transition-colors"
-                      maxLength={4}
+                      onChange={setNewPresetIcon}
                     />
                   </div>
 
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-3">
                     <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                      💡 <strong>Tip:</strong> The preset will copy your current
+                      <DynamicIcon
+                        name="Lightbulb"
+                        className="w-4 h-4 inline mr-2"
+                      />{" "}
+                      <strong>Tip:</strong> The preset will copy your current
                       Player Name, Stats, Resources, Inventory, Player Summary,
                       and Author Notes. Make sure they're configured as you want
                       before saving!
@@ -2054,7 +2123,7 @@ function AdventureCreatorContent() {
                                 : p
                             )
                           );
-                          addNotification("✨ Preset updated!", "success");
+                          addNotification("Preset updated!", "success");
                         } else {
                           // Create new preset
                           const newPreset = createPresetFromCurrentSettings(
@@ -2069,14 +2138,14 @@ function AdventureCreatorContent() {
                             authorNotes
                           );
                           setPresets([...presets, newPreset]);
-                          addNotification("✨ Preset created!", "success");
+                          addNotification("Preset created!", "success");
                         }
 
                         setShowPresetForm(false);
                         setEditingPresetId(null);
                         setNewPresetName("");
                         setNewPresetDescription("");
-                        setNewPresetIcon("⭐");
+                        setNewPresetIcon("Star");
                       }}
                       className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
                     >
@@ -2088,7 +2157,7 @@ function AdventureCreatorContent() {
                         setEditingPresetId(null);
                         setNewPresetName("");
                         setNewPresetDescription("");
-                        setNewPresetIcon("⭐");
+                        setNewPresetIcon("Star");
                       }}
                       className="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white font-semibold rounded-lg transition-colors"
                     >
@@ -2128,12 +2197,12 @@ function AdventureCreatorContent() {
                             setAuthorNotes
                           );
                           addNotification(
-                            `${preset.icon} ${preset.name} preset applied!`,
+                            `${preset.name} preset applied!`,
                             "success"
                           );
                         } else {
                           addNotification(
-                            "✨ Custom preset selected - build from scratch!",
+                            "Custom preset selected - build from scratch!",
                             "success"
                           );
                         }
@@ -2141,10 +2210,15 @@ function AdventureCreatorContent() {
                       className="text-left w-full"
                     >
                       <div className="flex items-start justify-between mb-3">
-                        <div className="text-4xl">{preset.icon}</div>
+                        <div className="text-4xl">
+                          <DynamicIcon
+                            name={preset.icon}
+                            className="w-10 h-10"
+                          />
+                        </div>
                         {isSelected && (
                           <div className="text-purple-600 dark:text-purple-400 text-xl">
-                            ✓
+                            <DynamicIcon name="Check" className="w-6 h-6" />
                           </div>
                         )}
                       </div>
@@ -2159,12 +2233,17 @@ function AdventureCreatorContent() {
 
                       {preset.id !== "custom" && (
                         <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                          <div>📊 {preset.stats?.length || 0} stats</div>
-                          <div>
-                            💎 {preset.resources?.length || 0} resources
+                          <div className="flex items-center gap-1">
+                            <DynamicIcon name="BarChart2" className="w-3 h-3" />{" "}
+                            {preset.stats?.length || 0} stats
                           </div>
-                          <div>
-                            🎒 {preset.inventory?.length || 0} starting items
+                          <div className="flex items-center gap-1">
+                            <DynamicIcon name="Gem" className="w-3 h-3" />{" "}
+                            {preset.resources?.length || 0} resources
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <DynamicIcon name="Package" className="w-3 h-3" />{" "}
+                            {preset.inventory?.length || 0} starting items
                           </div>
                         </div>
                       )}
@@ -2182,9 +2261,9 @@ function AdventureCreatorContent() {
                             setNewPresetIcon(preset.icon);
                             setShowPresetForm(true);
                           }}
-                          className="flex-1 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors"
+                          className="flex-1 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors flex items-center justify-center gap-1"
                         >
-                          ✏️ Edit
+                          <DynamicIcon name="Edit2" className="w-3 h-3" /> Edit
                         </button>
                         <button
                           onClick={(e) => {
@@ -2193,7 +2272,7 @@ function AdventureCreatorContent() {
                               isOpen: true,
                               title: "Delete Preset?",
                               message: `Delete "${preset.name}" preset? This cannot be undone.`,
-                              icon: "🗑️",
+                              icon: "Trash2",
                               confirmText: "Delete",
                               confirmButtonClass: "bg-red-600 hover:bg-red-700",
                               onConfirm: () => {
@@ -2211,9 +2290,10 @@ function AdventureCreatorContent() {
                               },
                             });
                           }}
-                          className="flex-1 px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold rounded transition-colors"
+                          className="flex-1 px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold rounded transition-colors flex items-center justify-center gap-1"
                         >
-                          🗑️ Delete
+                          <DynamicIcon name="Trash2" className="w-3 h-3" />{" "}
+                          Delete
                         </button>
                       </div>
                     )}
@@ -2224,8 +2304,9 @@ function AdventureCreatorContent() {
 
             {selectedPreset && selectedPreset !== "custom" && (
               <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700 rounded-lg p-4">
-                <h4 className="text-sm font-bold text-green-900 dark:text-green-100 mb-2">
-                  ✨ Preset Applied
+                <h4 className="text-sm font-bold text-green-900 dark:text-green-100 mb-2 flex items-center gap-2">
+                  <DynamicIcon name="Sparkles" className="w-4 h-4" /> Preset
+                  Applied
                 </h4>
                 <p className="text-xs text-green-800 dark:text-green-200">
                   Your character's stats, items, and resources have been
@@ -2306,10 +2387,16 @@ function AdventureCreatorContent() {
             </div>
 
             <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Story Points let players upgrade their
-                character. Momentum builds up from dramatic moments and choices.
-                Plot beat completion rewards points.
+              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>Tip:</strong> Story Points let players upgrade their
+                  character. Momentum builds up from dramatic moments and
+                  choices. Plot beat completion rewards points.
+                </span>
               </p>
             </div>
 
@@ -2376,10 +2463,16 @@ function AdventureCreatorContent() {
         return (
           <div className="space-y-6">
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Stats represent character attributes
-                that can be tested during skill checks (like Strength,
-                Intelligence, etc.). They range from 0-100.
+              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>Tip:</strong> Stats represent character attributes
+                  that can be tested during skill checks (like Strength,
+                  Intelligence, etc.). They range from 0-100.
+                </span>
               </p>
             </div>
 
@@ -2404,17 +2497,13 @@ function AdventureCreatorContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Symbol / Emoji
+                    Icon
                   </label>
-                  <input
-                    type="text"
-                    value={newStat.symbol}
-                    onChange={(e) =>
-                      setNewStat({ ...newStat, symbol: e.target.value })
+                  <IconPicker
+                    value={newStat.symbol || "Star"}
+                    onChange={(icon) =>
+                      setNewStat({ ...newStat, symbol: icon })
                     }
-                    placeholder="e.g., ⭐ or 💪"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    maxLength={4}
                   />
                 </div>
                 <div>
@@ -2491,19 +2580,16 @@ function AdventureCreatorContent() {
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Symbol
+                            Icon
                           </label>
-                          <input
-                            type="text"
-                            value={editStat.symbol || ""}
-                            onChange={(e) =>
+                          <IconPicker
+                            value={editStat.symbol || "Star"}
+                            onChange={(icon) =>
                               setEditStat({
                                 ...editStat,
-                                symbol: e.target.value,
+                                symbol: icon,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
-                            maxLength={4}
                           />
                         </div>
                         <div>
@@ -2547,7 +2633,11 @@ function AdventureCreatorContent() {
                           disabled={!editStat.name || !editStat.description}
                           className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
                         >
-                          💾 Save
+                          <DynamicIcon
+                            name="Save"
+                            className="inline-block w-4 h-4 mr-1"
+                          />
+                          Save
                         </button>
                         <button
                           onClick={cancelEditStat}
@@ -2569,9 +2659,11 @@ function AdventureCreatorContent() {
                       style={{ opacity: draggedStatIndex === index ? 0.5 : 1 }}
                     >
                       <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
-                        ⋮⋮
+                        <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
-                      <span className="text-2xl">{stat.symbol}</span>
+                      <div className="text-2xl">
+                        <DynamicIcon name={stat.symbol} className="w-8 h-8" />
+                      </div>
                       <div className="flex-1">
                         <div className="font-bold text-gray-900 dark:text-white">
                           {stat.name}
@@ -2592,7 +2684,7 @@ function AdventureCreatorContent() {
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
                             title="Move up"
                           >
-                            ▲
+                            <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => moveStatDown(index)}
@@ -2600,7 +2692,10 @@ function AdventureCreatorContent() {
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
                             title="Move down"
                           >
-                            ▼
+                            <DynamicIcon
+                              name="ChevronDown"
+                              className="w-4 h-4"
+                            />
                           </button>
                         </div>
                         <div className="flex flex-row items-center gap-1 ml-3">
@@ -2608,13 +2703,13 @@ function AdventureCreatorContent() {
                             onClick={() => startEditStat(index)}
                             className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
                           >
-                            ✏️
+                            <DynamicIcon name="Edit2" className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => removeStat(index)}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
                           >
-                            🗑️
+                            <DynamicIcon name="Trash2" className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -2630,10 +2725,16 @@ function AdventureCreatorContent() {
         return (
           <div className="space-y-6">
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Resources are consumable values like
-                Health, Mana, or Stamina that can be spent or restored during
-                the adventure.
+              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>Tip:</strong> Resources are consumable values like
+                  Health, Mana, or Stamina that can be spent or restored during
+                  the adventure.
+                </span>
               </p>
             </div>
 
@@ -2658,17 +2759,13 @@ function AdventureCreatorContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Symbol / Emoji
+                    Icon
                   </label>
-                  <input
-                    type="text"
-                    value={newResource.symbol}
-                    onChange={(e) =>
-                      setNewResource({ ...newResource, symbol: e.target.value })
+                  <IconPicker
+                    value={newResource.symbol || "Gem"}
+                    onChange={(icon) =>
+                      setNewResource({ ...newResource, symbol: icon })
                     }
-                    placeholder="e.g., 💎 or ❤️"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    maxLength={4}
                   />
                 </div>
                 <div>
@@ -2767,19 +2864,16 @@ function AdventureCreatorContent() {
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Symbol
+                            Icon
                           </label>
-                          <input
-                            type="text"
-                            value={editResource.symbol || ""}
-                            onChange={(e) =>
+                          <IconPicker
+                            value={editResource.symbol || "Gem"}
+                            onChange={(icon) =>
                               setEditResource({
                                 ...editResource,
-                                symbol: e.target.value,
+                                symbol: icon,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
-                            maxLength={4}
                           />
                         </div>
                         <div>
@@ -2841,7 +2935,11 @@ function AdventureCreatorContent() {
                           }
                           className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
                         >
-                          💾 Save
+                          <DynamicIcon
+                            name="Save"
+                            className="inline-block w-4 h-4 mr-1"
+                          />
+                          Save
                         </button>
                         <button
                           onClick={cancelEditResource}
@@ -2865,9 +2963,14 @@ function AdventureCreatorContent() {
                       }}
                     >
                       <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
-                        ⋮⋮
+                        <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
-                      <span className="text-2xl">{resource.symbol}</span>
+                      <div className="text-2xl">
+                        <DynamicIcon
+                          name={resource.symbol}
+                          className="w-8 h-8"
+                        />
+                      </div>
                       <div className="flex-1">
                         <div className="font-bold text-gray-900 dark:text-white">
                           {resource.name}
@@ -2887,7 +2990,7 @@ function AdventureCreatorContent() {
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
                             title="Move up"
                           >
-                            ▲
+                            <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => moveResourceDown(index)}
@@ -2895,7 +2998,10 @@ function AdventureCreatorContent() {
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
                             title="Move down"
                           >
-                            ▼
+                            <DynamicIcon
+                              name="ChevronDown"
+                              className="w-4 h-4"
+                            />
                           </button>
                         </div>
                         <div className="flex flex-row items-center gap-1 ml-3">
@@ -2903,13 +3009,13 @@ function AdventureCreatorContent() {
                             onClick={() => startEditResource(index)}
                             className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
                           >
-                            ✏️
+                            <DynamicIcon name="Edit2" className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => removeResource(index)}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
                           >
-                            🗑️
+                            <DynamicIcon name="Trash2" className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -2925,9 +3031,15 @@ function AdventureCreatorContent() {
         return (
           <div className="space-y-6">
             <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Starting inventory items that players
-                begin the adventure with.
+              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>Tip:</strong> Starting inventory items that players
+                  begin the adventure with.
+                </span>
               </p>
             </div>
 
@@ -2952,17 +3064,13 @@ function AdventureCreatorContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Symbol / Emoji
+                    Icon
                   </label>
-                  <input
-                    type="text"
-                    value={newItem.symbol}
-                    onChange={(e) =>
-                      setNewItem({ ...newItem, symbol: e.target.value })
+                  <IconPicker
+                    value={newItem.symbol || "Package"}
+                    onChange={(icon) =>
+                      setNewItem({ ...newItem, symbol: icon })
                     }
-                    placeholder="e.g., 🗡️ or 🎒"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    maxLength={4}
                   />
                 </div>
                 <div>
@@ -3065,19 +3173,16 @@ function AdventureCreatorContent() {
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Symbol
+                            Icon
                           </label>
-                          <input
-                            type="text"
-                            value={editInventoryItem.symbol || ""}
-                            onChange={(e) =>
+                          <IconPicker
+                            value={editInventoryItem.symbol || "Package"}
+                            onChange={(icon) =>
                               setEditInventoryItem({
                                 ...editInventoryItem,
-                                symbol: e.target.value,
+                                symbol: icon,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
-                            maxLength={4}
                           />
                         </div>
                         <div>
@@ -3140,7 +3245,11 @@ function AdventureCreatorContent() {
                           disabled={!editInventoryItem.name}
                           className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
                         >
-                          💾 Save
+                          <DynamicIcon
+                            name="Save"
+                            className="inline-block w-4 h-4 mr-1"
+                          />
+                          Save
                         </button>
                         <button
                           onClick={cancelEditInventoryItem}
@@ -3164,9 +3273,11 @@ function AdventureCreatorContent() {
                       }}
                     >
                       <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
-                        ⋮⋮
+                        <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
-                      <span className="text-2xl">{item.symbol}</span>
+                      <div className="text-2xl">
+                        <DynamicIcon name={item.symbol} className="w-8 h-8" />
+                      </div>
                       <div className="flex-1">
                         <div className="font-bold text-gray-900 dark:text-white">
                           {item.name} ×{item.quantity}
@@ -3188,7 +3299,7 @@ function AdventureCreatorContent() {
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
                             title="Move up"
                           >
-                            ▲
+                            <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => moveInventoryDown(index)}
@@ -3196,7 +3307,10 @@ function AdventureCreatorContent() {
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
                             title="Move down"
                           >
-                            ▼
+                            <DynamicIcon
+                              name="ChevronDown"
+                              className="w-4 h-4"
+                            />
                           </button>
                         </div>
                         <div className="flex flex-row items-center gap-1 ml-3">
@@ -3204,13 +3318,13 @@ function AdventureCreatorContent() {
                             onClick={() => startEditInventoryItem(index)}
                             className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
                           >
-                            ✏️
+                            <DynamicIcon name="Edit2" className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => removeInventoryItem(index)}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
                           >
-                            🗑️
+                            <DynamicIcon name="Trash2" className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -3226,11 +3340,17 @@ function AdventureCreatorContent() {
         return (
           <div className="space-y-6">
             <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Lore entries provide background
-                information about your world. Keys determine when the lore is
-                revealed during gameplay (e.g., "Ancient Ruins", "Dragon
-                Defeated").
+              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>Tip:</strong> Lore entries provide background
+                  information about your world. Keys determine when the lore is
+                  revealed during gameplay (e.g., "Ancient Ruins", "Dragon
+                  Defeated").
+                </span>
               </p>
             </div>
 
@@ -3280,9 +3400,10 @@ function AdventureCreatorContent() {
                     />
                     <label
                       htmlFor="loreSecret"
-                      className="text-sm text-gray-700 dark:text-gray-300"
+                      className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1"
                     >
-                      🔒 Hidden (only revealed when triggered by keys)
+                      <DynamicIcon name="Lock" className="w-3 h-3" /> Hidden
+                      (only revealed when triggered by keys)
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -3297,9 +3418,9 @@ function AdventureCreatorContent() {
                     />
                     <label
                       htmlFor="loreOn"
-                      className="text-sm text-gray-700 dark:text-gray-300"
+                      className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1"
                     >
-                      Enabled
+                      <DynamicIcon name="Check" className="w-3 h-3" /> Enabled
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -3314,9 +3435,10 @@ function AdventureCreatorContent() {
                     />
                     <label
                       htmlFor="loreAlwaysOn"
-                      className="text-sm text-gray-700 dark:text-gray-300"
+                      className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1"
                     >
-                      🔵 Always On (ignores all triggers)
+                      <DynamicIcon name="Globe" className="w-3 h-3" /> Always On
+                      (ignores all triggers)
                     </label>
                   </div>
                 </div>
@@ -3406,16 +3528,21 @@ function AdventureCreatorContent() {
                       />
                       <label
                         htmlFor="new-lore-thumb"
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer inline-block"
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer inline-flex items-center gap-2"
                       >
-                        📸 Upload Thumbnail
+                        <DynamicIcon name="Camera" className="w-4 h-4" /> Upload
+                        Thumbnail
                       </label>
                     </div>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    ✅ ON Triggers (Words that turn this lore ON)
+                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                    <DynamicIcon
+                      name="CheckCircle"
+                      className="w-4 h-4 text-green-600"
+                    />{" "}
+                    ON Triggers (Words that turn this lore ON)
                   </label>
                   <div className="flex gap-2 mb-2">
                     <input
@@ -3442,7 +3569,8 @@ function AdventureCreatorContent() {
                         key={trigger}
                         className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm flex items-center gap-1"
                       >
-                        ✅ {trigger}
+                        <DynamicIcon name="Check" className="w-3 h-3" />{" "}
+                        {trigger}
                         <button
                           onClick={() =>
                             setNewLore({
@@ -3461,8 +3589,12 @@ function AdventureCreatorContent() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    ❌ OFF Triggers (Words that turn this lore OFF)
+                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                    <DynamicIcon
+                      name="XCircle"
+                      className="w-4 h-4 text-red-600"
+                    />{" "}
+                    OFF Triggers (Words that turn this lore OFF)
                   </label>
                   <div className="flex gap-2 mb-2">
                     <input
@@ -3489,7 +3621,7 @@ function AdventureCreatorContent() {
                         key={trigger}
                         className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-sm flex items-center gap-1"
                       >
-                        ❌ {trigger}
+                        <DynamicIcon name="X" className="w-3 h-3" /> {trigger}
                         <button
                           onClick={() =>
                             setNewLore({
@@ -3516,11 +3648,17 @@ function AdventureCreatorContent() {
                     }
                     className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                   >
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      ⚙️ Advanced Section
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <DynamicIcon name="Settings" className="w-4 h-4" />{" "}
+                      Advanced Section
                     </span>
                     <span className="text-gray-500 dark:text-gray-400">
-                      {newLoreAdvancedExpanded ? "▼" : "▶"}
+                      <DynamicIcon
+                        name={
+                          newLoreAdvancedExpanded ? "ChevronUp" : "ChevronDown"
+                        }
+                        className="w-4 h-4"
+                      />
                     </span>
                   </button>
 
@@ -3529,8 +3667,12 @@ function AdventureCreatorContent() {
                       {/* Lore-based Triggers */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            ✅ Lores that turn this ON
+                          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                            <DynamicIcon
+                              name="CheckCircle"
+                              className="w-4 h-4 text-green-600"
+                            />{" "}
+                            Lores that turn this ON
                           </label>
                           <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                             {lore.length === 0 ? (
@@ -3571,8 +3713,12 @@ function AdventureCreatorContent() {
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            ❌ Lores that turn this OFF
+                          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                            <DynamicIcon
+                              name="XCircle"
+                              className="w-4 h-4 text-red-600"
+                            />{" "}
+                            Lores that turn this OFF
                           </label>
                           <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                             {lore.length === 0 ? (
@@ -3616,8 +3762,9 @@ function AdventureCreatorContent() {
 
                       {newLore.secrtet && (
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            🔑 Trigger Keys (Words that reveal this lore)
+                          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                            <DynamicIcon name="Key" className="w-4 h-4" />{" "}
+                            Trigger Keys (Words that reveal this lore)
                           </label>
                           <div className="flex gap-2 mb-2">
                             <input
@@ -3644,7 +3791,8 @@ function AdventureCreatorContent() {
                                 key={key}
                                 className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-sm flex items-center gap-1"
                               >
-                                🔑 {key}
+                                <DynamicIcon name="Key" className="w-3 h-3" />{" "}
+                                {key}
                                 <button
                                   onClick={() =>
                                     setNewLore({
@@ -3666,8 +3814,12 @@ function AdventureCreatorContent() {
                       {/* Plot Beat Triggers */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            ✅ Beats that turn this lore ON
+                          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                            <DynamicIcon
+                              name="CheckCircle"
+                              className="w-4 h-4 text-green-600"
+                            />{" "}
+                            Beats that turn this lore ON
                           </label>
                           <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                             {plotBeats.length === 0 ? (
@@ -3709,8 +3861,12 @@ function AdventureCreatorContent() {
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            ❌ Beats that turn this lore OFF
+                          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                            <DynamicIcon
+                              name="XCircle"
+                              className="w-4 h-4 text-red-600"
+                            />{" "}
+                            Beats that turn this lore OFF
                           </label>
                           <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                             {plotBeats.length === 0 ? (
@@ -3782,7 +3938,7 @@ function AdventureCreatorContent() {
                     className="pl-8 pr-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                   />
                   <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">
-                    🔍
+                    <DynamicIcon name="Search" className="w-4 h-4" />
                   </span>
                 </div>
               </div>
@@ -3833,8 +3989,9 @@ function AdventureCreatorContent() {
                           {editingLoreIndex === index ? (
                             // Edit mode
                             <div className="space-y-4">
-                              <h4 className="text-md font-bold text-indigo-900 dark:text-indigo-100">
-                                ✏️ Editing Lore Entry
+                              <h4 className="text-md font-bold text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
+                                <DynamicIcon name="Edit2" className="w-4 h-4" />{" "}
+                                Editing Lore Entry
                               </h4>
                               <div>
                                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -3926,7 +4083,11 @@ function AdventureCreatorContent() {
                                     htmlFor={`edit-lore-alwaysOn-${index}`}
                                     className="text-sm text-gray-700 dark:text-gray-300"
                                   >
-                                    🔵 Always On
+                                    <DynamicIcon
+                                      name="Circle"
+                                      className="inline-block w-4 h-4 mr-1 text-blue-500"
+                                    />
+                                    Always On
                                   </label>
                                 </div>
                               </div>
@@ -4029,15 +4190,23 @@ function AdventureCreatorContent() {
                                       htmlFor={`edit-mode-lore-thumb-${index}`}
                                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer inline-block text-sm"
                                     >
-                                      📸 Upload Thumbnail
+                                      <DynamicIcon
+                                        name="Upload"
+                                        className="inline-block w-4 h-4 mr-1"
+                                      />
+                                      Upload Thumbnail
                                     </label>
                                   </div>
                                 </div>
                               </div>
 
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                                  ✅ ON Triggers
+                                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                                  <DynamicIcon
+                                    name="CheckCircle"
+                                    className="w-4 h-4 text-green-600"
+                                  />{" "}
+                                  ON Triggers
                                 </label>
                                 <div className="flex gap-2 mb-2">
                                   <input
@@ -4068,7 +4237,11 @@ function AdventureCreatorContent() {
                                         key={trigger}
                                         className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm flex items-center gap-1"
                                       >
-                                        ✅ {trigger}
+                                        <DynamicIcon
+                                          name="Check"
+                                          className="w-3 h-3"
+                                        />{" "}
+                                        {trigger}
                                         <button
                                           onClick={() =>
                                             setEditLore({
@@ -4088,8 +4261,12 @@ function AdventureCreatorContent() {
                                 </div>
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                                  ❌ OFF Triggers
+                                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                                  <DynamicIcon
+                                    name="XCircle"
+                                    className="w-4 h-4 text-red-600"
+                                  />{" "}
+                                  OFF Triggers
                                 </label>
                                 <div className="flex gap-2 mb-2">
                                   <input
@@ -4120,7 +4297,11 @@ function AdventureCreatorContent() {
                                         key={trigger}
                                         className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-sm flex items-center gap-1"
                                       >
-                                        ❌ {trigger}
+                                        <DynamicIcon
+                                          name="X"
+                                          className="w-3 h-3"
+                                        />{" "}
+                                        {trigger}
                                         <button
                                           onClick={() =>
                                             setEditLore({
@@ -4150,11 +4331,22 @@ function AdventureCreatorContent() {
                                   }
                                   className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                                 >
-                                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                    ⚙️ Advanced Section
+                                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                    <DynamicIcon
+                                      name="Settings"
+                                      className="w-4 h-4"
+                                    />{" "}
+                                    Advanced Section
                                   </span>
                                   <span className="text-gray-500 dark:text-gray-400">
-                                    {editLoreAdvancedExpanded ? "▼" : "▶"}
+                                    <DynamicIcon
+                                      name={
+                                        editLoreAdvancedExpanded
+                                          ? "ChevronUp"
+                                          : "ChevronDown"
+                                      }
+                                      className="w-4 h-4"
+                                    />
                                   </span>
                                 </button>
 
@@ -4163,8 +4355,12 @@ function AdventureCreatorContent() {
                                     {/* Lore-based Triggers */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                       <div>
-                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                          ✅ Lores that turn this ON
+                                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                                          <DynamicIcon
+                                            name="CheckCircle"
+                                            className="w-4 h-4 text-green-600"
+                                          />{" "}
+                                          Lores that turn this ON
                                         </label>
                                         <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                                           {lore.filter((_, i) => i !== index)
@@ -4216,8 +4412,12 @@ function AdventureCreatorContent() {
                                         </div>
                                       </div>
                                       <div>
-                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                          ❌ Lores that turn this OFF
+                                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                                          <DynamicIcon
+                                            name="XCircle"
+                                            className="w-4 h-4 text-red-600"
+                                          />{" "}
+                                          Lores that turn this OFF
                                         </label>
                                         <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                                           {lore.filter((_, i) => i !== index)
@@ -4272,8 +4472,12 @@ function AdventureCreatorContent() {
 
                                     {editLore.secrtet && (
                                       <div>
-                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                                          🔑 Trigger Keys
+                                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                                          <DynamicIcon
+                                            name="Key"
+                                            className="w-4 h-4"
+                                          />{" "}
+                                          Trigger Keys
                                         </label>
                                         <div className="flex gap-2 mb-2">
                                           <input
@@ -4303,7 +4507,11 @@ function AdventureCreatorContent() {
                                               key={key}
                                               className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-sm flex items-center gap-1"
                                             >
-                                              🔑 {key}
+                                              <DynamicIcon
+                                                name="Key"
+                                                className="w-3 h-3"
+                                              />{" "}
+                                              {key}
                                               <button
                                                 onClick={() =>
                                                   setEditLore({
@@ -4325,8 +4533,12 @@ function AdventureCreatorContent() {
                                     {/* Plot Beat Triggers */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                       <div>
-                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                          ✅ Beats that turn this lore ON
+                                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                                          <DynamicIcon
+                                            name="CheckCircle"
+                                            className="w-4 h-4 text-green-600"
+                                          />{" "}
+                                          Beats that turn this lore ON
                                         </label>
                                         <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                                           {plotBeats.length === 0 ? (
@@ -4375,8 +4587,12 @@ function AdventureCreatorContent() {
                                         </div>
                                       </div>
                                       <div>
-                                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                          ❌ Beats that turn this lore OFF
+                                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                                          <DynamicIcon
+                                            name="XCircle"
+                                            className="w-4 h-4 text-red-600"
+                                          />{" "}
+                                          Beats that turn this lore OFF
                                         </label>
                                         <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                                           {plotBeats.length === 0 ? (
@@ -4437,7 +4653,11 @@ function AdventureCreatorContent() {
                                   }
                                   className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg"
                                 >
-                                  ✓ Save Changes
+                                  <DynamicIcon
+                                    name="Check"
+                                    className="inline-block w-4 h-4 mr-1"
+                                  />
+                                  Save Changes
                                 </button>
                                 <button
                                   onClick={cancelEditLore}
@@ -4451,7 +4671,10 @@ function AdventureCreatorContent() {
                             // View mode with drag-and-drop
                             <div className="flex items-start justify-between">
                               <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing mr-3 mt-1">
-                                ⋮⋮
+                                <DynamicIcon
+                                  name="GripVertical"
+                                  className="w-5 h-5"
+                                />
                               </div>
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
@@ -4460,7 +4683,11 @@ function AdventureCreatorContent() {
                                   </div>
                                   {entry.secrtet && (
                                     <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">
-                                      🔒 Hidden
+                                      <DynamicIcon
+                                        name="Lock"
+                                        className="inline-block w-3 h-3 mr-1"
+                                      />
+                                      Hidden
                                     </span>
                                   )}
                                   {/* On/Off Toggle */}
@@ -4501,14 +4728,26 @@ function AdventureCreatorContent() {
                                 {entry.on_triggers &&
                                   entry.on_triggers.length > 0 && (
                                     <div className="text-xs text-green-700 dark:text-green-400 mb-1">
-                                      <strong>✅ ON Triggers:</strong>{" "}
+                                      <strong>
+                                        <DynamicIcon
+                                          name="CheckCircle"
+                                          className="inline-block w-3 h-3 mr-1"
+                                        />
+                                        ON Triggers:
+                                      </strong>{" "}
                                       {entry.on_triggers.join(", ")}
                                     </div>
                                   )}
                                 {entry.off_triggers &&
                                   entry.off_triggers.length > 0 && (
                                     <div className="text-xs text-red-700 dark:text-red-400 mb-1">
-                                      <strong>❌ OFF Triggers:</strong>{" "}
+                                      <strong>
+                                        <DynamicIcon
+                                          name="XCircle"
+                                          className="inline-block w-3 h-3 mr-1"
+                                        />
+                                        OFF Triggers:
+                                      </strong>{" "}
                                       {entry.off_triggers.join(", ")}
                                     </div>
                                   )}
@@ -4521,7 +4760,13 @@ function AdventureCreatorContent() {
                                 {entry.beats_trigger &&
                                   entry.beats_trigger.length > 0 && (
                                     <div className="text-xs text-green-700 dark:text-green-400 mb-1">
-                                      <strong>✅ Beats turning ON:</strong>{" "}
+                                      <strong>
+                                        <DynamicIcon
+                                          name="CheckCircle"
+                                          className="inline-block w-3 h-3 mr-1"
+                                        />
+                                        Beats turning ON:
+                                      </strong>{" "}
                                       {entry.beats_trigger
                                         .map(
                                           (i) =>
@@ -4534,7 +4779,13 @@ function AdventureCreatorContent() {
                                 {entry.beats_untrigger &&
                                   entry.beats_untrigger.length > 0 && (
                                     <div className="text-xs text-red-700 dark:text-red-400 mb-1">
-                                      <strong>❌ Beats turning OFF:</strong>{" "}
+                                      <strong>
+                                        <DynamicIcon
+                                          name="XCircle"
+                                          className="inline-block w-3 h-3 mr-1"
+                                        />
+                                        Beats turning OFF:
+                                      </strong>{" "}
                                       {entry.beats_untrigger
                                         .map(
                                           (i) =>
@@ -4552,13 +4803,19 @@ function AdventureCreatorContent() {
                                     onClick={() => startEditLore(index)}
                                     className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
                                   >
-                                    ✏️
+                                    <DynamicIcon
+                                      name="Edit"
+                                      className="w-4 h-4"
+                                    />
                                   </button>
                                   <button
                                     onClick={() => removeLore(index)}
                                     className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
                                   >
-                                    🗑️
+                                    <DynamicIcon
+                                      name="Trash2"
+                                      className="w-4 h-4"
+                                    />
                                   </button>
                                 </div>
                               </div>
@@ -4604,8 +4861,12 @@ function AdventureCreatorContent() {
           <div className="space-y-6">
             <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Achievements reward players for
-                completing specific goals or milestones (optional).
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="inline-block w-4 h-4 mr-1 text-amber-600"
+                />
+                <strong>Tip:</strong> Achievements reward players for completing
+                specific goals or milestones (optional).
               </p>
             </div>
 
@@ -4633,20 +4894,13 @@ function AdventureCreatorContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Symbol / Emoji
+                    Icon
                   </label>
-                  <input
-                    type="text"
-                    value={newAchievement.symbol}
-                    onChange={(e) =>
-                      setNewAchievement({
-                        ...newAchievement,
-                        symbol: e.target.value,
-                      })
+                  <IconPicker
+                    value={newAchievement.symbol || "Trophy"}
+                    onChange={(icon) =>
+                      setNewAchievement({ ...newAchievement, symbol: icon })
                     }
-                    placeholder="e.g., 🏆 or ⭐"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    maxLength={4}
                   />
                 </div>
                 <div>
@@ -4706,8 +4960,12 @@ function AdventureCreatorContent() {
                     className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    💡 Keep player description vague to encourage discovery; use
-                    AI hint for exact trigger conditions.
+                    <DynamicIcon
+                      name="Lightbulb"
+                      className="inline-block w-3 h-3 mr-1 text-amber-600"
+                    />
+                    Keep player description vague to encourage discovery; use AI
+                    hint for exact trigger conditions.
                   </p>
                 </div>
                 <div className="sm:col-span-2">
@@ -4724,7 +4982,11 @@ function AdventureCreatorContent() {
                       className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
                     />
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      🔒 Hidden Achievement
+                      <DynamicIcon
+                        name="Lock"
+                        className="inline-block w-3 h-3 mr-1"
+                      />
+                      Hidden Achievement
                     </span>
                   </label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
@@ -4777,19 +5039,16 @@ function AdventureCreatorContent() {
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Symbol
+                            Icon
                           </label>
-                          <input
-                            type="text"
-                            value={editAchievement.symbol || ""}
-                            onChange={(e) =>
+                          <IconPicker
+                            value={editAchievement.symbol || "Trophy"}
+                            onChange={(icon) =>
                               setEditAchievement({
                                 ...editAchievement,
-                                symbol: e.target.value,
+                                symbol: icon,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
-                            maxLength={4}
                           />
                         </div>
                         <div>
@@ -4862,7 +5121,11 @@ function AdventureCreatorContent() {
                               className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
                             />
                             <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                              🔒 Hidden Achievement
+                              <DynamicIcon
+                                name="Lock"
+                                className="inline-block w-3 h-3 mr-1"
+                              />
+                              Hidden Achievement
                             </span>
                           </label>
                         </div>
@@ -4876,7 +5139,11 @@ function AdventureCreatorContent() {
                           }
                           className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
                         >
-                          💾 Save
+                          <DynamicIcon
+                            name="Save"
+                            className="inline-block w-4 h-4 mr-1"
+                          />
+                          Save
                         </button>
                         <button
                           onClick={cancelEditAchievement}
@@ -4900,17 +5167,23 @@ function AdventureCreatorContent() {
                       }}
                     >
                       <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
-                        ⋮⋮
+                        <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
-                      <span className="text-2xl">{achievement.symbol}</span>
+                      <div className="p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <DynamicIcon
+                          name={achievement.symbol || "Trophy"}
+                          className="w-8 h-8 text-amber-600 dark:text-amber-400"
+                        />
+                      </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <div className="font-bold text-gray-900 dark:text-white">
                             {achievement.title}
                           </div>
                           {achievement.hidden && (
-                            <span className="px-2 py-0.5 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full text-xs font-bold">
-                              🔒 Hidden
+                            <span className="px-2 py-0.5 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full text-xs font-bold flex items-center gap-1">
+                              <DynamicIcon name="Lock" className="w-3 h-3" />{" "}
+                              Hidden
                             </span>
                           )}
                         </div>
@@ -4929,7 +5202,7 @@ function AdventureCreatorContent() {
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
                             title="Move up"
                           >
-                            ▲
+                            <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => moveAchievementDown(index)}
@@ -4937,7 +5210,10 @@ function AdventureCreatorContent() {
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
                             title="Move down"
                           >
-                            ▼
+                            <DynamicIcon
+                              name="ChevronDown"
+                              className="w-4 h-4"
+                            />
                           </button>
                         </div>
                         <div className="flex flex-row items-center gap-1">
@@ -4945,13 +5221,13 @@ function AdventureCreatorContent() {
                             onClick={() => startEditAchievement(index)}
                             className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
                           >
-                            ✏️
+                            <DynamicIcon name="Edit2" className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => removeAchievement(index)}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
                           >
-                            🗑️
+                            <DynamicIcon name="Trash2" className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -4967,10 +5243,16 @@ function AdventureCreatorContent() {
         return (
           <div className="space-y-6">
             <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Plot beats are key story moments you
-                want to guide the AI toward (optional but helpful for structured
-                stories).
+              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-5 h-5 text-orange-600 shrink-0 mt-0.5"
+                />
+                <span>
+                  <strong>Tip:</strong> Plot beats are key story moments you
+                  want to guide the AI toward (optional but helpful for
+                  structured stories).
+                </span>
               </p>
             </div>
 
@@ -5047,8 +5329,9 @@ function AdventureCreatorContent() {
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 Plot Beats ({plotBeats.length})
               </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400">
-                💡 Drag and drop to reorder (or use arrow buttons on mobile)
+              <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                <DynamicIcon name="Lightbulb" className="w-3 h-3" /> Drag and
+                drop to reorder (or use arrow buttons on mobile)
               </p>
               {plotBeats.length === 0 ? (
                 <p className="text-gray-600 dark:text-gray-400 text-sm">
@@ -5073,8 +5356,9 @@ function AdventureCreatorContent() {
                     {editingPlotBeatIndex === index ? (
                       // Edit mode
                       <div className="space-y-4">
-                        <h4 className="text-md font-bold text-orange-900 dark:text-orange-100">
-                          ✏️ Editing Plot Beat
+                        <h4 className="text-md font-bold text-orange-900 dark:text-orange-100 flex items-center gap-2">
+                          <DynamicIcon name="Edit2" className="w-4 h-4" />{" "}
+                          Editing Plot Beat
                         </h4>
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -5137,9 +5421,10 @@ function AdventureCreatorContent() {
                             disabled={
                               !editPlotBeat.title || !editPlotBeat.content
                             }
-                            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg"
+                            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg flex items-center justify-center gap-2"
                           >
-                            ✓ Save Changes
+                            <DynamicIcon name="Check" className="w-4 h-4" />{" "}
+                            Save Changes
                           </button>
                           <button
                             onClick={cancelEditPlotBeat}
@@ -5153,8 +5438,11 @@ function AdventureCreatorContent() {
                       // View mode
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 flex-1">
-                          <div className="text-2xl cursor-grab active:cursor-grabbing select-none">
-                            ⋮⋮
+                          <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing select-none mt-1">
+                            <DynamicIcon
+                              name="GripVertical"
+                              className="w-5 h-5"
+                            />
                           </div>
                           <div className="flex-1">
                             <div className="font-bold text-gray-900 dark:text-white mb-1">
@@ -5164,8 +5452,9 @@ function AdventureCreatorContent() {
                               {beat.content}
                             </div>
                             {beat.points !== undefined && (
-                              <div className="text-xs text-orange-600 dark:text-orange-400 mt-1 font-semibold">
-                                💰 {beat.points} points
+                              <div className="text-xs text-orange-600 dark:text-orange-400 mt-1 font-semibold flex items-center gap-1">
+                                <DynamicIcon name="Coins" className="w-3 h-3" />{" "}
+                                {beat.points} points
                               </div>
                             )}
                           </div>
@@ -5179,7 +5468,10 @@ function AdventureCreatorContent() {
                                 className="px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs transition-colors"
                                 title="Move up"
                               >
-                                ▲
+                                <DynamicIcon
+                                  name="ChevronUp"
+                                  className="w-4 h-4"
+                                />
                               </button>
                               <button
                                 onClick={() => movePlotBeatDown(index)}
@@ -5187,7 +5479,10 @@ function AdventureCreatorContent() {
                                 className="px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs transition-colors"
                                 title="Move down"
                               >
-                                ▼
+                                <DynamicIcon
+                                  name="ChevronDown"
+                                  className="w-4 h-4"
+                                />
                               </button>
                             </div>
 
@@ -5196,13 +5491,16 @@ function AdventureCreatorContent() {
                                 onClick={() => startEditPlotBeat(index)}
                                 className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
                               >
-                                ✏️
+                                <DynamicIcon name="Edit2" className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => removePlotBeat(index)}
                                 className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
                               >
-                                🗑️
+                                <DynamicIcon
+                                  name="Trash2"
+                                  className="w-4 h-4"
+                                />
                               </button>
                             </div>
                           </div>
@@ -5220,10 +5518,16 @@ function AdventureCreatorContent() {
         return (
           <div className="space-y-6">
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                💡 <strong>Tip:</strong> Quests provide structured objectives
-                for players. They can be created upfront or generated
-                dynamically by the AI during gameplay.
+              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-5 h-5 text-blue-600 shrink-0 mt-0.5"
+                />
+                <span>
+                  <strong>Tip:</strong> Quests provide structured objectives for
+                  players. They can be created upfront or generated dynamically
+                  by the AI during gameplay.
+                </span>
               </p>
             </div>
 
@@ -5525,7 +5829,11 @@ function AdventureCreatorContent() {
                           }
                           className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
                         >
-                          💾 Save
+                          <DynamicIcon
+                            name="Save"
+                            className="inline-block w-4 h-4 mr-1"
+                          />
+                          Save
                         </button>
                         <button
                           onClick={() => {
@@ -5567,7 +5875,7 @@ function AdventureCreatorContent() {
                       }}
                     >
                       <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
-                        ⋮⋮
+                        <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -5611,7 +5919,7 @@ function AdventureCreatorContent() {
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
                             title="Move up"
                           >
-                            ▲
+                            <DynamicIcon name="ChevronUp" className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => {
@@ -5627,7 +5935,10 @@ function AdventureCreatorContent() {
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
                             title="Move down"
                           >
-                            ▼
+                            <DynamicIcon
+                              name="ChevronDown"
+                              className="w-5 h-5"
+                            />
                           </button>
                         </div>
                         <div className="flex flex-row items-center gap-1 ml-3">
@@ -5638,7 +5949,7 @@ function AdventureCreatorContent() {
                             }}
                             className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
                           >
-                            ✏️
+                            <DynamicIcon name="Edit" className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => {
@@ -5646,7 +5957,7 @@ function AdventureCreatorContent() {
                                 isOpen: true,
                                 title: "Remove Quest?",
                                 message: `Remove quest "${quest.title}"? This cannot be undone.`,
-                                icon: "🗑️",
+                                icon: "Trash2",
                                 confirmText: "Remove",
                                 confirmButtonClass:
                                   "bg-red-600 hover:bg-red-700",
@@ -5664,7 +5975,7 @@ function AdventureCreatorContent() {
                             }}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
                           >
-                            🗑️
+                            <DynamicIcon name="Trash2" className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -5681,9 +5992,13 @@ function AdventureCreatorContent() {
           <div className="space-y-6">
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
               <p className="text-sm text-blue-900 dark:text-blue-100">
-                💡 Configure the upgrade system for your adventure. Control
-                whether players can spend points to upgrade stats, resources, or
-                add items, and customize the costs and amounts.
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="inline-block w-4 h-4 mr-1 text-blue-600"
+                />
+                Configure the upgrade system for your adventure. Control whether
+                players can spend points to upgrade stats, resources, or add
+                items, and customize the costs and amounts.
               </p>
             </div>
 
@@ -5904,8 +6219,8 @@ function AdventureCreatorContent() {
                 {/* Stat Shop */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                      🏪 Stat Shop
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <DynamicIcon name="Store" className="w-5 h-5" /> Stat Shop
                     </h3>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -5933,7 +6248,7 @@ function AdventureCreatorContent() {
                           const newStat = {
                             name: "New Stat",
                             description: "Description...",
-                            symbol: "⭐",
+                            symbol: "Star",
                             startingValue: 1,
                             cost: 50,
                           };
@@ -5942,9 +6257,10 @@ function AdventureCreatorContent() {
                             statShop: [...upgradeSettings.statShop, newStat],
                           });
                         }}
-                        className="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-lg"
+                        className="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-lg flex items-center justify-center gap-2"
                       >
-                        + Add Shop Stat
+                        <DynamicIcon name="Plus" className="w-4 h-4" /> Add Shop
+                        Stat
                       </button>
 
                       {upgradeSettings.statShop.map((stat, index) => (
@@ -5967,20 +6283,16 @@ function AdventureCreatorContent() {
                               placeholder="Name"
                               className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                             />
-                            <input
-                              type="text"
+                            <IconPicker
                               value={stat.symbol}
-                              onChange={(e) => {
+                              onChange={(icon) => {
                                 const updated = [...upgradeSettings.statShop];
-                                updated[index].symbol = e.target.value;
+                                updated[index].symbol = icon;
                                 setUpgradeSettings({
                                   ...upgradeSettings,
                                   statShop: updated,
                                 });
                               }}
-                              placeholder="Symbol"
-                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                              maxLength={2}
                             />
                           </div>
                           <input
@@ -6064,8 +6376,9 @@ function AdventureCreatorContent() {
                 {/* Resource Shop */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                      🛒 Resource Shop
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <DynamicIcon name="ShoppingCart" className="w-5 h-5" />{" "}
+                      Resource Shop
                     </h3>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -6093,7 +6406,7 @@ function AdventureCreatorContent() {
                           const newResource = {
                             name: "New Resource",
                             description: "Description...",
-                            symbol: "💎",
+                            symbol: "Gem",
                             startingValue: 10,
                             startingMaxValue: 100,
                             cost: 75,
@@ -6106,9 +6419,10 @@ function AdventureCreatorContent() {
                             ],
                           });
                         }}
-                        className="w-full px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg"
+                        className="w-full px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg flex items-center justify-center gap-2"
                       >
-                        + Add Shop Resource
+                        <DynamicIcon name="Plus" className="w-4 h-4" /> Add Shop
+                        Resource
                       </button>
 
                       {upgradeSettings.resourceShop.map((resource, index) => (
@@ -6133,22 +6447,18 @@ function AdventureCreatorContent() {
                               placeholder="Name"
                               className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                             />
-                            <input
-                              type="text"
+                            <IconPicker
                               value={resource.symbol}
-                              onChange={(e) => {
+                              onChange={(icon) => {
                                 const updated = [
                                   ...upgradeSettings.resourceShop,
                                 ];
-                                updated[index].symbol = e.target.value;
+                                updated[index].symbol = icon;
                                 setUpgradeSettings({
                                   ...upgradeSettings,
                                   resourceShop: updated,
                                 });
                               }}
-                              placeholder="Symbol"
-                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                              maxLength={2}
                             />
                           </div>
                           <input
@@ -6260,8 +6570,8 @@ function AdventureCreatorContent() {
                 {/* Item Shop */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                      🏬 Item Shop
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <DynamicIcon name="Store" className="w-5 h-5" /> Item Shop
                     </h3>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -6289,7 +6599,7 @@ function AdventureCreatorContent() {
                           const newItem = {
                             name: "New Item",
                             description: "Description...",
-                            symbol: "📦",
+                            symbol: "Package",
                             type: "normal" as const,
                             quantity: 1,
                             cost: 30,
@@ -6299,9 +6609,10 @@ function AdventureCreatorContent() {
                             itemShop: [...upgradeSettings.itemShop, newItem],
                           });
                         }}
-                        className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg"
+                        className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg flex items-center justify-center gap-2"
                       >
-                        + Add Shop Item
+                        <DynamicIcon name="Plus" className="w-4 h-4" /> Add Shop
+                        Item
                       </button>
 
                       {upgradeSettings.itemShop.map((item, index) => (
@@ -6324,20 +6635,16 @@ function AdventureCreatorContent() {
                               placeholder="Name"
                               className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                             />
-                            <input
-                              type="text"
+                            <IconPicker
                               value={item.symbol}
-                              onChange={(e) => {
+                              onChange={(icon) => {
                                 const updated = [...upgradeSettings.itemShop];
-                                updated[index].symbol = e.target.value;
+                                updated[index].symbol = icon;
                                 setUpgradeSettings({
                                   ...upgradeSettings,
                                   itemShop: updated,
                                 });
                               }}
-                              placeholder="Symbol"
-                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                              maxLength={2}
                             />
                           </div>
                           <input
@@ -6573,10 +6880,16 @@ function AdventureCreatorContent() {
             )}
 
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                ⚠️ <strong>Note:</strong> Once you publish this adventure,
-                players will be able to start it. Make sure everything looks
-                good before proceeding!
+              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="AlertTriangle"
+                  className="w-4 h-4 mt-1 shrink-0"
+                />
+                <span>
+                  <strong>Note:</strong> Once you publish this adventure,
+                  players will be able to start it. Make sure everything looks
+                  good before proceeding!
+                </span>
               </p>
             </div>
           </div>
@@ -6612,14 +6925,15 @@ function AdventureCreatorContent() {
             onClick={() => setIsAIMenuOpen(true)}
             className="px-3 py-1.5 sm:px-4 sm:py-2 bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2"
           >
-            <span>🤖</span>{" "}
+            <DynamicIcon name="Bot" className="w-5 h-5" />{" "}
             <span className="hidden sm:inline">AI Assistant</span>
           </button>
           <button
             onClick={handleDiscardChanges}
             className="px-3 py-1.5 sm:px-4 sm:py-2 bg-red-600 hover:bg-red-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-colors shadow-md"
           >
-            <span>🗑️</span> <span className="hidden sm:inline">Discard</span>
+            <DynamicIcon name="Trash2" className="w-5 h-5" />{" "}
+            <span className="hidden sm:inline">Discard</span>
           </button>
         </div>
 
@@ -6638,7 +6952,7 @@ function AdventureCreatorContent() {
                     : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                 }`}
               >
-                <span>{step.icon}</span>
+                <DynamicIcon name={step.icon} className="w-5 h-5" />
                 <span className="hidden sm:inline">{step.label}</span>
               </button>
             ))}
@@ -6677,14 +6991,25 @@ function AdventureCreatorContent() {
                 disabled={saving}
                 className="flex-1 sm:flex-none px-3 py-2 bg-white dark:bg-gray-700 border-2 border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
               >
-                💾 Save
+                <DynamicIcon name="Save" className="w-4 h-4 inline mr-2" />
+                Save
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
                 className="flex-1 sm:flex-none px-3 py-2 bg-linear-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
               >
-                {saving ? "Publishing..." : "🚀 Publish"}
+                {saving ? (
+                  "Publishing..."
+                ) : (
+                  <>
+                    <DynamicIcon
+                      name="Rocket"
+                      className="w-4 h-4 inline mr-2"
+                    />{" "}
+                    Publish
+                  </>
+                )}
               </button>
             </div>
           ) : (

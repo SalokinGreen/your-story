@@ -2,6 +2,7 @@
 
 import { StoryData } from "../misc/structs";
 import { useState } from "react";
+import { DynamicIcon } from "../components/DynamicIcon";
 
 export default function QuestsPage(storyData: StoryData) {
   const [expandedQuestId, setExpandedQuestId] = useState<string | null>(null);
@@ -10,8 +11,9 @@ export default function QuestsPage(storyData: StoryData) {
     return (
       <div className="w-full">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-            📜 Quests
+          <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
+            <DynamicIcon name="Scroll" className="w-8 h-8 text-purple-600" />{" "}
+            Quests
           </h2>
           <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-700/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
             <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
@@ -44,15 +46,19 @@ export default function QuestsPage(storyData: StoryData) {
   return (
     <div className="w-full">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
-        <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-          📜 Quests
+        <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
+          <DynamicIcon name="Scroll" className="w-8 h-8 text-purple-600" />{" "}
+          Quests
         </h2>
 
         {/* Active Ongoing Quests */}
         {ongoingQuests.length > 0 && (
           <div className="mb-8">
             <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-              <span className="text-2xl">🎯</span>
+              <DynamicIcon
+                name="Target"
+                className="w-6 h-6 text-blue-600 dark:text-blue-400"
+              />
               Active Quests ({ongoingQuests.length})
             </h3>
             <div className="space-y-3">
@@ -97,7 +103,10 @@ export default function QuestsPage(storyData: StoryData) {
                       onClick={() => toggleQuestActive(quest.id)}
                       className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
                     >
-                      👁️ Hide Quest
+                      <span className="flex items-center gap-1">
+                        <DynamicIcon name="EyeOff" className="w-4 h-4" /> Hide
+                        Quest
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -110,7 +119,10 @@ export default function QuestsPage(storyData: StoryData) {
         {completedQuests.length > 0 && (
           <div className="mb-8">
             <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-              <span className="text-2xl">✅</span>
+              <DynamicIcon
+                name="CheckCircle"
+                className="w-6 h-6 text-green-600 dark:text-green-400"
+              />
               Completed Quests ({completedQuests.length})
             </h3>
             <div className="space-y-3">
@@ -122,9 +134,10 @@ export default function QuestsPage(storyData: StoryData) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-green-500 text-xl shrink-0">
-                          ✓
-                        </span>
+                        <DynamicIcon
+                          name="Check"
+                          className="w-5 h-5 text-green-500 shrink-0"
+                        />
                         <h4 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white line-through">
                           {quest.title}
                         </h4>
@@ -158,7 +171,10 @@ export default function QuestsPage(storyData: StoryData) {
                       onClick={() => toggleQuestActive(quest.id)}
                       className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
                     >
-                      👁️ Hide Quest
+                      <span className="flex items-center gap-1">
+                        <DynamicIcon name="EyeOff" className="w-4 h-4" /> Hide
+                        Quest
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -171,7 +187,10 @@ export default function QuestsPage(storyData: StoryData) {
         {inactiveQuests.length > 0 && (
           <div>
             <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-              <span className="text-2xl">👁️‍🗨️</span>
+              <DynamicIcon
+                name="EyeOff"
+                className="w-6 h-6 text-gray-600 dark:text-gray-400"
+              />
               Hidden Quests ({inactiveQuests.length})
             </h3>
             <div className="space-y-3">
@@ -194,9 +213,10 @@ export default function QuestsPage(storyData: StoryData) {
                           {quest.points} pts
                         </span>
                         {quest.fulfilled && (
-                          <span className="text-green-500 text-xl shrink-0">
-                            ✓
-                          </span>
+                          <DynamicIcon
+                            name="Check"
+                            className="w-5 h-5 text-green-500 shrink-0"
+                          />
                         )}
                       </div>
                       <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
@@ -225,7 +245,10 @@ export default function QuestsPage(storyData: StoryData) {
                       onClick={() => toggleQuestActive(quest.id)}
                       className="px-3 py-1 text-sm bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg transition-colors"
                     >
-                      👁️ Show Quest
+                      <span className="flex items-center gap-1">
+                        <DynamicIcon name="Eye" className="w-4 h-4" /> Show
+                        Quest
+                      </span>
                     </button>
                   </div>
                 </div>

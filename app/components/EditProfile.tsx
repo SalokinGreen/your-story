@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/app/misc/supabase";
 import { useNotification } from "@/app/misc/NotificationContext";
+import { DynamicIcon } from "./DynamicIcon";
 
 interface ProfileData {
   avatar_url?: string;
@@ -15,12 +16,16 @@ interface EditProfileProps {
   onSuccess?: () => void;
 }
 
-export default function EditProfile({ userId, currentProfile, onSuccess }: EditProfileProps) {
+export default function EditProfile({
+  userId,
+  currentProfile,
+  onSuccess,
+}: EditProfileProps) {
   const { addNotification } = useNotification();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  
+
   const [bio, setBio] = useState(currentProfile.bio || "");
   const [avatarUrl, setAvatarUrl] = useState(currentProfile.avatar_url || "");
 
@@ -29,7 +34,7 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       addNotification("Please upload an image file", "warning");
       return;
     }
@@ -43,7 +48,7 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
     setUploading(true);
 
     try {
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.name.split(".").pop();
       const timestamp = Date.now();
       const fileName = `${userId}/avatar-${timestamp}.${fileExt}`;
 
@@ -51,10 +56,10 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
       if (avatarUrl) {
         try {
           // Extract the full path from the URL
-          const urlParts = avatarUrl.split('/avatars/');
+          const urlParts = avatarUrl.split("/avatars/");
           if (urlParts.length > 1) {
-            const oldPath = urlParts[1].split('?')[0]; // Remove query params
-            await supabase.storage.from('avatars').remove([oldPath]);
+            const oldPath = urlParts[1].split("?")[0]; // Remove query params
+            await supabase.storage.from("avatars").remove([oldPath]);
           }
         } catch (error) {
           console.warn("Could not delete old avatar:", error);
@@ -64,7 +69,7 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
 
       // Upload new avatar
       const { error: uploadError } = await supabase.storage
-        .from('avatars')
+        .from("avatars")
         .upload(fileName, file, { upsert: true });
 
       if (uploadError) {
@@ -72,16 +77,14 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
       }
 
       // Get public URL with cache-busting query param
-      const { data } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
+      const { data } = supabase.storage.from("avatars").getPublicUrl(fileName);
 
       const newAvatarUrl = `${data.publicUrl}?t=${timestamp}`;
       setAvatarUrl(newAvatarUrl);
-      addNotification("✓ Avatar uploaded", "success");
-      
+      addNotification("Avatar uploaded", "success");
+
       // Reset the file input so the same file can be selected again if needed
-      e.target.value = '';
+      e.target.value = "";
     } catch (error) {
       console.error("Error uploading avatar:", error);
       addNotification("Failed to upload avatar", "failure");
@@ -95,7 +98,9 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
     setLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         addNotification("Please sign in", "warning");
         setLoading(false);
@@ -106,7 +111,7 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           avatar_url: avatarUrl || null,
@@ -117,12 +122,15 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
       const data = await response.json();
 
       if (!response.ok) {
-        addNotification(`❌ ${data.error || "Failed to update profile"}`, "failure");
+        addNotification(
+          `${data.error || "Failed to update profile"}`,
+          "failure"
+        );
         setLoading(false);
         return;
       }
 
-      addNotification("✓ Profile updated", "success");
+      addNotification("Profile updated", "success");
       setIsEditing(false);
       onSuccess?.();
     } catch (error) {
@@ -143,9 +151,9 @@ export default function EditProfile({ userId, currentProfile, onSuccess }: EditP
     return (
       <button
         onClick={() => setIsEditing(true)}
-        className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+        className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
       >
-        ✏️ Edit Profile
+        <DynamicIcon name="Edit" className="w-4 h-4" /> Edit Profile
       </button>
     );
   }

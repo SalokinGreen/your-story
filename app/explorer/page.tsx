@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Adventure } from "@/app/misc/structs";
 import { useAuth } from "@/app/misc/AuthContext";
+import { DynamicIcon } from "@/app/components/DynamicIcon";
 
 export default function ExplorerPage() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function ExplorerPage() {
     "popularity" | "newest" | "rating" | "title"
   >("popularity");
   const [showFilters, setShowFilters] = useState(false);
+  const [showNsfw, setShowNsfw] = useState(false);
 
   // Fetch adventures from database
   useEffect(() => {
@@ -36,6 +38,7 @@ export default function ExplorerPage() {
           params.append("tags", selectedTags.join(","));
         if (selectedDifficulties.length > 0)
           params.append("difficulty", selectedDifficulties.join(","));
+        if (showNsfw) params.append("nsfw", "true");
         params.append("sortBy", sortBy);
 
         const response = await fetch(`/api/adventures?${params}`);
@@ -58,7 +61,7 @@ export default function ExplorerPage() {
     };
 
     fetchAdventures();
-  }, [searchQuery, selectedTags, selectedDifficulties, sortBy]);
+  }, [searchQuery, selectedTags, selectedDifficulties, sortBy, showNsfw]);
 
   // Fetch featured adventures
   useEffect(() => {
@@ -127,16 +130,16 @@ export default function ExplorerPage() {
               {user && (
                 <button
                   onClick={() => router.push("/library")}
-                  className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
+                  className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
                 >
-                  📚 Library
+                  <DynamicIcon name="Library" className="w-4 h-4" /> Library
                 </button>
               )}
               <button
                 onClick={() => router.push("/")}
-                className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
+                className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
               >
-                ← Home
+                <DynamicIcon name="ArrowLeft" className="w-4 h-4" /> Home
               </button>
             </div>
           </div>
@@ -148,8 +151,9 @@ export default function ExplorerPage() {
         {/* Featured Carousel */}
         {featuredAdventures.length > 0 && (
           <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-              ⭐ Featured Adventures
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
+              <DynamicIcon name="Star" className="w-6 h-6 text-yellow-500" />{" "}
+              Featured Adventures
             </h2>
             <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
               <div className="relative h-64 sm:h-80 md:h-96">
@@ -160,8 +164,22 @@ export default function ExplorerPage() {
                       index === currentSlide ? "opacity-100" : "opacity-0"
                     }`}
                   >
-                    <div className="h-full bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 p-8 sm:p-12 flex flex-col justify-center">
-                      <div className="max-w-2xl">
+                    <div
+                      className={`h-full p-8 sm:p-12 flex flex-col justify-center relative ${
+                        adventure.bannerUrl
+                          ? "bg-cover bg-center"
+                          : "bg-linear-to-r from-purple-600 via-pink-600 to-blue-600"
+                      }`}
+                      style={
+                        adventure.bannerUrl
+                          ? { backgroundImage: `url(${adventure.bannerUrl})` }
+                          : {}
+                      }
+                    >
+                      {adventure.bannerUrl && (
+                        <div className="absolute inset-0 bg-linear-to-r from-black/90 via-black/60 to-transparent z-0"></div>
+                      )}
+                      <div className="max-w-2xl relative z-10">
                         <div className="flex items-center gap-2 mb-4">
                           <span
                             className={`px-3 py-1 rounded-full text-sm font-bold border-2 ${getDifficultyColor(
@@ -170,8 +188,12 @@ export default function ExplorerPage() {
                           >
                             {adventure.difficulty}
                           </span>
-                          <span className="px-3 py-1 bg-white/20 text-white rounded-full text-sm font-semibold">
-                            ⭐ {adventure.rating?.toFixed(1)}
+                          <span className="px-3 py-1 bg-white/20 text-white rounded-full text-sm font-semibold flex items-center gap-1">
+                            <DynamicIcon
+                              name="Star"
+                              className="w-4 h-4 fill-current"
+                            />{" "}
+                            {adventure.rating?.toFixed(1)}
                           </span>
                         </div>
                         <h3 className="text-3xl sm:text-4xl font-bold text-white mb-4">
@@ -230,7 +252,7 @@ export default function ExplorerPage() {
                 }
                 className="absolute left-4 top-1/2 transform -translate-y-1/2 p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors"
               >
-                ←
+                <DynamicIcon name="ChevronLeft" className="w-6 h-6" />
               </button>
               <button
                 onClick={() =>
@@ -240,7 +262,7 @@ export default function ExplorerPage() {
                 }
                 className="absolute right-4 top-1/2 transform -translate-y-1/2 p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors"
               >
-                →
+                <DynamicIcon name="ChevronRight" className="w-6 h-6" />
               </button>
             </div>
           </div>
@@ -250,8 +272,9 @@ export default function ExplorerPage() {
         <div className="mb-12">
           <div className="bg-linear-to-r from-green-400 via-blue-500 to-purple-500 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
             <div className="max-w-3xl mx-auto text-center">
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-                ✨ Create Your Own Story
+              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 flex items-center justify-center gap-2">
+                <DynamicIcon name="Sparkles" className="w-8 h-8" /> Create Your
+                Own Story
               </h2>
               <p className="text-white/90 text-lg mb-6">
                 Have an idea for an epic adventure? Bring your imagination to
@@ -265,9 +288,19 @@ export default function ExplorerPage() {
                     router.push("/creator");
                   }
                 }}
-                className="px-8 py-4 bg-white text-purple-600 font-bold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105"
+                className="px-8 py-4 bg-white text-purple-600 font-bold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center gap-2 mx-auto"
               >
-                {user ? "🎨 Start Creating" : "🔐 Sign In to Create"}
+                {user ? (
+                  <>
+                    <DynamicIcon name="Palette" className="w-5 h-5" /> Start
+                    Creating
+                  </>
+                ) : (
+                  <>
+                    <DynamicIcon name="Lock" className="w-5 h-5" /> Sign In to
+                    Create
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -277,7 +310,7 @@ export default function ExplorerPage() {
         <div className="mb-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
           <div className="flex flex-col gap-4">
             {/* Search Bar */}
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
                 placeholder="Search adventures..."
@@ -360,6 +393,24 @@ export default function ExplorerPage() {
                   </div>
                 </div>
 
+                {/* NSFW Toggle */}
+                <div>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={showNsfw}
+                        onChange={(e) => setShowNsfw(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">
+                      Show NSFW Content
+                    </span>
+                  </label>
+                </div>
+
                 {/* Clear Filters */}
                 {(selectedTags.length > 0 ||
                   selectedDifficulties.length > 0 ||
@@ -415,16 +466,16 @@ export default function ExplorerPage() {
                       }}
                     />
                   ) : (
-                    <div className="h-40 bg-linear-to-br from-blue-400 via-purple-500 to-pink-500 flex items-center justify-center">
-                      <span className="text-6xl">
-                        {adventure.tags[0] === "Fantasy"
-                          ? "⚔️"
-                          : adventure.tags[0] === "Sci-Fi"
-                          ? "🚀"
-                          : adventure.tags[0] === "Mystery"
-                          ? "🔍"
-                          : "📖"}
-                      </span>
+                    <div className="h-40 bg-linear-to-br from-blue-400 via-purple-500 to-pink-500 flex items-center justify-center text-white">
+                      {adventure.tags[0] === "Fantasy" ? (
+                        <DynamicIcon name="Sword" className="w-16 h-16" />
+                      ) : adventure.tags[0] === "Sci-Fi" ? (
+                        <DynamicIcon name="Rocket" className="w-16 h-16" />
+                      ) : adventure.tags[0] === "Mystery" ? (
+                        <DynamicIcon name="Search" className="w-16 h-16" />
+                      ) : (
+                        <DynamicIcon name="BookOpen" className="w-16 h-16" />
+                      )}
                     </div>
                   )}
 
@@ -434,7 +485,12 @@ export default function ExplorerPage() {
                         {adventure.title}
                       </h3>
                       {adventure.isFeatured && (
-                        <span className="text-yellow-500 ml-2">⭐</span>
+                        <span className="text-yellow-500 ml-2">
+                          <DynamicIcon
+                            name="Star"
+                            className="w-5 h-5 fill-current"
+                          />
+                        </span>
                       )}
                     </div>
 
@@ -450,8 +506,9 @@ export default function ExplorerPage() {
                       >
                         {adventure.difficulty}
                       </span>
-                      <span className="text-xs text-gray-600 dark:text-gray-400">
-                        ⏱️ {adventure.estimatedDuration}
+                      <span className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                        <DynamicIcon name="Clock" className="w-3 h-3" />{" "}
+                        {adventure.estimatedDuration}
                       </span>
                     </div>
 
@@ -468,16 +525,23 @@ export default function ExplorerPage() {
 
                     <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
                       <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                        <span>⭐ {adventure.rating?.toFixed(1)}</span>
-                        <span>
-                          👥{" "}
+                        <span className="flex items-center gap-1">
+                          <DynamicIcon
+                            name="Star"
+                            className="w-3 h-3 fill-current"
+                          />{" "}
+                          {adventure.rating?.toFixed(1)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <DynamicIcon name="Users" className="w-3 h-3" />{" "}
                           {adventure.playCount
                             ? adventure.playCount.toLocaleString()
                             : "0"}
                         </span>
                       </div>
-                      <span className="text-purple-600 dark:text-purple-400 font-semibold text-sm">
-                        Play →
+                      <span className="text-purple-600 dark:text-purple-400 font-semibold text-sm flex items-center gap-1">
+                        Play{" "}
+                        <DynamicIcon name="ArrowRight" className="w-3 h-3" />
                       </span>
                     </div>
                   </div>

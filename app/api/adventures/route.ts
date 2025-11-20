@@ -13,16 +13,19 @@ export async function GET(request: NextRequest) {
     const featured = searchParams.get("featured");
     const tags = searchParams.get("tags")?.split(",");
     const difficulty = searchParams.get("difficulty");
+    const nsfw = searchParams.get("nsfw");
     const sortBy = searchParams.get("sortBy") || "popularity";
     const search = searchParams.get("search");
-    const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : undefined;
+    const limit = searchParams.get("limit")
+      ? parseInt(searchParams.get("limit")!)
+      : undefined;
 
     // Check if this request is from the adventure author by validating auth token
     const authHeader = request.headers.get("authorization");
     console.log("Auth header:", authHeader ? "present" : "missing");
     let isAuthor = false;
     let authenticatedUserId: string | null = null;
-    
+
     if (authHeader && userId) {
       try {
         const token = authHeader.replace("Bearer ", "");
@@ -37,8 +40,18 @@ export async function GET(request: NextRequest) {
             },
           }
         );
-        const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser();
-        console.log("Auth user:", user?.id, "Requested userId:", userId, "Auth error:", authError);
+        const {
+          data: { user },
+          error: authError,
+        } = await authenticatedSupabase.auth.getUser();
+        console.log(
+          "Auth user:",
+          user?.id,
+          "Requested userId:",
+          userId,
+          "Auth error:",
+          authError
+        );
         authenticatedUserId = user?.id || null;
         isAuthor = user?.id === userId;
       } catch (error) {
@@ -48,10 +61,8 @@ export async function GET(request: NextRequest) {
 
     // Use service role client to bypass RLS when user is viewing their own adventures
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    let query = supabase
-      .from("adventures")
-      .select("*");
+
+    let query = supabase.from("adventures").select("*");
 
     // Filter by user's own adventures or published public ones
     console.log("isAuthor:", isAuthor, "userId:", userId);
@@ -60,7 +71,10 @@ export async function GET(request: NextRequest) {
       query = query.eq("author_id", userId);
     } else if (userId) {
       // Show user's public published adventures for non-authenticated requests
-      query = query.eq("author_id", userId).eq("is_published", true).eq("visibility", "public");
+      query = query
+        .eq("author_id", userId)
+        .eq("is_published", true)
+        .eq("visibility", "public");
     } else {
       // Only show public published adventures
       query = query.eq("is_published", true).eq("visibility", "public");
@@ -80,9 +94,22 @@ export async function GET(request: NextRequest) {
       query = query.eq("difficulty", difficulty);
     }
 
+    // Filter by NSFW
+    // If nsfw param is explicitly provided, filter by it
+    if (nsfw === "true") {
+      query = query.eq("nsfw", true);
+    } else if (nsfw === "false") {
+      query = query.eq("nsfw", false);
+    } else if (!isAuthor) {
+      // Default to safe content for public lists if not specified
+      query = query.eq("nsfw", false);
+    }
+
     // Search in title and description
     if (search) {
-      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,short_description.ilike.%${search}%`);
+      query = query.or(
+        `title.ilike.%${search}%,description.ilike.%${search}%,short_description.ilike.%${search}%`
+      );
     }
 
     // Sort
@@ -113,7 +140,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    console.log(`Found ${data.length} adventures for query. Visibilities:`, data.map(a => ({ title: a.title, visibility: a.visibility, published: a.is_published })));
+    console.log(
+      `Found ${data.length} adventures for query. Visibilities:`,
+      data.map((a) => ({
+        title: a.title,
+        visibility: a.visibility,
+        published: a.is_published,
+      }))
+    );
 
     // Transform database format to frontend format
     const adventures = data.map((item: any) => ({
@@ -135,6 +169,7 @@ export async function GET(request: NextRequest) {
       updatedAt: item.updated_at,
       isPublished: item.is_published,
       isFeatured: item.is_featured,
+      nsfw: item.nsfw,
       visibility: item.visibility,
       storyTemplate: item.story_template,
       selectedPreset: item.selected_preset,
@@ -144,7 +179,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ adventures }, { status: 200 });
   } catch (error) {
     console.error("Error in GET /api/adventures:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
@@ -158,7 +196,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    
+
     // Create authenticated Supabase client using anon keys for RLS
     const authenticatedSupabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl,
@@ -171,9 +209,12 @@ export async function POST(request: NextRequest) {
         },
       }
     );
-    
-    const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser();
-    
+
+    const {
+      data: { user },
+      error: authError,
+    } = await authenticatedSupabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -189,6 +230,7 @@ export async function POST(request: NextRequest) {
       tags,
       difficulty,
       visibility,
+      nsfw,
       estimatedDuration,
       isPublished,
       storyTemplate,
@@ -198,14 +240,25 @@ export async function POST(request: NextRequest) {
 
     // Validate that the authorId matches the authenticated user
     if (authorId !== user.id) {
-      return NextResponse.json({ error: "Forbidden: Cannot create adventure for another user" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Cannot create adventure for another user" },
+        { status: 403 }
+      );
     }
 
     // Get current display name from user metadata
     const authorName = user.user_metadata?.display_name || "Anonymous";
 
     // Validate required fields
-    if (!title || !description || !shortDescription || !authorId || !difficulty || !estimatedDuration || !storyTemplate) {
+    if (
+      !title ||
+      !description ||
+      !shortDescription ||
+      !authorId ||
+      !difficulty ||
+      !estimatedDuration ||
+      !storyTemplate
+    ) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -226,6 +279,7 @@ export async function POST(request: NextRequest) {
           tags: tags || [],
           difficulty,
           visibility: visibility || "public",
+          nsfw: nsfw || false,
           estimated_duration: estimatedDuration,
           is_published: isPublished || false,
           is_featured: false,
@@ -245,9 +299,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ adventure: data }, { status: 201 });
+    // Transform database format to frontend format
+    const adventure = {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      shortDescription: data.short_description,
+      author: data.author_name,
+      authorId: data.author_id,
+      thumbnailUrl: data.thumbnail_url,
+      bannerUrl: data.banner_url,
+      tags: data.tags,
+      difficulty: data.difficulty,
+      estimatedDuration: data.estimated_duration,
+      popularity: data.popularity,
+      rating: data.rating,
+      playCount: data.play_count,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      isPublished: data.is_published,
+      isFeatured: data.is_featured,
+      nsfw: data.nsfw,
+      visibility: data.visibility,
+      storyTemplate: data.story_template,
+      selectedPreset: data.selected_preset,
+      presets: data.presets,
+    };
+
+    return NextResponse.json({ adventure }, { status: 201 });
   } catch (error) {
     console.error("Error in POST /api/adventures:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

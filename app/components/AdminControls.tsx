@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/app/misc/supabase";
 import { useNotification } from "@/app/misc/NotificationContext";
+import { DynamicIcon } from "./DynamicIcon";
 
 interface AdminControlsProps {
   userId: string;
@@ -11,11 +12,18 @@ interface AdminControlsProps {
   onSuccess?: () => void;
 }
 
-export default function AdminControls({ userId, userEmail, currentRole, onSuccess }: AdminControlsProps) {
+export default function AdminControls({
+  userId,
+  userEmail,
+  currentRole,
+  onSuccess,
+}: AdminControlsProps) {
   const { addNotification } = useNotification();
   const [amount, setAmount] = useState(10);
   const [removeAmount, setRemoveAmount] = useState(1);
-  const [role, setRole] = useState<"user" | "moderator" | "admin">(currentRole as any || "user");
+  const [role, setRole] = useState<"user" | "moderator" | "admin">(
+    (currentRole as any) || "user"
+  );
   const [loading, setLoading] = useState(false);
   const [roleLoading, setRoleLoading] = useState(false);
 
@@ -24,7 +32,9 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
     setLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         addNotification("Please sign in to mint credits", "warning");
         setLoading(false);
@@ -35,7 +45,7 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           userId: userId,
@@ -46,13 +56,16 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
       const data = await response.json();
 
       if (!response.ok) {
-        addNotification(`❌ ${data.error || "Failed to mint credits"}`, "failure");
+        addNotification(`${data.error || "Failed to mint credits"}`, "failure");
         setLoading(false);
         return;
       }
 
       const creditMintLabel = amount === 1 ? "credit" : "credits";
-      addNotification(`✓ Minted ${amount} ${creditMintLabel} for ${userEmail}`, "success");
+      addNotification(
+        `Minted ${amount} ${creditMintLabel} for ${userEmail}`,
+        "success"
+      );
       setAmount(10);
       onSuccess?.();
     } catch (error) {
@@ -67,7 +80,9 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
     e.preventDefault();
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         addNotification("Please sign in to remove credits", "warning");
         setLoading(false);
@@ -77,14 +92,17 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ userId, amount: removeAmount }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to remove credits");
       const creditRemoveLabel = removeAmount === 1 ? "credit" : "credits";
-      addNotification(`✓ Removed ${removeAmount} ${creditRemoveLabel} for ${userEmail}` , "success");
+      addNotification(
+        `Removed ${removeAmount} ${creditRemoveLabel} for ${userEmail}`,
+        "success"
+      );
       onSuccess?.();
     } catch (err: any) {
       addNotification(err.message || "Failed to remove credits", "failure");
@@ -98,7 +116,9 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
     setRoleLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         addNotification("Please sign in to change roles", "warning");
         setRoleLoading(false);
@@ -109,7 +129,7 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           role: role,
@@ -119,12 +139,12 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
       const data = await response.json();
 
       if (!response.ok) {
-        addNotification(`❌ ${data.error || "Failed to change role"}`, "failure");
+        addNotification(`${data.error || "Failed to change role"}`, "failure");
         setRoleLoading(false);
         return;
       }
 
-      addNotification(`✓ Changed role to ${role} for ${userEmail}`, "success");
+      addNotification(`Changed role to ${role} for ${userEmail}`, "success");
       onSuccess?.();
     } catch (error) {
       console.error("Error changing role:", error);
@@ -137,17 +157,20 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
   return (
     <div className="bg-linear-to-br from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 rounded-2xl shadow-xl p-6 sm:p-8 border-2 border-red-400 dark:border-red-600">
       <h3 className="text-lg sm:text-xl font-bold mb-6 flex items-center gap-2 text-red-800 dark:text-red-200">
-        <span className="text-2xl">🔐</span>
+        <DynamicIcon name="Lock" className="w-6 h-6" />
         Admin Controls
       </h3>
-      
+
       <div className="space-y-6">
         {/* Mint Credits Section */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-red-200 dark:border-red-800">
           <form onSubmit={handleMint} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <label htmlFor="mint-amount" className="font-bold text-gray-900 dark:text-white">
-                💎 Mint Credits:
+              <label
+                htmlFor="mint-amount"
+                className="font-bold text-gray-900 dark:text-white flex items-center gap-2"
+              >
+                <DynamicIcon name="Coins" className="w-4 h-4" /> Mint Credits:
               </label>
               <input
                 id="mint-amount"
@@ -162,9 +185,16 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
             <button
               type="submit"
               disabled={loading || amount <= 0}
-              className="px-6 py-3 bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="px-6 py-3 bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
             >
-              {loading ? "Minting..." : `💎 Mint ${amount} ${amount === 1 ? "Credit" : "Credits"}`}
+              {loading ? (
+                "Minting..."
+              ) : (
+                <>
+                  <DynamicIcon name="Coins" className="w-4 h-4" />
+                  Mint {amount} {amount === 1 ? "Credit" : "Credits"}
+                </>
+              )}
             </button>
           </form>
         </div>
@@ -176,8 +206,12 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
         <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-red-200 dark:border-red-800">
           <form onSubmit={handleRemove} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <label htmlFor="remove-amount" className="font-bold text-gray-900 dark:text-white">
-                ❌ Remove Credits:
+              <label
+                htmlFor="remove-amount"
+                className="font-bold text-gray-900 dark:text-white flex items-center gap-2"
+              >
+                <DynamicIcon name="Trash2" className="w-4 h-4" /> Remove
+                Credits:
               </label>
               <input
                 id="remove-amount"
@@ -192,9 +226,17 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
             <button
               type="submit"
               disabled={loading || removeAmount <= 0}
-              className="px-6 py-3 bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="px-6 py-3 bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
             >
-              {loading ? "Removing..." : `❌ Remove ${removeAmount} ${removeAmount === 1 ? "Credit" : "Credits"}`}
+              {loading ? (
+                "Removing..."
+              ) : (
+                <>
+                  <DynamicIcon name="Trash2" className="w-4 h-4" />
+                  Remove {removeAmount}{" "}
+                  {removeAmount === 1 ? "Credit" : "Credits"}
+                </>
+              )}
             </button>
           </form>
         </div>
@@ -203,13 +245,19 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
         <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-red-200 dark:border-red-800">
           <form onSubmit={handleRoleChange} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <label htmlFor="role-select" className="font-bold text-gray-900 dark:text-white">
-                👤 Change User Role:
+              <label
+                htmlFor="role-select"
+                className="font-bold text-gray-900 dark:text-white flex items-center gap-2"
+              >
+                <DynamicIcon name="User" className="w-4 h-4" /> Change User
+                Role:
               </label>
               <select
                 id="role-select"
                 value={role}
-                onChange={(e) => setRole(e.target.value as "user" | "moderator" | "admin")}
+                onChange={(e) =>
+                  setRole(e.target.value as "user" | "moderator" | "admin")
+                }
                 className="px-4 py-3 border-2 border-red-300 dark:border-red-700 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-red-500 dark:focus:border-red-400 focus:ring-2 focus:ring-red-200 dark:focus:ring-red-800 transition-colors"
                 disabled={roleLoading}
               >
@@ -218,15 +266,25 @@ export default function AdminControls({ userId, userEmail, currentRole, onSucces
                 <option value="admin">Admin</option>
               </select>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Current role: <span className="font-semibold text-gray-900 dark:text-white">{currentRole || "user"}</span>
+                Current role:{" "}
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {currentRole || "user"}
+                </span>
               </p>
             </div>
             <button
               type="submit"
               disabled={roleLoading || role === currentRole}
-              className="px-6 py-3 bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="px-6 py-3 bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
             >
-              {roleLoading ? "Changing..." : "👤 Change Role"}
+              {roleLoading ? (
+                "Changing..."
+              ) : (
+                <>
+                  <DynamicIcon name="User" className="w-4 h-4" />
+                  Change Role
+                </>
+              )}
             </button>
           </form>
         </div>

@@ -3,6 +3,7 @@
 import { StoryData, StoryLore } from "../misc/structs";
 import ReactMarkdown from "react-markdown";
 import { useState } from "react";
+import { DynamicIcon } from "../components/DynamicIcon";
 
 export default function LorePage(storyData: StoryData) {
   const [selectedLore, setSelectedLore] = useState<StoryLore | null>(null);
@@ -37,8 +38,9 @@ export default function LorePage(storyData: StoryData) {
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-              📜 Story Lore
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <DynamicIcon name="Book" className="w-8 h-8 text-purple-600" />{" "}
+              Story Lore
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Discover the world, characters, and secrets of your adventure
@@ -49,8 +51,9 @@ export default function LorePage(storyData: StoryData) {
               {visibleLore.length} entries
             </span>
             {secretLore.length > 0 && (
-              <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full font-medium">
-                {secretLore.length} 🔒 secrets
+              <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full font-medium flex items-center gap-1">
+                {secretLore.length}{" "}
+                <DynamicIcon name="Lock" className="w-4 h-4" /> secrets
               </span>
             )}
           </div>
@@ -133,13 +136,15 @@ export default function LorePage(storyData: StoryData) {
                   </p>
                   <div className="flex flex-wrap gap-1 mt-2">
                     {loreItem.relatedCharacters?.length > 0 && (
-                      <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
-                        👤 {loreItem.relatedCharacters.length}
+                      <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded flex items-center gap-1">
+                        <DynamicIcon name="User" className="w-3 h-3" />{" "}
+                        {loreItem.relatedCharacters.length}
                       </span>
                     )}
                     {loreItem.relatedLocations?.length > 0 && (
-                      <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
-                        📍 {loreItem.relatedLocations.length}
+                      <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded flex items-center gap-1">
+                        <DynamicIcon name="MapPin" className="w-3 h-3" />{" "}
+                        {loreItem.relatedLocations.length}
                       </span>
                     )}
                   </div>
@@ -151,7 +156,7 @@ export default function LorePage(storyData: StoryData) {
             {secretLore.length > 0 && (
               <div className="pt-4 mt-4 border-t border-gray-300 dark:border-gray-600">
                 <h4 className="text-sm font-bold text-amber-700 dark:text-amber-400 mb-3 flex items-center gap-2">
-                  🔒 Hidden Secrets
+                  <DynamicIcon name="Lock" className="w-4 h-4" /> Hidden Secrets
                 </h4>
                 {secretLore.map((loreItem, index) => (
                   <button
@@ -172,7 +177,11 @@ export default function LorePage(storyData: StoryData) {
                     )}
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2 truncate">
-                        🔒 {loreItem.title}
+                        <DynamicIcon
+                          name="Lock"
+                          className="w-4 h-4 text-amber-600"
+                        />{" "}
+                        {loreItem.title}
                       </h4>
                       <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
                         {loreItem.content.substring(0, 100)}...
@@ -215,13 +224,19 @@ export default function LorePage(storyData: StoryData) {
           ) : (
             <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  {selectedLore.secrtet && "🔒 "}
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                  {selectedLore.secrtet && (
+                    <DynamicIcon
+                      name="Lock"
+                      className="w-6 h-6 text-amber-600"
+                    />
+                  )}
                   {selectedLore.title}
                 </h2>
                 {selectedLore.secrtet && (
-                  <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
-                    ✨ Secret knowledge unlocked!
+                  <p className="text-sm text-amber-600 dark:text-amber-400 mb-4 flex items-center gap-2">
+                    <DynamicIcon name="Sparkles" className="w-4 h-4" /> Secret
+                    knowledge unlocked!
                   </p>
                 )}
               </div>

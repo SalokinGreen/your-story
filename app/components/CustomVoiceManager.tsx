@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { DynamicIcon } from "./DynamicIcon";
 
 interface CustomVoiceManagerProps {
   onVoicesChange?: (voices: string[]) => void;
@@ -44,16 +45,16 @@ export default function CustomVoiceManager({
       const updated = [...customVoices, voiceId];
       saveCustomVoices(updated);
       setNewVoiceInput("");
-      addNotification(`✅ Added voice: ${voiceId}`, "success");
+      addNotification(`Added voice: ${voiceId}`, "success");
     } else if (customVoices.includes(voiceId)) {
-      addNotification("⚠️ Voice already exists", "warning");
+      addNotification("Voice already exists", "warning");
     }
   };
 
   const removeCustomVoice = (voiceId: string) => {
     const updated = customVoices.filter((v) => v !== voiceId);
     saveCustomVoices(updated);
-    addNotification(`🗑️ Removed voice: ${voiceId}`, "success");
+    addNotification(`Removed voice: ${voiceId}`, "success");
   };
 
   return (
@@ -98,9 +99,10 @@ export default function CustomVoiceManager({
             ))}
           </div>
         )}
-        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-          💡 Add custom Speechify voice IDs. Built-in voices: henry, snoop,
-          gwyneth, cliff, george
+        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 flex items-center gap-1">
+          <DynamicIcon name="Lightbulb" className="w-3 h-3" /> Add custom
+          Speechify voice IDs. Built-in voices: henry, snoop, gwyneth, cliff,
+          george
         </p>
       </div>
     </div>

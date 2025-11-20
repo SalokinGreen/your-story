@@ -15,18 +15,21 @@ export async function GET(request: NextRequest) {
     const isPublic = searchParams.get("isPublic");
 
     if (!userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "userId is required" },
+        { status: 400 }
+      );
     }
 
     // Get the authorization header for authenticated requests
     const authHeader = request.headers.get("authorization");
-    
+
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const token = authHeader.replace("Bearer ", "");
-    
+
     // Create authenticated Supabase client with the user's token
     const authenticatedSupabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
@@ -41,8 +44,11 @@ export async function GET(request: NextRequest) {
     );
 
     // Verify the token is valid
-    const { data: { user }, error: authError } = await authenticatedSupabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await authenticatedSupabase.auth.getUser();
+
     if (authError || !user) {
       console.error("Auth error:", authError);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
@@ -52,7 +58,10 @@ export async function GET(request: NextRequest) {
     // Otherwise, verify the userId matches the authenticated user
     const requestingPublicOnly = isPublic === "true";
     if (!requestingPublicOnly && userId !== user.id) {
-      return NextResponse.json({ error: "Forbidden: Cannot access another user's private stories" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Cannot access another user's private stories" },
+        { status: 403 }
+      );
     }
 
     let query = authenticatedSupabase
@@ -83,7 +92,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ stories: data || [] }, { status: 200 });
   } catch (error) {
     console.error("Error in GET /api/stories:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
@@ -97,7 +109,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    
+
     // Create authenticated Supabase client
     const supabase = createClient(
       process.env.SUPABASE_URL!,
@@ -110,9 +122,12 @@ export async function POST(request: NextRequest) {
         },
       }
     );
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -122,7 +137,10 @@ export async function POST(request: NextRequest) {
 
     // Validate that the userId matches the authenticated user
     if (userId !== user.id) {
-      return NextResponse.json({ error: "Forbidden: Cannot create story for another user" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Cannot create story for another user" },
+        { status: 403 }
+      );
     }
 
     // Validate required fields
@@ -143,6 +161,7 @@ export async function POST(request: NextRequest) {
           story_data: storyData,
           is_completed: false,
           is_public: isPublic || false,
+          nsfw: storyData.nsfw || body.nsfw || false,
         },
       ])
       .select()
@@ -156,6 +175,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ story: data }, { status: 201 });
   } catch (error) {
     console.error("Error in POST /api/stories:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

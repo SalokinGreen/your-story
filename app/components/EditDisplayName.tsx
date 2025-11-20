@@ -3,13 +3,17 @@
 import { useState } from "react";
 import { supabase } from "@/app/misc/supabase";
 import { useNotification } from "@/app/misc/NotificationContext";
+import { DynamicIcon } from "./DynamicIcon";
 
 interface EditDisplayNameProps {
   currentDisplayName: string | null;
   onSuccess?: () => void;
 }
 
-export default function EditDisplayName({ currentDisplayName, onSuccess }: EditDisplayNameProps) {
+export default function EditDisplayName({
+  currentDisplayName,
+  onSuccess,
+}: EditDisplayNameProps) {
   const { addNotification } = useNotification();
   const [displayName, setDisplayName] = useState(currentDisplayName || "");
   const [loading, setLoading] = useState(false);
@@ -17,7 +21,7 @@ export default function EditDisplayName({ currentDisplayName, onSuccess }: EditD
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!displayName.trim()) {
       addNotification("Display name cannot be empty", "warning");
       return;
@@ -26,7 +30,9 @@ export default function EditDisplayName({ currentDisplayName, onSuccess }: EditD
     setLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         addNotification("Please sign in to update your profile", "warning");
         setLoading(false);
@@ -37,7 +43,7 @@ export default function EditDisplayName({ currentDisplayName, onSuccess }: EditD
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           display_name: displayName.trim(),
@@ -47,12 +53,15 @@ export default function EditDisplayName({ currentDisplayName, onSuccess }: EditD
       const data = await response.json();
 
       if (!response.ok) {
-        addNotification(`❌ ${data.error || "Failed to update display name"}`, "failure");
+        addNotification(
+          `${data.error || "Failed to update display name"}`,
+          "failure"
+        );
         setLoading(false);
         return;
       }
 
-      addNotification("✓ Display name updated successfully", "success");
+      addNotification("Display name updated successfully", "success");
       setIsEditing(false);
       onSuccess?.();
     } catch (error) {
@@ -73,9 +82,9 @@ export default function EditDisplayName({ currentDisplayName, onSuccess }: EditD
       <div className="flex items-center gap-3">
         <button
           onClick={() => setIsEditing(true)}
-          className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+          className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
         >
-          ✏️ Edit Name
+          <DynamicIcon name="Edit" className="w-4 h-4" /> Edit Name
         </button>
       </div>
     );
@@ -98,7 +107,11 @@ export default function EditDisplayName({ currentDisplayName, onSuccess }: EditD
         <div className="flex gap-2">
           <button
             type="submit"
-            disabled={loading || !displayName.trim() || displayName === currentDisplayName}
+            disabled={
+              loading ||
+              !displayName.trim() ||
+              displayName === currentDisplayName
+            }
             className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? "Saving..." : "Save"}

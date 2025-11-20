@@ -158,6 +158,7 @@ export interface StoryData {
   upgradeSettings?: UpgradeSettings; // Customizable upgrade system
   newGamePlusCount?: number; // Number of NG+ runs completed
   newGamePlusMode?: boolean; // Whether current run is NG+
+  nsfw?: boolean; // Whether the story contains NSFW content
 }
 
 // Upgrade system configuration
@@ -258,6 +259,7 @@ export interface Adventure {
   updatedAt: Date;
   isPublished: boolean;
   isFeatured: boolean;
+  nsfw: boolean;
   storyTemplate: Partial<StoryData>; // The actual story data
   selectedPreset?: string; // ID of the preset used
   presets?: Preset[]; // Adventure-specific character presets
@@ -292,6 +294,7 @@ export interface Story {
   storyData: StoryData | EncryptedStoryData; // Can be plain or encrypted
   isCompleted: boolean;
   isPublic: boolean; // Allow sharing stories
+  nsfw?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

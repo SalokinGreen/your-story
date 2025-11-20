@@ -1,5 +1,7 @@
 "use client";
 
+import { DynamicIcon } from "./DynamicIcon";
+
 interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
@@ -21,7 +23,7 @@ export default function ConfirmDialog({
   confirmButtonClass = "bg-purple-600 hover:bg-purple-700",
   onConfirm,
   onCancel,
-  icon = "⚠️",
+  icon = "AlertTriangle",
 }: ConfirmDialogProps) {
   if (!isOpen) return null;
 
@@ -30,7 +32,10 @@ export default function ConfirmDialog({
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-md w-full border-2 border-gray-200 dark:border-gray-700 animate-in zoom-in-95 duration-200">
         {/* Icon & Title */}
         <div className="flex items-center gap-3 mb-4">
-          <span className="text-4xl">{icon}</span>
+          <DynamicIcon
+            name={icon as any}
+            className="w-10 h-10 text-gray-900 dark:text-white"
+          />
           <h3 className="text-xl font-bold text-gray-900 dark:text-white">
             {title}
           </h3>

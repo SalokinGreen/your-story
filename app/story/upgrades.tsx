@@ -6,6 +6,7 @@ import {
   DEFAULT_UPGRADE_SETTINGS,
 } from "../misc/structs";
 import { useState } from "react";
+import { DynamicIcon } from "../components/DynamicIcon";
 
 interface UpgradesPageProps {
   storyData: StoryData;
@@ -33,7 +34,10 @@ export default function UpgradesPage({
       <div className="w-full">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
           <div className="text-center py-12">
-            <span className="text-6xl mb-4 block">🔒</span>
+            <DynamicIcon
+              name="Lock"
+              className="w-16 h-16 mb-4 mx-auto text-gray-400"
+            />
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Upgrades Disabled
             </h2>
@@ -86,7 +90,7 @@ export default function UpgradesPage({
         quantity: 1,
         description: newItemDescription || "A useful item",
         type: newItemType,
-        symbol: "📦",
+        symbol: "Package",
       });
       setNewItemName("");
       setNewItemDescription("");
@@ -156,7 +160,7 @@ export default function UpgradesPage({
           {/* Points Display */}
           <div className="flex items-center justify-between p-6 rounded-lg bg-linear-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-2 border-yellow-400 dark:border-yellow-600">
             <div className="flex items-center gap-3">
-              <span className="text-4xl">⭐</span>
+              <DynamicIcon name="Star" className="w-10 h-10 text-yellow-500" />
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {storyData.points} Points
@@ -171,7 +175,11 @@ export default function UpgradesPage({
           {/* How to Earn Points */}
           <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
             <h3 className="text-sm font-bold text-blue-900 dark:text-blue-200 mb-2">
-              💡 How to Earn Points:
+              <DynamicIcon
+                name="Lightbulb"
+                className="inline-block w-4 h-4 mr-1"
+              />
+              How to Earn Points:
             </h3>
             <ul className="text-xs text-blue-800 dark:text-blue-300 space-y-1">
               <li>
@@ -199,7 +207,10 @@ export default function UpgradesPage({
           {upgradeSettings.allowStatUpgrade && storyData.stats.length > 0 && (
             <div className="p-6 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-                <span className="text-2xl">📊</span>
+                <DynamicIcon
+                  name="BarChart2"
+                  className="w-8 h-8 text-blue-600 dark:text-blue-400"
+                />
                 Upgrade Stats
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -222,7 +233,10 @@ export default function UpgradesPage({
                     onClick={() => setSelectedStat(stat.name)}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{stat.symbol}</span>
+                      <DynamicIcon
+                        name={stat.symbol}
+                        className="w-8 h-8 text-blue-600 dark:text-blue-400"
+                      />
                       <div>
                         <p className="font-bold text-gray-900 dark:text-white">
                           {stat.name}
@@ -266,7 +280,10 @@ export default function UpgradesPage({
             storyData.resources.length > 0 && (
               <div className="p-6 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-                  <span className="text-2xl">⚡</span>
+                  <DynamicIcon
+                    name="Zap"
+                    className="w-8 h-8 text-green-600 dark:text-green-400"
+                  />
                   Upgrade Resources
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -289,7 +306,10 @@ export default function UpgradesPage({
                       onClick={() => setSelectedResource(resource.name)}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{resource.symbol}</span>
+                        <DynamicIcon
+                          name={resource.symbol}
+                          className="w-8 h-8 text-green-600 dark:text-green-400"
+                        />
                         <div>
                           <p className="font-bold text-gray-900 dark:text-white">
                             {resource.name}
@@ -331,7 +351,10 @@ export default function UpgradesPage({
           {upgradeSettings.allowAddItem && (
             <div className="p-6 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-                <span className="text-2xl">🎒</span>
+                <DynamicIcon
+                  name="Backpack"
+                  className="w-8 h-8 text-purple-600 dark:text-purple-400"
+                />
                 Add Custom Item
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -422,7 +445,10 @@ export default function UpgradesPage({
             upgradeSettings.statShop.length > 0 && (
               <div className="p-6 rounded-lg bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-                  <span className="text-2xl">🏪</span>
+                  <DynamicIcon
+                    name="Store"
+                    className="w-8 h-8 text-cyan-600 dark:text-cyan-400"
+                  />
                   Stat Shop
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -444,13 +470,20 @@ export default function UpgradesPage({
                         }`}
                       >
                         <div className="flex items-center gap-3 flex-1">
-                          <span className="text-2xl">{shopStat.symbol}</span>
+                          <DynamicIcon
+                            name={shopStat.symbol}
+                            className="w-8 h-8 text-cyan-600 dark:text-cyan-400"
+                          />
                           <div>
                             <p className="font-bold text-gray-900 dark:text-white">
                               {shopStat.name}
                               {alreadyOwned && (
                                 <span className="ml-2 text-xs text-green-600 dark:text-green-400">
-                                  ✓ Owned
+                                  <DynamicIcon
+                                    name="Check"
+                                    className="inline-block w-3 h-3"
+                                  />{" "}
+                                  Owned
                                 </span>
                               )}
                             </p>
@@ -483,7 +516,10 @@ export default function UpgradesPage({
             upgradeSettings.resourceShop.length > 0 && (
               <div className="p-6 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-                  <span className="text-2xl">🛒</span>
+                  <DynamicIcon
+                    name="ShoppingCart"
+                    className="w-8 h-8 text-teal-600 dark:text-teal-400"
+                  />
                   Resource Shop
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -505,15 +541,20 @@ export default function UpgradesPage({
                         }`}
                       >
                         <div className="flex items-center gap-3 flex-1">
-                          <span className="text-2xl">
-                            {shopResource.symbol}
-                          </span>
+                          <DynamicIcon
+                            name={shopResource.symbol}
+                            className="w-8 h-8 text-teal-600 dark:text-teal-400"
+                          />
                           <div>
                             <p className="font-bold text-gray-900 dark:text-white">
                               {shopResource.name}
                               {alreadyOwned && (
                                 <span className="ml-2 text-xs text-green-600 dark:text-green-400">
-                                  ✓ Owned
+                                  <DynamicIcon
+                                    name="Check"
+                                    className="inline-block w-3 h-3"
+                                  />{" "}
+                                  Owned
                                 </span>
                               )}
                             </p>
@@ -547,7 +588,10 @@ export default function UpgradesPage({
             upgradeSettings.itemShop.length > 0 && (
               <div className="p-6 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-                  <span className="text-2xl">🏬</span>
+                  <DynamicIcon
+                    name="ShoppingBag"
+                    className="w-8 h-8 text-amber-600 dark:text-amber-400"
+                  />
                   Item Shop
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -561,7 +605,10 @@ export default function UpgradesPage({
                       className="flex items-center justify-between p-4 rounded-lg border-2 bg-white dark:bg-gray-700 border-amber-300 dark:border-amber-700"
                     >
                       <div className="flex items-center gap-3 flex-1">
-                        <span className="text-2xl">{shopItem.symbol}</span>
+                        <DynamicIcon
+                          name={shopItem.symbol}
+                          className="w-8 h-8 text-amber-600 dark:text-amber-400"
+                        />
                         <div>
                           <p className="font-bold text-gray-900 dark:text-white">
                             {shopItem.name}

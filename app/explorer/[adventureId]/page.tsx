@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Adventure, StoryData } from "@/app/misc/structs";
 import { useAuth } from "@/app/misc/AuthContext";
+import { isAdmin } from "@/app/misc/auth";
 import { useNotification } from "@/app/misc/NotificationContext";
 import Comments from "@/app/components/Comments";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { supabase } from "@/app/misc/supabase";
+import { DynamicIcon } from "@/app/components/DynamicIcon";
 
 export default function AdventureDetailPage() {
   const params = useParams();
@@ -18,6 +20,8 @@ export default function AdventureDetailPage() {
   const [loading, setLoading] = useState(true);
   const [startingAdventure, setStartingAdventure] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const [togglingFeatured, setTogglingFeatured] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "lore">("overview");
   const [showSecretLore, setShowSecretLore] = useState(false);
   const [contentTab, setContentTab] = useState<
@@ -44,6 +48,14 @@ export default function AdventureDetailPage() {
   const isAuthor = user && adventure && adventure.authorId === user.id;
 
   useEffect(() => {
+    const checkAdmin = async () => {
+      const admin = await isAdmin();
+      setIsAdminUser(admin);
+    };
+    checkAdmin();
+  }, [user]);
+
+  useEffect(() => {
     const fetchAdventure = async () => {
       try {
         const response = await fetch(`/api/adventures/${adventureId}`);
@@ -63,6 +75,48 @@ export default function AdventureDetailPage() {
       fetchAdventure();
     }
   }, [adventureId]);
+
+  const handleToggleFeatured = async () => {
+    if (!adventure) return;
+
+    try {
+      setTogglingFeatured(true);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const response = await fetch(`/api/adventures/${adventureId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          isFeatured: !adventure.isFeatured,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update featured status");
+      }
+
+      const { adventure: updatedAdventure } = await response.json();
+      setAdventure(updatedAdventure);
+      addNotification(
+        updatedAdventure.isFeatured
+          ? "Adventure featured!"
+          : "Adventure un-featured",
+        "success"
+      );
+    } catch (error: any) {
+      console.error("Error toggling featured status:", error);
+      addNotification(error.message, "failure");
+    } finally {
+      setTogglingFeatured(false);
+    }
+  };
 
   const getDifficultyColor = (difficulty: string) => {
     const lower = difficulty.toLowerCase();
@@ -107,7 +161,7 @@ export default function AdventureDetailPage() {
     const password = getEncryptionPassword();
     if (!password || !user.email) {
       addNotification(
-        "🔒 Please sign out and sign back in to enable encrypted story saving",
+        "Please sign out and sign back in to enable encrypted story saving",
         "warning"
       );
       return;
@@ -183,7 +237,7 @@ export default function AdventureDetailPage() {
       title: "Delete Adventure?",
       message:
         "Are you sure you want to delete this adventure? This action cannot be undone.",
-      icon: "🗑️",
+      icon: "Trash2",
       confirmText: "Delete Adventure",
       confirmButtonClass: "bg-red-600 hover:bg-red-700",
       onConfirm: async () => {
@@ -269,15 +323,19 @@ export default function AdventureDetailPage() {
           {/* Banner Image or Gradient */}
           {adventure.bannerUrl ? (
             <div
-              className="min-h-[600px] sm:min-h-[500px] md:h-96 bg-cover bg-center relative"
+              className="min-h-[600px] sm:min-h-[500px] md:min-h-96 bg-cover bg-center relative"
               style={{ backgroundImage: `url(${adventure.bannerUrl})` }}
             >
               <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-black/20"></div>
-              <div className="absolute inset-0 p-6 sm:p-8 md:p-12 flex flex-col justify-between">
+              <div className="relative z-10 p-6 sm:p-8 md:p-12 flex flex-col justify-between h-full">
                 <div className="flex items-center gap-3">
                   {adventure.isFeatured && (
                     <span className="px-3 py-1 bg-yellow-400 text-yellow-900 rounded-full text-sm font-bold">
-                      ⭐ Featured
+                      <DynamicIcon
+                        name="Star"
+                        className="inline-block w-4 h-4 mr-1"
+                      />
+                      Featured
                     </span>
                   )}
                   <span
@@ -300,21 +358,21 @@ export default function AdventureDetailPage() {
 
                   <div className="flex flex-wrap gap-4 text-white/90">
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">⏱️</span>
+                      <DynamicIcon name="Clock" className="w-5 h-5" />
                       <span>{adventure.estimatedDuration}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">⭐</span>
+                      <DynamicIcon name="Star" className="w-5 h-5" />
                       <span>{adventure.rating?.toFixed(1)} / 5.0</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">👥</span>
+                      <DynamicIcon name="Users" className="w-5 h-5" />
                       <span>
                         {(adventure.playCount || 0).toLocaleString()} plays
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">✍️</span>
+                      <DynamicIcon name="User" className="w-5 h-5" />
                       <span>by {adventure.author || "Unknown"}</span>
                     </div>
                   </div>
@@ -345,16 +403,63 @@ export default function AdventureDetailPage() {
                         onClick={() =>
                           router.push(`/creator?edit=${adventureId}`)
                         }
-                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-colors"
+                        className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md transition-colors"
                       >
-                        ✏️ Edit Adventure
+                        <DynamicIcon
+                          name="Edit"
+                          className="inline-block w-4 h-4 mr-1"
+                        />
+                        Edit Adventure
                       </button>
                       <button
                         onClick={handleDelete}
                         disabled={deleting}
                         className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {deleting ? "Deleting..." : "🗑️ Delete"}
+                        {deleting ? (
+                          "Deleting..."
+                        ) : (
+                          <>
+                            <DynamicIcon
+                              name="Trash2"
+                              className="inline-block w-4 h-4 mr-1"
+                            />
+                            Delete
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Admin Controls */}
+                  {isAdminUser && (
+                    <div className="mt-4 pt-4 border-t border-white/20">
+                      <h3 className="text-sm font-bold text-white/80 mb-2 uppercase tracking-wider">
+                        Admin Controls
+                      </h3>
+                      <button
+                        onClick={handleToggleFeatured}
+                        disabled={togglingFeatured}
+                        className={`px-4 py-2 rounded-lg font-semibold shadow-md transition-colors ${
+                          adventure.isFeatured
+                            ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                            : "bg-gray-700 hover:bg-gray-600 text-white"
+                        }`}
+                      >
+                        {togglingFeatured ? (
+                          <DynamicIcon
+                            name="Loader2"
+                            className="inline-block mr-2 w-4 h-4 animate-spin"
+                          />
+                        ) : (
+                          <DynamicIcon
+                            name="Star"
+                            className="inline-block mr-2 w-4 h-4"
+                          />
+                        )}
+                        {adventure.isFeatured
+                          ? "Un-feature"
+                          : "Feature Adventure"}
                       </button>
                     </div>
                   )}
@@ -366,7 +471,11 @@ export default function AdventureDetailPage() {
               <div className="flex items-center gap-3 mb-4">
                 {adventure.isFeatured && (
                   <span className="px-3 py-1 bg-yellow-400 text-yellow-900 rounded-full text-sm font-bold">
-                    ⭐ Featured
+                    <DynamicIcon
+                      name="Star"
+                      className="inline-block w-4 h-4 mr-1"
+                    />
+                    Featured
                   </span>
                 )}
                 <span
@@ -389,21 +498,21 @@ export default function AdventureDetailPage() {
 
                 <div className="flex flex-wrap gap-4 text-white/90">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">⏱️</span>
+                    <DynamicIcon name="Clock" className="w-5 h-5" />
                     <span>{adventure.estimatedDuration}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">⭐</span>
+                    <DynamicIcon name="Star" className="w-5 h-5" />
                     <span>{adventure.rating?.toFixed(1)} / 5.0</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">👥</span>
+                    <DynamicIcon name="Users" className="w-5 h-5" />
                     <span>
                       {(adventure.playCount || 0).toLocaleString()} plays
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">✍️</span>
+                    <DynamicIcon name="User" className="w-5 h-5" />
                     <span>by {adventure.author || "Unknown"}</span>
                   </div>
                 </div>
@@ -436,14 +545,61 @@ export default function AdventureDetailPage() {
                       }
                       className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-colors"
                     >
-                      ✏️ Edit Adventure
+                      <DynamicIcon
+                        name="Edit"
+                        className="inline-block w-4 h-4 mr-1"
+                      />
+                      Edit Adventure
                     </button>
                     <button
                       onClick={handleDelete}
                       disabled={deleting}
                       className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {deleting ? "Deleting..." : "🗑️ Delete"}
+                      {deleting ? (
+                        "Deleting..."
+                      ) : (
+                        <>
+                          <DynamicIcon
+                            name="Trash2"
+                            className="inline-block w-4 h-4 mr-1"
+                          />
+                          Delete
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Admin Controls */}
+                {isAdminUser && (
+                  <div className="mt-4 pt-4 border-t border-white/20">
+                    <h3 className="text-sm font-bold text-white/80 mb-2 uppercase tracking-wider">
+                      Admin Controls
+                    </h3>
+                    <button
+                      onClick={handleToggleFeatured}
+                      disabled={togglingFeatured}
+                      className={`px-4 py-2 rounded-lg font-semibold shadow-md transition-colors ${
+                        adventure.isFeatured
+                          ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                          : "bg-gray-700 hover:bg-gray-600 text-white"
+                      }`}
+                    >
+                      {togglingFeatured ? (
+                        <DynamicIcon
+                          name="Loader2"
+                          className="inline-block mr-2 w-4 h-4 animate-spin"
+                        />
+                      ) : (
+                        <DynamicIcon
+                          name="Star"
+                          className="inline-block mr-2 w-4 h-4"
+                        />
+                      )}
+                      {adventure.isFeatured
+                        ? "Un-feature"
+                        : "Feature Adventure"}
                     </button>
                   </div>
                 )}
@@ -476,7 +632,7 @@ export default function AdventureDetailPage() {
               <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-6 border-l-4 border-purple-500">
                 <p className="text-gray-800 dark:text-gray-200 italic">
                   "
-                  {adventure.storyTemplate.starting_content ||
+                  {adventure.storyTemplate?.starting_content ||
                     "The adventure begins..."}
                   "
                 </p>
@@ -573,13 +729,13 @@ export default function AdventureDetailPage() {
                         );
 
                   const displayStats =
-                    selectedPreset?.stats || adventure.storyTemplate.stats;
+                    selectedPreset?.stats || adventure.storyTemplate?.stats;
                   const displayResources =
                     selectedPreset?.resources ||
-                    adventure.storyTemplate.resources;
+                    adventure.storyTemplate?.resources;
                   const displayInventory =
                     selectedPreset?.inventory ||
-                    adventure.storyTemplate.inventory;
+                    adventure.storyTemplate?.inventory;
 
                   return (
                     <div className="space-y-6">
@@ -730,7 +886,7 @@ export default function AdventureDetailPage() {
                   <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
                     <span className="text-2xl">🏆</span>
                     Achievements
-                    {adventure.storyTemplate.achievements &&
+                    {adventure.storyTemplate?.achievements &&
                       adventure.storyTemplate.achievements.filter(
                         (a) => a.hidden
                       ).length > 0 && (
@@ -741,11 +897,15 @@ export default function AdventureDetailPage() {
                               (a) => a.hidden
                             ).length
                           }{" "}
-                          🔒 Hidden
+                          <DynamicIcon
+                            name="Lock"
+                            className="inline-block w-3 h-3"
+                          />{" "}
+                          Hidden
                         </span>
                       )}
                   </h3>
-                  {adventure.storyTemplate.achievements &&
+                  {adventure.storyTemplate?.achievements &&
                   adventure.storyTemplate.achievements.filter((a) => !a.hidden)
                     .length > 0 ? (
                     <div className="grid grid-cols-1 gap-3">
@@ -793,7 +953,7 @@ export default function AdventureDetailPage() {
               {contentTab === "upgrades" && (
                 <div className="space-y-6">
                   {/* Upgrade Settings Info */}
-                  {adventure.storyTemplate.upgradeSettings?.enabled ? (
+                  {adventure.storyTemplate?.upgradeSettings?.enabled ? (
                     <>
                       <div className="bg-linear-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
@@ -1128,7 +1288,11 @@ export default function AdventureDetailPage() {
             {/* Details */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
-                ℹ️ Details
+                <DynamicIcon
+                  name="Info"
+                  className="inline-block w-5 h-5 mr-1"
+                />
+                Details
               </h3>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
@@ -1136,7 +1300,7 @@ export default function AdventureDetailPage() {
                     Story Beats:
                   </span>
                   <span className="font-semibold text-gray-900 dark:text-white">
-                    {adventure.storyTemplate.plot_beats?.length || 0}
+                    {adventure.storyTemplate?.plot_beats?.length || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -1220,14 +1384,14 @@ export default function AdventureDetailPage() {
                   : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
               }`}
             >
-              📚 Lore ({adventure?.storyTemplate.lore?.length || 0})
+              📚 Lore ({adventure?.storyTemplate?.lore?.length || 0})
             </button>
           </div>
 
           {/* Tab Content */}
           {activeTab === "overview" && <Comments adventureId={adventureId} />}
 
-          {activeTab === "lore" && adventure?.storyTemplate.lore && (
+          {activeTab === "lore" && adventure?.storyTemplate?.lore && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -1246,7 +1410,11 @@ export default function AdventureDetailPage() {
                       className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                     />
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      🔒 Show Secret Lore
+                      <DynamicIcon
+                        name="Lock"
+                        className="inline-block w-3 h-3 mr-1"
+                      />
+                      Show Secret Lore
                     </span>
                   </label>
                 </div>
@@ -1254,14 +1422,13 @@ export default function AdventureDetailPage() {
 
               {/* Lore Grid */}
               {(() => {
-                const filteredLore = adventure.storyTemplate.lore.filter(
-                  (lore) => {
+                const filteredLore =
+                  adventure.storyTemplate?.lore?.filter((lore) => {
                     // Filter by secret status
                     if (lore.secrtet && !showSecretLore) return false;
 
                     return true;
-                  }
-                );
+                  }) || [];
 
                 if (filteredLore.length === 0) {
                   return (
@@ -1288,9 +1455,10 @@ export default function AdventureDetailPage() {
                         <div className="flex items-start justify-between mb-3">
                           <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             {lore.secrtet && (
-                              <span className="text-purple-600 dark:text-purple-400">
-                                🔒
-                              </span>
+                              <DynamicIcon
+                                name="Lock"
+                                className="w-4 h-4 text-purple-600 dark:text-purple-400"
+                              />
                             )}
                             {lore.title}
                           </h3>
@@ -1313,7 +1481,11 @@ export default function AdventureDetailPage() {
                             lore.relatedCharacters.length > 0 && (
                               <div className="flex flex-wrap gap-2">
                                 <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-                                  👥 Characters:
+                                  <DynamicIcon
+                                    name="Users"
+                                    className="inline-block w-3 h-3 mr-1"
+                                  />
+                                  Characters:
                                 </span>
                                 {lore.relatedCharacters.map((char, i) => (
                                   <span

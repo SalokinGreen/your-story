@@ -6,6 +6,7 @@ import { Comment } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
+import { DynamicIcon } from "./DynamicIcon";
 
 interface CommentsProps {
   adventureId: string;
@@ -139,7 +140,7 @@ export default function Comments({
       if (response.ok) {
         setNewComment("");
         setRating(null);
-        addNotification("✨ Comment posted!", "success");
+        addNotification("Comment posted!", "success");
         await fetchComments(); // Refresh comments
       } else {
         const error = await response.json();
@@ -201,7 +202,7 @@ export default function Comments({
       title: "Delete Comment?",
       message:
         "Are you sure you want to delete this comment? This cannot be undone.",
-      icon: "🗑️",
+      icon: "Trash2",
       confirmText: "Delete",
       confirmButtonClass: "bg-red-600 hover:bg-red-700",
       onConfirm: async () => {
@@ -255,8 +256,9 @@ export default function Comments({
     <div className="space-y-2">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-          💬 Comments ({comments.length})
+        <h3 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <DynamicIcon name="MessageCircle" className="w-6 h-6" /> Comments (
+          {comments.length})
         </h3>
         <select
           value={sortBy}
@@ -308,15 +310,23 @@ export default function Comments({
                   onClick={() => setRating(rating === star ? null : star)}
                   onMouseEnter={() => setHoveredStar(star)}
                   onMouseLeave={() => setHoveredStar(null)}
-                  className="text-3xl transition-transform hover:scale-110 w-10 text-center"
+                  className="text-3xl transition-transform hover:scale-110 w-10 text-center flex items-center justify-center"
                 >
                   {(
                     hoveredStar !== null
                       ? star <= hoveredStar
                       : star <= (rating || 0)
-                  )
-                    ? "⭐"
-                    : "☆"}
+                  ) ? (
+                    <DynamicIcon
+                      name="Star"
+                      className="w-8 h-8 text-yellow-500 fill-current"
+                    />
+                  ) : (
+                    <DynamicIcon
+                      name="Star"
+                      className="w-8 h-8 text-gray-300 dark:text-gray-600"
+                    />
+                  )}
                 </button>
               ))}
               {rating && (
@@ -360,8 +370,11 @@ export default function Comments({
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400 mx-auto"></div>
           </div>
         ) : comments.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600">
-            <div className="text-6xl mb-4">💬</div>
+          <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center">
+            <DynamicIcon
+              name="MessageCircle"
+              className="w-16 h-16 text-gray-400 mb-4"
+            />
             <p className="text-gray-600 dark:text-gray-400 text-lg font-semibold">
               No comments yet
             </p>
@@ -410,7 +423,17 @@ export default function Comments({
                 <div className="mb-3 flex gap-1">
                   {[...Array(5)].map((_, i) => (
                     <span key={i} className="text-yellow-500">
-                      {i < comment.rating! ? "⭐" : "☆"}
+                      {i < comment.rating! ? (
+                        <DynamicIcon
+                          name="Star"
+                          className="w-4 h-4 fill-current"
+                        />
+                      ) : (
+                        <DynamicIcon
+                          name="Star"
+                          className="w-4 h-4 text-gray-300 dark:text-gray-600"
+                        />
+                      )}
                     </span>
                   ))}
                 </div>
@@ -429,7 +452,14 @@ export default function Comments({
                       : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                   }`}
                 >
-                  {comment.likedBy?.includes(user?.id || "") ? "❤️" : "🤍"}{" "}
+                  {comment.likedBy?.includes(user?.id || "") ? (
+                    <DynamicIcon
+                      name="Heart"
+                      className="w-4 h-4 fill-current"
+                    />
+                  ) : (
+                    <DynamicIcon name="Heart" className="w-4 h-4" />
+                  )}{" "}
                   {comment.likes}
                 </button>
               </div>

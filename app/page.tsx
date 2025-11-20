@@ -8,6 +8,7 @@ import AuthForm from "./components/AuthForm";
 import UserProfile from "./components/UserProfile";
 import { Adventure } from "./misc/structs";
 import { AI_MODELS, AIModelKey } from "./misc/ai_prices";
+import { DynamicIcon } from "./components/DynamicIcon";
 
 // InfoTabs Component
 function InfoTabs() {
@@ -30,33 +31,33 @@ function InfoTabs() {
         <div className="inline-flex bg-white dark:bg-gray-800 rounded-xl shadow-lg p-1 border border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setActiveTab("models")}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+            className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
               activeTab === "models"
                 ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
             }`}
           >
-            🤖 AI Models
+            <DynamicIcon name="Bot" className="w-5 h-5" /> AI Models
           </button>
           <button
             onClick={() => setActiveTab("coins")}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+            className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
               activeTab === "coins"
                 ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
             }`}
           >
-            💰 Coins Packages
+            <DynamicIcon name="Coins" className="w-5 h-5" /> Coins Packages
           </button>
           <button
             onClick={() => setActiveTab("byok")}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+            className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
               activeTab === "byok"
                 ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
             }`}
           >
-            🔑 BYOK
+            <DynamicIcon name="Key" className="w-5 h-5" /> BYOK
           </button>
         </div>
       </div>
@@ -65,8 +66,8 @@ function InfoTabs() {
       <div className="animate-fadeIn">
         {activeTab === "models" && (
           <div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
-              🤖 AI Models
+            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white flex items-center justify-center gap-2">
+              <DynamicIcon name="Bot" className="w-8 h-8" /> AI Models
             </h2>
             <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
               Choose from our curated selection of AI models, each with unique
@@ -115,9 +116,10 @@ function InfoTabs() {
                         {model.strengths.map((strength, idx) => (
                           <span
                             key={idx}
-                            className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-semibold"
+                            className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-semibold flex items-center gap-1"
                           >
-                            ✓ {strength}
+                            <DynamicIcon name="Check" className="w-3 h-3" />{" "}
+                            {strength}
                           </span>
                         ))}
                       </div>
@@ -130,9 +132,13 @@ function InfoTabs() {
                         {model.weaknesses.map((weakness, idx) => (
                           <span
                             key={idx}
-                            className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-semibold"
+                            className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-semibold flex items-center gap-1"
                           >
-                            ⚠ {weakness}
+                            <DynamicIcon
+                              name="AlertTriangle"
+                              className="w-3 h-3"
+                            />{" "}
+                            {weakness}
                           </span>
                         ))}
                       </div>
@@ -143,15 +149,17 @@ function InfoTabs() {
             </div>
 
             <div className="mt-8 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-              <p className="text-sm text-purple-900 dark:text-purple-200 text-center">
-                💡 <strong>Pro Tip:</strong> You can select your preferred AI
-                model in the story menu during gameplay. Each model offers
-                unique storytelling characteristics!
+              <p className="text-sm text-purple-900 dark:text-purple-200 text-center flex items-center justify-center gap-2">
+                <DynamicIcon name="Lightbulb" className="w-4 h-4" />{" "}
+                <strong>Pro Tip:</strong> You can select your preferred AI model
+                in the story menu during gameplay. Each model offers unique
+                storytelling characteristics!
               </p>
             </div>
             <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-sm text-blue-900 dark:text-blue-200 text-center">
-                🎙️ <strong>Text-to-Speech:</strong> Each TTS generation costs 3
+              <p className="text-sm text-blue-900 dark:text-blue-200 text-center flex items-center justify-center gap-2">
+                <DynamicIcon name="Mic" className="w-4 h-4" />{" "}
+                <strong>Text-to-Speech:</strong> Each TTS generation costs 3
                 coins and runs through Speechify for high-quality voice
                 narration.
               </p>
@@ -161,8 +169,8 @@ function InfoTabs() {
 
         {activeTab === "coins" && (
           <div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
-              💰 Coins Packages
+            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white flex items-center justify-center gap-2">
+              <DynamicIcon name="Coins" className="w-8 h-8" /> Coins Packages
             </h2>
             <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
               Purchase coins to generate AI-powered story continuations. Each
@@ -318,7 +326,11 @@ function InfoTabs() {
 
             <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
               <p className="text-sm text-blue-900 dark:text-blue-200 text-center">
-                💡 <strong>Tip:</strong> Each AI story generation costs 1 Coin.
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="inline-block w-4 h-4 mr-1 text-blue-600"
+                />
+                <strong>Tip:</strong> Each AI story generation costs 1 Coin.
                 Coins older than 1 month can be gifted to other users!
               </p>
             </div>
@@ -327,8 +339,9 @@ function InfoTabs() {
 
         {activeTab === "byok" && (
           <div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
-              🔑 Bring Your Own Key (BYOK)
+            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white flex items-center justify-center gap-2">
+              <DynamicIcon name="Key" className="w-8 h-8" /> Bring Your Own Key
+              (BYOK)
             </h2>
             <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
               Take full control of your AI experience. Use your own API keys
@@ -338,7 +351,9 @@ function InfoTabs() {
 
             <div className="bg-linear-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-950 dark:via-purple-950 dark:to-pink-950 rounded-2xl shadow-2xl border-2 border-indigo-300 dark:border-indigo-700 overflow-hidden">
               <div className="bg-linear-to-r from-indigo-600 via-purple-600 to-pink-600 p-8 text-white text-center">
-                <div className="text-5xl mb-4">🚀</div>
+                <div className="text-5xl mb-4 flex justify-center">
+                  <DynamicIcon name="Rocket" className="w-16 h-16" />
+                </div>
                 <h3 className="text-3xl sm:text-4xl font-bold mb-2">
                   Premium BYOK Subscription
                 </h3>
@@ -354,32 +369,42 @@ function InfoTabs() {
                 <div className="grid md:grid-cols-2 gap-6 mb-8">
                   <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="text-3xl">🤖</div>
+                      <div className="text-3xl">
+                        <DynamicIcon name="Bot" className="w-8 h-8" />
+                      </div>
                       <h4 className="text-xl font-bold text-gray-900 dark:text-white">
                         OpenRouter Integration
                       </h4>
                     </div>
                     <ul className="space-y-3">
                       <li className="flex items-start gap-2">
-                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-green-500 font-bold mt-1">
+                          <DynamicIcon name="Check" className="w-4 h-4" />
+                        </span>
                         <span className="text-gray-700 dark:text-gray-300">
                           Use your own OpenRouter API key
                         </span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-green-500 font-bold mt-1">
+                          <DynamicIcon name="Check" className="w-4 h-4" />
+                        </span>
                         <span className="text-gray-700 dark:text-gray-300">
                           Choose from <strong>100+ AI models</strong>
                         </span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-green-500 font-bold mt-1">
+                          <DynamicIcon name="Check" className="w-4 h-4" />
+                        </span>
                         <span className="text-gray-700 dark:text-gray-300">
                           Customize <strong>context window size</strong>
                         </span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-green-500 font-bold mt-1">
+                          <DynamicIcon name="Check" className="w-4 h-4" />
+                        </span>
                         <span className="text-gray-700 dark:text-gray-300">
                           Full model parameter control
                         </span>
@@ -389,32 +414,42 @@ function InfoTabs() {
 
                   <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="text-3xl">🎙️</div>
+                      <div className="text-3xl">
+                        <DynamicIcon name="Mic" className="w-8 h-8" />
+                      </div>
                       <h4 className="text-xl font-bold text-gray-900 dark:text-white">
                         Speechify TTS
                       </h4>
                     </div>
                     <ul className="space-y-3">
                       <li className="flex items-start gap-2">
-                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-green-500 font-bold mt-1">
+                          <DynamicIcon name="Check" className="w-4 h-4" />
+                        </span>
                         <span className="text-gray-700 dark:text-gray-300">
                           Use your own Speechify API key
                         </span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-green-500 font-bold mt-1">
+                          <DynamicIcon name="Check" className="w-4 h-4" />
+                        </span>
                         <span className="text-gray-700 dark:text-gray-300">
                           <strong>Unlimited</strong> text-to-speech generations
                         </span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-green-500 font-bold mt-1">
+                          <DynamicIcon name="Check" className="w-4 h-4" />
+                        </span>
                         <span className="text-gray-700 dark:text-gray-300">
                           Premium voice library access
                         </span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-green-500 font-bold mt-1">✓</span>
+                        <span className="text-green-500 font-bold mt-1">
+                          <DynamicIcon name="Check" className="w-4 h-4" />
+                        </span>
                         <span className="text-gray-700 dark:text-gray-300">
                           No per-generation fees
                         </span>
@@ -424,12 +459,15 @@ function InfoTabs() {
                 </div>
 
                 <div className="bg-linear-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-xl p-6 mb-6">
-                  <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 text-center">
-                    ✨ Additional Benefits
+                  <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 text-center flex items-center justify-center gap-2">
+                    <DynamicIcon name="Sparkles" className="w-5 h-5" />{" "}
+                    Additional Benefits
                   </h4>
                   <div className="grid sm:grid-cols-2 gap-4 text-center">
-                    <div>
-                      <div className="text-2xl mb-2">💰</div>
+                    <div className="flex flex-col items-center">
+                      <div className="text-2xl mb-2">
+                        <DynamicIcon name="Coins" className="w-8 h-8" />
+                      </div>
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">
                         Pay-as-you-go pricing
                       </p>
@@ -437,8 +475,10 @@ function InfoTabs() {
                         Only pay for what you use
                       </p>
                     </div>
-                    <div>
-                      <div className="text-2xl mb-2">🔒</div>
+                    <div className="flex flex-col items-center">
+                      <div className="text-2xl mb-2">
+                        <DynamicIcon name="Lock" className="w-8 h-8" />
+                      </div>
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">
                         Your keys, your data
                       </p>
@@ -465,10 +505,11 @@ function InfoTabs() {
             </div>
 
             <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-              <p className="text-sm text-purple-900 dark:text-purple-200 text-center">
-                <strong>💡 Perfect for power users:</strong> With BYOK, you
-                control your AI budget directly through OpenRouter and
-                Speechify. No coin limits, just pure flexibility!
+              <p className="text-sm text-purple-900 dark:text-purple-200 text-center flex items-center justify-center gap-2">
+                <DynamicIcon name="Lightbulb" className="w-4 h-4" />{" "}
+                <strong>Perfect for power users:</strong> With BYOK, you control
+                your AI budget directly through OpenRouter and Speechify. No
+                coin limits, just pure flexibility!
               </p>
             </div>
           </div>
@@ -544,27 +585,27 @@ export default function Home() {
           </p>
 
           <div className="flex flex-wrap justify-center gap-4 mb-8">
-            <div className="px-6 py-3 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                📗
+            <div className="px-6 py-3 bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center gap-2">
+              <div className="text-blue-600 dark:text-blue-400">
+                <DynamicIcon name="BookOpen" className="w-6 h-6" />
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-gray-600 dark:text-gray-400 font-semibold">
                 Author curated
               </div>
             </div>
-            <div className="px-6 py-3 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                ⚡
+            <div className="px-6 py-3 bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center gap-2">
+              <div className="text-purple-600 dark:text-purple-400">
+                <DynamicIcon name="Zap" className="w-6 h-6" />
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-gray-600 dark:text-gray-400 font-semibold">
                 AI-Powered
               </div>
             </div>
-            <div className="px-6 py-3 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-              <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">
-                🎮
+            <div className="px-6 py-3 bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center gap-2">
+              <div className="text-pink-600 dark:text-pink-400">
+                <DynamicIcon name="Gamepad2" className="w-6 h-6" />
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-gray-600 dark:text-gray-400 font-semibold">
                 Your Choices
               </div>
             </div>
@@ -583,8 +624,9 @@ export default function Home() {
         {/* Popular Today Section */}
         <div className="w-full max-w-5xl mb-12">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
-              🔥 Popular Today
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <DynamicIcon name="Flame" className="w-8 h-8 text-orange-500" />{" "}
+              Popular Today
             </h2>
             <button
               onClick={() => router.push("/explorer")}
@@ -643,8 +685,14 @@ export default function Home() {
                           : "from-pink-400 to-red-600"
                       } flex items-center justify-center`}
                     >
-                      <div className="text-6xl">
-                        {index === 0 ? "👹" : index === 1 ? "🤖" : "🔮"}
+                      <div className="text-white">
+                        {index === 0 ? (
+                          <DynamicIcon name="Ghost" className="w-16 h-16" />
+                        ) : index === 1 ? (
+                          <DynamicIcon name="Bot" className="w-16 h-16" />
+                        ) : (
+                          <DynamicIcon name="Sparkles" className="w-16 h-16" />
+                        )}
                       </div>
                     </div>
                   )}
@@ -654,8 +702,12 @@ export default function Home() {
                       <h3 className="text-xl font-bold text-gray-900 dark:text-white line-clamp-1">
                         {adventure.title}
                       </h3>
-                      <span className="text-yellow-500 text-sm font-semibold whitespace-nowrap ml-2">
-                        ⭐ {adventure.rating?.toFixed(1) || "N/A"}
+                      <span className="text-yellow-500 text-sm font-semibold whitespace-nowrap ml-2 flex items-center gap-1">
+                        <DynamicIcon
+                          name="Star"
+                          className="w-4 h-4 fill-current"
+                        />{" "}
+                        {adventure.rating?.toFixed(1) || "N/A"}
                       </span>
                     </div>
 
@@ -678,8 +730,8 @@ export default function Home() {
                         >
                           {adventure.difficulty}
                         </span>
-                        <span className="text-gray-500 dark:text-gray-400">
-                          🎮{" "}
+                        <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                          <DynamicIcon name="Gamepad2" className="w-3 h-3" />
                           {adventure.playCount >= 1000
                             ? `${(adventure.playCount / 1000).toFixed(1)}k`
                             : adventure.playCount}{" "}
@@ -720,8 +772,8 @@ export default function Home() {
 
         {/* Roadmap Carousel Section */}
         <div className="w-full max-w-5xl mt-12">
-          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-8 text-gray-900 dark:text-white">
-            🗺️ Project Roadmap
+          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-8 text-gray-900 dark:text-white flex items-center justify-center gap-2">
+            <DynamicIcon name="Map" className="w-8 h-8" /> Project Roadmap
           </h2>
 
           <div className="relative">
@@ -764,15 +816,28 @@ export default function Home() {
                             <div
                               className={`text-3xl ${
                                 milestone.status === "done"
-                                  ? "animate-bounce"
-                                  : ""
+                                  ? "text-green-500"
+                                  : milestone.status === "wip"
+                                  ? "text-blue-500"
+                                  : "text-gray-400"
                               }`}
                             >
-                              {milestone.status === "done"
-                                ? "✅"
-                                : milestone.status === "wip"
-                                ? "🚧"
-                                : "📋"}
+                              {milestone.status === "done" ? (
+                                <DynamicIcon
+                                  name="CheckCircle"
+                                  className="w-8 h-8"
+                                />
+                              ) : milestone.status === "wip" ? (
+                                <DynamicIcon
+                                  name="Construction"
+                                  className="w-8 h-8"
+                                />
+                              ) : (
+                                <DynamicIcon
+                                  name="ClipboardList"
+                                  className="w-8 h-8"
+                                />
+                              )}
                             </div>
                             <span
                               className={`px-3 py-1 rounded-full text-sm font-semibold ${
@@ -873,7 +938,11 @@ export default function Home() {
             {/* Keyboard Navigation Hint */}
             <div className="text-center mt-6">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                💡 Tip: Use arrow keys to navigate
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="inline-block w-3 h-3 mr-1"
+                />
+                Tip: Use arrow keys to navigate
               </p>
             </div>
           </div>

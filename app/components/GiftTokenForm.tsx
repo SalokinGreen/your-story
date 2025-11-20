@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/app/misc/supabase";
 import { useNotification } from "@/app/misc/NotificationContext";
+import { DynamicIcon } from "./DynamicIcon";
 
 interface GiftTokenFormProps {
   recipientId: string;
@@ -10,7 +11,11 @@ interface GiftTokenFormProps {
   onSuccess?: () => void;
 }
 
-export default function GiftTokenForm({ recipientId, recipientEmail, onSuccess }: GiftTokenFormProps) {
+export default function GiftTokenForm({
+  recipientId,
+  recipientEmail,
+  onSuccess,
+}: GiftTokenFormProps) {
   const { addNotification } = useNotification();
   const [amount, setAmount] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -20,7 +25,9 @@ export default function GiftTokenForm({ recipientId, recipientEmail, onSuccess }
     setLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         addNotification("Please sign in to gift credits", "warning");
         setLoading(false);
@@ -31,7 +38,7 @@ export default function GiftTokenForm({ recipientId, recipientEmail, onSuccess }
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           toUserId: recipientId,
@@ -42,13 +49,16 @@ export default function GiftTokenForm({ recipientId, recipientEmail, onSuccess }
       const data = await response.json();
 
       if (!response.ok) {
-        addNotification(`❌ ${data.error || "Failed to gift credits"}`, "failure");
+        addNotification(`${data.error || "Failed to gift credits"}`, "failure");
         setLoading(false);
         return;
       }
 
       const creditLabel = amount === 1 ? "credit" : "credits";
-      addNotification(`✓ Gifted ${amount} ${creditLabel} to ${recipientEmail}`, "success");
+      addNotification(
+        `Gifted ${amount} ${creditLabel} to ${recipientEmail}`,
+        "success"
+      );
       setAmount(1);
       onSuccess?.();
     } catch (error) {
@@ -62,12 +72,15 @@ export default function GiftTokenForm({ recipientId, recipientEmail, onSuccess }
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
       <h3 className="text-lg sm:text-xl font-bold mb-6 flex items-center gap-2 text-gray-900 dark:text-white">
-        <span className="text-2xl">🎁</span>
+        <DynamicIcon name="Gift" className="w-6 h-6 text-pink-500" />
         Gift Credits
       </h3>
       <form onSubmit={handleGift} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <label htmlFor="amount" className="font-bold text-gray-900 dark:text-white">
+          <label
+            htmlFor="amount"
+            className="font-bold text-gray-900 dark:text-white"
+          >
             Amount:
           </label>
           <input
@@ -83,12 +96,22 @@ export default function GiftTokenForm({ recipientId, recipientEmail, onSuccess }
         <button
           type="submit"
           disabled={loading || amount <= 0}
-          className="px-6 py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          className="px-6 py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
         >
-          {loading ? "Gifting..." : `🎁 Gift ${amount} ${amount === 1 ? "Credit" : "Credits"}`}
+          {loading ? (
+            "Gifting..."
+          ) : (
+            <>
+              <DynamicIcon name="Gift" className="w-5 h-5" /> Gift {amount}{" "}
+              {amount === 1 ? "Credit" : "Credits"}
+            </>
+          )}
         </button>
         <p className="text-xs text-gray-600 dark:text-gray-400">
-          Sending to: <span className="font-semibold text-gray-900 dark:text-white">{recipientEmail}</span>
+          Sending to:{" "}
+          <span className="font-semibold text-gray-900 dark:text-white">
+            {recipientEmail}
+          </span>
         </p>
       </form>
     </div>

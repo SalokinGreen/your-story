@@ -13,6 +13,7 @@ import EditDisplayName from "@/app/components/EditDisplayName";
 import EditProfile from "@/app/components/EditProfile";
 import UserOptions from "@/app/components/UserOptions";
 import { Adventure, Story } from "@/app/misc/structs";
+import { DynamicIcon } from "@/app/components/DynamicIcon";
 
 interface ProfileUser {
   id: string;
@@ -303,9 +304,10 @@ export default function ProfilePage() {
           <div className="flex justify-center">
             <button
               onClick={handleRefresh}
-              className="px-6 py-3 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 font-semibold transition-all rounded-lg shadow-md hover:shadow-lg text-gray-900 dark:text-white"
+              className="px-6 py-3 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 font-semibold transition-all rounded-lg shadow-md hover:shadow-lg text-gray-900 dark:text-white flex items-center gap-2"
             >
-              🔄 Refresh Balance
+              <DynamicIcon name="RefreshCw" className="w-5 h-5" /> Refresh
+              Balance
             </button>
           </div>
           {/* Gift Form (only show if viewing another user's profile) */}
@@ -321,7 +323,8 @@ export default function ProfilePage() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-purple-50 dark:bg-purple-900/30">
               <h2 className="text-xl font-bold text-purple-600 dark:text-purple-400 flex items-center gap-2">
-                🎮 Adventures ({adventures.length})
+                <DynamicIcon name="Gamepad2" className="w-5 h-5" /> Adventures (
+                {adventures.length})
               </h2>
             </div>
 
@@ -359,7 +362,10 @@ export default function ProfilePage() {
                           {adventure.title}
                         </h3>
                         {adventure.isFeatured && (
-                          <span className="text-yellow-500 ml-2">⭐</span>
+                          <DynamicIcon
+                            name="Star"
+                            className="w-4 h-4 text-yellow-500 ml-2"
+                          />
                         )}
                       </div>
                       <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
@@ -373,17 +379,20 @@ export default function ProfilePage() {
                         >
                           {adventure.difficulty}
                         </span>
-                        <span className="text-xs text-gray-600 dark:text-gray-400">
-                          ⭐ {adventure.rating?.toFixed(1) || "N/A"}
+                        <span className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                          <DynamicIcon name="Star" className="w-3 h-3" />{" "}
+                          {adventure.rating?.toFixed(1) || "N/A"}
                         </span>
-                        <span className="text-xs text-gray-600 dark:text-gray-400">
-                          🎮 {adventure.playCount} plays
+                        <span className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                          <DynamicIcon name="Gamepad2" className="w-3 h-3" />{" "}
+                          {adventure.playCount} plays
                         </span>
                       </div>
                       {!adventure.isPublished && (
                         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                          <span className="text-xs font-semibold text-orange-600 dark:text-orange-400">
-                            📝 Draft
+                          <span className="text-xs font-semibold text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                            <DynamicIcon name="FileEdit" className="w-3 h-3" />{" "}
+                            Draft
                           </span>
                         </div>
                       )}

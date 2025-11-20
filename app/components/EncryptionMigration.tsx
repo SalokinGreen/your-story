@@ -5,6 +5,7 @@ import { useAuth } from "@/app/misc/AuthContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { encryptStoryData, isEncrypted } from "@/app/misc/encryption";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
+import { DynamicIcon } from "./DynamicIcon";
 
 interface Story {
   id: string;
@@ -91,7 +92,7 @@ export default function EncryptionMigration({
 
     if (failCount === 0) {
       addNotification(
-        `✅ Successfully encrypted ${successCount} ${
+        `Successfully encrypted ${successCount} ${
           successCount === 1 ? "story" : "stories"
         }!`,
         "success"
@@ -116,7 +117,12 @@ export default function EncryptionMigration({
     <>
       <div className="bg-linear-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-2 border-emerald-300 dark:border-emerald-700 rounded-2xl p-6 mb-6 shadow-lg">
         <div className="flex items-start gap-4">
-          <div className="text-4xl">🔒</div>
+          <div className="text-4xl">
+            <DynamicIcon
+              name="Lock"
+              className="w-10 h-10 text-emerald-600 dark:text-emerald-400"
+            />
+          </div>
           <div className="flex-1">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
               Encrypt Your Stories
@@ -129,9 +135,10 @@ export default function EncryptionMigration({
             </p>
             <button
               onClick={() => setShowDialog(true)}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors shadow-md"
+              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors shadow-md flex items-center gap-2"
             >
-              🔐 Enable Encryption ({unencryptedStories.length}{" "}
+              <DynamicIcon name="Lock" className="w-5 h-5" /> Enable Encryption
+              ({unencryptedStories.length}{" "}
               {unencryptedStories.length === 1 ? "story" : "stories"})
             </button>
           </div>
@@ -142,7 +149,12 @@ export default function EncryptionMigration({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-2xl w-full shadow-2xl">
             <div className="text-center mb-6">
-              <div className="text-6xl mb-4">🔒</div>
+              <div className="flex justify-center mb-4">
+                <DynamicIcon
+                  name="Lock"
+                  className="w-16 h-16 text-emerald-600 dark:text-emerald-400"
+                />
+              </div>
               <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Enable Story Encryption
               </h2>
@@ -151,8 +163,9 @@ export default function EncryptionMigration({
             {!encrypting ? (
               <>
                 <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-6 mb-6">
-                  <h3 className="font-bold text-gray-900 dark:text-white mb-3">
-                    📋 What will happen:
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <DynamicIcon name="Clipboard" className="w-5 h-5" /> What
+                    will happen:
                   </h3>
                   <ul className="space-y-2 text-gray-700 dark:text-gray-300">
                     <li>
@@ -174,8 +187,9 @@ export default function EncryptionMigration({
                 </div>
 
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-700 rounded-xl p-6 mb-6">
-                  <h3 className="font-bold text-gray-900 dark:text-white mb-3">
-                    ⚠️ Important:
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <DynamicIcon name="AlertTriangle" className="w-5 h-5" />{" "}
+                    Important:
                   </h3>
                   <ul className="space-y-2 text-gray-700 dark:text-gray-300">
                     <li>
@@ -199,9 +213,10 @@ export default function EncryptionMigration({
                   </button>
                   <button
                     onClick={handleEncryptAll}
-                    className="flex-1 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors shadow-md"
+                    className="flex-1 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
                   >
-                    🔐 Encrypt All Stories
+                    <DynamicIcon name="Lock" className="w-5 h-5" /> Encrypt All
+                    Stories
                   </button>
                 </div>
               </>

@@ -6,6 +6,7 @@ import { StoryData } from "@/app/misc/structs";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
 import { parseCreatorOutput } from "@/app/misc/creator_ai";
 import { AI_MODELS } from "@/app/misc/ai_prices";
+import { DynamicIcon } from "./DynamicIcon";
 
 interface CreatorAIChatProps {
   isOpen: boolean;
@@ -160,7 +161,11 @@ export default function CreatorAIChat({
         <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-6 py-4 backdrop-blur-sm">
           <div>
             <h2 className="text-xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
-              <span>✨</span> AI Creative Assistant
+              <DynamicIcon
+                name="Sparkles"
+                className="w-5 h-5 text-purple-500"
+              />{" "}
+              AI Creative Assistant
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               For your Adventures
@@ -184,43 +189,14 @@ export default function CreatorAIChat({
                 className="rounded-full p-2 text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                 title="Clear chat history"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 6h18" />
-                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                  <line x1="10" x2="10" y1="11" y2="17" />
-                  <line x1="14" x2="14" y1="11" y2="17" />
-                </svg>
+                <DynamicIcon name="Trash2" className="w-5 h-5" />
               </button>
             )}
             <button
               onClick={onClose}
               className="rounded-full p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
+              <DynamicIcon name="X" className="w-6 h-6" />
             </button>
           </div>
         </div>
@@ -230,7 +206,10 @@ export default function CreatorAIChat({
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400 space-y-4 p-8">
               <div className="w-20 h-20 bg-linear-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center text-4xl shadow-inner">
-                🤖
+                <DynamicIcon
+                  name="Bot"
+                  className="w-10 h-10 text-purple-600 dark:text-purple-400"
+                />
               </div>
               <div className="max-w-sm">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
@@ -307,27 +286,11 @@ export default function CreatorAIChat({
               disabled={loading || !input.trim()}
               className="mb-0.5 p-2 rounded-lg bg-linear-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg active:scale-95"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={loading ? "animate-spin" : ""}
-              >
-                {loading ? (
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                ) : (
-                  <>
-                    <path d="m22 2-7 20-4-9-9-4Z" />
-                    <path d="M22 2 11 13" />
-                  </>
-                )}
-              </svg>
+              {loading ? (
+                <DynamicIcon name="Loader2" className="w-5 h-5 animate-spin" />
+              ) : (
+                <DynamicIcon name="Send" className="w-5 h-5" />
+              )}
             </button>
           </div>
           <div className="text-center mt-2">
@@ -375,21 +338,7 @@ function MessageItem({
         {!isUser && meta?.cost && (
           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50 flex items-center justify-between text-xs">
             <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
-                <path d="M12 18V6" />
-              </svg>
+              <DynamicIcon name="Info" className="w-3 h-3" />
               Generation cost
             </span>
             <span className="font-semibold text-amber-600 dark:text-amber-400">
@@ -415,19 +364,7 @@ function MessageItem({
                 onClick={() => onApplyChanges(data)}
                 className="w-full rounded-lg bg-green-600 hover:bg-green-500 text-white py-2 text-sm font-bold transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
+                <DynamicIcon name="Check" className="w-4 h-4" />
                 Apply Changes
               </button>
             </div>
@@ -463,7 +400,7 @@ function ChangeSummary({
       type: "Update",
       label: "Adventure Title",
       value: data.title,
-      icon: "🎯",
+      icon: "Target",
     });
   if (data.shortDescription)
     changes.push({
@@ -471,7 +408,7 @@ function ChangeSummary({
       label: "Short Description",
       value: data.shortDescription,
       details: data.shortDescription,
-      icon: "📄",
+      icon: "FileText",
     });
   if (data.description)
     changes.push({
@@ -482,7 +419,7 @@ function ChangeSummary({
           ? data.description.substring(0, 50) + "..."
           : data.description,
       details: data.description,
-      icon: "📋",
+      icon: "Clipboard",
     });
 
   // Story data changes
@@ -491,7 +428,7 @@ function ChangeSummary({
       type: "Update",
       label: "Story Name",
       value: data.story_name,
-      icon: "📝",
+      icon: "Edit3",
     });
   if (data.premise)
     changes.push({
@@ -499,14 +436,14 @@ function ChangeSummary({
       label: "Premise",
       value: "Updated premise text",
       details: data.premise,
-      icon: "📖",
+      icon: "BookOpen",
     });
   if (data.player_name)
     changes.push({
       type: "Update",
       label: "Player Name",
       value: data.player_name,
-      icon: "👤",
+      icon: "User",
     });
   if (data.player_summary)
     changes.push({
@@ -514,7 +451,7 @@ function ChangeSummary({
       label: "Player Summary",
       value: "Updated summary",
       details: data.player_summary,
-      icon: "📄",
+      icon: "FileText",
     });
   if (data.starting_content)
     changes.push({
@@ -522,7 +459,7 @@ function ChangeSummary({
       label: "Starting Content",
       value: "Updated content",
       details: data.starting_content,
-      icon: "🎬",
+      icon: "Clapperboard",
     });
   if (data.author_notes)
     changes.push({
@@ -530,7 +467,7 @@ function ChangeSummary({
       label: "Author Notes",
       value: "Updated notes",
       details: data.author_notes,
-      icon: "🗒️",
+      icon: "StickyNote",
     });
 
   if (data.stats?.length) {
@@ -539,7 +476,7 @@ function ChangeSummary({
       label: "Stats",
       value: `${data.stats.length} stats`,
       details: data.stats,
-      icon: "📊",
+      icon: "BarChart2",
     });
   }
   if (data.resources?.length) {
@@ -548,7 +485,7 @@ function ChangeSummary({
       label: "Resources",
       value: `${data.resources.length} resources`,
       details: data.resources,
-      icon: "💎",
+      icon: "Diamond",
     });
   }
   if (data.inventory?.length) {
@@ -557,7 +494,7 @@ function ChangeSummary({
       label: "Inventory",
       value: `${data.inventory.length} items`,
       details: data.inventory,
-      icon: "🎒",
+      icon: "Backpack",
     });
   }
   if (data.plot_beats?.length) {
@@ -566,7 +503,7 @@ function ChangeSummary({
       label: "Plot Beats",
       value: `${data.plot_beats.length} beats`,
       details: data.plot_beats,
-      icon: "📈",
+      icon: "TrendingUp",
     });
   }
   if (data.lore?.length) {
@@ -575,7 +512,7 @@ function ChangeSummary({
       label: "Lore",
       value: `${data.lore.length} entries`,
       details: data.lore,
-      icon: "📜",
+      icon: "Scroll",
     });
   }
   if (data.achievements?.length) {
@@ -584,7 +521,7 @@ function ChangeSummary({
       label: "Achievements",
       value: `${data.achievements.length} achievements`,
       details: data.achievements,
-      icon: "🏆",
+      icon: "Trophy",
     });
   }
   if (data.quests?.length) {
@@ -593,7 +530,7 @@ function ChangeSummary({
       label: "Quests",
       value: `${data.quests.length} quests`,
       details: data.quests,
-      icon: "⚔️",
+      icon: "Swords",
     });
   }
   if (data.presets?.length) {
@@ -602,7 +539,7 @@ function ChangeSummary({
       label: "Presets",
       value: `${data.presets.length} templates`,
       details: data.presets,
-      icon: "🎭",
+      icon: "LayoutTemplate",
     });
   }
 
@@ -623,7 +560,10 @@ function ChangeSummary({
               change.details && setExpandedIndex(expandedIndex === i ? null : i)
             }
           >
-            <span className="text-lg">{change.icon}</span>
+            <DynamicIcon
+              name={change.icon as any}
+              className="w-5 h-5 text-gray-600 dark:text-gray-300"
+            />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
@@ -640,33 +580,9 @@ function ChangeSummary({
             {change.details && (
               <span className="text-gray-400 transition-transform duration-200">
                 {expandedIndex === i ? (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="m18 15-6-6-6 6" />
-                  </svg>
+                  <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                 ) : (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
+                  <DynamicIcon name="ChevronDown" className="w-4 h-4" />
                 )}
               </span>
             )}

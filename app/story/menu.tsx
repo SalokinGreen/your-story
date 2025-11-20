@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   StoryData,
@@ -20,6 +20,8 @@ import { AI_MODELS } from "../misc/ai_prices";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { getUserSettings, updateUserSettings } from "../misc/user_settings";
 import { useAuth } from "../misc/AuthContext";
+import { DynamicIcon } from "../components/DynamicIcon";
+import { IconPicker } from "../components/IconPicker";
 
 // AI Model Selector Component with state management
 function AIModelSelector({
@@ -141,10 +143,10 @@ function AIModelSelector({
       setCurrentModelKey(newModelKey);
 
       if (newModelKey === "custom") {
-        addNotification(`🤖 Model changed to Custom Model`, "success");
+        addNotification(`Model changed to Custom Model`, "success");
       } else {
         const newModel = AI_MODELS[newModelKey as keyof typeof AI_MODELS];
-        addNotification(`🤖 Model changed to ${newModel.name}`, "success");
+        addNotification(`Model changed to ${newModel.name}`, "success");
       }
     }
   };
@@ -152,7 +154,9 @@ function AIModelSelector({
   return (
     <div className="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
       <label className="p-4 pb-3 text-sm font-semibold text-gray-700 dark:text-gray-300 flex justify-between items-center">
-        <span>🤖 AI Model Selection</span>
+        <span className="flex items-center gap-2">
+          <DynamicIcon name="Bot" className="w-4 h-4" /> AI Model Selection
+        </span>
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
@@ -554,7 +558,7 @@ function StatsResourcesEditor({
       name: "New Stat",
       value: 50,
       description: "",
-      symbol: "⭐",
+      symbol: "Star",
     };
     const updated = [...localStats, newStat];
     setLocalStats(updated);
@@ -573,7 +577,7 @@ function StatsResourcesEditor({
       value: 100,
       maxValue: 100,
       description: "",
-      symbol: "💎",
+      symbol: "Gem",
     };
     const updated = [...localResources, newResource];
     setLocalResources(updated);
@@ -613,7 +617,7 @@ function StatsResourcesEditor({
       description: "",
       dateAchieved: null,
       points: 10,
-      symbol: "🏆",
+      symbol: "Trophy",
     };
     const updated = [...localAchievements, newAchievement];
     setLocalAchievements(updated);
@@ -780,8 +784,8 @@ function StatsResourcesEditor({
       {/* Stats Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white">
-            📊 Stats
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <DynamicIcon name="BarChart2" className="w-6 h-6" /> Stats
           </h4>
           <button
             onClick={addStat}
@@ -792,7 +796,8 @@ function StatsResourcesEditor({
         </div>
         <div className="space-y-3">
           <p className="text-xs text-gray-600 dark:text-gray-400">
-            💡 Drag and drop to reorder (or use arrow buttons on mobile)
+            <DynamicIcon name="Lightbulb" className="w-3 h-3 inline mr-1" />{" "}
+            Drag and drop to reorder (or use arrow buttons on mobile)
           </p>
           {localStats.map((stat, index) =>
             editingStatIndex === index ? (
@@ -802,7 +807,7 @@ function StatsResourcesEditor({
                 className="p-4 bg-blue-100 dark:bg-blue-900/40 rounded-lg border-2 border-blue-400"
               >
                 <h5 className="text-sm font-bold mb-3 text-gray-900 dark:text-white">
-                  ✏️ Editing Stat
+                  <DynamicIcon name="Edit" className="w-4 h-4" /> Editing Stat
                 </h5>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                   <input
@@ -814,16 +819,14 @@ function StatsResourcesEditor({
                     placeholder="Stat name"
                     className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
-                  <input
-                    type="text"
-                    value={editStat.symbol || ""}
-                    onChange={(e) =>
-                      setEditStat({ ...editStat, symbol: e.target.value })
-                    }
-                    placeholder="Symbol"
-                    className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                    maxLength={4}
-                  />
+                  <div className="relative z-50">
+                    <IconPicker
+                      value={editStat.symbol || "Star"}
+                      onChange={(icon) =>
+                        setEditStat({ ...editStat, symbol: icon })
+                      }
+                    />
+                  </div>
                   <input
                     type="number"
                     value={editStat.value || 0}
@@ -852,7 +855,8 @@ function StatsResourcesEditor({
                     disabled={!editStat.name || !editStat.description}
                     className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded"
                   >
-                    ✓ Save
+                    <DynamicIcon name="Check" className="w-4 h-4 inline mr-1" />{" "}
+                    Save
                   </button>
                   <button
                     onClick={cancelEditStat}
@@ -875,11 +879,14 @@ function StatsResourcesEditor({
               >
                 <div className="flex items-start gap-3">
                   <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing mt-2">
-                    ⋮⋮
+                    <DynamicIcon name="GripVertical" className="w-5 h-5" />
                   </div>
                   <div className="flex-1 space-y-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl">{stat.symbol}</span>
+                      <DynamicIcon
+                        name={stat.symbol}
+                        className="w-8 h-8 text-blue-600 dark:text-blue-400"
+                      />
                       <div>
                         <div className="font-bold text-gray-900 dark:text-white">
                           {stat.name}
@@ -899,26 +906,26 @@ function StatsResourcesEditor({
                       disabled={index === 0}
                       className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs"
                     >
-                      ▲
+                      <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => moveStatDown(index)}
                       disabled={index === localStats.length - 1}
                       className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs"
                     >
-                      ▼
+                      <DynamicIcon name="ChevronDown" className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => startEditStat(index)}
                       className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs"
                     >
-                      ✏️
+                      <DynamicIcon name="Edit" className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => removeStat(index)}
                       className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
                     >
-                      ✕
+                      <DynamicIcon name="X" className="w-4 h-4 inline mr-1" />
                     </button>
                   </div>
                 </div>
@@ -931,8 +938,8 @@ function StatsResourcesEditor({
       {/* Resources Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white">
-            💎 Resources
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <DynamicIcon name="Gem" className="w-6 h-6" /> Resources
           </h4>
           <button
             onClick={addResource}
@@ -958,18 +965,14 @@ function StatsResourcesEditor({
                     placeholder="Resource name"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
-                  <input
-                    type="text"
-                    value={editResource.symbol || ""}
-                    onChange={(e) =>
-                      setEditResource({
-                        ...editResource,
-                        symbol: e.target.value,
-                      })
-                    }
-                    placeholder="Symbol"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                  />
+                  <div className="relative z-50">
+                    <IconPicker
+                      value={editResource.symbol || "Gem"}
+                      onChange={(icon) =>
+                        setEditResource({ ...editResource, symbol: icon })
+                      }
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <input
                       type="number"
@@ -1035,11 +1038,18 @@ function StatsResourcesEditor({
                   draggedResourceIndex === index ? "opacity-50" : ""
                 }`}
               >
-                <span className="text-gray-400 select-none">⋮⋮</span>
+                <span className="text-gray-400 select-none">
+                  <DynamicIcon name="GripVertical" className="w-5 h-5" />
+                </span>
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    {resource.symbol} {resource.name}: {resource.value}/
-                    {resource.maxValue}
+                  <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                    <DynamicIcon
+                      name={resource.symbol}
+                      className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                    />
+                    <span>
+                      {resource.name}: {resource.value}/{resource.maxValue}
+                    </span>
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     {resource.description}
@@ -1052,7 +1062,7 @@ function StatsResourcesEditor({
                     className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                     title="Move up"
                   >
-                    ▲
+                    <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => moveResourceDown(index)}
@@ -1060,14 +1070,14 @@ function StatsResourcesEditor({
                     className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                     title="Move down"
                   >
-                    ▼
+                    <DynamicIcon name="ChevronDown" className="w-5 h-5" />
                   </button>
                 </div>
                 <button
                   onClick={() => startEditResource(index)}
                   className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
                 >
-                  ✏️
+                  <DynamicIcon name="Edit" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => removeResource(index)}
@@ -1084,8 +1094,8 @@ function StatsResourcesEditor({
       {/* Achievements Editor */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white">
-            🏆 Achievements
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <DynamicIcon name="Trophy" className="w-6 h-6" /> Achievements
           </h4>
           <button
             onClick={addAchievement}
@@ -1114,18 +1124,14 @@ function StatsResourcesEditor({
                     placeholder="Title"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
-                  <input
-                    type="text"
-                    value={editAchievement.symbol || ""}
-                    onChange={(e) =>
-                      setEditAchievement({
-                        ...editAchievement,
-                        symbol: e.target.value,
-                      })
-                    }
-                    placeholder="Symbol"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                  />
+                  <div className="relative z-50">
+                    <IconPicker
+                      value={editAchievement.symbol || "Trophy"}
+                      onChange={(icon) =>
+                        setEditAchievement({ ...editAchievement, symbol: icon })
+                      }
+                    />
+                  </div>
                   <input
                     type="number"
                     value={editAchievement.points ?? 0}
@@ -1174,7 +1180,13 @@ function StatsResourcesEditor({
                       }
                       className="w-4 h-4 rounded"
                     />
-                    <span>🔒 Hidden Achievement</span>
+                    <span>
+                      <DynamicIcon
+                        name="Lock"
+                        className="inline-block w-3 h-3 mr-1"
+                      />
+                      Hidden Achievement
+                    </span>
                   </label>
                   <label className="flex items-center gap-2 text-gray-900 dark:text-white">
                     <input
@@ -1217,19 +1229,35 @@ function StatsResourcesEditor({
                   draggedAchievementIndex === index ? "opacity-50" : ""
                 }`}
               >
-                <span className="text-gray-400 select-none">⋮⋮</span>
+                <span className="text-gray-400 select-none">
+                  <DynamicIcon name="GripVertical" className="w-5 h-5" />
+                </span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 font-medium text-gray-900 dark:text-white">
-                    <span>
-                      {achievement.symbol} {achievement.title} (
-                      {achievement.points} pts)
+                    <div className="flex items-center gap-2">
+                      <DynamicIcon
+                        name={achievement.symbol}
+                        className="w-5 h-5 text-yellow-600 dark:text-yellow-400"
+                      />
+                      <span>
+                        {achievement.title} ({achievement.points} pts)
+                      </span>
                       {achievement.dateAchieved && (
-                        <span className="ml-2 text-green-500">✓</span>
+                        <span className="ml-2 text-green-500">
+                          <DynamicIcon
+                            name="Check"
+                            className="w-4 h-4 inline mr-1"
+                          />
+                        </span>
                       )}
-                    </span>
+                    </div>
                     {achievement.hidden && (
                       <span className="px-2 py-0.5 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full text-xs font-bold">
-                        🔒 Hidden
+                        <DynamicIcon
+                          name="Lock"
+                          className="inline-block w-3 h-3 mr-1"
+                        />
+                        Hidden
                       </span>
                     )}
                   </div>
@@ -1244,7 +1272,7 @@ function StatsResourcesEditor({
                     className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                     title="Move up"
                   >
-                    ▲
+                    <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => moveAchievementDown(index)}
@@ -1252,14 +1280,14 @@ function StatsResourcesEditor({
                     className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                     title="Move down"
                   >
-                    ▼
+                    <DynamicIcon name="ChevronDown" className="w-5 h-5" />
                   </button>
                 </div>
                 <button
                   onClick={() => startEditAchievement(index)}
                   className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
                 >
-                  ✏️
+                  <DynamicIcon name="Edit" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => removeAchievement(index)}
@@ -1388,8 +1416,8 @@ function QuestEditor({
       {/* Quests Editor */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white">
-            📜 Quests
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <DynamicIcon name="Scroll" className="w-6 h-6" /> Quests
           </h4>
           <button
             onClick={addQuest}
@@ -1462,7 +1490,7 @@ function QuestEditor({
                             active: e.target.checked,
                           })
                         }
-                        className="w-4 h-4 rounded"
+                        className="rounded"
                       />
                       <span>Active</span>
                     </label>
@@ -1476,7 +1504,7 @@ function QuestEditor({
                             fulfilled: e.target.checked,
                           })
                         }
-                        className="w-4 h-4 rounded"
+                        className="rounded"
                       />
                       <span>Fulfilled</span>
                     </label>
@@ -1508,11 +1536,17 @@ function QuestEditor({
                   draggedQuestIndex === index ? "opacity-50" : ""
                 }`}
               >
-                <span className="text-gray-400 select-none">⋮⋮</span>
+                <span className="text-gray-400 select-none">
+                  <DynamicIcon name="GripVertical" className="w-5 h-5" />
+                </span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 font-medium text-gray-900 dark:text-white">
-                    <span>
-                      📜 {quest.title} ({quest.points} pts)
+                    <span className="flex items-center gap-2">
+                      <DynamicIcon
+                        name="Scroll"
+                        className="w-5 h-5 text-amber-600 dark:text-amber-400"
+                      />
+                      {quest.title} ({quest.points} pts)
                     </span>
                     {quest.active && !quest.fulfilled && (
                       <span className="px-2 py-0.5 bg-blue-200 dark:bg-blue-800/50 text-blue-800 dark:text-blue-200 rounded-full text-xs font-bold">
@@ -1520,7 +1554,12 @@ function QuestEditor({
                       </span>
                     )}
                     {quest.fulfilled && (
-                      <span className="text-green-500">✓</span>
+                      <span className="text-green-500">
+                        <DynamicIcon
+                          name="Check"
+                          className="w-4 h-4 inline mr-1"
+                        />
+                      </span>
                     )}
                     {!quest.active && !quest.fulfilled && (
                       <span className="px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full text-xs font-bold">
@@ -1539,7 +1578,7 @@ function QuestEditor({
                     className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                     title="Move up"
                   >
-                    ▲
+                    <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => moveQuestDown(index)}
@@ -1547,14 +1586,14 @@ function QuestEditor({
                     className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                     title="Move down"
                   >
-                    ▼
+                    <DynamicIcon name="ChevronDown" className="w-5 h-5" />
                   </button>
                 </div>
                 <button
                   onClick={() => startEditQuest(index)}
                   className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
                 >
-                  ✏️
+                  <DynamicIcon name="Edit" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => removeQuest(index)}
@@ -1673,7 +1712,7 @@ function InventoryEditor({
       quantity: 1,
       description: "",
       type: "normal",
-      symbol: "📦",
+      symbol: "Package",
     };
     const updated = [...localInventory, newItem];
     setLocalInventory(updated);
@@ -1689,8 +1728,9 @@ function InventoryEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white">
-          🎒 Inventory ({localInventory.length} items)
+        <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <DynamicIcon name="Backpack" className="w-6 h-6" /> Inventory (
+          {localInventory.length} items)
         </h4>
         <button
           onClick={addItem}
@@ -1719,18 +1759,17 @@ function InventoryEditor({
                   placeholder="Item name"
                   className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                 />
-                <input
-                  type="text"
-                  value={editInventoryItem.symbol || ""}
-                  onChange={(e) =>
-                    setEditInventoryItem({
-                      ...editInventoryItem,
-                      symbol: e.target.value,
-                    })
-                  }
-                  placeholder="Symbol"
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
-                />
+                <div className="relative z-50">
+                  <IconPicker
+                    value={editInventoryItem.symbol || "Package"}
+                    onChange={(icon) =>
+                      setEditInventoryItem({
+                        ...editInventoryItem,
+                        symbol: icon,
+                      })
+                    }
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     type="number"
@@ -1800,11 +1839,18 @@ function InventoryEditor({
                 draggedInventoryIndex === index ? "opacity-50" : ""
               }`}
             >
-              <span className="text-gray-400 select-none">⋮⋮</span>
+              <span className="text-gray-400 select-none">
+                <DynamicIcon name="GripVertical" className="w-5 h-5" />
+              </span>
               <div className="flex-1">
-                <div className="font-medium text-gray-900 dark:text-white">
-                  {item.symbol} {item.name} x{item.quantity}{" "}
-                  {item.type && `(${item.type})`}
+                <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                  <DynamicIcon
+                    name={item.symbol}
+                    className="w-5 h-5 text-gray-600 dark:text-gray-400"
+                  />
+                  <span>
+                    {item.name} x{item.quantity} {item.type && `(${item.type})`}
+                  </span>
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   {item.description}
@@ -1817,7 +1863,7 @@ function InventoryEditor({
                   className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                   title="Move up"
                 >
-                  ▲
+                  <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => moveInventoryDown(index)}
@@ -1825,14 +1871,14 @@ function InventoryEditor({
                   className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                   title="Move down"
                 >
-                  ▼
+                  <DynamicIcon name="ChevronDown" className="w-5 h-5" />
                 </button>
               </div>
               <button
                 onClick={() => startEditInventoryItem(index)}
                 className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
               >
-                ✏️
+                <DynamicIcon name="Edit" className="w-4 h-4" />
               </button>
               <button
                 onClick={() => removeItem(index)}
@@ -2008,8 +2054,9 @@ function LoreEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white">
-          📜 Lore Entries ({localLore.length})
+        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+          <DynamicIcon name="Book" className="w-6 h-6" /> Lore Entries (
+          {localLore.length})
         </h4>
         <button
           onClick={addLore}
@@ -2079,7 +2126,11 @@ function LoreEditor({
                         htmlFor={`upload-lore-thumb-edit-${index}`}
                         className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer text-sm"
                       >
-                        📸 Upload Thumbnail
+                        <DynamicIcon
+                          name="Upload"
+                          className="inline-block w-4 h-4 mr-1"
+                        />
+                        Upload Thumbnail
                       </label>
                       {editLore.thumbnailUrl && (
                         <button
@@ -2117,7 +2168,13 @@ function LoreEditor({
                       }
                       className="rounded"
                     />
-                    <span>🔒 Secret Lore (hidden until discovered)</span>
+                    <span>
+                      <DynamicIcon
+                        name="Lock"
+                        className="inline-block w-3 h-3 mr-1"
+                      />
+                      Secret Lore (hidden until discovered)
+                    </span>
                   </label>
                   <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                     <input
@@ -2128,18 +2185,30 @@ function LoreEditor({
                       }
                       className="rounded"
                     />
-                    <span>✅ Enabled</span>
+                    <span>
+                      <DynamicIcon
+                        name="CheckCircle"
+                        className="inline-block w-4 h-4 mr-1 text-green-600"
+                      />
+                      Enabled
+                    </span>
                   </label>
                   <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                     <input
                       type="checkbox"
-                      checked={editLore.alwaysOn ?? false}
+                      checked={!!editLore.alwaysOn}
                       onChange={(e) =>
                         setEditLore({ ...editLore, alwaysOn: e.target.checked })
                       }
                       className="rounded"
                     />
-                    <span>🔵 Always On</span>
+                    <span>
+                      <DynamicIcon
+                        name="Circle"
+                        className="inline-block w-4 h-4 mr-1 text-blue-500"
+                      />
+                      Always On
+                    </span>
                   </label>
                 </div>
 
@@ -2147,7 +2216,11 @@ function LoreEditor({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      ✅ ON Trigger Words
+                      <DynamicIcon
+                        name="CheckCircle"
+                        className="inline-block w-4 h-4 mr-1 text-green-600"
+                      />
+                      ON Trigger Words
                     </label>
                     <div className="space-y-2">
                       <div className="flex gap-2">
@@ -2182,7 +2255,11 @@ function LoreEditor({
                             key={idx}
                             className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs flex items-center gap-1"
                           >
-                            ✅ {trigger}
+                            <DynamicIcon
+                              name="CheckCircle"
+                              className="w-3 h-3"
+                            />
+                            {trigger}
                             <button
                               onClick={() =>
                                 setEditLore({
@@ -2204,7 +2281,11 @@ function LoreEditor({
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      ❌ OFF Trigger Words
+                      <DynamicIcon
+                        name="XCircle"
+                        className="inline-block w-4 h-4 mr-1 text-red-600"
+                      />
+                      OFF Trigger Words
                     </label>
                     <div className="space-y-2">
                       <div className="flex gap-2">
@@ -2239,7 +2320,8 @@ function LoreEditor({
                             key={idx}
                             className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-xs flex items-center gap-1"
                           >
-                            ❌ {trigger}
+                            <DynamicIcon name="XCircle" className="w-3 h-3" />
+                            {trigger}
                             <button
                               onClick={() =>
                                 setEditLore({
@@ -2269,10 +2351,18 @@ function LoreEditor({
                     className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                   >
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      ⚙️ Advanced Section
+                      <DynamicIcon
+                        name="Settings"
+                        className="inline-block w-4 h-4 mr-1"
+                      />
+                      Advanced Section
                     </span>
                     <span className="text-gray-500 dark:text-gray-400">
-                      {editLoreAdvancedExpanded ? "▼" : "▶"}
+                      {editLoreAdvancedExpanded ? (
+                        <DynamicIcon name="ChevronDown" className="w-4 h-4" />
+                      ) : (
+                        <DynamicIcon name="ChevronRight" className="w-4 h-4" />
+                      )}
                     </span>
                   </button>
 
@@ -2282,7 +2372,11 @@ function LoreEditor({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            ✅ Lores that turn this ON
+                            <DynamicIcon
+                              name="CheckCircle"
+                              className="inline-block w-4 h-4 mr-1 text-green-600"
+                            />
+                            Lores that turn this ON
                           </label>
                           <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                             {localLore.filter((_, i) => i !== index).length ===
@@ -2327,7 +2421,11 @@ function LoreEditor({
                         </div>
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            ❌ Lores that turn this OFF
+                            <DynamicIcon
+                              name="XCircle"
+                              className="inline-block w-4 h-4 mr-1 text-red-600"
+                            />
+                            Lores that turn this OFF
                           </label>
                           <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                             {localLore.filter((_, i) => i !== index).length ===
@@ -2376,7 +2474,11 @@ function LoreEditor({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            ✅ Beats that turn this lore ON
+                            <DynamicIcon
+                              name="CheckCircle"
+                              className="inline-block w-4 h-4 mr-1 text-green-600"
+                            />
+                            Beats that turn this lore ON
                           </label>
                           <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                             {plotBeats.length === 0 ? (
@@ -2418,7 +2520,11 @@ function LoreEditor({
                         </div>
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            ❌ Beats that turn this lore OFF
+                            <DynamicIcon
+                              name="XCircle"
+                              className="inline-block w-4 h-4 mr-1 text-red-600"
+                            />
+                            Beats that turn this lore OFF
                           </label>
                           <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
                             {plotBeats.length === 0 ? (
@@ -2490,10 +2596,17 @@ function LoreEditor({
                 draggedLoreIndex === index ? "opacity-50" : ""
               }`}
             >
-              <span className="text-gray-400 select-none">⋮⋮</span>
+              <span className="text-gray-400 select-none">
+                <DynamicIcon name="GripVertical" className="w-5 h-5" />
+              </span>
               <div className="flex-1">
                 <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                  {loreItem.secrtet && "🔒 "}
+                  {loreItem.secrtet && (
+                    <DynamicIcon
+                      name="Lock"
+                      className="w-4 h-4 text-gray-500"
+                    />
+                  )}
                   {loreItem.title}
                   {/* On/Off Toggle */}
                   <button
@@ -2525,21 +2638,30 @@ function LoreEditor({
                   {loreItem.content}
                 </div>
                 {loreItem.on_triggers && loreItem.on_triggers.length > 0 && (
-                  <div className="text-xs text-green-700 dark:text-green-400 mt-1">
-                    <strong>✅ ON Triggers:</strong>{" "}
+                  <div className="text-xs text-green-700 dark:text-green-400 mt-1 flex items-center gap-1">
+                    <strong className="flex items-center gap-1">
+                      <DynamicIcon name="CheckCircle" className="w-3 h-3" /> ON
+                      Triggers:
+                    </strong>{" "}
                     {loreItem.on_triggers.join(", ")}
                   </div>
                 )}
                 {loreItem.off_triggers && loreItem.off_triggers.length > 0 && (
-                  <div className="text-xs text-red-700 dark:text-red-400 mt-1">
-                    <strong>❌ OFF Triggers:</strong>{" "}
+                  <div className="text-xs text-red-700 dark:text-red-400 mt-1 flex items-center gap-1">
+                    <strong className="flex items-center gap-1">
+                      <DynamicIcon name="XCircle" className="w-3 h-3" /> OFF
+                      Triggers:
+                    </strong>{" "}
                     {loreItem.off_triggers.join(", ")}
                   </div>
                 )}
                 {loreItem.beats_trigger &&
                   loreItem.beats_trigger.length > 0 && (
-                    <div className="text-xs text-green-700 dark:text-green-400 mt-1">
-                      <strong>✅ Beats turning ON:</strong>{" "}
+                    <div className="text-xs text-green-700 dark:text-green-400 mt-1 flex items-center gap-1">
+                      <strong className="flex items-center gap-1">
+                        <DynamicIcon name="CheckCircle" className="w-3 h-3" />{" "}
+                        Beats turning ON:
+                      </strong>{" "}
                       {loreItem.beats_trigger
                         .map((i) => plotBeats[i]?.title || `Beat ${i + 1}`)
                         .join(", ")}
@@ -2547,8 +2669,11 @@ function LoreEditor({
                   )}
                 {loreItem.beats_untrigger &&
                   loreItem.beats_untrigger.length > 0 && (
-                    <div className="text-xs text-red-700 dark:text-red-400 mt-1">
-                      <strong>❌ Beats turning OFF:</strong>{" "}
+                    <div className="text-xs text-red-700 dark:text-red-400 mt-1 flex items-center gap-1">
+                      <strong className="flex items-center gap-1">
+                        <DynamicIcon name="XCircle" className="w-3 h-3" /> Beats
+                        turning OFF:
+                      </strong>{" "}
                       {loreItem.beats_untrigger
                         .map((i) => plotBeats[i]?.title || `Beat ${i + 1}`)
                         .join(", ")}
@@ -2562,7 +2687,7 @@ function LoreEditor({
                   className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                   title="Move up"
                 >
-                  ▲
+                  <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => moveLoreDown(index)}
@@ -2570,14 +2695,14 @@ function LoreEditor({
                   className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                   title="Move down"
                 >
-                  ▼
+                  <DynamicIcon name="ChevronDown" className="w-5 h-5" />
                 </button>
               </div>
               <button
                 onClick={() => startEditLore(index)}
                 className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
               >
-                ✏️
+                <DynamicIcon name="Edit" className="w-4 h-4" />
               </button>
               <button
                 onClick={() => removeLore(index)}
@@ -2721,8 +2846,8 @@ function StoryMetaEditor({
       {/* Plot Beats */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white">
-            📖 Plot Beats
+          <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <DynamicIcon name="BookOpen" className="w-6 h-6" /> Plot Beats
           </h4>
           <button
             onClick={addBeat}
@@ -2732,7 +2857,8 @@ function StoryMetaEditor({
           </button>
         </div>
         <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-          💡 Drag and drop to reorder (or use arrow buttons on mobile)
+          <DynamicIcon name="Lightbulb" className="w-3 h-3 inline mr-1" /> Drag
+          and drop to reorder (or use arrow buttons on mobile)
         </p>
         <div className="space-y-3">
           {localPlotBeats.map((beat, index) => (
@@ -2751,8 +2877,9 @@ function StoryMetaEditor({
               {editingPlotBeatIndex === index ? (
                 // Edit mode
                 <div className="space-y-3">
-                  <h5 className="text-sm font-bold text-gray-900 dark:text-white">
-                    ✏️ Editing Plot Beat
+                  <h5 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <DynamicIcon name="Edit" className="w-4 h-4" /> Editing Plot
+                    Beat
                   </h5>
                   <input
                     type="text"
@@ -2794,8 +2921,9 @@ function StoryMetaEditor({
                       min="0"
                       className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      💰 Custom points reward
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                      <DynamicIcon name="Coins" className="w-3 h-3" /> Custom
+                      points reward
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -2804,7 +2932,11 @@ function StoryMetaEditor({
                       disabled={!editPlotBeat.title || !editPlotBeat.content}
                       className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded"
                     >
-                      ✓ Save
+                      <DynamicIcon
+                        name="Check"
+                        className="w-4 h-4 inline mr-1"
+                      />{" "}
+                      Save
                     </button>
                     <button
                       onClick={cancelEditPlotBeat}
@@ -2818,7 +2950,7 @@ function StoryMetaEditor({
                 // View mode
                 <div className="flex items-start gap-3">
                   <div className="text-xl cursor-grab active:cursor-grabbing select-none pt-1">
-                    ⋮⋮
+                    <DynamicIcon name="GripVertical" className="w-5 h-5" />
                   </div>
                   <div className="flex-1">
                     <div className="font-bold text-gray-900 dark:text-white mb-1">
@@ -2828,8 +2960,9 @@ function StoryMetaEditor({
                       {beat.content}
                     </div>
                     {beat.points !== undefined && (
-                      <div className="text-xs text-orange-600 dark:text-orange-400 mb-2 font-semibold">
-                        💰 {beat.points} points
+                      <div className="text-xs text-orange-600 dark:text-orange-400 mb-2 font-semibold flex items-center gap-1">
+                        <DynamicIcon name="Coins" className="w-3 h-3" />{" "}
+                        {beat.points} points
                       </div>
                     )}
                     <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -2841,7 +2974,13 @@ function StoryMetaEditor({
                         }
                         className="rounded"
                       />
-                      <span>✓ Fulfilled</span>
+                      <span>
+                        <DynamicIcon
+                          name="Check"
+                          className="w-4 h-4 inline mr-1"
+                        />{" "}
+                        Fulfilled
+                      </span>
                     </label>
                   </div>
                   <div className="flex flex-col gap-2">
@@ -2852,7 +2991,7 @@ function StoryMetaEditor({
                         className="px-2 py-1 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs"
                         title="Move up"
                       >
-                        ▲
+                        <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => movePlotBeatDown(index)}
@@ -2860,14 +2999,14 @@ function StoryMetaEditor({
                         className="px-2 py-1 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs"
                         title="Move down"
                       >
-                        ▼
+                        <DynamicIcon name="ChevronDown" className="w-4 h-4" />
                       </button>
                     </div>
                     <button
                       onClick={() => startEditPlotBeat(index)}
                       className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs"
                     >
-                      ✏️ Edit
+                      <DynamicIcon name="Edit" className="w-4 h-4" /> Edit
                     </button>
                     <button
                       onClick={() => removeBeat(index)}
@@ -2885,8 +3024,8 @@ function StoryMetaEditor({
 
       {/* Author Notes */}
       <div>
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-          ✍️ Author Notes
+        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <DynamicIcon name="Edit3" className="w-6 h-6" /> Author Notes
         </h4>
         <textarea
           value={localAuthorNotes}
@@ -2898,15 +3037,16 @@ function StoryMetaEditor({
           className="w-full h-32 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
         />
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          💡 These notes help guide the AI in maintaining story consistency and
-          tone
+          <DynamicIcon name="Lightbulb" className="w-3 h-3 inline mr-1" /> These
+          notes help guide the AI in maintaining story consistency and tone
         </p>
       </div>
 
       {/* Memory Entries (Editable) */}
       <div>
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
-          🧠 Memory Entries ({localMemory.length})
+        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+          <DynamicIcon name="Brain" className="w-6 h-6" /> Memory Entries (
+          {localMemory.length})
         </h4>
         <div className="space-y-3">
           <div className="flex gap-2">
@@ -2966,12 +3106,14 @@ interface MenuProps extends StoryData {
   storyDbId: string | null;
   onSaveProgress: () => Promise<void>;
   onUpdateStoryData: (updates: Partial<StoryData>) => void;
+  onViewLogs?: () => void;
 }
 
 export default function MenuPage({
   storyDbId,
   onSaveProgress,
   onUpdateStoryData,
+  onViewLogs,
   ...storyData
 }: MenuProps) {
   const router = useRouter();
@@ -3133,7 +3275,7 @@ export default function MenuPage({
       title: "Leave Story",
       message:
         "Are you sure you want to leave? Make sure your progress is saved!",
-      icon: "⚠️",
+      icon: "AlertTriangle",
       confirmText: "Leave",
       confirmButtonClass: "bg-gray-600 hover:bg-gray-700",
       onConfirm: () => {
@@ -3171,8 +3313,8 @@ export default function MenuPage({
     <div className="w-full space-y-6">
       {/* Story Info Card */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          ⚙️ Story Menu
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+          <DynamicIcon name="Settings" className="w-8 h-8" /> Story Menu
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
           Manage your adventure progress and settings
@@ -3181,8 +3323,8 @@ export default function MenuPage({
 
       {/* Actions Card */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-          🎮 Actions
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <DynamicIcon name="Gamepad2" className="w-6 h-6" /> Actions
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -3212,6 +3354,17 @@ export default function MenuPage({
             </svg>
             <span>Story Settings</span>
           </button>
+
+          {/* View Logs */}
+          {onViewLogs && (
+            <button
+              onClick={onViewLogs}
+              className="flex items-center justify-center gap-3 px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+            >
+              <DynamicIcon name="ClipboardList" className="w-5 h-5" />
+              <span>View Debug Logs</span>
+            </button>
+          )}
 
           {/* Save Progress */}
           <button
@@ -3304,7 +3457,7 @@ export default function MenuPage({
                 title: "Delete Story?",
                 message:
                   "Are you sure you want to permanently delete this story? This action cannot be undone.",
-                icon: "⚠️",
+                icon: "AlertTriangle",
                 confirmText: "Delete Forever",
                 confirmButtonClass: "bg-red-600 hover:bg-red-700",
                 onConfirm: async () => {
@@ -3366,8 +3519,8 @@ export default function MenuPage({
 
       {/* Story Progress Card */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-          📊 Story Progress
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <DynamicIcon name="BarChart2" className="w-6 h-6" /> Story Progress
         </h3>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -3453,8 +3606,8 @@ export default function MenuPage({
       {/* Player Notes Card */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            📝 Player Notes
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <DynamicIcon name="FileText" className="w-6 h-6" /> Player Notes
           </h3>
           <button
             onClick={() => setEditingNotes(!editingNotes)}
@@ -3484,7 +3637,7 @@ export default function MenuPage({
               </button>
               <button
                 onClick={handleSaveNotes}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
               >
                 Save Notes
               </button>
@@ -3507,8 +3660,8 @@ export default function MenuPage({
 
       {/* Replay & Restart Card */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-          🔄 Replay & Restart
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <DynamicIcon name="RefreshCw" className="w-6 h-6" /> Replay & Restart
         </h3>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           Start your adventure anew with different options
@@ -3523,7 +3676,7 @@ export default function MenuPage({
                 title: "Restart Story",
                 message:
                   "Are you sure you want to restart this story? All progress will be lost!",
-                icon: "🔄",
+                icon: "RefreshCw",
                 confirmText: "Restart",
                 confirmButtonClass: "bg-blue-600 hover:bg-blue-700",
                 onConfirm: async () => {
@@ -3595,7 +3748,7 @@ export default function MenuPage({
             }}
             className="flex flex-col items-center justify-center gap-2 px-6 py-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md"
           >
-            <span className="text-3xl">🔄</span>
+            <DynamicIcon name="RefreshCw" className="w-8 h-8" />
             <div className="text-center">
               <div className="font-bold">Restart Story</div>
               <div className="text-xs opacity-80 mt-1">
@@ -3612,7 +3765,7 @@ export default function MenuPage({
                 title: "New Game Plus",
                 message:
                   "Start New Game Plus? You'll keep achievements, stats, resources, and items, plus get bonus rewards!",
-                icon: "⭐",
+                icon: "Star",
                 confirmText: "Start NG+",
                 confirmButtonClass:
                   "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700",
@@ -3698,7 +3851,7 @@ export default function MenuPage({
             }}
             className="flex flex-col items-center justify-center gap-2 px-6 py-6 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-colors shadow-md"
           >
-            <span className="text-3xl">⭐</span>
+            <DynamicIcon name="Star" className="w-8 h-8" />
             <div className="text-center">
               <div className="font-bold">New Game Plus</div>
               <div className="text-xs opacity-80 mt-1">
@@ -3712,7 +3865,8 @@ export default function MenuPage({
         {storyData.newGamePlusCount && storyData.newGamePlusCount > 0 && (
           <div className="mt-4 p-3 bg-linear-to-r from-amber-50 to-purple-50 dark:from-amber-900/20 dark:to-purple-900/20 rounded-lg border border-amber-200 dark:border-amber-800 text-center">
             <div className="font-bold text-sm text-amber-900 dark:text-amber-200">
-              ⭐ Current Run: New Game Plus #{storyData.newGamePlusCount}
+              <DynamicIcon name="Star" className="inline-block w-4 h-4 mr-1" />
+              Current Run: New Game Plus #{storyData.newGamePlusCount}
             </div>
             <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
               {storyData.newGamePlusMode
@@ -3726,8 +3880,8 @@ export default function MenuPage({
 
       {/* Story Info Card */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-          ℹ️ Story Information
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <DynamicIcon name="Info" className="w-6 h-6" /> Story Information
         </h3>
 
         <div className="space-y-3 text-sm">
@@ -3780,8 +3934,8 @@ export default function MenuPage({
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-6xl w-full border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                ⚙️ Story Editor
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <DynamicIcon name="Settings" className="w-6 h-6" /> Story Editor
               </h3>
               <button
                 onClick={() => setShowSettings(false)}
@@ -3806,23 +3960,24 @@ export default function MenuPage({
             {/* Tabs */}
             <div className="flex gap-2 px-6 pt-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
               {[
-                { id: "basic", label: "📝 Basic", icon: "📝" },
-                { id: "stats", label: "📊 Stats & Resources", icon: "📊" },
-                { id: "inventory", label: "🎒 Inventory", icon: "🎒" },
-                { id: "quests", label: "📜 Quests", icon: "📜" },
-                { id: "lore", label: "📚 Lore", icon: "📚" },
-                { id: "story", label: "📖 Story", icon: "📖" },
-                { id: "tts", label: "🤖 AI Config", icon: "🤖" },
+                { id: "basic", label: "Basic", icon: "FileText" },
+                { id: "stats", label: "Stats & Resources", icon: "BarChart2" },
+                { id: "inventory", label: "Inventory", icon: "Backpack" },
+                { id: "quests", label: "Quests", icon: "Scroll" },
+                { id: "lore", label: "Lore", icon: "Book" },
+                { id: "story", label: "Story", icon: "BookOpen" },
+                { id: "tts", label: "AI Config", icon: "Bot" },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-4 py-2 font-semibold rounded-t-lg transition-colors whitespace-nowrap ${
+                  className={`px-4 py-2 font-semibold rounded-t-lg transition-colors whitespace-nowrap flex items-center gap-2 ${
                     activeTab === tab.id
                       ? "bg-purple-600 text-white"
                       : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                   }`}
                 >
+                  <DynamicIcon name={tab.icon} className="w-4 h-4" />
                   {tab.label}
                 </button>
               ))}
@@ -3876,8 +4031,9 @@ export default function MenuPage({
 
               {activeTab === "tts" && (
                 <div className="space-y-6">
-                  <h4 className="text-lg font-bold text-gray-900 dark:text-white">
-                    🤖 AI Configuration
+                  <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <DynamicIcon name="Bot" className="w-6 h-6" /> AI
+                    Configuration
                   </h4>
 
                   <div className="space-y-4">
@@ -3900,8 +4056,8 @@ export default function MenuPage({
                             );
                             addNotification(
                               e.target.checked
-                                ? "🔧 Raw context mode enabled"
-                                : "🔧 Raw context mode disabled",
+                                ? "Raw context mode enabled"
+                                : "Raw context mode disabled",
                               "success"
                             );
                           }
@@ -3934,9 +4090,7 @@ export default function MenuPage({
                               e.target.checked ? "true" : "false"
                             );
                             addNotification(
-                              e.target.checked
-                                ? "🔊 TTS Enabled"
-                                : "🔇 TTS Disabled",
+                              e.target.checked ? "TTS Enabled" : "TTS Disabled",
                               "success"
                             );
                             // Force re-render
@@ -3970,8 +4124,8 @@ export default function MenuPage({
                             );
                             addNotification(
                               e.target.checked
-                                ? "🤖 Auto-generate enabled"
-                                : "🤖 Auto-generate disabled",
+                                ? "Auto-generate enabled"
+                                : "Auto-generate disabled",
                               "success"
                             );
                           }
@@ -3991,7 +4145,11 @@ export default function MenuPage({
 
                     <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                        🔊 TTS Voice Settings
+                        <DynamicIcon
+                          name="Volume2"
+                          className="inline-block w-4 h-4 mr-1"
+                        />
+                        TTS Voice Settings
                       </h5>
 
                       <CustomVoiceManager addNotification={addNotification} />
@@ -4029,14 +4187,30 @@ export default function MenuPage({
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
                       />
                       <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        <span>🔇 0%</span>
-                        <span>🔊 100%</span>
+                        <span>
+                          <DynamicIcon
+                            name="VolumeX"
+                            className="inline-block w-3 h-3"
+                          />{" "}
+                          0%
+                        </span>
+                        <span>
+                          <DynamicIcon
+                            name="Volume2"
+                            className="inline-block w-3 h-3"
+                          />{" "}
+                          100%
+                        </span>
                       </div>
                     </div>
 
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                       <h5 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">
-                        ℹ️ How TTS Works
+                        <DynamicIcon
+                          name="Info"
+                          className="inline-block w-4 h-4 mr-1"
+                        />
+                        How TTS Works
                       </h5>
                       <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
                         <li>
@@ -4082,7 +4256,11 @@ export default function MenuPage({
                 }}
                 className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
               >
-                💾 Save All Changes
+                <DynamicIcon
+                  name="Save"
+                  className="inline-block w-4 h-4 mr-1"
+                />
+                Save All Changes
               </button>
             </div>
           </div>

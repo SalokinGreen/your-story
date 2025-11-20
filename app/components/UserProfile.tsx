@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/app/misc/AuthContext";
 import { useRouter } from "next/navigation";
+import { DynamicIcon } from "./DynamicIcon";
 
 export default function UserProfile() {
   const { user, signOut, loading } = useAuth();
@@ -24,28 +25,28 @@ export default function UserProfile() {
       <div className="flex flex-col gap-2 text-center">
         <div className="w-12 h-12 mx-auto bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-md">
           <span className="text-xl font-bold text-white">
-            {user.email?.[0].toUpperCase() || '?'}
+            {user.email?.[0].toUpperCase() || "?"}
           </span>
         </div>
         <span className="text-sm font-semibold text-gray-900 dark:text-white break-all">
           {user.email}
         </span>
-        <span className="text-xs px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-full font-medium">
-          ✓ Signed in
+        <span className="text-xs px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-full font-medium flex items-center justify-center gap-1">
+          <DynamicIcon name="Check" className="w-3 h-3" /> Signed in
         </span>
       </div>
       <div className="flex flex-col w-full gap-2">
         <button
           onClick={() => router.push(`/profile/${user.id}`)}
-          className="w-full px-6 py-3 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+          className="w-full px-6 py-3 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
         >
-          View Profile
+          <DynamicIcon name="User" className="w-5 h-5" /> View Profile
         </button>
         <button
           onClick={() => router.push("/library")}
-          className="w-full px-6 py-3 bg-linear-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+          className="w-full px-6 py-3 bg-linear-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
         >
-          📚 My Library
+          <DynamicIcon name="Library" className="w-5 h-5" /> My Library
         </button>
         {/* <button
           onClick={() => router.push("/story")}
@@ -55,9 +56,9 @@ export default function UserProfile() {
         </button> */}
         <button
           onClick={signOut}
-          className="w-full px-6 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-semibold transition-colors border-2 border-gray-300 dark:border-gray-600"
+          className="w-full px-6 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-semibold transition-colors border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center gap-2"
         >
-          Sign Out
+          <DynamicIcon name="LogOut" className="w-5 h-5" /> Sign Out
         </button>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/app/misc/AuthContext";
 import { supabase } from "@/app/misc/supabase";
 import { getUserSettings } from "@/app/misc/user_settings";
+import { DynamicIcon } from "./DynamicIcon";
 
 export default function UserOptions() {
   const { user } = useAuth();
@@ -51,14 +52,16 @@ export default function UserOptions() {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
       <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
-        ⚙️ User Options
+        <DynamicIcon name="Settings" className="w-6 h-6" /> User Options
       </h2>
-      
+
       <div className="space-y-4">
         <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-gray-900 dark:text-white">Offline Mode</h3>
+              <h3 className="font-bold text-gray-900 dark:text-white">
+                Offline Mode
+              </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Save stories locally to your device instead of the cloud.
               </p>

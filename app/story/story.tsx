@@ -3,6 +3,7 @@ import { Choice, Choices, StoryData } from "../misc/structs";
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import TTSControls from "../components/TTSControls";
+import { DynamicIcon } from "../components/DynamicIcon";
 
 interface StoryProps {
   storyData: StoryData;
@@ -54,7 +55,7 @@ export default function Story({
           {/* TTS Controls - positioned at top */}
           <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🔊</span>
+              <DynamicIcon name="Volume2" className="w-6 h-6" />
               <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                 Text-to-Speech
               </span>
@@ -132,7 +133,7 @@ export default function Story({
         {/* Momentum Display and Controls */}
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between w-full pt-4 border-t border-gray-200 dark:border-gray-700 mt-4 overflow-hidden">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">⚡</span>
+            <DynamicIcon name="Zap" className="w-6 h-6 text-yellow-500" />
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 ">
                 Momentum: {storyData.momentum}/{storyData.maxMomentum}
@@ -161,7 +162,7 @@ export default function Story({
                   )
                 }
                 disabled={!canUseReroll}
-                className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
+                className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-2 ${
                   momentumMode === "reroll"
                     ? "bg-yellow-500 text-white shadow-md"
                     : canUseReroll
@@ -169,7 +170,8 @@ export default function Story({
                     : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
                 }`}
               >
-                🎲 Reroll (1⚡)
+                <DynamicIcon name="Dices" className="w-4 h-4" /> Reroll (1
+                <DynamicIcon name="Zap" className="w-3 h-3 inline ml-1" />)
               </button>
               <button
                 onClick={() =>
@@ -178,7 +180,7 @@ export default function Story({
                   )
                 }
                 disabled={!canUseGuarantee}
-                className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
+                className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-2 ${
                   momentumMode === "guarantee"
                     ? "bg-green-500 text-white shadow-md"
                     : canUseGuarantee
@@ -186,7 +188,8 @@ export default function Story({
                     : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
                 }`}
               >
-                ✓ Guarantee (2⚡)
+                <DynamicIcon name="Check" className="w-4 h-4" /> Guarantee (2
+                <DynamicIcon name="Zap" className="w-3 h-3 inline ml-1" />)
               </button>
             </div>
           )}
@@ -195,22 +198,33 @@ export default function Story({
         <div className="flex justify-center w-full pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
           <button
             onClick={handleChoice}
-            className="cursor-pointer px-8 py-4 text-lg font-semibold bg-linear-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg"
+            className="cursor-pointer px-8 py-4 text-lg font-semibold bg-linear-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg flex items-center gap-2"
             disabled={!Object.values(input).some((v) => v) || loading}
           >
-            {loading
-              ? "Generating..."
-              : momentumMode === "reroll"
-              ? "🎲 Continue with Reroll"
-              : momentumMode === "guarantee"
-              ? "✓ Continue Guaranteed"
-              : "✨ Continue Story"}
+            {loading ? (
+              "Generating..."
+            ) : momentumMode === "reroll" ? (
+              <>
+                <DynamicIcon name="Dices" className="w-5 h-5" /> Continue with
+                Reroll
+              </>
+            ) : momentumMode === "guarantee" ? (
+              <>
+                <DynamicIcon name="Check" className="w-5 h-5" /> Continue
+                Guaranteed
+              </>
+            ) : (
+              <>
+                <DynamicIcon name="Sparkles" className="w-5 h-5" /> Continue
+                Story
+              </>
+            )}
           </button>
         </div>
 
         {/* Bottom Custom Input Toggle & Section */}
         <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3 gap-2">
             <button
               type="button"
               onClick={() => {
@@ -220,13 +234,22 @@ export default function Story({
                   localStorage.setItem("freeInputEnabled", String(next));
                 }
               }}
-              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors border ${
+              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors border flex items-center gap-2 ${
                 freeInputEnabled
-                  ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700"
+                  ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700 "
                   : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-purple-200 dark:hover:bg-purple-600/40"
               }`}
             >
-              {freeInputEnabled ? "Hide Custom Input ✕" : "Add Custom Input ✍️"}
+              {freeInputEnabled ? (
+                <>
+                  Hide Custom Input <DynamicIcon name="X" className="w-4 h-4" />
+                </>
+              ) : (
+                <>
+                  Add Custom Input{" "}
+                  <DynamicIcon name="PenLine" className="w-4 h-4" />
+                </>
+              )}
             </button>
             {freeInputEnabled && (
               <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -350,13 +373,25 @@ const choice_button_factory = (
   onClick: () => void
 ) => {};
 const convert_choice_to_text = (choice: Choice, storyData: StoryData) => {
-  let extra = "";
+  let extra: React.ReactNode = null;
   if (choice.skill_used) {
     const skill = storyData.stats.find(
       (stat) => stat.name === choice.skill_used
     );
-    extra += ` ${skill?.symbol}`;
+    if (skill?.symbol) {
+      extra = (
+        <DynamicIcon
+          name={skill.symbol as any}
+          className="inline w-4 h-4 ml-1"
+        />
+      );
+    }
   }
 
-  return `${choice.text}` + extra;
+  return (
+    <span>
+      {choice.text}
+      {extra}
+    </span>
+  );
 };

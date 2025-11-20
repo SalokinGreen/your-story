@@ -1,6 +1,7 @@
 "use client";
 
 import { StoryData, UPGRADE_COSTS } from "../misc/structs";
+import { DynamicIcon } from "../components/DynamicIcon";
 
 export default function StatsPage(storyData: StoryData) {
   return (
@@ -19,7 +20,12 @@ export default function StatsPage(storyData: StoryData) {
 
           {/* Points Display - Prominent at top */}
           <div className="flex flex-row items-center gap-3 p-4 rounded-lg bg-linear-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-2 border-yellow-400 dark:border-yellow-600 shadow-lg">
-            <span className="text-3xl sm:text-4xl shrink-0">💰</span>
+            <div className="shrink-0">
+              <DynamicIcon
+                name="Coins"
+                className="w-8 h-8 sm:w-10 sm:h-10 text-yellow-600 dark:text-yellow-400"
+              />
+            </div>
             <div className="flex-1 min-w-0">
               <div className="flex flex-row items-baseline justify-between mb-1">
                 <span className="font-bold text-base sm:text-lg text-gray-900 dark:text-white">
@@ -40,7 +46,10 @@ export default function StatsPage(storyData: StoryData) {
           {/* Stats Section */}
           <div>
             <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-              <span className="text-2xl">📊</span>
+              <DynamicIcon
+                name="BarChart2"
+                className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600 dark:text-blue-400"
+              />
               Statistics
             </h3>
             <div className="space-y-3">
@@ -49,9 +58,12 @@ export default function StatsPage(storyData: StoryData) {
                   key={index}
                   className="flex flex-row items-center gap-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
                 >
-                  <span className="text-2xl sm:text-3xl shrink-0">
-                    {stat.symbol}
-                  </span>
+                  <div className="shrink-0">
+                    <DynamicIcon
+                      name={stat.symbol}
+                      className="w-8 h-8 sm:w-9 sm:h-9 text-blue-600 dark:text-blue-400"
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-row items-baseline justify-between mb-2">
                       <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">
@@ -82,13 +94,21 @@ export default function StatsPage(storyData: StoryData) {
           {/* Resources Section */}
           <div>
             <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-              <span className="text-2xl">⚡</span>
+              <DynamicIcon
+                name="Zap"
+                className="w-6 h-6 sm:w-7 sm:h-7 text-yellow-600 dark:text-yellow-400"
+              />
               Resources
             </h3>
             <div className="space-y-3">
               {/* Momentum - Special Resource */}
               <div className="flex flex-row items-center gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 shadow-md">
-                <span className="text-2xl sm:text-3xl shrink-0">⚡</span>
+                <div className="shrink-0">
+                  <DynamicIcon
+                    name="Zap"
+                    className="w-8 h-8 sm:w-9 sm:h-9 text-yellow-600 dark:text-yellow-400"
+                  />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-row items-baseline justify-between mb-2">
                     <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">
@@ -140,9 +160,12 @@ export default function StatsPage(storyData: StoryData) {
                   key={index}
                   className="flex flex-row items-center gap-3 p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
                 >
-                  <span className="text-2xl sm:text-3xl shrink-0">
-                    {resource.symbol}
-                  </span>
+                  <div className="shrink-0">
+                    <DynamicIcon
+                      name={resource.symbol}
+                      className="w-8 h-8 sm:w-9 sm:h-9 text-green-600 dark:text-green-400"
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-row items-baseline justify-between mb-2">
                       <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">
@@ -183,7 +206,10 @@ export default function StatsPage(storyData: StoryData) {
           {/* Inventory Section */}
           <div>
             <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-              <span className="text-2xl">🎒</span>
+              <DynamicIcon
+                name="Backpack"
+                className="w-6 h-6 sm:w-7 sm:h-7 text-purple-600 dark:text-purple-400"
+              />
               Inventory
             </h3>
             {storyData.inventory.length > 0 ? (
@@ -193,9 +219,12 @@ export default function StatsPage(storyData: StoryData) {
                     key={index}
                     className="flex flex-row items-center gap-3 p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800"
                   >
-                    <span className="text-2xl sm:text-3xl shrink-0">
-                      {item.symbol}
-                    </span>
+                    <div className="shrink-0">
+                      <DynamicIcon
+                        name={item.symbol}
+                        className="w-8 h-8 sm:w-9 sm:h-9 text-purple-600 dark:text-purple-400"
+                      />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-row items-baseline justify-between mb-1">
                         <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white truncate">
@@ -231,7 +260,10 @@ export default function StatsPage(storyData: StoryData) {
           {/* Achievements Section */}
           <div>
             <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-              <span className="text-2xl">🏆</span>
+              <DynamicIcon
+                name="Trophy"
+                className="w-6 h-6 sm:w-7 sm:h-7 text-yellow-600 dark:text-yellow-400"
+              />
               Achievements
               {storyData.achievements.filter((a) => a.hidden && !a.dateAchieved)
                 .length > 0 && (
@@ -242,7 +274,8 @@ export default function StatsPage(storyData: StoryData) {
                       (a) => a.hidden && !a.dateAchieved
                     ).length
                   }{" "}
-                  🔒 Hidden
+                  <DynamicIcon name="Lock" className="inline-block w-3 h-3" />{" "}
+                  Hidden
                 </span>
               )}
             </h3>
@@ -260,9 +293,12 @@ export default function StatsPage(storyData: StoryData) {
                           : "bg-gray-50 dark:bg-gray-700/30 border-gray-300 dark:border-gray-600 opacity-60"
                       }`}
                     >
-                      <span className="text-2xl sm:text-3xl shrink-0">
-                        {achievement.symbol}
-                      </span>
+                      <div className="shrink-0">
+                        <DynamicIcon
+                          name={achievement.symbol}
+                          className="w-8 h-8 sm:w-9 sm:h-9 text-yellow-600 dark:text-yellow-400"
+                        />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-row items-baseline justify-between mb-1">
                           <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">
@@ -302,7 +338,10 @@ export default function StatsPage(storyData: StoryData) {
           {storyData.quests && storyData.quests.length > 0 && (
             <div>
               <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-                <span className="text-2xl">📜</span>
+                <DynamicIcon
+                  name="Scroll"
+                  className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600 dark:text-blue-400"
+                />
                 Quests
               </h3>
               {storyData.quests.filter((q) => q.active).length > 0 ? (
@@ -326,7 +365,10 @@ export default function StatsPage(storyData: StoryData) {
                               </span>
                               {quest.fulfilled && (
                                 <span className="text-green-500 shrink-0">
-                                  ✓
+                                  <DynamicIcon
+                                    name="Check"
+                                    className="w-4 h-4"
+                                  />
                                 </span>
                               )}
                             </div>
