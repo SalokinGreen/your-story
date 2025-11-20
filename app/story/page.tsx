@@ -542,12 +542,12 @@ function StoryPageContent() {
   // Load story from database on mount
   useEffect(() => {
     if (!storyId) {
-      addNotification("NostoryIDprovided", "failure");
+      addNotification("No story ID provided", "failure");
       setLoadingStory(false);
       return;
     }
 
-    //Waitforusertobeloadedbeforeattemptingtoloadstory
+    //Wait for user to be loaded before attempting to load story
     if (!user) {
       return;
     }
@@ -565,7 +565,7 @@ function StoryPageContent() {
             throw new Error("Localstorynotfound");
           }
 
-          console.log("Localstoryloaded:", localStory);
+          console.log("Local story loaded:", localStory);
           setStoryDbId(localStory.id);
           setStoryData(localStory.storyData);
 
@@ -609,24 +609,24 @@ function StoryPageContent() {
         }
 
         const response = await fetch(`/api/stories/${storyId}`, { headers });
-        console.log("Storyfetchresponsestatus:", response.status);
+        console.log("Story fetch response status:", response.status);
 
         if (!response.ok) {
           const errorData = await response
             .json()
-            .catch(() => ({ error: "Unknownerror" }));
-          console.error("Storyfetchfailed:", errorData);
-          throw new Error(errorData.error || "Failedtoloadstory");
+            .catch(() => ({ error: "Unknown error" }));
+          console.error("Story fetch failed:", errorData);
+          throw new Error(errorData.error || "Failed to load story");
         }
 
         const { story } = await response.json();
-        console.log("Storyloaded:", story);
+        console.log("Story loaded:", story);
         setStoryDbId(story.id);
 
         //Checkifstorydataisencrypted
         let loadedStoryData: StoryData;
         if (isEncrypted(story.storyData)) {
-          console.log("Storyisencrypted,attemptingdecryption...");
+          console.log("Story is encrypted, attempting decryption...");
 
           //Getusercredentialsfordecryption
           const password = getEncryptionPassword();
@@ -634,7 +634,7 @@ function StoryPageContent() {
 
           if (!password || !email) {
             throw new Error(
-              "Cannotdecryptstory:credentialsnotavailable.Pleasesignoutandsignbackin."
+              "Cannot decrypt story: credentials not available. Please sign out and sign back in."
             );
           }
 
@@ -645,11 +645,11 @@ function StoryPageContent() {
               email,
               password
             );
-            console.log("Storydecryptedsuccessfully");
+            console.log("Story decrypted successfully");
           } catch (decryptError) {
-            console.error("Decryptionfailed:", decryptError);
+            console.error("Decryption failed:", decryptError);
             throw new Error(
-              "Failedtodecryptstory.Yourcredentialsmayhavechanged."
+              "Failed to decrypt story. Your credentials may have changed."
             );
           }
         } else {
@@ -689,8 +689,8 @@ function StoryPageContent() {
         setStarted(true);
         setLoadingStory(false);
       } catch (error: any) {
-        console.error("Errorloadingstory:", error);
-        addNotification(error.message || "Failedtoloadstory", "failure");
+        console.error("Error loading story:", error);
+        addNotification(error.message || "Failed to load story", "failure");
         setLoadingStory(false);
       }
     }
@@ -701,7 +701,7 @@ function StoryPageContent() {
   //Applypresetandstartstory
   const handlePresetSelect = async (preset: Preset) => {
     if (!storyData) return;
-    logger.action("Userselectedpreset", { preset: preset.name });
+    logger.action("User selected preset", { preset: preset.name });
 
     const updatedStoryData = { ...storyData };
 
@@ -766,7 +766,7 @@ function StoryPageContent() {
           }
         }
       } catch (error) {
-        console.error("Errorsavingpreset:", error);
+        console.error("Error saving preset:", error);
       }
     }
 
@@ -803,7 +803,7 @@ function StoryPageContent() {
           //Trimscenehistorybeforesavingtoreducedatasize
           const trimmedData = trimStoryData(updatedStoryData);
           await saveLocalStory(storyDbId, trimmedData);
-          console.log("Localstorysaved");
+          console.log("Local story saved");
           return;
         }
 
@@ -817,10 +817,12 @@ function StoryPageContent() {
         const email = user?.email;
 
         if (!password || !email) {
-          //Nocredentialsavailable-requireusertore-loginforsecurity
-          console.error("Cannotsavestory:encryptioncredentialsnotavailable");
+          //No credentials available - require user to re-login for security
+          console.error(
+            "Cannot save story: encryption credentials not available"
+          );
           addNotification(
-            "??Pleasesignoutandsignbackintoenableencryptedstorysaving",
+            "⚠️ Please sign out and sign back in to enable encrypted story saving",
             "warning"
           );
           return; //Abortsavetopreventunencrypteddatastorage
@@ -833,11 +835,11 @@ function StoryPageContent() {
         let dataToSave: any;
         try {
           dataToSave = await encryptStoryData(trimmedData, email, password);
-          console.log("Storydataencryptedforsaving");
+          console.log("Story data encrypted for saving");
         } catch (encryptError) {
-          console.error("Encryptionfailed:", encryptError);
+          console.error("Encryption failed:", encryptError);
           addNotification(
-            "?Failedtoencryptstorydata.Pleasesignoutandsignbackin.",
+            "⚠ Failed to encrypt story data. Please sign out and sign back in.",
             "failure"
           );
           return; //Abortsaveonencryptionfailure
@@ -854,8 +856,11 @@ function StoryPageContent() {
           }),
         });
       } catch (error) {
-        console.error("Errorsavingprogress:", error);
-        addNotification("Failedtosavestoryprogress.Pleasetryagain.", "failure");
+        console.error("Error saving progress:", error);
+        addNotification(
+          "Failed to save story progress. Please try again.",
+          "failure"
+        );
       }
     }, 3000); //3seconddebounce
   }
@@ -903,9 +908,9 @@ function StoryPageContent() {
 
   async function handleCustomInput(customText: string) {
     if (!storyData) return;
-    logger.action("Usercustominput", { customText });
+    logger.action("User custom input", { customText });
     if (!user) {
-      addNotification("Pleasesignintocontinuethestory", "warning");
+      addNotification("Please sign in to continue the story", "warning");
       return;
     }
 
@@ -927,13 +932,13 @@ function StoryPageContent() {
       data: { session },
     } = await supabase.auth.getSession();
     if (!session) {
-      addNotification("Sessionexpired.Pleasesigninagain.", "failure");
+      addNotification("Session expired. Please sign in again.", "failure");
       setLoading(false);
       return;
     }
 
-    //BuildminimalpayloadforAI
-    const MAX_CONTENT_LENGTH = 50000; //Increasedlimitperpart
+    //Build minimal payload for AI
+    const MAX_CONTENT_LENGTH = 50000; //Increased limit per part
 
     //Getcurrentmodelconfigtoestimateneededcontext
     const modelKey =
@@ -1017,15 +1022,17 @@ function StoryPageContent() {
     };
 
     const payloadSize = JSON.stringify(payload).length;
-    console.log(`Custominputpayloadsize:${(payloadSize / 1024).toFixed(2)}KB`);
-    logger.ai_request("SendingcustominputtoAI", {
+    console.log(
+      `Custom input payload size: ${(payloadSize / 1024).toFixed(2)} KB`
+    );
+    logger.ai_request("Sending custom input to AI", {
       model: payload.model,
       payloadSize,
     });
 
     if (payloadSize > 4 * 1024 * 1024) {
-      addNotification("?Storydatatoolargeforgeneration.", "failure");
-      console.error("Payloadexceeds4MBlimit:", payloadSize);
+      addNotification("⚠ Story data too large for generation.", "failure");
+      console.error("Payload exceeds 4MB limit:", payloadSize);
       setLoading(false);
       return;
     }
@@ -1060,7 +1067,7 @@ function StoryPageContent() {
         try {
           data = JSON.parse(text);
         } catch (e) {
-          console.error("Failedtoparseresponse:", text);
+          console.error("Failed to parse response:", text);
           addNotification(`⚠ Invalid JSON response from server`, "failure");
           setLoading(false);
           return;
@@ -1070,7 +1077,7 @@ function StoryPageContent() {
           addNotification(`⚠ ${data.error}`, "failure");
           if (data.balance) {
             addNotification(
-              `Yourbalance:${data.balance.tradable}tradable,${data.balance.locked}locked`,
+              `Your balance: ${data.balance.tradable} tradable, ${data.balance.locked} locked`,
               "info"
             );
           }
@@ -1093,14 +1100,14 @@ function StoryPageContent() {
             error: data.error,
           });
           addNotification(
-            `Error:${data.error || "Failedtogeneratestory"}`,
+            `Error: ${data.error || "Failed to generate story"}`,
             "failure"
           );
           setLoading(false);
           return;
         }
 
-        logger.ai_response("AIresponsereceived", {
+        logger.ai_response("AI response received", {
           tokensDeducted: data.meta?.tokensDeducted,
           partLength: data.part.content.length,
         });
@@ -1138,7 +1145,7 @@ function StoryPageContent() {
         await saveProgress(storyData);
       })
       .catch((err) => {
-        console.error("Custominputerror:", err);
+        console.error("Custom input error:", err);
         addNotification(`⚠ Error generating story: ${err.message}`, "failure");
         setLoading(false);
       });
@@ -1150,10 +1157,10 @@ function StoryPageContent() {
     if (!choice) return;
     const key = choices.choices.indexOf(choice);
 
-    logger.action("Userselectedchoice", { choice: choice.text, index: key });
+    logger.action("User selected choice", { choice: choice.text, index: key });
 
     if (!user) {
-      addNotification("Pleasesignintocontinuethestory", "warning");
+      addNotification("Please sign in to continue the story", "warning");
       return;
     }
 
@@ -1162,30 +1169,33 @@ function StoryPageContent() {
     //Handlemomentumspending
     if (momentumMode === "reroll" && storyData.momentum >= 1) {
       storyData.momentum--;
-      logger.action("Momentumspent", {
+      logger.action("Momentum spent", {
         mode: "reroll",
         cost: 1,
         remaining: storyData.momentum,
       });
       addNotification(
-        `?Spent1MomentumforReroll!(${storyData.momentum}/${storyData.maxMomentum}remaining)`,
+        `⚡ Spent 1 Momentum for Reroll! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
         "info"
       );
     } else if (momentumMode === "guarantee" && storyData.momentum >= 2) {
       storyData.momentum -= 2;
-      logger.action("Momentumspent", {
+      logger.action("Momentum spent", {
         mode: "guarantee",
         cost: 2,
         remaining: storyData.momentum,
       });
       addNotification(
-        `?Spent2MomentumforGuaranteedSuccess!(${storyData.momentum}/${storyData.maxMomentum}remaining)`,
+        `⚡ Spent 2 Momentum for Guaranteed Success! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
         "success"
       );
     }
 
     let dice_roll = getSecureRandomInt(1, 100);
-    logger.action("Initialdiceroll", { roll: dice_roll });
+    logger.action("Initial dice roll", { roll: dice_roll });
+
+    //Track all dice rolls for visualization
+    const allDiceRolls: number[] = [dice_roll];
 
     //BuilddetailedRPG-stylechoicetextwithbrackets
     let choiceDetails: string[] = [];
@@ -1208,26 +1218,27 @@ function StoryPageContent() {
         itemQuantityBefore = item.quantity;
         const itemType = item.type || "normal";
 
-        //Handleadvantagebasedonitemtype
+        //Handle advantage based on item type
         if (itemType === "misc") {
-          //Miscitemsdon'tgiveadvantage,butpreventdisadvantage
+          //Misc items don't give advantage, but prevent disadvantage
           addNotification(
             `Used item: ${choice.item_used} (No disadvantage)`,
             "info"
           );
         } else {
-          //Normal,consumable,andstoryitemsgiveadvantage
+          //Normal, consumable, and story items give advantage
           addNotification(
             `Used item: ${choice.item_used} (Advantage!)`,
             "info"
           );
           const second_roll = getSecureRandomInt(1, 100);
-          logger.action("Advantagerollfromitem", {
+          allDiceRolls.push(second_roll);
+          logger.action("Advantage roll from item", {
             item: choice.item_used,
             firstRoll: dice_roll,
             secondRoll: second_roll,
           });
-          if (second_roll < dice_roll) {
+          if (second_roll > dice_roll) {
             dice_roll = second_roll;
           }
         }
@@ -1236,16 +1247,17 @@ function StoryPageContent() {
           // Reroll: Roll two more times and take the best
           const reroll1 = getSecureRandomInt(1, 100);
           const reroll2 = getSecureRandomInt(1, 100);
+          allDiceRolls.push(reroll1, reroll2);
           const oldRoll = dice_roll;
-          dice_roll = Math.min(dice_roll, reroll1, reroll2);
-          logger.action("Momentumreroll(withitem)", {
+          dice_roll = Math.max(dice_roll, reroll1, reroll2);
+          logger.action("Momentum reroll (with item)", {
             oldRoll,
             reroll1,
             reroll2,
             finalRoll: dice_roll,
           });
           addNotification(
-            `⚡ Reroll Used! Best of 3 rolls: ${dice_roll}`,
+            `⚡ Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} → Best: ${dice_roll}`,
             "success"
           );
         }
@@ -1271,34 +1283,36 @@ function StoryPageContent() {
           itemQuantityAfter = itemQuantityBefore;
         }
       } else {
-        //Itemmissing-disadvantage
+        //Item missing - disadvantage
         addNotification(
-          `Missingitem:${choice.item_used}(Disadvantage!)`,
+          `Missing item: ${choice.item_used} (Disadvantage!)`,
           "warning"
         );
         const second_roll = getSecureRandomInt(1, 100);
-        logger.action("Disadvantageroll(missingitem)", {
+        allDiceRolls.push(second_roll);
+        logger.action("Disadvantage roll (missing item)", {
           item: choice.item_used,
           firstRoll: dice_roll,
           secondRoll: second_roll,
         });
-        if (second_roll > dice_roll) {
+        if (second_roll < dice_roll) {
           dice_roll = second_roll;
         }
         if (momentumMode === "reroll") {
           //Rerollstillhelpswithdisadvantage
           const reroll1 = getSecureRandomInt(1, 100);
           const reroll2 = getSecureRandomInt(1, 100);
+          allDiceRolls.push(reroll1, reroll2);
           const oldRoll = dice_roll;
-          dice_roll = Math.min(dice_roll, reroll1, reroll2);
-          logger.action("Momentumreroll(missingitem)", {
+          dice_roll = Math.max(dice_roll, reroll1, reroll2);
+          logger.action("Momentum reroll (missing item)", {
             oldRoll,
             reroll1,
             reroll2,
             finalRoll: dice_roll,
           });
           addNotification(
-            `⚡ Reroll Used! Best of 3 rolls: ${dice_roll}`,
+            `⚡ Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} → Best: ${dice_roll}`,
             "success"
           );
         }
@@ -1306,16 +1320,20 @@ function StoryPageContent() {
     } else if (momentumMode === "reroll") {
       //Noitem-justreroll
       const reroll = getSecureRandomInt(1, 100);
+      allDiceRolls.push(reroll);
       const oldRoll = dice_roll;
-      if (reroll < dice_roll) {
+      if (reroll > dice_roll) {
         dice_roll = reroll;
       }
-      logger.action("Momentumreroll(noitem)", {
+      logger.action("Momentum reroll (no item)", {
         oldRoll,
         reroll,
         finalRoll: dice_roll,
       });
-      addNotification(`⚡ Reroll Used! Better roll: ${dice_roll}`, "success");
+      addNotification(
+        `⚡ Reroll Used! Rolls: ${oldRoll}, ${reroll} → Best: ${dice_roll}`,
+        "success"
+      );
     }
 
     //Processresourceusage(resourceisautomaticallyatriskonskillcheckfailure)
@@ -1333,21 +1351,21 @@ function StoryPageContent() {
         if (resource.value < requiredAmount) {
           insufficientResource = true;
           const penalty = Math.max(5, Math.floor(dc / 10)); //DCï¿½10,minimum5
-          logger.action("Insufficientresource", {
+          logger.action("Insufficient resource", {
             resource: choice.resource_used,
             required: requiredAmount,
             available: resource.value,
             penalty,
           });
           addNotification(
-            `??Insufficient${resource.name}!Need${requiredAmount},have${resource.value}.Rollpenalty:-${penalty}`,
+            `⚠️ Insufficient ${resource.name}! Need ${requiredAmount}, have ${resource.value}. Roll penalty: -${penalty}`,
             "warning"
           );
         }
       } else {
-        logger.warn("Resourcenotfound", { resource: choice.resource_used });
+        logger.warn("Resource not found", { resource: choice.resource_used });
         addNotification(
-          `??Resourcenotfound:${choice.resource_used}`,
+          `⚠️ Resource not found: ${choice.resource_used}`,
           "warning"
         );
       }
@@ -1369,19 +1387,19 @@ function StoryPageContent() {
       //Handleguaranteedsuccess
       if (momentumMode === "guarantee") {
         skillCheckResult = "success";
-        logger.action("Skillcheck(Guaranteed)", {
+        logger.action("Skill check (Guaranteed)", {
           skill: choice.skill_used,
           dc,
         });
         addNotification(
-          `?GuaranteedSuccess!(${choice.skill_used}:Auto-successwith2Momentum)`,
+          `✓ Guaranteed Success! (${choice.skill_used}: Auto-success with 2 Momentum)`,
           "success"
         );
       } else {
         const total = effectiveDiceRoll + statValue;
         const dc_passed = dice_roll === 100 || total >= dc;
 
-        logger.action("Skillcheckresult", {
+        logger.action("Skill check result", {
           skill: choice.skill_used,
           dc,
           roll: dice_roll,
@@ -1399,11 +1417,9 @@ function StoryPageContent() {
           !!usedItem && (usedItem.type || "normal") !== "misc";
         const hasItemDisadvantage = !!(choice.item_used && !usedItem);
 
-        const allRolls: number[] = [dice_roll];
-
         setDiceRoll({
           show: true,
-          rolls: allRolls,
+          rolls: allDiceRolls,
           finalRoll: dice_roll,
           skillName: choice.skill_used,
           skillBonus: statValue,
@@ -1421,12 +1437,12 @@ function StoryPageContent() {
         if (dc_passed) {
           skillCheckResult = "success";
           const penaltyText = insufficientResource
-            ? `(-${dicePenalty}dicepenaltyfrominsufficientresource)`
+            ? ` (-${dicePenalty} dice penalty from insufficient resource)`
             : "";
           addNotification(
-            `?CheckPassed!(${choice.skill_used}:${dice_roll}${
-              insufficientResource ? `-${dicePenalty}` : ""
-            }+${statValue}=${total}=${dc})${penaltyText}`,
+            `✓ Check Passed! (${choice.skill_used}: ${dice_roll}${
+              insufficientResource ? ` - ${dicePenalty}` : ""
+            } + ${statValue} = ${total} ≥ ${dc})${penaltyText}`,
             "success"
           );
 
@@ -1443,13 +1459,13 @@ function StoryPageContent() {
                 resource.value + recovery
               );
               resourceUsedAfter = resource.value;
-              logger.action("Resourcerecovered", {
+              logger.action("Resource recovered", {
                 resource: choice.resource_used,
                 amount: recovery,
                 newTotal: resource.value,
               });
               addNotification(
-                `?${resource.name}recovered:${beforeRecovery}?${resourceUsedAfter}(+${recovery})`,
+                `✓ ${resource.name} recovered: ${beforeRecovery} → ${resourceUsedAfter} (+${recovery})`,
                 "success"
               );
             }
@@ -1465,12 +1481,12 @@ function StoryPageContent() {
                   storyData.maxMomentum - storyData.momentum
                 );
                 storyData.momentum += earned;
-                logger.action("Momentumearned(CriticalSuccess)", {
+                logger.action("Momentum earned (Critical Success)", {
                   earned,
                   newTotal: storyData.momentum,
                 });
                 addNotification(
-                  `?CriticalSuccess!Earned${earned}Momentum!(${storyData.momentum}/${storyData.maxMomentum})`,
+                  `✨ Critical Success! Earned ${earned} Momentum! (${storyData.momentum}/${storyData.maxMomentum})`,
                   "success"
                 );
               }
@@ -1478,12 +1494,12 @@ function StoryPageContent() {
               //Strongsuccess(beatDCby20+):earn1momentum
               if (storyData.momentum < storyData.maxMomentum) {
                 storyData.momentum++;
-                logger.action("Momentumearned(StrongSuccess)", {
+                logger.action("Momentum earned (Strong Success)", {
                   earned: 1,
                   newTotal: storyData.momentum,
                 });
                 addNotification(
-                  `?StrongSuccess!Earned1Momentum!(${storyData.momentum}/${storyData.maxMomentum})`,
+                  `✓ Strong Success! Earned 1 Momentum! (${storyData.momentum}/${storyData.maxMomentum})`,
                   "success"
                 );
               }
@@ -1492,12 +1508,12 @@ function StoryPageContent() {
         } else {
           skillCheckResult = "failure";
           const penaltyText = insufficientResource
-            ? `(-${dicePenalty}dicepenaltyfrominsufficientresource)`
+            ? ` (-${dicePenalty} dice penalty from insufficient resource)`
             : "";
           addNotification(
-            `?CheckFailed!(${choice.skill_used}:${dice_roll}${
-              insufficientResource ? `-${dicePenalty}` : ""
-            }+${statValue}=${total}<${dc})${penaltyText}`,
+            `✗ Check Failed! (${choice.skill_used}: ${dice_roll}${
+              insufficientResource ? ` - ${dicePenalty}` : ""
+            } + ${statValue} = ${total} < ${dc})${penaltyText}`,
             "failure"
           );
 
@@ -1511,13 +1527,13 @@ function StoryPageContent() {
               const penalty = Math.max(5, Math.floor(dc / 10)); //DCï¿½10,minimum5
               resource.value = Math.max(0, resource.value - penalty);
               const lossAfter = resource.value;
-              logger.action("Resourcelost(Failure)", {
+              logger.action("Resource lost (Failure)", {
                 resource: choice.resource_used,
                 penalty,
                 newTotal: resource.value,
               });
               addNotification(
-                `??${resource.name}lostfromfailure:${lossBefore}?${lossAfter}(-${penalty})`,
+                `⚠️ ${resource.name} lost from failure: ${lossBefore} → ${lossAfter} (-${penalty})`,
                 "failure"
               );
             }
@@ -1548,7 +1564,7 @@ function StoryPageContent() {
                   itemQuantityAfter = 0;
                   itemBroken = true;
                 }
-                logger.action("Itembroken(Failure)", {
+                logger.action("Item broken (Failure)", {
                   item: choice.item_used,
                 });
                 addNotification(
@@ -1603,7 +1619,7 @@ function StoryPageContent() {
       text = choiceDetails.join("\n") + "\n";
     }
     text += ">" + choices.choices[key].text;
-    console.log("Finalchoicetext:", text);
+    console.log("Final choice text:", text);
     //Resetmomentummodeafteruse
     setMomentumMode("none");
 
@@ -1624,12 +1640,12 @@ function StoryPageContent() {
       data: { session },
     } = await supabase.auth.getSession();
     if (!session) {
-      addNotification("Sessionexpired.Pleasesigninagain.", "failure");
+      addNotification("Session expired. Please sign in again.", "failure");
       setLoading(false);
       return;
     }
 
-    //Buildminimalpayload-onlysendwhattheAIneedstogeneratethenextpart
+    //Build minimal payload - only send what the AI needs to generate the next part
     //TheAIusesbuildMessages()whichonlyneedsrecentcontext+currentstate
     const MAX_CONTENT_LENGTH = 50000;
 
@@ -1720,15 +1736,15 @@ function StoryPageContent() {
     };
 
     const payloadSize = JSON.stringify(payload).length;
-    console.log(`Payloadsize:${(payloadSize / 1024).toFixed(2)}KB`);
-    logger.ai_request("SendingchoicetoAI", {
+    console.log(`Payload size: ${(payloadSize / 1024).toFixed(2)} KB`);
+    logger.ai_request("Sending choice to AI", {
       model: payload.model,
       payloadSize,
     });
 
     if (payloadSize > 4 * 1024 * 1024) {
-      addNotification("?Storydatatoolargeforgeneration.", "failure");
-      console.error("Payloadexceeds4MBlimit:", payloadSize);
+      addNotification("⚠ Story data too large for generation.", "failure");
+      console.error("Payload exceeds 4MB limit:", payloadSize);
       setLoading(false);
       return;
     }
@@ -1786,7 +1802,7 @@ function StoryPageContent() {
 
         if (!res.ok) {
           addNotification(
-            `Error:${data.error || "Failedtogeneratestory"}`,
+            `Error: ${data.error || "Failed to generate story"}`,
             "failure"
           );
           setLoading(false);
@@ -1840,8 +1856,8 @@ function StoryPageContent() {
         await saveProgress(storyData);
       })
       .catch((error) => {
-        console.error("Errorfetchingnextstorypart:", error);
-        addNotification("Networkerror.Pleasetryagain.", "failure");
+        console.error("Error fetching next story part:", error);
+        addNotification("Network error. Please try again.", "failure");
         setLoading(false);
         setChoices({
           choices:
@@ -1872,13 +1888,13 @@ function StoryPageContent() {
     //CheckiflastpartisanAIresponse
     const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
     if (!lastPart || lastPart.user) {
-      addNotification("Nothingtoretry", "warning");
+      addNotification("Nothing to retry", "warning");
       return;
     }
 
     //Findtheuser'schoice(secondtolastpart)
     if (storyData.scene.parts.length < 2) {
-      addNotification("Cannotretryinitialstory", "warning");
+      addNotification("Cannot retry initial story", "warning");
       return;
     }
 
@@ -1897,20 +1913,20 @@ function StoryPageContent() {
       setChoices({ choices: userChoicePart.choices });
     }
 
-    addNotification("Regeneratingresponse...", "info");
-    logger.action("Userrequestedretry");
+    addNotification("Regenerating response...", "info");
+    logger.action("User requested retry");
 
     //Regeneratefromcurrentstate
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (!session) {
-      addNotification("Sessionexpired.Pleasesigninagain.", "failure");
+      addNotification("Session expired. Please sign in again.", "failure");
       setLoading(false);
       return;
     }
 
-    //Buildminimalpayload
+    //Build minimal payload
     const MAX_CONTENT_LENGTH = 50000;
 
     //Getcurrentmodelconfigtoestimateneededcontext
@@ -2024,7 +2040,7 @@ function StoryPageContent() {
 
         if (!res.ok) {
           addNotification(
-            `Error:${data.error || "Failedtogeneratestory"}`,
+            `Error: ${data.error || "Failed to generate story"}`,
             "failure"
           );
           setLoading(false);
@@ -2066,13 +2082,13 @@ function StoryPageContent() {
         setChoices({ choices: data.part.choices || [] });
         setLoading(false);
         setCanRetry(true);
-        addNotification("?Responseregenerated", "success");
+        addNotification("✓ Response regenerated", "success");
 
         await saveProgress(storyData);
       })
       .catch((error) => {
-        console.error("Errorretryingstory:", error);
-        addNotification("Networkerror.Pleasetryagain.", "failure");
+        console.error("Error retrying story:", error);
+        addNotification("Network error. Please try again.", "failure");
         setLoading(false);
         setCanRetry(true);
       });
@@ -2083,16 +2099,16 @@ function StoryPageContent() {
 
     if (storyData.points >= cost) {
       storyData.points -= cost;
-      callback(); //Executetheupgrade
+      callback(); //Execute the upgrade
       setStoryData({ ...storyData });
       addNotification(
-        `?Upgradepurchased!(${storyData.points}pointsremaining)`,
+        `✓ Upgrade purchased! (${storyData.points} points remaining)`,
         "success"
       );
       await saveProgress(storyData);
     } else {
       addNotification(
-        `?Notenoughpoints!Need${cost},have${storyData.points}`,
+        `⚠ Not enough points! Need ${cost}, have ${storyData.points}`,
         "failure"
       );
     }
@@ -2310,7 +2326,10 @@ function StoryPageContent() {
                           data: { session },
                         } = await supabase.auth.getSession();
                         if (!session) {
-                          addNotification("Pleasesignintoreplay", "warning");
+                          addNotification(
+                            "Please sign in to replay",
+                            "warning"
+                          );
                           return;
                         }
 
@@ -2359,14 +2378,14 @@ function StoryPageContent() {
                         });
 
                         addNotification(
-                          "Storyreset!Startingfresh...",
+                          "Story reset! Starting fresh...",
                           "success"
                         );
                         router.push(`/story?storyId=${storyDbId}`);
                         window.location.reload();
                       } catch (error) {
-                        console.error("Errorreplayingstory:", error);
-                        addNotification("Failedtoreplaystory", "failure");
+                        console.error("Error replaying story:", error);
+                        addNotification("Failed to replay story", "failure");
                       }
                     },
                   });
@@ -2386,16 +2405,16 @@ function StoryPageContent() {
                 onClick={() => {
                   setConfirmDialog({
                     isOpen: true,
-                    title: "new GamePlus",
+                    title: "New Game Plus",
                     message:
-                      "Startanew GamePlusrun?You'llkeepallachievements,stats,resources,anditems,plusearnbonusrewards!",
+                      "Start a New Game Plus run? You'll keep all achievements, stats, resources, and items, plus earn bonus rewards!",
                     icon: "Star",
-                    confirmText: "StartNG+",
+                    confirmText: "Start NG+",
                     confirmButtonClass:
-                      "bg-linear-to-rfrom-purple-600to-pink-600hover:from-purple-700hover:to-pink-700",
+                      "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700",
                     onConfirm: async () => {
                       setConfirmDialog({ ...confirmDialog, isOpen: false });
-                      //new GamePlus-keepachievementsandincreasedifficulty
+                      //New Game Plus - keep achievements and increase difficulty
                       if (!storyDbId) return;
                       try {
                         const {
@@ -2403,7 +2422,7 @@ function StoryPageContent() {
                         } = await supabase.auth.getSession();
                         if (!session) {
                           addNotification(
-                            "Pleasesigninfornew GamePlus",
+                            "Please sign in for New Game Plus",
                             "warning"
                           );
                           return;
@@ -2463,14 +2482,17 @@ function StoryPageContent() {
                         });
 
                         addNotification(
-                          `new GamePlus${ngPlusCount}activated!+${bonusPoints}points,+${bonusMomentum}maxmomentum`,
+                          `New Game Plus ${ngPlusCount} activated! +${bonusPoints} points, +${bonusMomentum} max momentum`,
                           "success"
                         );
                         router.push(`/story?storyId=${storyDbId}`);
                         window.location.reload();
                       } catch (error) {
-                        console.error("ErrorstartingNG+:", error);
-                        addNotification("Failedtostartnew GamePlus", "failure");
+                        console.error("Error starting NG+:", error);
+                        addNotification(
+                          "Failed to start New Game Plus",
+                          "failure"
+                        );
                       }
                     },
                   });

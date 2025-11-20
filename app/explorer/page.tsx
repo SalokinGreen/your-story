@@ -156,7 +156,7 @@ export default function ExplorerPage() {
               Featured Adventures
             </h2>
             <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
-              <div className="relative h-64 sm:h-80 md:h-96">
+              <div className="relative h-96 sm:h-80 md:h-96">
                 {featuredAdventures.map((adventure, index) => (
                   <div
                     key={adventure.id}
@@ -165,7 +165,7 @@ export default function ExplorerPage() {
                     }`}
                   >
                     <div
-                      className={`h-full p-8 sm:p-12 flex flex-col justify-center relative ${
+                      className={`h-full p-6 sm:p-8 md:p-12 flex flex-col justify-end sm:justify-center relative ${
                         adventure.bannerUrl
                           ? "bg-cover bg-center"
                           : "bg-linear-to-r from-purple-600 via-pink-600 to-blue-600"
@@ -177,36 +177,36 @@ export default function ExplorerPage() {
                       }
                     >
                       {adventure.bannerUrl && (
-                        <div className="absolute inset-0 bg-linear-to-r from-black/90 via-black/60 to-transparent z-0"></div>
+                        <div className="absolute inset-0 bg-linear-to-t sm:bg-linear-to-r from-black/95 via-black/80 to-black/40 sm:from-black/90 sm:via-black/60 sm:to-transparent z-0"></div>
                       )}
                       <div className="max-w-2xl relative z-10">
-                        <div className="flex items-center gap-2 mb-4">
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
                           <span
-                            className={`px-3 py-1 rounded-full text-sm font-bold border-2 ${getDifficultyColor(
+                            className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold border-2 ${getDifficultyColor(
                               adventure.difficulty
                             )}`}
                           >
                             {adventure.difficulty}
                           </span>
-                          <span className="px-3 py-1 bg-white/20 text-white rounded-full text-sm font-semibold flex items-center gap-1">
+                          <span className="px-2 sm:px-3 py-1 bg-white/20 text-white rounded-full text-xs sm:text-sm font-semibold flex items-center gap-1">
                             <DynamicIcon
                               name="Star"
-                              className="w-4 h-4 fill-current"
+                              className="w-3 sm:w-4 h-3 sm:h-4 fill-current"
                             />{" "}
                             {adventure.rating?.toFixed(1)}
                           </span>
                         </div>
-                        <h3 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+                        <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4 leading-tight">
                           {adventure.title}
                         </h3>
-                        <p className="text-white/90 text-lg mb-6 line-clamp-3">
+                        <p className="text-white/90 text-sm sm:text-base md:text-lg mb-4 sm:mb-6 line-clamp-2 sm:line-clamp-3">
                           {adventure.description}
                         </p>
-                        <div className="flex flex-wrap gap-2 mb-6">
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-6">
                           {adventure.tags.slice(0, 4).map((tag) => (
                             <span
                               key={tag}
-                              className="px-3 py-1 bg-white/20 text-white rounded-full text-sm"
+                              className="px-2 sm:px-3 py-1 bg-white/20 text-white rounded-full text-xs sm:text-sm"
                             >
                               {tag}
                             </span>
@@ -216,7 +216,7 @@ export default function ExplorerPage() {
                           onClick={() =>
                             router.push(`/explorer/${adventure.id}`)
                           }
-                          className="px-8 py-4 bg-white text-purple-600 font-bold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105"
+                          className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white text-purple-600 font-bold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 text-sm sm:text-base"
                         >
                           Start Adventure →
                         </button>
@@ -227,14 +227,14 @@ export default function ExplorerPage() {
               </div>
 
               {/* Carousel Navigation */}
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-20">
                 {featuredAdventures.map((_, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentSlide(index)}
-                    className={`w-3 h-3 rounded-full transition-all ${
+                    className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all ${
                       index === currentSlide
-                        ? "bg-white w-8"
+                        ? "bg-white w-6 sm:w-8"
                         : "bg-white/50 hover:bg-white/75"
                     }`}
                   />
@@ -250,9 +250,12 @@ export default function ExplorerPage() {
                       featuredAdventures.length
                   )
                 }
-                className="absolute left-4 top-1/2 transform -translate-y-1/2 p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors"
+                className="absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors z-20"
               >
-                <DynamicIcon name="ChevronLeft" className="w-6 h-6" />
+                <DynamicIcon
+                  name="ChevronLeft"
+                  className="w-5 h-5 sm:w-6 sm:h-6"
+                />
               </button>
               <button
                 onClick={() =>
@@ -260,9 +263,12 @@ export default function ExplorerPage() {
                     (prev) => (prev + 1) % featuredAdventures.length
                   )
                 }
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors"
+                className="absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors z-20"
               >
-                <DynamicIcon name="ChevronRight" className="w-6 h-6" />
+                <DynamicIcon
+                  name="ChevronRight"
+                  className="w-5 h-5 sm:w-6 sm:h-6"
+                />
               </button>
             </div>
           </div>

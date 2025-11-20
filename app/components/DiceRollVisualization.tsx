@@ -24,10 +24,7 @@ interface Props {
   onComplete: () => void;
 }
 
-export default function DiceRollVisualization({
-  rollData,
-  onComplete,
-}: Props) {
+export default function DiceRollVisualization({ rollData, onComplete }: Props) {
   const [phase, setPhase] = useState<"rolling" | "result" | "complete">(
     "rolling"
   );
