@@ -232,7 +232,7 @@ export function processCommands(
           beatIndex: beatIndex + 1,
           title: storyData.plot_beats[beatIndex].title,
         });
-        addNotification(`?? Story beat ${beatIndex + 1} completed`, "success");
+        addNotification(`✨ Story beat ${beatIndex + 1} completed`, "success");
 
         // Award points for completing a new beat (use custom points if set, otherwise default)
         if (!storyData.earnedPointsFromBeats.includes(beatIndex)) {
@@ -280,7 +280,7 @@ export function processCommands(
 
       storyData.quests.push(newQuest);
       logger.action("New quest created via command", { title, points });
-      addNotification(`?? New quest: ${title}`, "success");
+      addNotification(`✨ New quest: ${title}`, "success");
       continue;
     }
 
@@ -294,7 +294,7 @@ export function processCommands(
       if (quest) {
         quest.active = true;
         logger.action("Quest activated via command", { title: questTitle });
-        addNotification(`?? Quest activated: ${questTitle}`, "info");
+        addNotification(`✨ Quest activated: ${questTitle}`, "info");
       }
       continue;
     }
@@ -320,13 +320,13 @@ export function processCommands(
             points: quest.points,
             totalPoints: storyData.points,
           });
-          addNotification(`? Quest completed: ${questTitle}`, "success");
+          addNotification(`⚠️ Quest completed: ${questTitle}`, "success");
           addNotification(
-            `?? Earned ${quest.points} points! Total: ${storyData.points}`,
+            `✨ Earned ${quest.points} points! Total: ${storyData.points}`,
             "success"
           );
         } else {
-          addNotification(`? Quest completed: ${questTitle}`, "success");
+          addNotification(`⚠️ Quest completed: ${questTitle}`, "success");
         }
       }
       continue;
@@ -342,7 +342,7 @@ export function processCommands(
       if (quest) {
         quest.active = false;
         logger.action("Quest deactivated via command", { title: questTitle });
-        addNotification(`?? Quest deactivated: ${questTitle}`, "info");
+        addNotification(`✨ Quest deactivated: ${questTitle}`, "info");
       }
       continue;
     }
@@ -362,7 +362,7 @@ export function processCommands(
       // Check if lore entry already exists
       const existingLore = storyData.lore.find((l) => l.title === loreTitle);
       if (existingLore) {
-        addNotification(`?? Lore "${loreTitle}" already exists`, "warning");
+        addNotification(`⚠️ Lore "${loreTitle}" already exists`, "warning");
       } else {
         const onTriggerArray = onTriggers
           ? onTriggers
@@ -389,7 +389,7 @@ export function processCommands(
           on: onTriggerArray.length === 0, // If no triggers, show from start
         });
         logger.action("New lore created via command", { title: loreTitle });
-        addNotification(`?? New lore entry created: ${loreTitle}`, "success");
+        addNotification(`✨ New lore entry created: ${loreTitle}`, "success");
       }
       continue;
     }
@@ -403,7 +403,7 @@ export function processCommands(
       const beatIndex = parseInt(editBeatTitleMatch[2], 10);
       if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
         storyData.plot_beats[beatIndex].title = newTitle;
-        addNotification(`?? Story beat ${beatIndex + 1} title updated`, "info");
+        addNotification(`✨ Story beat ${beatIndex + 1} title updated`, "info");
       }
       continue;
     }
@@ -417,7 +417,7 @@ export function processCommands(
       const beatIndex = parseInt(editBeatContentMatch[2], 10);
       if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
         storyData.plot_beats[beatIndex].content = newContent;
-        addNotification(`??Storybeat${beatIndex + 1}contentupdated`, "info");
+        addNotification(`✨ Story beat ${beatIndex + 1} content updated`, "info");
       }
       continue;
     }
@@ -432,7 +432,7 @@ export function processCommands(
         content: content,
         fulfilled: false,
       });
-      addNotification(`??new storybeatadded:${title}`, "success");
+      addNotification(`✨ New story beat added: ${title}`, "success");
       continue;
     }
 
@@ -442,16 +442,16 @@ export function processCommands(
       const beatIndex = parseInt(removeBeatMatch[1], 10);
       if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
         const removed = storyData.plot_beats.splice(beatIndex, 1)[0];
-        addNotification(`??Storybeatremoved:${removed.content}`, "warning");
+        addNotification(`✨ Story beat removed: ${removed.content}`, "warning");
       }
       continue;
     }
   }
 }
 
-//Utility:trimscenehistorytopreventbloat
+// Utility: Trim scene history to prevent bloat
 function trimStoryData(data: StoryData): StoryData {
-  const MAX_PERSISTED_PARTS = 10; //Keeplast10sceneparts
+  const MAX_PERSISTED_PARTS = 10; // Keep last 10 scene parts
   return {
     ...data,
     scene: {
@@ -503,7 +503,7 @@ function StoryPageContent() {
     onConfirm: () => {},
   });
 
-  //Fetchtokenbalanceonmount
+  // Fetch token balance on mount
   useEffect(() => {
     async function fetchBalance() {
       try {
@@ -517,13 +517,13 @@ function StoryPageContent() {
           setTokenBalance(data.balance.total);
         }
       } catch (error) {
-        console.error("Failedtofetchtokenbalance:", error);
+        console.error("Failed to fetch token balance:", error);
       }
     }
     fetchBalance();
   }, []);
 
-  //Loadstoryfromdatabaseonmount
+  // Load story from database on mount
   useEffect(() => {
     if (!storyId) {
       addNotification("NostoryIDprovided", "failure");
@@ -589,7 +589,7 @@ function StoryPageContent() {
         };
 
         if (session?.access_token) {
-          headers["Authorization"] = `Bearer${session.access_token}`;
+          headers["Authorization"] = `Bearer ${session.access_token}`;
         }
 
         const response = await fetch(`/api/stories/${storyId}`, { headers });
@@ -733,7 +733,7 @@ function StoryPageContent() {
             "Content-Type": "application/json",
           };
           if (session?.access_token) {
-            headers["Authorization"] = `Bearer${session.access_token}`;
+            headers["Authorization"] = `Bearer ${session.access_token}`;
           }
 
           const response = await fetch(`/api/stories/${storyDbId}`, {
@@ -746,7 +746,7 @@ function StoryPageContent() {
           });
 
           if (!response.ok) {
-            console.error("Failedtosavepresetselection");
+            console.error("Failed to save preset selection");
           }
         }
       } catch (error) {
@@ -763,7 +763,7 @@ function StoryPageContent() {
     setShowPresetSelection(false);
     setSelectedPreset(preset);
 
-    addNotification(`Characterpreset"${preset.name}"applied!??`, "success");
+    addNotification(`Character preset "${preset.name}" applied! ✨`, "success");
   };
 
   //Savestoryprogresstodatabase(debounced)
@@ -775,10 +775,10 @@ function StoryPageContent() {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    //Debounce:onlysaveafter3secondsofnoactivity
+    // Debounce: Only save after 3 seconds of no activity
     saveTimeoutRef.current = setTimeout(async () => {
       try {
-        logger.info("Savingstoryprogress...");
+        logger.info("Saving story progress...");
         //Handlelocalstorysaving
         if (storyDbId.startsWith("local_")) {
           const { saveLocalStory } = await import(
@@ -831,7 +831,7 @@ function StoryPageContent() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer${session.access_token}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             storyData: dataToSave,
@@ -855,7 +855,7 @@ function StoryPageContent() {
         : "deep-seek/deepseek-chat";
     const modelConfig = getModelConfig(modelKey);
 
-    //Dynamicmemorycap:1/4ofcontextwindow(approx4charspertoken)
+    // Dynamic memory cap: 1/4 of context window (approx 4 chars per token)
     const CHARS_PER_TOKEN = 4;
     const memory_cap = modelConfig.maxTokens * 0.25 * CHARS_PER_TOKEN;
 
@@ -1018,7 +1018,7 @@ function StoryPageContent() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer${session.access_token}`,
+        Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify(payload),
     })
@@ -1035,7 +1035,7 @@ function StoryPageContent() {
 
         const text = await res.text();
         if (!text || text.trim() === "") {
-          addNotification(`?Emptyresponsefromserver`, "failure");
+          addNotification(`⚠ Empty response from server`, "failure");
           setLoading(false);
           return;
         }
@@ -1045,13 +1045,13 @@ function StoryPageContent() {
           data = JSON.parse(text);
         } catch (e) {
           console.error("Failedtoparseresponse:", text);
-          addNotification(`?InvalidJSONresponsefromserver`, "failure");
+          addNotification(`⚠ Invalid JSON response from server`, "failure");
           setLoading(false);
           return;
         }
 
         if (res.status === 402) {
-          addNotification(`?${data.error}`, "failure");
+          addNotification(`⚠ ${data.error}`, "failure");
           if (data.balance) {
             addNotification(
               `Yourbalance:${data.balance.tradable}tradable,${data.balance.locked}locked`,
@@ -1090,7 +1090,7 @@ function StoryPageContent() {
         });
 
         if (data.meta?.tokensDeducted) {
-          addNotification(`?Used${data.meta.tokensDeducted}tokens`, "success");
+          addNotification(`✨ Used ${data.meta.tokensDeducted} tokens`, "success");
           if (data.meta.remainingBalance) {
             addNotification(
               `Balance:${data.meta.remainingBalance.total}tokensremaining(${data.meta.remainingBalance.tradable}tradable)`,
@@ -1120,7 +1120,7 @@ function StoryPageContent() {
       })
       .catch((err) => {
         console.error("Custominputerror:", err);
-        addNotification(`?Errorgeneratingstory:${err.message}`, "failure");
+        addNotification(`⚠ Error generating story: ${err.message}`, "failure");
         setLoading(false);
       });
   }
@@ -1193,12 +1193,12 @@ function StoryPageContent() {
         if (itemType === "misc") {
           //Miscitemsdon'tgiveadvantage,butpreventdisadvantage
           addNotification(
-            `Useditem:${choice.item_used}(Nodisadvantage)`,
+            `Used item: ${choice.item_used} (No disadvantage)`,
             "info"
           );
         } else {
           //Normal,consumable,andstoryitemsgiveadvantage
-          addNotification(`Useditem:${choice.item_used}(Advantage!)`, "info");
+          addNotification(`Used item: ${choice.item_used} (Advantage!)`, "info");
           const second_roll = getSecureRandomInt(1, 100);
           logger.action("Advantagerollfromitem", {
             item: choice.item_used,
@@ -1211,7 +1211,7 @@ function StoryPageContent() {
         }
 
         if (momentumMode === "reroll") {
-          //Reroll:rolltwomoretimesandtakethebest
+          // Reroll: Roll two more times and take the best
           const reroll1 = getSecureRandomInt(1, 100);
           const reroll2 = getSecureRandomInt(1, 100);
           const oldRoll = dice_roll;
@@ -1222,11 +1222,11 @@ function StoryPageContent() {
             reroll2,
             finalRoll: dice_roll,
           });
-          addNotification(`??RerollUsed!Bestof3rolls:${dice_roll}`, "success");
+          addNotification(`⚡ Reroll Used! Best of 3 rolls: ${dice_roll}`, "success");
         }
 
-        //Handleitemconsumptionbasedontype
-        //Consumable:AlwaysconsumedwhenUsed
+        // Handle item consumption based on type
+        // Consumable: Always consumed when used
         if (itemType === "consumable") {
           const itemIndex = storyData.inventory.findIndex(
             (i) => i.name === choice.item_used
@@ -1272,7 +1272,7 @@ function StoryPageContent() {
             reroll2,
             finalRoll: dice_roll,
           });
-          addNotification(`??RerollUsed!Bestof3rolls:${dice_roll}`, "success");
+          addNotification(`⚡ Reroll Used! Best of 3 rolls: ${dice_roll}`, "success");
         }
       }
     } else if (momentumMode === "reroll") {
@@ -1287,7 +1287,7 @@ function StoryPageContent() {
         reroll,
         finalRoll: dice_roll,
       });
-      addNotification(`??RerollUsed!Betterroll:${dice_roll}`, "success");
+      addNotification(`⚡ Reroll Used! Better roll: ${dice_roll}`, "success");
     }
 
     //Processresourceusage(resourceisautomaticallyatriskonskillcheckfailure)
@@ -1403,7 +1403,7 @@ function StoryPageContent() {
           //Earnmomentumonsuccess(notwhenusingguaranteeorreroll)
           if (momentumMode === "none") {
             if (dice_roll === 100) {
-              //Criticalsuccess:earn2momentum
+              // Critical success: Earn 2 momentum
               if (storyData.momentum < storyData.maxMomentum) {
                 const earned = Math.min(
                   2,
@@ -1446,7 +1446,7 @@ function StoryPageContent() {
             "failure"
           );
 
-          //Onfailure:loseadditionalresourceifonew asUsed(DC-basedpenalty)
+          // On failure: Lose additional resource if one was used (DC-based penalty)
           if (choice.resource_used) {
             const resource = storyData.resources.find(
               (r) => r.name === choice.resource_used
@@ -1682,7 +1682,7 @@ function StoryPageContent() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer${session.access_token}`,
+        Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify(payload),
     })
@@ -1705,7 +1705,7 @@ function StoryPageContent() {
 
         const text = await res.text();
         if (!text || text.trim() === "") {
-          addNotification(`?Emptyresponsefromserver`, "failure");
+          addNotification(`⚠ Empty response from server`, "failure");
           setLoading(false);
           setChoices({
             choices:
@@ -1719,7 +1719,7 @@ function StoryPageContent() {
         try {
           data = JSON.parse(text);
         } catch (e) {
-          addNotification(`?InvalidJSONresponse`, "failure");
+          addNotification(`⚠ Invalid JSON response`, "failure");
           setLoading(false);
           setChoices({
             choices:
@@ -1936,14 +1936,14 @@ function StoryPageContent() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer${session.access_token}`,
+        Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify(payload),
     })
       .then(async (res) => {
         const contentType = res.headers.get("content-type");
         if (!contentType || !contentType.includes("application/json")) {
-          addNotification(`?Invalidresponsefromserver`, "failure");
+          addNotification(`⚠ Invalid response from server`, "failure");
           setLoading(false);
           setCanRetry(true);
           return;
@@ -1951,7 +1951,7 @@ function StoryPageContent() {
 
         const text = await res.text();
         if (!text || text.trim() === "") {
-          addNotification(`?Emptyresponsefromserver`, "failure");
+          addNotification(`⚠ Empty response from server`, "failure");
           setLoading(false);
           setCanRetry(true);
           return;
@@ -1961,7 +1961,7 @@ function StoryPageContent() {
         try {
           data = JSON.parse(text);
         } catch (e) {
-          addNotification(`?InvalidJSONresponse`, "failure");
+          addNotification(`⚠ Invalid JSON response`, "failure");
           setLoading(false);
           setCanRetry(true);
           return;
@@ -2072,9 +2072,9 @@ function StoryPageContent() {
             </p>
             <button
               onClick={() => router.push("/explorer")}
-              className="mt-4px-6py-3bg-purple-600text-whiterounded-lghover:bg-purple-700"
+              className="mt-4 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
             >
-              BrowseAdventures
+              Browse Adventures
             </button>
           </div>
         </div>
@@ -2115,23 +2115,23 @@ function StoryPageContent() {
           </div>
 
           {/*StatsSummary*/}
-          <div className="bg-whitedark:bg-gray-800rounded-2xlshadow-xlp-8borderborder-gray-200dark:border-gray-700mb-6">
-            <h3 className="text-2xlfont-boldmb-6text-gray-900dark:text-whiteflexitems-centergap-2">
-              <DynamicIcon name="BarChart2" className="w-8h-8" />
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6">
+            <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
+              <DynamicIcon name="BarChart2" className="w-8 h-8" />
               Final Statistics
             </h3>
-            <div className="gridgrid-cols-1md:grid-cols-2gap-6">
-              <div className="p-4bg-purple-50dark:bg-purple-900/20rounded-lgborderborder-purple-200dark:border-purple-800">
-                <div className="flexitems-centergap-2mb-2">
-                  <DynamicIcon name="Trophy" className="w-8h-8" />
-                  <span className="text-lgfont-semiboldtext-gray-900dark:text-white">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <DynamicIcon name="Trophy" className="w-8 h-8" />
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
                     Achievements
                   </span>
                 </div>
-                <div className="text-3xlfont-boldtext-purple-600dark:text-purple-400">
+                <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
                   {achievedCount}/{totalAchievements}
                 </div>
-                <div className="mt-2text-smtext-gray-600dark:text-gray-400">
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                   {totalAchievements > 0
                     ? Math.round((achievedCount / totalAchievements) * 100)
                     : 0}
@@ -2139,17 +2139,17 @@ function StoryPageContent() {
                 </div>
               </div>
 
-              <div className="p-4bg-blue-50dark:bg-blue-900/20rounded-lgborderborder-blue-200dark:border-blue-800">
-                <div className="flexitems-centergap-2mb-2">
-                  <DynamicIcon name="BookOpen" className="w-8h-8" />
-                  <span className="text-lgfont-semiboldtext-gray-900dark:text-white">
-                    StoryBeats
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <DynamicIcon name="BookOpen" className="w-8 h-8" />
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Story Beats
                   </span>
                 </div>
-                <div className="text-3xlfont-boldtext-blue-600dark:text-blue-400">
+                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                   {completedBeats}/{totalBeats}
                 </div>
-                <div className="mt-2text-smtext-gray-600dark:text-gray-400">
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                   {totalBeats > 0
                     ? Math.round((completedBeats / totalBeats) * 100)
                     : 0}
@@ -2157,17 +2157,17 @@ function StoryPageContent() {
                 </div>
               </div>
 
-              <div className="p-4bg-green-50dark:bg-green-900/20rounded-lgborderborder-green-200dark:border-green-800">
-                <div className="flexitems-centergap-2mb-2">
-                  <DynamicIcon name="Target" className="w-8h-8" />
-                  <span className="text-lgfont-semiboldtext-gray-900dark:text-white">
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <DynamicIcon name="Target" className="w-8 h-8" />
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
                     Quests
                   </span>
                 </div>
-                <div className="text-3xlfont-boldtext-green-600dark:text-green-400">
+                <div className="text-3xl font-bold text-green-600 dark:text-green-400">
                   {completedQuests}/{totalQuests}
                 </div>
-                <div className="mt-2text-smtext-gray-600dark:text-gray-400">
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                   {totalQuests > 0
                     ? Math.round((completedQuests / totalQuests) * 100)
                     : 0}
@@ -2175,18 +2175,18 @@ function StoryPageContent() {
                 </div>
               </div>
 
-              <div className="p-4bg-yellow-50dark:bg-yellow-900/20rounded-lgborderborder-yellow-200dark:border-yellow-800">
-                <div className="flexitems-centergap-2mb-2">
-                  <DynamicIcon name="Coins" className="w-8h-8" />
-                  <span className="text-lgfont-semiboldtext-gray-900dark:text-white">
-                    TotalPoints
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <DynamicIcon name="Coins" className="w-8 h-8" />
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Total Points
                   </span>
                 </div>
-                <div className="text-3xlfont-boldtext-yellow-600dark:text-yellow-400">
+                <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
                   {storyData.points}
                 </div>
-                <div className="mt-2text-smtext-gray-600dark:text-gray-400">
-                  ProgressionPointsEarned
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  Progression Points Earned
                 </div>
               </div>
             </div>
@@ -2194,33 +2194,33 @@ function StoryPageContent() {
 
           {/*RecentAchievements*/}
           {achievedCount > 0 && (
-            <div className="bg-whitedark:bg-gray-800rounded-2xlshadow-xlp-8borderborder-gray-200dark:border-gray-700mb-6">
-              <h3 className="text-2xlfont-boldmb-6text-gray-900dark:text-whiteflexitems-centergap-2">
-                <DynamicIcon name="Trophy" className="w-8h-8" />
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6">
+              <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
+                <DynamicIcon name="Trophy" className="w-8 h-8" />
                 Achievements Earned
               </h3>
-              <div className="gridgrid-cols-1sm:grid-cols-2gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {storyData.achievements
                   .filter((a) => a.dateAchieved)
                   .map((achievement, idx) => (
                     <div
                       key={idx}
-                      className="p-4bg-amber-50dark:bg-amber-900/20rounded-lgborderborder-amber-200dark:border-amber-800"
+                      className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800"
                     >
-                      <div className="flexitems-startgap-3">
+                      <div className="flex items-start gap-3">
                         <DynamicIcon
                           name={achievement.symbol}
-                          className="w-8h-8"
+                          className="w-8 h-8"
                         />
                         <div>
-                          <div className="font-boldtext-gray-900dark:text-white">
+                          <div className="font-bold text-gray-900 dark:text-white">
                             {achievement.title}
                           </div>
-                          <div className="text-smtext-gray-600dark:text-gray-400">
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
                             {achievement.description}
                           </div>
-                          <div className="text-xstext-amber-600dark:text-amber-400font-semiboldmt-1">
-                            +{achievement.points}points
+                          <div className="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-1">
+                            +{achievement.points} points
                           </div>
                         </div>
                       </div>
@@ -2231,8 +2231,8 @@ function StoryPageContent() {
           )}
 
           {/*ActionButtons*/}
-          <div className="bg-whitedark:bg-gray-800rounded-2xlshadow-xlp-8borderborder-gray-200dark:border-gray-700">
-            <h3 className="text-2xlfont-boldmb-6text-gray-900dark:text-whitetext-center">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
+            <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white text-center">
               What'sNext?
             </h3>
             <div className="gridgrid-cols-1sm:grid-cols-2gap-4">
@@ -2298,7 +2298,7 @@ function StoryPageContent() {
                           method: "PATCH",
                           headers: {
                             "Content-Type": "application/json",
-                            Authorization: `Bearer${session.access_token}`,
+                            Authorization: `Bearer ${session.access_token}`,
                           },
                           body: JSON.stringify({ storyData: resetStoryData }),
                         });
@@ -2316,12 +2316,12 @@ function StoryPageContent() {
                     },
                   });
                 }}
-                className="px-6py-4bg-blue-600hover:bg-blue-700text-whitefont-semiboldrounded-lgtransition-colorsshadow-mdflexitems-centerjustify-centergap-2"
+                className="px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
               >
-                <DynamicIcon name="RotateCcw" className="w-8h-8" />
+                <DynamicIcon name="RotateCcw" className="w-8 h-8" />
                 <div className="text-left">
-                  <div>ReplayStory</div>
-                  <div className="text-xsopacity-80">Startfromthebeginning</div>
+                  <div>Replay Story</div>
+                  <div className="text-xs opacity-80">Start from the beginning</div>
                 </div>
               </button>
 
@@ -2400,7 +2400,7 @@ function StoryPageContent() {
                           method: "PATCH",
                           headers: {
                             "Content-Type": "application/json",
-                            Authorization: `Bearer${session.access_token}`,
+                            Authorization: `Bearer ${session.access_token}`,
                           },
                           body: JSON.stringify({ storyData: ngPlusStoryData }),
                         });
@@ -2418,48 +2418,48 @@ function StoryPageContent() {
                     },
                   });
                 }}
-                className="px-6py-4bg-linear-to-rfrom-purple-600to-pink-600hover:from-purple-700hover:to-pink-700text-whitefont-semiboldrounded-lgtransition-colorsshadow-mdflexitems-centerjustify-centergap-2"
+                className="px-6 py-4 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
               >
-                <DynamicIcon name="Star" className="w-8h-8" />
+                <DynamicIcon name="Star" className="w-8 h-8" />
                 <div className="text-left">
-                  <div>new GamePlus</div>
-                  <div className="text-xsopacity-80">
-                    Keepachievements+bonuses
+                  <div>New Game Plus</div>
+                  <div className="text-xs opacity-80">
+                    Keep achievements + bonuses
                   </div>
                 </div>
               </button>
 
               <button
                 onClick={() => router.push("/library")}
-                className="px-6py-4bg-gray-600hover:bg-gray-700text-whitefont-semiboldrounded-lgtransition-colorsshadow-mdflexitems-centerjustify-centergap-2"
+                className="px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
               >
-                <DynamicIcon name="Library" className="w-8h-8" />
+                <DynamicIcon name="Library" className="w-8 h-8" />
                 <div className="text-left">
-                  <div>ReturntoLibrary</div>
-                  <div className="text-xsopacity-80">Viewallyourstories</div>
+                  <div>Return to Library</div>
+                  <div className="text-xs opacity-80">View all your stories</div>
                 </div>
               </button>
 
               <button
                 onClick={() => router.push("/explorer")}
-                className="px-6py-4bg-green-600hover:bg-green-700text-whitefont-semiboldrounded-lgtransition-colorsshadow-mdflexitems-centerjustify-centergap-2"
+                className="px-6 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
               >
-                <DynamicIcon name="Map" className="w-8h-8" />
+                <DynamicIcon name="Map" className="w-8 h-8" />
                 <div className="text-left">
-                  <div>ExploreAdventures</div>
-                  <div className="text-xsopacity-80">Startanew adventure</div>
+                  <div>Explore Adventures</div>
+                  <div className="text-xs opacity-80">Start a new adventure</div>
                 </div>
               </button>
             </div>
 
             {storyData.newGamePlusCount && storyData.newGamePlusCount > 0 && (
-              <div className="mt-6p-4bg-linear-to-rfrom-amber-50to-purple-50dark:from-amber-900/20dark:to-purple-900/20rounded-lgborderborder-amber-200dark:border-amber-800text-center">
-                <div className="font-boldtext-lgtext-amber-900dark:text-amber-200flexitems-centerjustify-centergap-2">
-                  <DynamicIcon name="Star" className="w-5h-5" />
-                  new GamePlus: Run#{storyData.newGamePlusCount}
+              <div className="mt-6 p-4 bg-linear-to-r from-amber-50 to-purple-50 dark:from-amber-900/20 dark:to-purple-900/20 rounded-lg border border-amber-200 dark:border-amber-800 text-center">
+                <div className="font-bold text-lg text-amber-900 dark:text-amber-200 flex items-center justify-center gap-2">
+                  <DynamicIcon name="Star" className="w-5 h-5" />
+                  New Game Plus: Run #{storyData.newGamePlusCount}
                 </div>
-                <div className="text-smtext-amber-700dark:text-amber-300mt-1">
-                  Completed{storyData.newGamePlusCount}
+                <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  Completed {storyData.newGamePlusCount}
                   {""}
                   {storyData.newGamePlusCount === 1
                     ? "playthrough"
@@ -2481,79 +2481,79 @@ function StoryPageContent() {
     ];
 
     return (
-      <div className="min-h-screenbg-linear-to-brfrom-blue-50via-purple-50to-pink-50dark:from-gray-900dark:via-purple-900dark:to-blue-900font-sanspy-8px-4sm:px-8">
-        <div className="max-w-4xlmx-auto">
+      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
+        <div className="max-w-4xl mx-auto">
           {/*Header*/}
-          <div className="bg-whitedark:bg-gray-800rounded-2xlshadow-xlp-6sm:p-8borderborder-gray-200dark:border-gray-700mb-6">
-            <h1 className="text-3xlsm:text-4xlfont-boldtext-gray-900dark:text-whitemb-2">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 mb-6">
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
               {storyData.story_name}
             </h1>
-            <p className="text-gray-600dark:text-gray-400">
-              Chooseyourcharacterpresettobeginyouradventure
+            <p className="text-gray-600 dark:text-gray-400">
+              Choose your character preset to begin your adventure
             </p>
           </div>
 
           {/*PresetSelection*/}
-          <div className="bg-whitedark:bg-gray-800rounded-2xlshadow-xlp-6sm:p-8borderborder-gray-200dark:border-gray-700">
-            <h2 className="text-2xlfont-boldmb-2text-gray-900dark:text-whiteflexitems-centergap-2">
-              <DynamicIcon name="Users" className="w-8h-8" />
-              SelectYour Character
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+            <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white flex items-center gap-2">
+              <DynamicIcon name="Users" className="w-8 h-8" />
+              Select Your Character
             </h2>
-            <p className="text-smtext-gray-600dark:text-gray-400mb-6">
-              Chooseacharacterarchetypetostartwithpre-configuredstats,
-              items,andresources,orcreateyourowncustomcharacter.
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Choose a character archetype to start with pre-configured stats,
+              items, and resources, or create your own custom character.
             </p>
 
-            <div className="gridgrid-cols-1md:grid-cols-2gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {availablePresets.map((preset) => (
                 <button
                   key={preset.id}
                   onClick={() => handlePresetSelect(preset)}
-                  className={`border-2rounded-xlp-4text-lefttransition-allhover:shadow-lg${
+                  className={`border-2 rounded-xl p-4 text-left transition-all hover:shadow-lg ${
                     preset.id === "custom"
-                      ? "border-purple-300dark:border-purple-700bg-purple-50dark:bg-purple-900/20hover:border-purple-400dark:hover:border-purple-600"
-                      : "border-gray-300dark:border-gray-600bg-gray-50dark:bg-gray-900/30hover:border-purple-400dark:hover:border-purple-600"
+                      ? "border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 hover:border-purple-400 dark:hover:border-purple-600"
+                      : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/30 hover:border-purple-400 dark:hover:border-purple-600"
                   }`}
                 >
-                  <div className="flexitems-startgap-3mb-3">
-                    <DynamicIcon name={preset.icon} className="w-8h-8" />
+                  <div className="flex items-start gap-3 mb-3">
+                    <DynamicIcon name={preset.icon} className="w-8 h-8" />
                     <div className="flex-1">
-                      <h3 className="font-boldtext-lgtext-gray-900dark:text-white">
+                      <h3 className="font-bold text-lg text-gray-900 dark:text-white">
                         {preset.name}
                       </h3>
-                      <p className="text-smtext-gray-600dark:text-gray-400">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
                         {preset.description}
                       </p>
                     </div>
                   </div>
 
                   {preset.id !== "custom" && (
-                    <div className="flexflex-wrapgap-2text-xs">
+                    <div className="flex flex-wrap gap-2 text-xs">
                       {preset.stats && preset.stats.length > 0 && (
-                        <span className="px-2py-1bg-blue-200dark:bg-blue-800/50text-blue-800dark:text-blue-200rounded-full">
-                          {preset.stats.length}Stats
+                        <span className="px-2 py-1 bg-blue-200 dark:bg-blue-800/50 text-blue-800 dark:text-blue-200 rounded-full">
+                          {preset.stats.length} Stats
                         </span>
                       )}
                       {preset.resources && preset.resources.length > 0 && (
-                        <span className="px-2py-1bg-green-200dark:bg-green-800/50text-green-800dark:text-green-200rounded-full">
-                          {preset.resources.length}Resources
+                        <span className="px-2 py-1 bg-green-200 dark:bg-green-800/50 text-green-800 dark:text-green-200 rounded-full">
+                          {preset.resources.length} Resources
                         </span>
                       )}
                       {preset.inventory && preset.inventory.length > 0 && (
-                        <span className="px-2py-1bg-yellow-200dark:bg-yellow-800/50text-yellow-800dark:text-yellow-200rounded-full">
-                          {preset.inventory.length}Items
+                        <span className="px-2 py-1 bg-yellow-200 dark:bg-yellow-800/50 text-yellow-800 dark:text-yellow-200 rounded-full">
+                          {preset.inventory.length} Items
                         </span>
                       )}
                     </div>
                   )}
 
                   {preset.id === "custom" && (
-                    <div className="flexflex-wrapgap-2text-xs">
-                      <span className="px-2py-1bg-purple-200dark:bg-purple-800/50text-purple-800dark:text-purple-200rounded-full">
-                        DefaultStats
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="px-2 py-1 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full">
+                        Default Stats
                       </span>
-                      <span className="px-2py-1bg-purple-200dark:bg-purple-800/50text-purple-800dark:text-purple-200rounded-full">
-                        StartingItems
+                      <span className="px-2 py-1 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full">
+                        Starting Items
                       </span>
                     </div>
                   )}
@@ -2566,10 +2566,10 @@ function StoryPageContent() {
           <div className="mt-6">
             <button
               onClick={() => router.push("/library")}
-              className="px-6py-3bg-whitedark:bg-gray-800border-2border-gray-300dark:border-gray-600hover:border-purple-500dark:hover:border-purple-400text-gray-900dark:text-whitefont-semiboldrounded-lgtransition-colorsshadow-mdflexitems-centergap-2"
+              className="px-6 py-3 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
             >
-              <DynamicIcon name="ArrowLeft" className="w-5h-5" />
-              Backto Library
+              <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
+              Back to Library
             </button>
           </div>
         </div>
@@ -2578,89 +2578,89 @@ function StoryPageContent() {
   }
 
   return (
-    <div className="min-h-screenbg-linear-to-brfrom-blue-50via-purple-50to-pink-50dark:from-gray-900dark:via-purple-900dark:to-blue-900font-sanspy-8px-4sm:px-8pt-24">
-      <main className="flexgap-6w-fullmax-w-4xlmx-autoflex-col">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8 pt-24">
+      <main className="flex gap-6 w-full max-w-4xl mx-auto flex-col">
         {/*StoryHeader*/}
-        <div className="bg-whitedark:bg-gray-800rounded-2xlshadow-xlp-6sm:p-8borderborder-gray-200dark:border-gray-700">
-          <div className="flexjustify-betweenitems-center">
-            <h1 className="text-3xlsm:text-4xlfont-boldbg-linear-to-rfrom-blue-600via-purple-600to-pink-600bg-clip-texttext-transparent">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl sm:text-4xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               {storyData.story_name}
             </h1>
             {tokenBalance !== null && (
-              <div className="text-xlsm:text-2xlfont-semiboldtext-yellow-500dark:text-yellow-400flexitems-centergap-2">
-                <DynamicIcon name="Coins" className="w-6h-6" />
+              <div className="text-xl sm:text-2xl font-semibold text-yellow-500 dark:text-yellow-400 flex items-center gap-2">
+                <DynamicIcon name="Coins" className="w-6 h-6" />
                 <span>{tokenBalance}</span>
               </div>
             )}
           </div>
         </div>
         {/*Buttonsfornavigationandpages*/}
-        <div className="bg-whitedark:bg-gray-800rounded-2xlshadow-xlp-4sm:p-6borderborder-gray-200dark:border-gray-700">
-          <div className="flexflex-rowflex-wrapitems-centerjustify-centersm:justify-startgap-3">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+          <div className="flex flex-row flex-wrap items-center justify-center sm:justify-start gap-3">
             <button
               onClick={() => setCurrentState(StoryState.STORY)}
-              className={`px-4py-2.5sm:px-6sm:py-3text-smsm:text-basefont-semiboldrounded-lgtransition-allshadow-mdflexitems-centergap-2${
+              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
                 currentState === StoryState.STORY
-                  ? "bg-linear-to-rfrom-gray-700to-gray-900text-whitering-2ring-gray-400shadow-lg"
-                  : "bg-gray-100dark:bg-gray-700text-gray-900dark:text-whitehover:bg-gray-200dark:hover:bg-gray-600"
+                  ? "bg-linear-to-r from-gray-700 to-gray-900 text-white ring-2 ring-gray-400 shadow-lg"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
               }`}
             >
-              <DynamicIcon name="BookOpen" className="w-5h-5" />
+              <DynamicIcon name="BookOpen" className="w-5 h-5" />
               Story
             </button>
             <button
               onClick={() => setCurrentState(StoryState.STATS)}
-              className={`px-4py-2.5sm:px-6sm:py-3text-smsm:text-basefont-semiboldrounded-lgtransition-allshadow-mdflexitems-centergap-2${
+              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
                 currentState === StoryState.STATS
-                  ? "bg-linear-to-rfrom-blue-600to-blue-800text-whitering-2ring-blue-400shadow-lg"
-                  : "bg-blue-50dark:bg-blue-900/30text-blue-900dark:text-blue-200hover:bg-blue-100dark:hover:bg-blue-900/50"
+                  ? "bg-linear-to-r from-blue-600 to-blue-800 text-white ring-2 ring-blue-400 shadow-lg"
+                  : "bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/50"
               }`}
             >
-              <DynamicIcon name="BarChart2" className="w-5h-5" />
+              <DynamicIcon name="BarChart2" className="w-5 h-5" />
               Stats
             </button>
             <button
               onClick={() => setCurrentState(StoryState.LORE)}
-              className={`px-4py-2.5sm:px-6sm:py-3text-smsm:text-basefont-semiboldrounded-lgtransition-allshadow-mdflexitems-centergap-2${
+              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
                 currentState === StoryState.LORE
-                  ? "bg-linear-to-rfrom-purple-600to-purple-800text-whitering-2ring-purple-400shadow-lg"
-                  : "bg-purple-50dark:bg-purple-900/30text-purple-900dark:text-purple-200hover:bg-purple-100dark:hover:bg-purple-900/50"
+                  ? "bg-linear-to-r from-purple-600 to-purple-800 text-white ring-2 ring-purple-400 shadow-lg"
+                  : "bg-purple-50 dark:bg-purple-900/30 text-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900/50"
               }`}
             >
-              <DynamicIcon name="Scroll" className="w-5h-5" />
+              <DynamicIcon name="Scroll" className="w-5 h-5" />
               Lore
             </button>
             <button
               onClick={() => setCurrentState(StoryState.QUESTS)}
-              className={`px-4py-2.5sm:px-6sm:py-3text-smsm:text-basefont-semiboldrounded-lgtransition-allshadow-mdflexitems-centergap-2${
+              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
                 currentState === StoryState.QUESTS
-                  ? "bg-linear-to-rfrom-blue-600to-blue-800text-whitering-2ring-blue-400shadow-lg"
-                  : "bg-blue-50dark:bg-blue-900/30text-blue-900dark:text-blue-200hover:bg-blue-100dark:hover:bg-blue-900/50"
+                  ? "bg-linear-to-r from-blue-600 to-blue-800 text-white ring-2 ring-blue-400 shadow-lg"
+                  : "bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/50"
               }`}
             >
-              <DynamicIcon name="Target" className="w-5h-5" />
+              <DynamicIcon name="Target" className="w-5 h-5" />
               Quests
             </button>
             <button
               onClick={() => setCurrentState(StoryState.UPGRADES)}
-              className={`px-4py-2.5sm:px-6sm:py-3text-smsm:text-basefont-semiboldrounded-lgtransition-allshadow-mdflexitems-centergap-2${
+              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
                 currentState === StoryState.UPGRADES
-                  ? "bg-linear-to-rfrom-yellow-600to-yellow-800text-whitering-2ring-yellow-400shadow-lg"
-                  : "bg-yellow-50dark:bg-yellow-900/30text-yellow-900dark:text-yellow-200hover:bg-yellow-100dark:hover:bg-yellow-900/50"
+                  ? "bg-linear-to-r from-yellow-600 to-yellow-800 text-white ring-2 ring-yellow-400 shadow-lg"
+                  : "bg-yellow-50 dark:bg-yellow-900/30 text-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900/50"
               }`}
             >
-              <DynamicIcon name="ShoppingCart" className="w-5h-5" />
+              <DynamicIcon name="ShoppingCart" className="w-5 h-5" />
               Upgrades
             </button>
             <button
               onClick={() => setCurrentState(StoryState.MENU)}
-              className={`px-4py-2.5sm:px-6sm:py-3text-smsm:text-basefont-semiboldrounded-lgtransition-allshadow-mdflexitems-centergap-2${
+              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
                 currentState === StoryState.MENU
-                  ? "bg-linear-to-rfrom-green-600to-green-800text-whitering-2ring-green-400shadow-lg"
-                  : "bg-green-50dark:bg-green-900/30text-green-900dark:text-green-200hover:bg-green-100dark:hover:bg-green-900/50"
+                  ? "bg-linear-to-r from-green-600 to-green-800 text-white ring-2 ring-green-400 shadow-lg"
+                  : "bg-green-50 dark:bg-green-900/30 text-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900/50"
               }`}
             >
-              <DynamicIcon name="Settings" className="w-5h-5" />
+              <DynamicIcon name="Settings" className="w-5 h-5" />
               Menu
             </button>
           </div>
@@ -2720,8 +2720,8 @@ export default function StoryPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screenbg-linear-to-brfrom-blue-50via-purple-50to-pink-50dark:from-gray-900dark:via-purple-900dark:to-blue-900flexitems-centerjustify-center">
-          <div className="animate-spinrounded-fullh-12w-12border-b-2border-purple-600dark:border-purple-400"></div>
+        <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
         </div>
       }
     >

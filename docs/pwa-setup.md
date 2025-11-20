@@ -16,7 +16,7 @@ This app now has Progressive Web App (PWA) support, allowing users to install it
 You need to create proper PNG icons to replace the placeholder:
 
 1. **icon-192x192.png** - 192x192 pixels
-2. **icon-384x384.png** - 384x384 pixels  
+2. **icon-384x384.png** - 384x384 pixels
 3. **icon-512x512.png** - 512x512 pixels
 
 Place these in the `/public` directory.
@@ -33,6 +33,7 @@ Place these in the `/public` directory.
 ### Install Prompt
 
 Users on supported browsers will see an "Add to Home Screen" prompt when:
+
 - They've visited the site at least twice
 - At least 5 minutes have passed between visits
 - The site is served over HTTPS
@@ -40,6 +41,7 @@ Users on supported browsers will see an "Add to Home Screen" prompt when:
 ### Offline Support
 
 The service worker caches:
+
 - Static assets (JS, CSS, images)
 - API responses (with network-first strategy)
 - Pages for offline viewing
@@ -47,6 +49,7 @@ The service worker caches:
 ### App Shortcuts
 
 Long-press the app icon to access shortcuts to:
+
 - Library (view stories/adventures)
 - Explorer (browse public adventures)
 - Creator (create new adventures)
@@ -57,12 +60,12 @@ Edit `next.config.ts` to customize PWA behavior:
 
 ```typescript
 withPWA({
-  dest: "public",              // Where to output service worker
-  register: true,              // Auto-register service worker
-  skipWaiting: true,           // Activate new SW immediately
+  dest: "public", // Where to output service worker
+  register: true, // Auto-register service worker
+  skipWaiting: true, // Activate new SW immediately
   disable: process.env.NODE_ENV === "development", // Disable in dev
   buildExcludes: [/middleware-manifest\.json$/],
-})
+});
 ```
 
 ## Testing
