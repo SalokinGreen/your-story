@@ -7,7 +7,7 @@ const kids_on_machines: StoryData = {
   player_name: "Alex",
   player_summary:
     "You are a daring teenager who tries to make his dead pa proud by taking over the gang.",
-  starting_content:
+  intro:
     "You rev your motorcycle's engine as you and your friends speed through the neon-lit streets of Neo City. The wind rushes past you, carrying the scent of rain and electricity. Ahead, the towering skyscrapers loom like giants, their windows glowing with vibrant colors. Suddenly, a rival gang appears, blocking your path. What do you do?",
   plot_beats: [],
   memory: [],
@@ -35,7 +35,7 @@ const goblin_layer: StoryData = {
   player_name: "Eldrin",
   player_summary:
     "You are a skilled rogue with a mysterious past, driven by a desire for justice and treasure.",
-  starting_content:
+  intro:
     "You find yourself at the entrance of a rancid village. You see it has been looted and partly burned. The villagers look at you with a mix of fear and hope, whispering about the goblin lair that lies ahead.",
   plot_beats: [
     {

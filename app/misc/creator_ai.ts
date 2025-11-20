@@ -54,7 +54,7 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - premise (string) - Story premise/conflict summary
 - player_name (string) - Default player character name
 - player_summary (string) - Player character background/description
-- starting_content (string) - Opening narrative text shown at game start
+- intro (string) - Opening narrative text shown at game start
 - author_notes (string) - Private instructions/notes for the AI narrator
 - stats (Array of { name, value, description, symbol })
   - name: Stat name (e.g., "Strength", "Intelligence")
@@ -109,6 +109,7 @@ When the user asks you to create or modify parts of the scenario (like "create a
   - icon: Emoji representing the preset
   - playerName: Default character name for this preset
   - playerSummary: Character background for this preset
+  - intro: Unique opening narrative for this preset
   - stats: Array of starting stats for this preset
   - resources: Array of starting resources for this preset
   - inventory: Array of starting items for this preset

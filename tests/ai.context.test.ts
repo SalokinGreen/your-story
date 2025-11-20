@@ -15,7 +15,7 @@ describe("AI Context Building", () => {
     premise: "Test Premise",
     player_name: "Test Player",
     player_summary: "Test Summary",
-    starting_content: "Starting content.",
+    intro: "Starting content.",
     stats: [],
     resources: [],
     inventory: [],

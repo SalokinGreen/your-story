@@ -13,7 +13,7 @@ describe("processCommands", () => {
       premise: "Test premise",
       player_name: "Hero",
       player_summary: "A brave hero",
-      starting_content: "The adventure begins...",
+      intro: "The adventure begins...",
       plot_beats: [
         {
           title: "First Beat",

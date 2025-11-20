@@ -204,7 +204,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 
 - Data model reference: app/misc/structs.ts
 - Sample dataset used on the story page: app/misc/starter_stories.ts (goblin_layer)
-- Rendering the current scene vs starting_content: app/story/story.tsx
+- Rendering the current scene vs intro: app/story/story.tsx
 - AI prompt construction and parsing: app/misc/ai.ts (buildMessages, outputToScenePart)
 - DeepSeek API integration: app/api/story/next/route.ts
 - Token balance with aggregate counts: app/misc/tokens.ts (getUserTokenBalance)

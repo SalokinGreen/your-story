@@ -631,9 +631,7 @@ export default function AdventureDetailPage() {
               </h2>
               <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-6 border-l-4 border-purple-500">
                 <p className="text-gray-800 dark:text-gray-200 italic">
-                  "
-                  {adventure.storyTemplate?.starting_content ||
-                    "The adventure begins..."}
+                  "{adventure.storyTemplate?.intro || "The adventure begins..."}
                   "
                 </p>
               </div>

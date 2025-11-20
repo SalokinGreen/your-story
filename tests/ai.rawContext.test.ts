@@ -34,7 +34,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       premise: "A test adventure",
       player_name: "Hero",
       player_summary: "A brave hero",
-      starting_content: "You wake up in a forest.",
+      intro: "You wake up in a forest.",
       stats: [
         {
           name: "Strength",
@@ -132,7 +132,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       premise: "A test adventure",
       player_name: "Hero",
       player_summary: "A brave hero",
-      starting_content: "You wake up in a forest.",
+      intro: "You wake up in a forest.",
       stats: [
         {
           name: "Strength",
@@ -227,7 +227,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       premise: "A test adventure",
       player_name: "Hero",
       player_summary: "A brave hero",
-      starting_content: "You wake up in a forest.",
+      intro: "You wake up in a forest.",
       stats: [],
       resources: [],
       inventory: [],
@@ -306,7 +306,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       premise: "A test adventure",
       player_name: "Hero",
       player_summary: "A brave hero",
-      starting_content: "You wake up in a forest.",
+      intro: "You wake up in a forest.",
       stats: [],
       resources: [],
       inventory: [],

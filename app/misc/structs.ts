@@ -121,6 +121,7 @@ export interface Preset {
   icon: string;
   playerName?: string; // Optional default name for the character
   playerSummary: string;
+  intro?: string; // Unique intro text for this preset (optional for backward compatibility)
   stats: Stat[];
   resources: Resource[];
   inventory: InventoryItem[];
@@ -132,7 +133,7 @@ export interface StoryData {
   premise: string;
   player_name: string;
   player_summary: string;
-  starting_content: string;
+  intro: string;
   plot_beats: PlotBeat[];
   memory: string[];
   max_chapters: number;

@@ -33,6 +33,13 @@ import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { DiceVisualizer } from "../components/DiceVisualizer";
+import {
+  findItemMatch,
+  findResourceMatch,
+  findStatMatch,
+  findAchievementMatch,
+  findQuestMatch,
+} from "../misc/fuzzyMatch";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -180,23 +187,48 @@ export function processCommands(
     if (achievementMatch) {
       const achievementTitle = achievementMatch[1].trim();
 
-      const existing = storyData.achievements.find(
-        (a) => a.title === achievementTitle
+      // Try fuzzy matching first
+      const matchResult = findAchievementMatch(
+        achievementTitle,
+        storyData.achievements
       );
+      const existing = matchResult?.item;
+
+      // Log fuzzy match result
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched achievement", {
+          aiProvided: achievementTitle,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+        addNotification(
+          `📝 Matched "${achievementTitle}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          "info"
+        );
+      }
+
       if (existing && !existing.dateAchieved) {
         existing.dateAchieved = new Date();
         storyData.points += existing.points;
         logger.action("Achievement unlocked via command", {
-          title: achievementTitle,
+          title: existing.title,
           points: existing.points,
         });
         addNotification(
-          `?? Achievement Unlocked: ${achievementTitle}`,
+          `🏆 Achievement Unlocked: ${existing.title}`,
           "success"
         );
         addNotification(
-          `?? Earned ${existing.points} points! Total: ${storyData.points}`,
+          `✨ Earned ${existing.points} points! Total: ${storyData.points}`,
           "success"
+        );
+      } else if (!existing) {
+        logger.warn("Achievement not found or no fuzzy match", {
+          achievement: achievementTitle,
+        });
+        addNotification(
+          `⚠️ Achievement not found: ${achievementTitle}`,
+          "warning"
         );
       }
       continue;
@@ -291,11 +323,32 @@ export function processCommands(
       const questTitle = activateQuestMatch[1].trim();
       if (!storyData.quests) storyData.quests = [];
 
-      const quest = storyData.quests.find((q) => q.title === questTitle);
+      // Try fuzzy matching first
+      const matchResult = findQuestMatch(questTitle, storyData.quests);
+      const quest = matchResult?.item;
+
+      // Log fuzzy match result
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched quest", {
+          aiProvided: questTitle,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+        addNotification(
+          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          "info"
+        );
+      }
+
       if (quest) {
         quest.active = true;
-        logger.action("Quest activated via command", { title: questTitle });
-        addNotification(`✨ Quest activated: ${questTitle}`, "info");
+        logger.action("Quest activated via command", { title: quest.title });
+        addNotification(`✨ Quest activated: ${quest.title}`, "info");
+      } else {
+        logger.warn("Quest not found or no fuzzy match", {
+          quest: questTitle,
+        });
+        addNotification(`⚠️ Quest not found: ${questTitle}`, "warning");
       }
       continue;
     }
@@ -308,10 +361,26 @@ export function processCommands(
       if (!storyData.earnedPointsFromQuests)
         storyData.earnedPointsFromQuests = [];
 
-      const quest = storyData.quests.find((q) => q.title === questTitle);
+      // Try fuzzy matching first
+      const matchResult = findQuestMatch(questTitle, storyData.quests);
+      const quest = matchResult?.item;
+
+      // Log fuzzy match result
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched quest", {
+          aiProvided: questTitle,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+        addNotification(
+          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          "info"
+        );
+      }
+
       if (quest && !quest.fulfilled) {
         quest.fulfilled = true;
-        logger.action("Quest completed via command", { title: questTitle });
+        logger.action("Quest completed via command", { title: quest.title });
 
         // Award points if not already awarded
         if (!storyData.earnedPointsFromQuests.includes(quest.id)) {
@@ -321,14 +390,19 @@ export function processCommands(
             points: quest.points,
             totalPoints: storyData.points,
           });
-          addNotification(`⚠️ Quest completed: ${questTitle}`, "success");
+          addNotification(`✅ Quest completed: ${quest.title}`, "success");
           addNotification(
             `✨ Earned ${quest.points} points! Total: ${storyData.points}`,
             "success"
           );
         } else {
-          addNotification(`⚠️ Quest completed: ${questTitle}`, "success");
+          addNotification(`✅ Quest completed: ${quest.title}`, "success");
         }
+      } else if (!quest) {
+        logger.warn("Quest not found or no fuzzy match", {
+          quest: questTitle,
+        });
+        addNotification(`⚠️ Quest not found: ${questTitle}`, "warning");
       }
       continue;
     }
@@ -339,11 +413,32 @@ export function processCommands(
       const questTitle = deactivateQuestMatch[1].trim();
       if (!storyData.quests) storyData.quests = [];
 
-      const quest = storyData.quests.find((q) => q.title === questTitle);
+      // Try fuzzy matching first
+      const matchResult = findQuestMatch(questTitle, storyData.quests);
+      const quest = matchResult?.item;
+
+      // Log fuzzy match result
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched quest", {
+          aiProvided: questTitle,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+        addNotification(
+          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          "info"
+        );
+      }
+
       if (quest) {
         quest.active = false;
-        logger.action("Quest deactivated via command", { title: questTitle });
-        addNotification(`✨ Quest deactivated: ${questTitle}`, "info");
+        logger.action("Quest deactivated via command", { title: quest.title });
+        addNotification(`✨ Quest deactivated: ${quest.title}`, "info");
+      } else {
+        logger.warn("Quest not found or no fuzzy match", {
+          quest: questTitle,
+        });
+        addNotification(`⚠️ Quest not found: ${questTitle}`, "warning");
       }
       continue;
     }
@@ -725,7 +820,7 @@ function StoryPageContent() {
 
     //Addstartingscenepart
     updatedStoryData.scene.parts.push({
-      content: updatedStoryData.starting_content,
+      content: updatedStoryData.intro,
       imageUrl: "",
       user: false,
       role: "assistant",
@@ -772,8 +867,8 @@ function StoryPageContent() {
 
     //Updatelocalstate
     setStoryData(updatedStoryData);
-    setStoryText(updatedStoryData.starting_content);
-    setChoices({ choices: [{ text: "StartStory" }] });
+    setStoryText(updatedStoryData.intro);
+    setChoices({ choices: [{ text: "Start Story" }] });
     setInput({ StartStory: false });
     setStarted(true);
     setShowPresetSelection(false);
@@ -974,7 +1069,7 @@ function StoryPageContent() {
       premise: storyData.premise?.substring(0, 1500) || "",
       player_name: storyData.player_name,
       player_summary: storyData.player_summary?.substring(0, 800) || "",
-      starting_content: storyData.starting_content?.substring(0, 1500) || "",
+      intro: storyData.intro?.substring(0, 1500) || "",
       stats: storyData.stats,
       resources: storyData.resources,
       inventory: storyData.inventory,
@@ -1211,8 +1306,25 @@ function StoryPageContent() {
 
     //Processitemusage
     if (choice.item_used) {
-      const item = storyData.inventory.find((i) => i.name === choice.item_used);
+      // Try fuzzy matching first
+      const matchResult = findItemMatch(choice.item_used, storyData.inventory);
+      const item = matchResult?.item;
       const item_exists = item !== undefined;
+
+      // Log fuzzy match result
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched item", {
+          aiProvided: choice.item_used,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+        addNotification(
+          `📝 Matched "${choice.item_used}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          "info"
+        );
+        // Update choice to use the exact matched name
+        choice.item_used = matchResult.name;
+      }
 
       if (item_exists && item) {
         itemQuantityBefore = item.quantity;
@@ -1338,9 +1450,28 @@ function StoryPageContent() {
 
     //Processresourceusage(resourceisautomaticallyatriskonskillcheckfailure)
     if (choice.resource_used) {
-      const resource = storyData.resources.find(
-        (r) => r.name === choice.resource_used
+      // Try fuzzy matching first
+      const matchResult = findResourceMatch(
+        choice.resource_used,
+        storyData.resources
       );
+      const resource = matchResult?.item;
+
+      // Log fuzzy match result
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched resource", {
+          aiProvided: choice.resource_used,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+        addNotification(
+          `📝 Matched "${choice.resource_used}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          "info"
+        );
+        // Update choice to use the exact matched name
+        choice.resource_used = matchResult.name;
+      }
+
       if (resource) {
         const dc = choice.skill_dc || 0;
         const requiredAmount = Math.max(5, Math.floor(dc / 10)); //DCï¿½10,minimum5
@@ -1373,9 +1504,34 @@ function StoryPageContent() {
 
     //Handleskillcheck
     if (choice.skill_used) {
-      const statValue =
-        storyData.stats.find((stat) => stat.name === choice.skill_used)
-          ?.value || 0;
+      // Try fuzzy matching first
+      const matchResult = findStatMatch(choice.skill_used, storyData.stats);
+      const statValue = matchResult?.item.value || 0;
+
+      // Log fuzzy match result
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched skill", {
+          aiProvided: choice.skill_used,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+        addNotification(
+          `📝 Matched "${choice.skill_used}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          "info"
+        );
+        // Update choice to use the exact matched name
+        choice.skill_used = matchResult.name;
+      } else if (!matchResult) {
+        // No match found - log warning
+        logger.warn("Skill not found or no fuzzy match", {
+          skill: choice.skill_used,
+        });
+        addNotification(
+          `⚠️ Skill not found: ${choice.skill_used}`,
+          "warning"
+        );
+      }
+
       const dc = choice.skill_dc || 0;
 
       //Calculatedicepenaltyifinsufficientresource
@@ -1684,7 +1840,7 @@ function StoryPageContent() {
       premise: storyData.premise?.substring(0, 1500) || "",
       player_name: storyData.player_name,
       player_summary: storyData.player_summary?.substring(0, 800) || "",
-      starting_content: storyData.starting_content?.substring(0, 1500) || "",
+      intro: storyData.intro?.substring(0, 1500) || "",
       //Currentgamestate-sendas-is
       stats: storyData.stats,
       resources: storyData.resources,
@@ -1963,7 +2119,7 @@ function StoryPageContent() {
       premise: storyData.premise?.substring(0, 1500) || "",
       player_name: storyData.player_name,
       player_summary: storyData.player_summary?.substring(0, 800) || "",
-      starting_content: storyData.starting_content?.substring(0, 1500) || "",
+      intro: storyData.intro?.substring(0, 1500) || "",
       stats: storyData.stats,
       resources: storyData.resources,
       inventory: storyData.inventory,

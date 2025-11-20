@@ -74,7 +74,7 @@ export const sampleAdventures: Adventure[] = [
       player_name: "Elara",
       player_summary:
         "A talented apprentice with an affinity for elemental magic.",
-      starting_content:
+      intro:
         "The morning sun streams through the stained glass windows of the Arcane Tower. Your master, the elderly Archmage Theron, calls you to his study with unusual urgency...",
       plot_beats: [],
       memory: [],
@@ -115,7 +115,7 @@ export const sampleAdventures: Adventure[] = [
       player_name: "Ghost",
       player_summary:
         "A skilled hacker with a mysterious past and cutting-edge cybernetics.",
-      starting_content:
+      intro:
         "Rain hammers against your apartment window as news feeds scroll across your retinal display. A message appears from an unknown sender: 'They know about Omega. Run.'",
       plot_beats: [],
       memory: [],
@@ -156,7 +156,7 @@ export const sampleAdventures: Adventure[] = [
       player_name: "Captain Redbeard",
       player_summary:
         "A cunning pirate with dreams of finding the legendary Dragon's Hoard.",
-      starting_content:
+      intro:
         "The smell of salt air and rum fills your nostrils as you stand on the deck of the Crimson Tide. Your first mate approaches with a tattered map...",
       plot_beats: [],
       memory: [],
@@ -197,7 +197,7 @@ export const sampleAdventures: Adventure[] = [
       player_name: "Detective Quinn",
       player_summary:
         "A brilliant investigator cursed with the ability to see parallel timelines.",
-      starting_content:
+      intro:
         "The crime scene flickers before your eyes, shifting between different versions of reality. In one timeline, the victim is still alive. In another, they never existed...",
       plot_beats: [],
       memory: [],

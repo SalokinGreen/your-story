@@ -3958,7 +3958,7 @@ export default function MenuPage({
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 px-6 pt-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+            <div className="flex gap-2 px-6 pt-4 pb-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
               {[
                 { id: "basic", label: "Basic", icon: "FileText" },
                 { id: "stats", label: "Stats & Resources", icon: "BarChart2" },
@@ -4031,7 +4031,7 @@ export default function MenuPage({
 
               {activeTab === "tts" && (
                 <div className="space-y-6">
-                  <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
                     <DynamicIcon name="Bot" className="w-6 h-6" /> AI
                     Configuration
                   </h4>

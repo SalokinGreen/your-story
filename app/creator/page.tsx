@@ -136,7 +136,7 @@ function AdventureCreatorContent() {
     if (data.nsfw !== undefined) setNsfw(data.nsfw);
     if (data.player_name) setPlayerName(data.player_name);
     if (data.player_summary) setPlayerSummary(data.player_summary);
-    if (data.starting_content) setStartingContent(data.starting_content);
+    if (data.intro) setIntro(data.intro);
     if (data.author_notes) setAuthorNotes(data.author_notes);
 
     if (data.stats) {
@@ -290,7 +290,7 @@ function AdventureCreatorContent() {
         setPlayerName(template.player_name || "");
         setPlayerSummary(template.player_summary || "");
         setPremise(template.premise || "");
-        setStartingContent(template.starting_content || "");
+        setIntro(template.intro || "");
         setMaxChapters(template.max_chapters || 8);
         setAuthorNotes(template.author_notes || "");
         setSelectedPreset(
@@ -342,8 +342,7 @@ function AdventureCreatorContent() {
             if (saved.playerSummary !== undefined)
               setPlayerSummary(saved.playerSummary);
             if (saved.premise !== undefined) setPremise(saved.premise);
-            if (saved.startingContent !== undefined)
-              setStartingContent(saved.startingContent);
+            if (saved.intro !== undefined) setIntro(saved.intro);
             if (typeof saved.maxChapters === "number")
               setMaxChapters(saved.maxChapters);
             if (saved.authorNotes !== undefined)
@@ -400,7 +399,7 @@ function AdventureCreatorContent() {
   const [playerName, setPlayerName] = useState("");
   const [playerSummary, setPlayerSummary] = useState("");
   const [premise, setPremise] = useState("");
-  const [startingContent, setStartingContent] = useState("");
+  const [intro, setIntro] = useState("");
   const [maxChapters, setMaxChapters] = useState(8);
   const [authorNotes, setAuthorNotes] = useState("");
 
@@ -616,8 +615,7 @@ function AdventureCreatorContent() {
       if (saved.playerSummary !== undefined)
         setPlayerSummary(saved.playerSummary);
       if (saved.premise !== undefined) setPremise(saved.premise);
-      if (saved.startingContent !== undefined)
-        setStartingContent(saved.startingContent);
+      if (saved.intro !== undefined) setIntro(saved.intro);
       if (typeof saved.maxChapters === "number")
         setMaxChapters(saved.maxChapters);
       if (saved.authorNotes !== undefined) setAuthorNotes(saved.authorNotes);
@@ -677,7 +675,7 @@ function AdventureCreatorContent() {
       playerName,
       playerSummary,
       premise,
-      startingContent,
+      intro,
       maxChapters,
       authorNotes,
       points,
@@ -719,7 +717,7 @@ function AdventureCreatorContent() {
     playerName,
     playerSummary,
     premise,
-    startingContent,
+    intro,
     maxChapters,
     authorNotes,
     points,
@@ -1402,7 +1400,7 @@ function AdventureCreatorContent() {
       setCurrentStep("basic");
       return;
     }
-    if (!premise.trim() || !startingContent.trim()) {
+    if (!premise.trim() || !intro.trim()) {
       addNotification("Please fill in the story setup", "warning");
       setCurrentStep("premise");
       return;
@@ -1414,7 +1412,7 @@ function AdventureCreatorContent() {
       premise,
       player_name: playerName || "Hero",
       player_summary: playerSummary || "An adventurer",
-      starting_content: startingContent,
+      intro: intro,
       plot_beats: plotBeats,
       memory: [],
       max_chapters: maxChapters,
@@ -1508,7 +1506,7 @@ function AdventureCreatorContent() {
       setPlayerName("");
       setPlayerSummary("");
       setPremise("");
-      setStartingContent("");
+      setIntro("");
       setMaxChapters(8);
       setAuthorNotes("");
       setPoints(0);
@@ -1542,7 +1540,7 @@ function AdventureCreatorContent() {
       setCurrentStep("basic");
       return;
     }
-    if (!premise.trim() || !startingContent.trim()) {
+    if (!premise.trim() || !intro.trim()) {
       addNotification("Please fill in the story setup", "warning");
       setCurrentStep("premise");
       return;
@@ -1556,7 +1554,7 @@ function AdventureCreatorContent() {
       premise,
       player_name: playerName || "Hero",
       player_summary: playerSummary || "An adventurer",
-      starting_content: startingContent,
+      intro: intro,
       plot_beats: plotBeats,
       memory: [],
       max_chapters: maxChapters,
@@ -2079,9 +2077,9 @@ function AdventureCreatorContent() {
                         className="w-4 h-4 inline mr-2"
                       />{" "}
                       <strong>Tip:</strong> The preset will copy your current
-                      Player Name, Stats, Resources, Inventory, Player Summary,
-                      and Author Notes. Make sure they're configured as you want
-                      before saving!
+                      Player Name, Player Summary, Intro, Stats, Resources,
+                      Inventory, and Author Notes. Make sure they're configured
+                      as you want before saving!
                     </p>
                   </div>
 
@@ -2111,6 +2109,7 @@ function AdventureCreatorContent() {
                                     icon: newPresetIcon,
                                     playerName,
                                     playerSummary,
+                                    intro,
                                     stats: JSON.parse(JSON.stringify(stats)),
                                     resources: JSON.parse(
                                       JSON.stringify(resources)
@@ -2132,6 +2131,7 @@ function AdventureCreatorContent() {
                             newPresetIcon,
                             playerName,
                             playerSummary,
+                            intro,
                             stats,
                             resources,
                             inventory,
@@ -2191,6 +2191,7 @@ function AdventureCreatorContent() {
                             preset,
                             setPlayerName,
                             setPlayerSummary,
+                            setIntro,
                             setStats,
                             setResources,
                             setInventory,
@@ -2362,11 +2363,11 @@ function AdventureCreatorContent() {
 
             <div>
               <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
-                Starting Content *
+                Intro *
               </label>
               <textarea
-                value={startingContent}
-                onChange={(e) => setStartingContent(e.target.value)}
+                value={intro}
+                onChange={(e) => setIntro(e.target.value)}
                 placeholder="The opening text that players will see when they start the adventure..."
                 rows={6}
                 className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
@@ -6866,14 +6867,14 @@ function AdventureCreatorContent() {
               </div>
             </div>
 
-            {startingContent && (
+            {intro && (
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
                 <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
                   Opening Scene
                 </h3>
                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-6 border-l-4 border-purple-500">
                   <p className="text-gray-800 dark:text-gray-200 italic">
-                    "{startingContent}"
+                    "{intro}"
                   </p>
                 </div>
               </div>
@@ -7050,7 +7051,7 @@ function AdventureCreatorContent() {
           premise,
           player_name: playerName,
           player_summary: playerSummary,
-          starting_content: startingContent,
+          intro: intro,
           author_notes: authorNotes,
           stats,
           resources,

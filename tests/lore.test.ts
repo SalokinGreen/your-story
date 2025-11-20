@@ -10,7 +10,7 @@ describe("processLoreTriggers", () => {
     premise: "Test Premise",
     player_name: "Test Player",
     player_summary: "Test Summary",
-    starting_content: "Starting content with keyword1.",
+    intro: "Starting content with keyword1.",
     stats: [],
     resources: [],
     inventory: [],

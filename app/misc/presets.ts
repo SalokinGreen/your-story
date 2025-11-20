@@ -10,6 +10,7 @@ export const DEFAULT_PRESET: Preset = {
     "Create your own character from scratch with no predefined attributes.",
   icon: "Sparkles",
   playerSummary: "",
+  intro: "",
   stats: [],
   resources: [],
   inventory: [],
@@ -31,6 +32,7 @@ export function createPresetFromCurrentSettings(
   icon: string,
   playerName: string,
   playerSummary: string,
+  intro: string,
   stats: any[],
   resources: any[],
   inventory: any[],
@@ -43,6 +45,7 @@ export function createPresetFromCurrentSettings(
     icon,
     playerName,
     playerSummary,
+    intro,
     stats: JSON.parse(JSON.stringify(stats)), // Deep clone
     resources: JSON.parse(JSON.stringify(resources)),
     inventory: JSON.parse(JSON.stringify(inventory)),
@@ -55,6 +58,7 @@ export function applyPreset(
   preset: Preset,
   setPlayerName: (val: string) => void,
   setPlayerSummary: (val: string) => void,
+  setIntro: (val: string) => void,
   setStats: (val: any[]) => void,
   setResources: (val: any[]) => void,
   setInventory: (val: any[]) => void,
@@ -68,6 +72,8 @@ export function applyPreset(
   if (preset.playerName !== undefined) setPlayerName(preset.playerName);
   if (preset.playerSummary !== undefined)
     setPlayerSummary(preset.playerSummary);
+  // Only set intro if it exists in the preset (for backward compatibility)
+  if (preset.intro !== undefined) setIntro(preset.intro);
 
   // Always apply arrays, even if empty, to correctly reflect the preset
   setStats(JSON.parse(JSON.stringify(preset.stats || [])));

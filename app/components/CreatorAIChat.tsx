@@ -453,12 +453,12 @@ function ChangeSummary({
       details: data.player_summary,
       icon: "FileText",
     });
-  if (data.starting_content)
+  if (data.intro)
     changes.push({
       type: "Update",
-      label: "Starting Content",
-      value: "Updated content",
-      details: data.starting_content,
+      label: "Intro",
+      value: "Updated intro",
+      details: data.intro,
       icon: "Clapperboard",
     });
   if (data.author_notes)

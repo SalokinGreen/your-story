@@ -78,6 +78,18 @@ Choice Syntax:
 Example:
 - You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 50); use_resource: Stamina; use_item: Stamina Potion; item_loss: true>
 
+⚠️ EXACT NAME MATCHING REQUIREMENT:
+When referencing skills, resources, or items in choices and commands, you MUST use the EXACT names as they appear in the game state below.
+- Copy the exact spelling, capitalization, and punctuation from the Stats, Resources, and Inventory sections.
+- Do NOT paraphrase, abbreviate, or modify names. The system uses exact string matching and will fail if names don't match perfectly.
+- Examples:
+  ✓ CORRECT: use_skill: Stealth (if "Stealth" exists in Stats)
+  ✗ WRONG: use_skill: Sneak (if the actual stat is called "Stealth")
+  ✓ CORRECT: use_resource: Stamina (if "Stamina" exists in Resources)
+  ✗ WRONG: use_resource: Energy (if the actual resource is called "Stamina")
+  ✓ CORRECT: use_item: Health Potion (if "Health Potion" exists in Inventory)
+  ✗ WRONG: use_item: Healing Potion (if the actual item is called "Health Potion")
+
 Resource System:
 - When a choice uses a resource (use_resource), that resource is AUTOMATICALLY at risk if the skill check fails.
 - Choose resources that thematically fit the action: use Stamina for running/escaping, Health for combat/dangerous situations, Mana for spellcasting, etc.
@@ -90,14 +102,17 @@ Resource System:
 - This creates meaningful risk/reward - higher DC actions demand more resources but reward success with recovery.
 
 Guidelines:
-- Always provide at least six choices.
-- Only use one of the available skills and resources, or none of them.
+- Always provide at least six choices (more is better for player agency).
+- Vary choice types: include safe/risky options, creative solutions, social/combat/stealth approaches, and morally ambiguous paths.
+- Only reference skills and resources that exist in the game state below - use EXACT names from Stats and Resources sections.
 - You can use items that are not in the inventory, but the player rolls at a disadvantage.
 - You can use markdown formatting for more immersive experience. But only in the story section.
 - Choices should be distinct and lead to different outcomes.
 - Incorporate the player's stats, resources, inventory, and achievements into the story and choices.
 - Adapt the story based on the player's previous choices and current state.
 - DC system: Roll (1-100) + Stat Value ≥ DC. For average stats (~50): DC 50 is trivial, DC 100 is easy, DC 120 is medium, DC 140 is hard, DC 160+ is very hard, DC 200+ is impossible.
+- Balance challenge with narrative flow: not every choice needs a skill check. Include some "automatic success" choices that advance the story.
+- Use skill checks for dramatic moments, high-stakes decisions, and character-defining actions.
 
 Item Types:
 - normal: Gives advantage when used. Doesn't get consumed on use, but breaks on skill check failure.
@@ -105,14 +120,14 @@ Item Types:
 - story: Gives advantage when used. Never breaks and never gets consumed. Important quest items.
 - misc: Doesn't give advantage, but prevents disadvantage from not having an item. Never breaks or gets consumed.
 
-Commands:
+Commands (EXACT NAME MATCHING APPLIES):
 - /add_item: item name | description | type | quantity - Adds a new item to the player's inventory. Type must be: normal, consumable, story, or misc. Example: /add_item: Health Potion | Restores vitality | consumable | 3
-- /trigger_achievement: achievement title - Triggers/unlocks an existing achievement from the player's achievement list. Only use titles that exist in the Achievements section below.
+- /trigger_achievement: achievement title - Triggers/unlocks an existing achievement. Use EXACT title from Achievements section below. Example: /trigger_achievement: First Blood
 - /mark_beat: beat index - Marks a story beat as fulfilled. IMPORTANT: Only mark a beat as fulfilled after ALL events, objectives, and key moments described in that beat's content have been completed in the narrative. Do not mark it early.
 - /create_quest: title | short description | full description | points - Creates a new quest and makes it active. Example: /create_quest: Find the Lost Amulet | Locate the ancient amulet | Search the old ruins for the legendary amulet of power | 10
-- /activate_quest: quest title - Makes an inactive quest active/visible to the player.
-- /complete_quest: quest title - Marks an active quest as fulfilled and awards points.
-- /deactivate_quest: quest title - Makes an active quest inactive/hidden from the player.
+- /activate_quest: quest title - Makes an inactive quest active/visible to the player. Use EXACT title from Quests section.
+- /complete_quest: quest title - Marks an active quest as fulfilled and awards points. Use EXACT title from Quests section.
+- /deactivate_quest: quest title - Makes an active quest inactive/hidden from the player. Use EXACT title from Quests section.
 - /create_lore: title | content | on_triggers | off_triggers - Creates a new lore entry. Triggers are comma-separated keywords. Set on_triggers to empty if lore should be visible from start. Example: /create_lore: The Ancient Order | A secret society of mages | ancient,order,mages | disbanded,destroyed
 
 Plot Beat Guidelines:
@@ -127,10 +142,19 @@ Progression System:
 - Players earn upgrade points from story progression: ${UPGRADE_COSTS.BEAT_REWARD} points per completed story beat.
 - Points are automatically awarded when you use /mark_beat.
 - Players spend points in the Upgrades shop to increase stats, expand resource maximums, or add custom items.
-- Balance story progression rewards - complete meaningful beats with /mark_beat to grant points for character growth.`;
+- Balance story progression rewards - complete meaningful beats with /mark_beat to grant points for character growth.
 
-  const recentScene =
-    storyData.scene.parts.at(-1)?.content ?? storyData.starting_content;
+Narrative Best Practices:
+- Show, don't tell: Use vivid descriptions, sensory details, and character actions instead of exposition dumps.
+- Respect player agency: Let choices matter and have meaningful consequences that ripple through the story.
+- Maintain consistent tone: Match the adventure's theme (dark fantasy, lighthearted comedy, gritty realism, etc.).
+- Build tension gradually: Escalate stakes through the story beats, with peaks and valleys for pacing.
+- Reward creativity: If the player's previous choice was unexpected or clever, acknowledge it in the narrative.
+- Use the memory system strategically: Add short-term developments to <memory>, but remember that older memory entries will eventually fall out as new ones are added.
+- Preserve important information as lore: When you introduce crucial worldbuilding, key NPCs, locations, factions, or story-critical information that should persist permanently, use /create_lore to save it. Unlike memory entries, lore entries never disappear and can be referenced throughout the entire adventure.
+- Reference lore: Weave in lore entries when contextually appropriate to enrich worldbuilding and maintain narrative consistency.`;
+
+  const recentScene = storyData.scene.parts.at(-1)?.content ?? storyData.intro;
 
   // Dynamic caps based on context window
   // 1 token ~= 4 characters
@@ -178,7 +202,7 @@ Progression System:
   if (storyData.scene.parts.length === 1) {
     context.push({
       role: "assistant",
-      content: cleanString(storyData.starting_content),
+      content: cleanString(storyData.intro),
     });
     context.push({ role: "user", content: cleanString(recentScene) });
   } else {

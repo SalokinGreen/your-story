@@ -12,7 +12,7 @@ export function processLoreTriggers(
 ) {
   // Combine all content for history scan
   const fullContent = [
-    storyData.starting_content,
+    storyData.intro,
     ...storyData.scene.parts.map((p) => p.content),
   ]
     .join("\n")

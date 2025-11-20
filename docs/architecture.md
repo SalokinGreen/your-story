@@ -83,7 +83,7 @@ StoryData (from starter_stories.ts)
    ↓
 Story Component (spread as props)
    ↓
-Initial scene.parts[0] with starting_content
+Initial scene.parts[0] with intro
    ↓
 Render story text + choices
 ```
@@ -127,6 +127,7 @@ Update UI with new story text + choices
 **Purpose**: Single source of truth for TypeScript interfaces.
 
 **Key Types**:
+
 - `StoryData`: Complete game state
 - `ScenePart`: Story segment with content, choices, commands
 - `Choice`: Player option with metadata
@@ -139,6 +140,7 @@ Update UI with new story text + choices
 **Purpose**: AI integration layer - prompt building and response parsing.
 
 **Key Functions**:
+
 - `buildMessages()`: Converts StoryData to chat history
 - `outputToScenePart()`: Parses AI response (XML-like tags)
 - `storyDataToString()`: Formats context for AI prompt
@@ -198,6 +200,7 @@ Story Page (app/story/page.tsx)
 ### Component-Level State (useState)
 
 Used in `Story` component:
+
 - `choices`: Current available choices
 - `input`: Selected choice (one at a time)
 - `storyText`: Current scene content
@@ -207,12 +210,14 @@ Used in `Story` component:
 ### Context State (React Context)
 
 Global state shared across components:
+
 - `AuthContext`: User authentication state
 - `NotificationContext`: Toast notifications queue
 
 ### Props-Based State
 
 `StoryData` is passed as spread props to `Story`:
+
 ```typescript
 <Story {...storyData} />
 ```
@@ -225,7 +230,7 @@ This allows direct mutation (not recommended for production, but works for proto
 
 ```typescript
 // In page.tsx
-<Story {...storyData} />
+<Story {...storyData} />;
 
 // In story.tsx
 export default function Story(storyData: StoryData) {
@@ -239,6 +244,7 @@ export default function Story(storyData: StoryData) {
 ### 2. Command Pattern
 
 AI issues commands that are parsed and executed:
+
 ```typescript
 "/modify_item: Sword(+1)"
    ↓
@@ -250,6 +256,7 @@ Parse command → Execute → Notify user
 ### 3. Observer Pattern
 
 Notifications are observed by `NotificationContainer`:
+
 ```typescript
 addNotification("Message", "success")
    ↓
@@ -263,6 +270,7 @@ Toast appears and auto-dismisses
 ### 4. Factory Pattern
 
 Choice parsing in `ai.ts`:
+
 ```typescript
 parseChoice(line: string): Choice
    ↓
@@ -276,6 +284,7 @@ Return structured Choice object
 ### POST /api/story/next
 
 **Input**:
+
 ```typescript
 {
   storyData: StoryData,
@@ -284,6 +293,7 @@ Return structured Choice object
 ```
 
 **Output**:
+
 ```typescript
 {
   part: ScenePart,
@@ -292,6 +302,7 @@ Return structured Choice object
 ```
 
 **Flow**:
+
 1. Validate request body
 2. Build chat messages from StoryData
 3. Call DeepSeek API with system prompt
@@ -313,6 +324,7 @@ Return structured Choice object
 - `DELETE /api/folders/[id]`: Delete folder (stories become uncategorized)
 
 Notes:
+
 - All folder endpoints require an authenticated Supabase session; the API uses an auth-bound Supabase client under RLS.
 - Moving a story between folders is done via `PATCH /api/stories/[id]` with `{ folderId: string | null }`.
 
@@ -370,8 +382,9 @@ Notes:
 - [API Reference](./api-reference.md) - Complete API documentation
 
 Related setup:
+
 - Run the database migration in `docs/folders-setup.sql` to create `story_folders` and add `stories.folder_id`.
 
 ---
 
-*Last updated: November 16, 2025*
+_Last updated: November 16, 2025_
