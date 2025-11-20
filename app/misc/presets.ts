@@ -14,6 +14,7 @@ export const DEFAULT_PRESET: Preset = {
   stats: [],
   resources: [],
   inventory: [],
+  relationships: [],
   authorNotes: "",
 };
 
@@ -36,6 +37,7 @@ export function createPresetFromCurrentSettings(
   stats: any[],
   resources: any[],
   inventory: any[],
+  relationships: any[],
   authorNotes: string
 ): Preset {
   return {
@@ -49,6 +51,7 @@ export function createPresetFromCurrentSettings(
     stats: JSON.parse(JSON.stringify(stats)), // Deep clone
     resources: JSON.parse(JSON.stringify(resources)),
     inventory: JSON.parse(JSON.stringify(inventory)),
+    relationships: JSON.parse(JSON.stringify(relationships)),
     authorNotes,
   };
 }
@@ -62,6 +65,7 @@ export function applyPreset(
   setStats: (val: any[]) => void,
   setResources: (val: any[]) => void,
   setInventory: (val: any[]) => void,
+  setRelationships: (val: any[]) => void,
   setAuthorNotes: (val: string) => void
 ) {
   if (preset.id === "custom") {
@@ -79,6 +83,7 @@ export function applyPreset(
   setStats(JSON.parse(JSON.stringify(preset.stats || [])));
   setResources(JSON.parse(JSON.stringify(preset.resources || [])));
   setInventory(JSON.parse(JSON.stringify(preset.inventory || [])));
+  setRelationships(JSON.parse(JSON.stringify(preset.relationships || [])));
 
   if (preset.authorNotes !== undefined) setAuthorNotes(preset.authorNotes);
 }

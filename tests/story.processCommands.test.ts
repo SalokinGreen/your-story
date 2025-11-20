@@ -62,6 +62,7 @@ describe("processCommands", () => {
       lore: [],
       quests: [],
       earnedPointsFromQuests: [],
+      relationships: [],
       momentum: 0,
       maxMomentum: 3,
       points: 0,
@@ -244,7 +245,7 @@ describe("processCommands", () => {
         "success"
       );
       expect(mockNotification).toHaveBeenCalledWith(
-        "💰 Earned 25 points! Total: 25",
+        "✨ Earned 25 points! Total: 25",
         "success"
       );
     });
@@ -280,7 +281,7 @@ describe("processCommands", () => {
 
       expect(mockStoryData.momentum).toBe(2);
       expect(mockNotification).toHaveBeenCalledWith(
-        "⚡ Momentum: 0 → 2/3",
+        "? Momentum: 0 ? 2/3",
         "success"
       );
     });
@@ -296,7 +297,7 @@ describe("processCommands", () => {
 
       expect(mockStoryData.momentum).toBe(1);
       expect(mockNotification).toHaveBeenCalledWith(
-        "⚡ Momentum: 2 → 1/3",
+        "? Momentum: 2 ? 1/3",
         "warning"
       );
     });
@@ -330,11 +331,11 @@ describe("processCommands", () => {
       expect(mockStoryData.points).toBe(30);
       expect(mockStoryData.earnedPointsFromBeats).toContain(0);
       expect(mockNotification).toHaveBeenCalledWith(
-        "📖 Story beat 1 completed",
+        "✨ Story beat 1 completed",
         "success"
       );
       expect(mockNotification).toHaveBeenCalledWith(
-        "💰 Earned 30 points! Total: 30",
+        "?? Earned 30 points! Total: 30",
         "success"
       );
     });
@@ -384,7 +385,7 @@ describe("processCommands", () => {
         fulfilled: false,
       });
       expect(mockNotification).toHaveBeenCalledWith(
-        "📜 New quest: Find the Amulet",
+        "✨ New quest: Find the Amulet",
         "success"
       );
     });
@@ -429,7 +430,7 @@ describe("processCommands", () => {
 
       expect(mockStoryData.quests![0].active).toBe(true);
       expect(mockNotification).toHaveBeenCalledWith(
-        "📜 Quest activated: Test Quest",
+        "✨ Quest activated: Test Quest",
         "info"
       );
     });
@@ -477,7 +478,7 @@ describe("processCommands", () => {
         "success"
       );
       expect(mockNotification).toHaveBeenCalledWith(
-        "💰 Earned 50 points! Total: 50",
+        "✨ Earned 50 points! Total: 50",
         "success"
       );
     });
@@ -534,7 +535,7 @@ describe("processCommands", () => {
 
       expect(mockStoryData.quests![0].active).toBe(false);
       expect(mockNotification).toHaveBeenCalledWith(
-        "📜 Quest deactivated: Test Quest",
+        "✨ Quest deactivated: Test Quest",
         "info"
       );
     });
@@ -589,7 +590,7 @@ describe("processCommands", () => {
       expect(newLore.off_triggers).toEqual(["disbanded"]);
       expect(newLore.on).toBe(false); // Has triggers, so starts hidden
       expect(mockNotification).toHaveBeenCalledWith(
-        "📚 New lore entry created: Ancient Order",
+        "✨ New lore entry created: Ancient Order",
         "success"
       );
     });
@@ -636,7 +637,7 @@ describe("processCommands", () => {
 
       expect(mockStoryData.lore).toHaveLength(1); // Only one entry added
       expect(mockNotification).toHaveBeenCalledWith(
-        '📚 Lore "Test Lore" already exists',
+        '⚠️ Lore "Test Lore" already exists',
         "warning"
       );
     });

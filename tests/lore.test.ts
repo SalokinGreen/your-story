@@ -42,6 +42,7 @@ describe("processLoreTriggers", () => {
     earnedPointsFromBeats: [],
     earnedPointsFromChapters: [],
     earnedPointsFromQuests: [],
+    relationships: [],
   });
 
   const baseLore: Omit<StoryLore, "title" | "content" | "on"> = {

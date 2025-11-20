@@ -54,15 +54,16 @@ Output Format (REQUIRED):
 Story prose here. Write your narrative content between these tags.
 </story>
 
+<choices>
+- Choice 1
+- Choice 2
+</choices>
+
 <memory> (Optional)
 - New Memory Entry 1
 - New Memory Entry 2
 </memory>
 
-<choices>
-- Choice 1
-- Choice 2
-</choices>
 
 <commands> (Optional)
 /command1
@@ -121,14 +122,66 @@ Item Types:
 - misc: Doesn't give advantage, but prevents disadvantage from not having an item. Never breaks or gets consumed.
 
 Commands (EXACT NAME MATCHING APPLIES):
+
+Inventory Commands:
 - /add_item: item name | description | type | quantity - Adds a new item to the player's inventory. Type must be: normal, consumable, story, or misc. Example: /add_item: Health Potion | Restores vitality | consumable | 3
-- /trigger_achievement: achievement title - Triggers/unlocks an existing achievement. Use EXACT title from Achievements section below. Example: /trigger_achievement: First Blood
-- /mark_beat: beat index - Marks a story beat as fulfilled. IMPORTANT: Only mark a beat as fulfilled after ALL events, objectives, and key moments described in that beat's content have been completed in the narrative. Do not mark it early.
+- /remove_item: item name | quantity - Removes items from inventory. Use EXACT item name. Example: /remove_item: Health Potion | 2
+- /modify_item_quantity: item name | quantity_delta - Changes item quantity by delta (can be negative). Example: /modify_item_quantity: Gold Coins | -50
+- /transform_item: old_item | new_item | description | type - Transforms one item into another (upgrades, downgrades, crafting). Example: /transform_item: Rusty Sword | Steel Sword | A well-forged blade | normal
+
+Resource & Stat Commands:
+- /add_resource: name | description | current | max - Adds a new resource to the player. Example: /add_resource: Stamina | Physical energy | 100 | 100
+- /modify_resource: name | current_delta | max_delta - Modifies existing resource values (can be negative). Example: /modify_resource: Health | -20 | 0
+- /remove_resource: name - Removes a resource from the player. Use EXACT resource name.
+- /add_stat: name | description | value - Adds a new stat to the player. Example: /add_stat: Charisma | Force of personality | 45
+- /modify_stat: name | value_delta - Modifies existing stat value (can be negative). Example: /modify_stat: Strength | 5
+- /remove_stat: name - Removes a stat from the player. Use EXACT stat name.
+
+Quest Commands:
 - /create_quest: title | short description | full description | points - Creates a new quest and makes it active. Example: /create_quest: Find the Lost Amulet | Locate the ancient amulet | Search the old ruins for the legendary amulet of power | 10
 - /activate_quest: quest title - Makes an inactive quest active/visible to the player. Use EXACT title from Quests section.
 - /complete_quest: quest title - Marks an active quest as fulfilled and awards points. Use EXACT title from Quests section.
 - /deactivate_quest: quest title - Makes an active quest inactive/hidden from the player. Use EXACT title from Quests section.
+- /update_quest_description: quest title | new description - Updates the full description of an existing quest. Example: /update_quest_description: Find the Lost Amulet | New evidence suggests the amulet is cursed
+- /update_quest_short_description: quest title | new short description - Updates the short description shown in quest list.
+
+Relationship Commands:
+- /add_relationship: name | value | description - Adds a new relationship with a character/faction. Value ranges from -100 (enemy) to 100 (ally). Example: /add_relationship: King's Guard | 30 | Respected by the royal guards
+- /modify_relationship: name | value_delta - Changes relationship value by delta (can be negative). Example: /modify_relationship: King's Guard | 15
+- /remove_relationship: name - Removes a relationship from tracking. Use EXACT name.
+- /update_relationship_description: name | new description - Updates the description of an existing relationship. Example: /update_relationship_description: King's Guard | Now trusted advisors to the throne
+
+Relationship Guidelines:
+Value Ranges & Meanings:
+- 75 to 100: Strong Ally/Friend - Will go out of their way to help, trust implicitly, may offer special favors or discounts
+- 50 to 74: Ally - Helpful and supportive, willing to assist within reason
+- 25 to 49: Friend/Acquaintance - Generally friendly, minor assistance available
+- 0 to 24: Neutral - Neither friend nor foe, purely transactional
+- -1 to -24: Slight Tension - Minor distrust, may be uncooperative or charge more
+- -25 to -49: Unfriendly - Actively unhelpful, rude, or obstructive
+- -50 to -74: Enemy - Hostile, may refuse service or actively work against player
+- -75 to -100: Blood Enemy - Will attack on sight or plot player's downfall
+
+Relationship Change Guidelines:
+- Small actions (minor help/insult): ±3 to ±8
+- Moderate actions (saving from danger/betrayal): ±10 to ±20
+- Major actions (life-changing favor/grievous harm): ±25 to ±40
+- Epic actions (saving their faction/destroying their life's work): ±50+
+- Relationships should evolve gradually through consistent actions, not single dramatic swings (unless truly warranted)
+- Consider cultural context: some factions value honor, others pragmatism
+- Track key NPCs, factions, guilds, kingdoms - anyone with ongoing story relevance
+- Use relationships to open/close narrative paths: high reputation unlocks exclusive quests, low reputation creates obstacles
+- Don't track every minor NPC - focus on recurring characters and important factions
+
+Achievement & Beat Commands:
+- /trigger_achievement: achievement title - Triggers/unlocks an existing achievement. Use EXACT title from Achievements section below. Example: /trigger_achievement: First Blood
+- /mark_beat: beat index - Marks a story beat as fulfilled. IMPORTANT: Only mark a beat as fulfilled after ALL events, objectives, and key moments described in that beat's content have been completed in the narrative. Do not mark it early.
+
+Lore Commands:
 - /create_lore: title | content | on_triggers | off_triggers - Creates a new lore entry. Triggers are comma-separated keywords. Set on_triggers to empty if lore should be visible from start. Example: /create_lore: The Ancient Order | A secret society of mages | ancient,order,mages | disbanded,destroyed
+- /lore_replace_content: lore title | old text | new text - Replaces specific text within an existing lore entry. Use EXACT lore title. Example: /lore_replace_content: The Ancient Order | secret society | powerful organization
+- /lore_add_content: lore title | new text - Adds new content on a new line at the bottom of an existing lore entry. Use EXACT lore title. Example: /lore_add_content: The Ancient Order | Their influence spans across the kingdom.
+- /lore_delete_content: lore title | text to delete - Removes specific text from an existing lore entry. Use EXACT lore title. Example: /lore_delete_content: The Ancient Order | disbanded
 
 Plot Beat Guidelines:
 - Each plot beat represents a significant story milestone with multiple scenes and events.
@@ -139,7 +192,7 @@ Plot Beat Guidelines:
 - After marking a beat complete, the next beat becomes current. Reference it to smoothly transition the narrative forward.
 
 Progression System:
-- Players earn upgrade points from story progression: ${UPGRADE_COSTS.BEAT_REWARD} points per completed story beat.
+- Players earn upgrade points from story progression and achievements.
 - Points are automatically awarded when you use /mark_beat.
 - Players spend points in the Upgrades shop to increase stats, expand resource maximums, or add custom items.
 - Balance story progression rewards - complete meaningful beats with /mark_beat to grant points for character growth.
@@ -265,6 +318,20 @@ export function storyDataToString(storyData: StoryData): string {
     storyData.inventory
       .map((item) => `- ${item.name} x${item.quantity}: ${item.description}`)
       .join("\n") + "\n\n";
+
+  // Relationships - show all tracked relationships with current values
+  if (storyData.relationships && storyData.relationships.length > 0) {
+    result += `## Relationships:\n`;
+    result +=
+      storyData.relationships
+        .map(
+          (rel) =>
+            `- ${rel.name} (${rel.value > 0 ? "+" : ""}${rel.value}): ${
+              rel.description
+            }`
+        )
+        .join("\n") + "\n\n";
+  }
 
   // Only show locked achievements (available to unlock)
   const lockedAchievements = storyData.achievements.filter(

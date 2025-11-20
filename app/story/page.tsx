@@ -39,6 +39,7 @@ import {
   findStatMatch,
   findAchievementMatch,
   findQuestMatch,
+  findRelationshipMatch,
 } from "../misc/fuzzyMatch";
 
 // Cryptographically secure random number generator
@@ -202,7 +203,9 @@ export function processCommands(
           score: matchResult.score,
         });
         addNotification(
-          `📝 Matched "${achievementTitle}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          `📝 Matched "${achievementTitle}" → "${
+            matchResult.name
+          }" (${Math.round(matchResult.score * 100)}% match)`,
           "info"
         );
       }
@@ -335,7 +338,9 @@ export function processCommands(
           score: matchResult.score,
         });
         addNotification(
-          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(
+            matchResult.score * 100
+          )}% match)`,
           "info"
         );
       }
@@ -373,7 +378,9 @@ export function processCommands(
           score: matchResult.score,
         });
         addNotification(
-          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(
+            matchResult.score * 100
+          )}% match)`,
           "info"
         );
       }
@@ -425,7 +432,9 @@ export function processCommands(
           score: matchResult.score,
         });
         addNotification(
-          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(
+            matchResult.score * 100
+          )}% match)`,
           "info"
         );
       }
@@ -486,6 +495,773 @@ export function processCommands(
         });
         logger.action("New lore created via command", { title: loreTitle });
         addNotification(`✨ New lore entry created: ${loreTitle}`, "success");
+      }
+      continue;
+    }
+
+    // /lore_replace_content: lore title | old text | new text
+    const loreReplaceMatch = trimmed.match(
+      /^\/lore_replace_content:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+)$/i
+    );
+    if (loreReplaceMatch) {
+      const loreTitle = loreReplaceMatch[1].trim();
+      const oldText = loreReplaceMatch[2].trim();
+      const newText = loreReplaceMatch[3].trim();
+
+      if (!storyData.lore) storyData.lore = [];
+
+      const loreEntry = storyData.lore.find((l) => l.title === loreTitle);
+      if (!loreEntry) {
+        addNotification(`⚠️ Lore "${loreTitle}" not found`, "warning");
+        logger.warn("Lore replace failed: entry not found", {
+          title: loreTitle,
+        });
+      } else if (!loreEntry.content.includes(oldText)) {
+        addNotification(`⚠️ Text not found in lore "${loreTitle}"`, "warning");
+        logger.warn("Lore replace failed: text not found", {
+          title: loreTitle,
+          oldText,
+        });
+      } else {
+        loreEntry.content = loreEntry.content.replace(oldText, newText);
+        logger.action("Lore content replaced via command", {
+          title: loreTitle,
+          oldText,
+          newText,
+        });
+        addNotification(`✨ Lore "${loreTitle}" content updated`, "success");
+      }
+      continue;
+    }
+
+    // /lore_add_content: lore title | new text
+    const loreAddMatch = trimmed.match(
+      /^\/lore_add_content:\s*(.+?)\s*\|\s*(.+)$/i
+    );
+    if (loreAddMatch) {
+      const loreTitle = loreAddMatch[1].trim();
+      const newText = loreAddMatch[2].trim();
+
+      if (!storyData.lore) storyData.lore = [];
+
+      const loreEntry = storyData.lore.find((l) => l.title === loreTitle);
+      if (!loreEntry) {
+        addNotification(`⚠️ Lore "${loreTitle}" not found`, "warning");
+        logger.warn("Lore add failed: entry not found", { title: loreTitle });
+      } else {
+        loreEntry.content = loreEntry.content.trim() + "\n" + newText;
+        logger.action("Content added to lore via command", {
+          title: loreTitle,
+          addedText: newText,
+        });
+        addNotification(`✨ Content added to lore "${loreTitle}"`, "success");
+      }
+      continue;
+    }
+
+    // /lore_delete_content: lore title | text to delete
+    const loreDeleteMatch = trimmed.match(
+      /^\/lore_delete_content:\s*(.+?)\s*\|\s*(.+)$/i
+    );
+    if (loreDeleteMatch) {
+      const loreTitle = loreDeleteMatch[1].trim();
+      const textToDelete = loreDeleteMatch[2].trim();
+
+      if (!storyData.lore) storyData.lore = [];
+
+      const loreEntry = storyData.lore.find((l) => l.title === loreTitle);
+      if (!loreEntry) {
+        addNotification(`⚠️ Lore "${loreTitle}" not found`, "warning");
+        logger.warn("Lore delete failed: entry not found", {
+          title: loreTitle,
+        });
+      } else if (!loreEntry.content.includes(textToDelete)) {
+        addNotification(`⚠️ Text not found in lore "${loreTitle}"`, "warning");
+        logger.warn("Lore delete failed: text not found", {
+          title: loreTitle,
+          textToDelete,
+        });
+      } else {
+        loreEntry.content = loreEntry.content.replace(textToDelete, "").trim();
+        // Clean up multiple spaces and newlines that might result from deletion
+        loreEntry.content = loreEntry.content.replace(/  +/g, " "); // Replace multiple spaces with single space
+        loreEntry.content = loreEntry.content.replace(/\n{3,}/g, "\n\n"); // Max 2 newlines
+        logger.action("Content deleted from lore via command", {
+          title: loreTitle,
+          deletedText: textToDelete,
+        });
+        addNotification(
+          `✨ Content removed from lore "${loreTitle}"`,
+          "success"
+        );
+      }
+      continue;
+    }
+
+    // ==== INVENTORY MANAGEMENT COMMANDS ====
+
+    // /remove_item: item name | quantity
+    const removeItemMatch = trimmed.match(
+      /^\/remove_item:\s*(.+?)\s*\|\s*(\d+)$/i
+    );
+    if (removeItemMatch) {
+      const itemName = removeItemMatch[1].trim();
+      const quantity = parseInt(removeItemMatch[2], 10);
+
+      const matchResult = findItemMatch(itemName, storyData.inventory);
+      const item = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched item for removal", {
+          aiProvided: itemName,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!item) {
+        addNotification(`⚠️ Item "${itemName}" not found`, "warning");
+        logger.warn("Item removal failed: item not found", { itemName });
+      } else if (item.quantity < quantity) {
+        addNotification(
+          `⚠️ Not enough "${item.name}" (have ${item.quantity}, need ${quantity})`,
+          "warning"
+        );
+        logger.warn("Item removal failed: insufficient quantity", {
+          itemName: item.name,
+          have: item.quantity,
+          need: quantity,
+        });
+      } else {
+        item.quantity -= quantity;
+        if (item.quantity === 0) {
+          storyData.inventory = storyData.inventory.filter(
+            (i) => i.name !== item.name
+          );
+          logger.action("Item removed (depleted) via command", {
+            itemName: item.name,
+            quantityRemoved: quantity,
+          });
+          addNotification(`✨ Removed all ${item.name}`, "success");
+        } else {
+          logger.action("Item quantity reduced via command", {
+            itemName: item.name,
+            quantityRemoved: quantity,
+            remaining: item.quantity,
+          });
+          addNotification(
+            `✨ Removed ${quantity} ${item.name} (${item.quantity} left)`,
+            "success"
+          );
+        }
+      }
+      continue;
+    }
+
+    // /modify_item_quantity: item name | quantity_delta
+    const modifyItemQuantityMatch = trimmed.match(
+      /^\/modify_item_quantity:\s*(.+?)\s*\|\s*(-?\d+)$/i
+    );
+    if (modifyItemQuantityMatch) {
+      const itemName = modifyItemQuantityMatch[1].trim();
+      const quantityDelta = parseInt(modifyItemQuantityMatch[2], 10);
+
+      const matchResult = findItemMatch(itemName, storyData.inventory);
+      const item = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched item for quantity modification", {
+          aiProvided: itemName,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!item) {
+        addNotification(`⚠️ Item "${itemName}" not found`, "warning");
+        logger.warn("Item quantity modification failed: item not found", {
+          itemName,
+        });
+      } else {
+        const newQuantity = Math.max(0, item.quantity + quantityDelta);
+        const actualDelta = newQuantity - item.quantity;
+
+        if (newQuantity === 0) {
+          storyData.inventory = storyData.inventory.filter(
+            (i) => i.name !== item.name
+          );
+          logger.action("Item depleted via quantity modification", {
+            itemName: item.name,
+            delta: actualDelta,
+          });
+          addNotification(`✨ ${item.name} depleted`, "success");
+        } else {
+          item.quantity = newQuantity;
+          logger.action("Item quantity modified via command", {
+            itemName: item.name,
+            delta: actualDelta,
+            newQuantity,
+          });
+          addNotification(
+            `✨ ${item.name}: ${
+              actualDelta > 0 ? "+" : ""
+            }${actualDelta} (now ${newQuantity})`,
+            "success"
+          );
+        }
+      }
+      continue;
+    }
+
+    // /transform_item: old_item | new_item | description | type
+    const transformItemMatch = trimmed.match(
+      /^\/transform_item:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(normal|consumable|story|misc)$/i
+    );
+    if (transformItemMatch) {
+      const oldItemName = transformItemMatch[1].trim();
+      const newItemName = transformItemMatch[2].trim();
+      const newDescription = transformItemMatch[3].trim();
+      const newType = transformItemMatch[4].trim() as
+        | "normal"
+        | "consumable"
+        | "story"
+        | "misc";
+
+      const matchResult = findItemMatch(oldItemName, storyData.inventory);
+      const oldItem = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched item for transformation", {
+          aiProvided: oldItemName,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!oldItem) {
+        addNotification(`⚠️ Item "${oldItemName}" not found`, "warning");
+        logger.warn("Item transformation failed: item not found", {
+          oldItemName,
+        });
+      } else {
+        const quantity = oldItem.quantity;
+        const symbol = oldItem.symbol;
+        const custom_symbol_url = oldItem.custom_symbol_url;
+
+        // Remove old item
+        storyData.inventory = storyData.inventory.filter(
+          (i) => i.name !== oldItem.name
+        );
+
+        // Add new item
+        storyData.inventory.push({
+          name: newItemName,
+          quantity,
+          description: newDescription,
+          type: newType,
+          symbol,
+          custom_symbol_url,
+        });
+
+        logger.action("Item transformed via command", {
+          oldItem: oldItem.name,
+          newItem: newItemName,
+          type: newType,
+          quantity,
+        });
+        addNotification(
+          `✨ ${oldItem.name} → ${newItemName} (×${quantity})`,
+          "success"
+        );
+      }
+      continue;
+    }
+
+    // ==== RESOURCE MANAGEMENT COMMANDS ====
+
+    // /add_resource: name | description | current | max
+    const addResourceMatch = trimmed.match(
+      /^\/add_resource:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)\s*\|\s*(\d+)$/i
+    );
+    if (addResourceMatch) {
+      const name = addResourceMatch[1].trim();
+      const description = addResourceMatch[2].trim();
+      const current = parseInt(addResourceMatch[3], 10);
+      const max = parseInt(addResourceMatch[4], 10);
+
+      const existing = storyData.resources.find((r) => r.name === name);
+      if (existing) {
+        addNotification(`⚠️ Resource "${name}" already exists`, "warning");
+        logger.warn("Resource addition failed: already exists", { name });
+      } else {
+        storyData.resources.push({
+          name,
+          value: current,
+          maxValue: max,
+          description,
+          symbol: "💎",
+          custom_symbol_url: undefined,
+        });
+        logger.action("Resource added via command", { name, current, max });
+        addNotification(`✨ New resource: ${name}`, "success");
+      }
+      continue;
+    }
+
+    // /modify_resource: name | current_delta | max_delta
+    const modifyResourceMatch = trimmed.match(
+      /^\/modify_resource:\s*(.+?)\s*\|\s*(-?\d+)\s*\|\s*(-?\d+)$/i
+    );
+    if (modifyResourceMatch) {
+      const name = modifyResourceMatch[1].trim();
+      const currentDelta = parseInt(modifyResourceMatch[2], 10);
+      const maxDelta = parseInt(modifyResourceMatch[3], 10);
+
+      const matchResult = findResourceMatch(name, storyData.resources);
+      const resource = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched resource for modification", {
+          aiProvided: name,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!resource) {
+        addNotification(`⚠️ Resource "${name}" not found`, "warning");
+        logger.warn("Resource modification failed: resource not found", {
+          name,
+        });
+      } else {
+        const oldValue = resource.value;
+        const oldMax = resource.maxValue;
+
+        resource.maxValue = Math.max(1, resource.maxValue + maxDelta);
+        resource.value = Math.max(
+          0,
+          Math.min(resource.maxValue, resource.value + currentDelta)
+        );
+
+        logger.action("Resource modified via command", {
+          name: resource.name,
+          currentDelta,
+          maxDelta,
+          oldValue,
+          newValue: resource.value,
+          oldMax,
+          newMax: resource.maxValue,
+        });
+        addNotification(
+          `✨ ${resource.name}: ${resource.value}/${resource.maxValue} (${
+            currentDelta > 0 ? "+" : ""
+          }${currentDelta}/${maxDelta > 0 ? "+" : ""}${maxDelta})`,
+          "success"
+        );
+      }
+      continue;
+    }
+
+    // /remove_resource: name
+    const removeResourceMatch = trimmed.match(/^\/remove_resource:\s*(.+)$/i);
+    if (removeResourceMatch) {
+      const name = removeResourceMatch[1].trim();
+
+      const matchResult = findResourceMatch(name, storyData.resources);
+      const resource = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched resource for removal", {
+          aiProvided: name,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!resource) {
+        addNotification(`⚠️ Resource "${name}" not found`, "warning");
+        logger.warn("Resource removal failed: resource not found", { name });
+      } else {
+        storyData.resources = storyData.resources.filter(
+          (r) => r.name !== resource.name
+        );
+        logger.action("Resource removed via command", {
+          name: resource.name,
+        });
+        addNotification(`✨ Removed resource: ${resource.name}`, "success");
+      }
+      continue;
+    }
+
+    // ==== STAT MANAGEMENT COMMANDS ====
+
+    // /add_stat: name | description | value
+    const addStatMatch = trimmed.match(
+      /^\/add_stat:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)$/i
+    );
+    if (addStatMatch) {
+      const name = addStatMatch[1].trim();
+      const description = addStatMatch[2].trim();
+      const value = parseInt(addStatMatch[3], 10);
+
+      const existing = storyData.stats.find((s) => s.name === name);
+      if (existing) {
+        addNotification(`⚠️ Stat "${name}" already exists`, "warning");
+        logger.warn("Stat addition failed: already exists", { name });
+      } else {
+        storyData.stats.push({
+          name,
+          value,
+          description,
+          symbol: "⭐",
+          custom_symbol_url: undefined,
+        });
+        logger.action("Stat added via command", { name, value });
+        addNotification(`✨ New stat: ${name}`, "success");
+      }
+      continue;
+    }
+
+    // /modify_stat: name | value_delta
+    const modifyStatMatch = trimmed.match(
+      /^\/modify_stat:\s*(.+?)\s*\|\s*(-?\d+)$/i
+    );
+    if (modifyStatMatch) {
+      const name = modifyStatMatch[1].trim();
+      const valueDelta = parseInt(modifyStatMatch[2], 10);
+
+      const matchResult = findStatMatch(name, storyData.stats);
+      const stat = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched stat for modification", {
+          aiProvided: name,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!stat) {
+        addNotification(`⚠️ Stat "${name}" not found`, "warning");
+        logger.warn("Stat modification failed: stat not found", { name });
+      } else {
+        const oldValue = stat.value;
+        stat.value = Math.max(0, stat.value + valueDelta);
+
+        logger.action("Stat modified via command", {
+          name: stat.name,
+          valueDelta,
+          oldValue,
+          newValue: stat.value,
+        });
+        addNotification(
+          `✨ ${stat.name}: ${oldValue} → ${stat.value} (${
+            valueDelta > 0 ? "+" : ""
+          }${valueDelta})`,
+          "success"
+        );
+      }
+      continue;
+    }
+
+    // /remove_stat: name
+    const removeStatMatch = trimmed.match(/^\/remove_stat:\s*(.+)$/i);
+    if (removeStatMatch) {
+      const name = removeStatMatch[1].trim();
+
+      const matchResult = findStatMatch(name, storyData.stats);
+      const stat = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched stat for removal", {
+          aiProvided: name,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!stat) {
+        addNotification(`⚠️ Stat "${name}" not found`, "warning");
+        logger.warn("Stat removal failed: stat not found", { name });
+      } else {
+        storyData.stats = storyData.stats.filter((s) => s.name !== stat.name);
+        logger.action("Stat removed via command", { name: stat.name });
+        addNotification(`✨ Removed stat: ${stat.name}`, "success");
+      }
+      continue;
+    }
+
+    // ==== QUEST MANAGEMENT COMMANDS (ADDITIONAL) ====
+
+    // /update_quest_description: quest title | new description
+    const updateQuestDescMatch = trimmed.match(
+      /^\/update_quest_description:\s*(.+?)\s*\|\s*(.+)$/i
+    );
+    if (updateQuestDescMatch) {
+      const questTitle = updateQuestDescMatch[1].trim();
+      const newDescription = updateQuestDescMatch[2].trim();
+
+      if (!storyData.quests) storyData.quests = [];
+
+      const matchResult = findQuestMatch(questTitle, storyData.quests);
+      const quest = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched quest for description update", {
+          aiProvided: questTitle,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!quest) {
+        addNotification(`⚠️ Quest "${questTitle}" not found`, "warning");
+        logger.warn("Quest description update failed: quest not found", {
+          title: questTitle,
+        });
+      } else {
+        quest.description = newDescription;
+        logger.action("Quest description updated via command", {
+          title: quest.title,
+          newDescription,
+        });
+        addNotification(
+          `✨ Quest "${quest.title}" description updated`,
+          "success"
+        );
+      }
+      continue;
+    }
+
+    // /update_quest_short_description: quest title | new short description
+    const updateQuestShortDescMatch = trimmed.match(
+      /^\/update_quest_short_description:\s*(.+?)\s*\|\s*(.+)$/i
+    );
+    if (updateQuestShortDescMatch) {
+      const questTitle = updateQuestShortDescMatch[1].trim();
+      const newShortDescription = updateQuestShortDescMatch[2].trim();
+
+      if (!storyData.quests) storyData.quests = [];
+
+      const matchResult = findQuestMatch(questTitle, storyData.quests);
+      const quest = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched quest for short description update", {
+          aiProvided: questTitle,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!quest) {
+        addNotification(`⚠️ Quest "${questTitle}" not found`, "warning");
+        logger.warn("Quest short description update failed: quest not found", {
+          title: questTitle,
+        });
+      } else {
+        quest.shortDescription = newShortDescription;
+        logger.action("Quest short description updated via command", {
+          title: quest.title,
+          newShortDescription,
+        });
+        addNotification(`✨ Quest "${quest.title}" summary updated`, "success");
+      }
+      continue;
+    }
+
+    // /add_relationship: name | value | description
+    const addRelationshipMatch = trimmed.match(
+      /^\/add_relationship:\s*(.+?)\s*\|\s*(-?\d+)\s*\|\s*(.+)$/i
+    );
+    if (addRelationshipMatch) {
+      const name = addRelationshipMatch[1].trim();
+      const value = parseInt(addRelationshipMatch[2], 10);
+      const description = addRelationshipMatch[3].trim();
+
+      if (!storyData.relationships) storyData.relationships = [];
+
+      // Validate name is not empty
+      if (!name) {
+        addNotification(`⚠️ Relationship name cannot be empty`, "warning");
+        logger.warn("Relationship add failed: empty name");
+        continue;
+      }
+
+      // Check for duplicates
+      const existing = storyData.relationships.find(
+        (r) => r.name.toLowerCase() === name.toLowerCase()
+      );
+
+      if (existing) {
+        addNotification(`⚠️ Relationship "${name}" already exists`, "warning");
+        logger.warn("Relationship add failed: already exists", { name });
+      } else if (value < -100 || value > 100) {
+        addNotification(
+          `⚠️ Relationship value must be between -100 and 100`,
+          "warning"
+        );
+        logger.warn("Relationship add failed: invalid value", {
+          name,
+          value,
+        });
+      } else {
+        // Determine symbol based on relationship value
+        let symbol = "🤝"; // Default neutral
+        if (value >= 75) symbol = "💚"; // Strong ally
+        else if (value >= 50) symbol = "💙"; // Ally
+        else if (value >= 25) symbol = "😊"; // Friend
+        else if (value >= 0) symbol = "🤝"; // Neutral/Acquaintance
+        else if (value >= -25) symbol = "😐"; // Slight tension
+        else if (value >= -50) symbol = "😠"; // Unfriendly
+        else if (value >= -75) symbol = "💔"; // Enemy
+        else symbol = "⚔️"; // Hostile
+
+        storyData.relationships.push({
+          name,
+          value,
+          description,
+          symbol,
+        });
+        logger.action("Relationship added via command", {
+          name,
+          value,
+          description,
+        });
+        addNotification(`✨ New relationship: ${name} (${value})`, "success");
+      }
+      continue;
+    }
+
+    // /modify_relationship: name | value_delta
+    const modifyRelationshipMatch = trimmed.match(
+      /^\/modify_relationship:\s*(.+?)\s*\|\s*(-?\d+)$/i
+    );
+    if (modifyRelationshipMatch) {
+      const name = modifyRelationshipMatch[1].trim();
+      const delta = parseInt(modifyRelationshipMatch[2], 10);
+
+      if (!storyData.relationships) storyData.relationships = [];
+
+      const matchResult = findRelationshipMatch(name, storyData.relationships);
+      const relationship = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched relationship for modification", {
+          aiProvided: name,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!relationship) {
+        addNotification(`⚠️ Relationship "${name}" not found`, "warning");
+        logger.warn("Relationship modify failed: not found", { name });
+      } else {
+        const oldValue = relationship.value;
+        relationship.value = Math.max(-100, Math.min(100, oldValue + delta));
+
+        // Update symbol based on new value
+        if (relationship.value >= 75) relationship.symbol = "💚";
+        else if (relationship.value >= 50) relationship.symbol = "💙";
+        else if (relationship.value >= 25) relationship.symbol = "😊";
+        else if (relationship.value >= 0) relationship.symbol = "🤝";
+        else if (relationship.value >= -25) relationship.symbol = "😐";
+        else if (relationship.value >= -50) relationship.symbol = "😠";
+        else if (relationship.value >= -75) relationship.symbol = "💔";
+        else relationship.symbol = "⚔️";
+
+        logger.action("Relationship modified via command", {
+          name: relationship.name,
+          oldValue,
+          newValue: relationship.value,
+          delta,
+        });
+        addNotification(
+          `${delta > 0 ? "📈" : "📉"} ${relationship.name}: ${oldValue} → ${
+            relationship.value
+          }`,
+          "success"
+        );
+      }
+      continue;
+    }
+
+    // /remove_relationship: name
+    const removeRelationshipMatch = trimmed.match(
+      /^\/remove_relationship:\s*(.+)$/i
+    );
+    if (removeRelationshipMatch) {
+      const name = removeRelationshipMatch[1].trim();
+
+      if (!storyData.relationships) storyData.relationships = [];
+
+      const matchResult = findRelationshipMatch(name, storyData.relationships);
+      const relationship = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched relationship for removal", {
+          aiProvided: name,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!relationship) {
+        addNotification(`⚠️ Relationship "${name}" not found`, "warning");
+        logger.warn("Relationship remove failed: not found", { name });
+      } else {
+        storyData.relationships = storyData.relationships.filter(
+          (r) => r !== relationship
+        );
+        logger.action("Relationship removed via command", {
+          name: relationship.name,
+          value: relationship.value,
+        });
+        addNotification(
+          `🗑️ Relationship with ${relationship.name} removed`,
+          "success"
+        );
+      }
+      continue;
+    }
+
+    // /update_relationship_description: name | new description
+    const updateRelationshipDescMatch = trimmed.match(
+      /^\/update_relationship_description:\s*(.+?)\s*\|\s*(.+)$/i
+    );
+    if (updateRelationshipDescMatch) {
+      const name = updateRelationshipDescMatch[1].trim();
+      const newDescription = updateRelationshipDescMatch[2].trim();
+
+      if (!storyData.relationships) storyData.relationships = [];
+
+      const matchResult = findRelationshipMatch(name, storyData.relationships);
+      const relationship = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched relationship for description update", {
+          aiProvided: name,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!relationship) {
+        addNotification(`⚠️ Relationship "${name}" not found`, "warning");
+        logger.warn("Relationship description update failed: not found", {
+          name,
+        });
+      } else {
+        relationship.description = newDescription;
+        logger.action("Relationship description updated via command", {
+          name: relationship.name,
+          newDescription,
+        });
+        addNotification(
+          `✨ Relationship with ${relationship.name} updated`,
+          "success"
+        );
       }
       continue;
     }
@@ -1205,6 +1981,13 @@ function StoryPageContent() {
         logger.ai_response("AI response received", {
           tokensDeducted: data.meta?.tokensDeducted,
           partLength: data.part.content.length,
+          raw: data.part.raw || data.part.content,
+          parsed: {
+            content: data.part.content,
+            choices: data.part.choices?.length || 0,
+            commands: data.part.commands?.length || 0,
+            memoryEntries: data.part.memoryEntries?.length || 0,
+          },
         });
 
         if (data.meta?.tokensDeducted) {
@@ -1319,7 +2102,9 @@ function StoryPageContent() {
           score: matchResult.score,
         });
         addNotification(
-          `📝 Matched "${choice.item_used}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          `📝 Matched "${choice.item_used}" → "${
+            matchResult.name
+          }" (${Math.round(matchResult.score * 100)}% match)`,
           "info"
         );
         // Update choice to use the exact matched name
@@ -1465,7 +2250,9 @@ function StoryPageContent() {
           score: matchResult.score,
         });
         addNotification(
-          `📝 Matched "${choice.resource_used}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          `📝 Matched "${choice.resource_used}" → "${
+            matchResult.name
+          }" (${Math.round(matchResult.score * 100)}% match)`,
           "info"
         );
         // Update choice to use the exact matched name
@@ -1516,7 +2303,9 @@ function StoryPageContent() {
           score: matchResult.score,
         });
         addNotification(
-          `📝 Matched "${choice.skill_used}" → "${matchResult.name}" (${Math.round(matchResult.score * 100)}% match)`,
+          `📝 Matched "${choice.skill_used}" → "${
+            matchResult.name
+          }" (${Math.round(matchResult.score * 100)}% match)`,
           "info"
         );
         // Update choice to use the exact matched name
@@ -1526,10 +2315,7 @@ function StoryPageContent() {
         logger.warn("Skill not found or no fuzzy match", {
           skill: choice.skill_used,
         });
-        addNotification(
-          `⚠️ Skill not found: ${choice.skill_used}`,
-          "warning"
-        );
+        addNotification(`⚠️ Skill not found: ${choice.skill_used}`, "warning");
       }
 
       const dc = choice.skill_dc || 0;
@@ -1976,6 +2762,18 @@ function StoryPageContent() {
           setTokenBalance(data.meta.remainingBalance.total);
         }
 
+        logger.ai_response("AI response received (choice)", {
+          tokensDeducted: data.meta?.tokensDeducted,
+          partLength: data.part.content.length,
+          raw: data.part.raw || data.part.content,
+          parsed: {
+            content: data.part.content,
+            choices: data.part.choices?.length || 0,
+            commands: data.part.commands?.length || 0,
+            memoryEntries: data.part.memoryEntries?.length || 0,
+          },
+        });
+
         if (data.part.commands && data.part.commands.length > 0) {
           processCommands(data.part.commands, storyData, addNotification);
         }
@@ -2208,6 +3006,18 @@ function StoryPageContent() {
         if (data.meta?.remainingBalance?.total !== undefined) {
           setTokenBalance(data.meta.remainingBalance.total);
         }
+
+        logger.ai_response("AI response received (retry)", {
+          tokensDeducted: data.meta?.tokensDeducted,
+          partLength: data.part.content.length,
+          raw: data.part.raw || data.part.content,
+          parsed: {
+            content: data.part.content,
+            choices: data.part.choices?.length || 0,
+            commands: data.part.commands?.length || 0,
+            memoryEntries: data.part.memoryEntries?.length || 0,
+          },
+        });
 
         if (data.part.commands && data.part.commands.length > 0) {
           processCommands(data.part.commands, storyData, addNotification);

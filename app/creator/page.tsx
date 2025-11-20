@@ -12,6 +12,7 @@ import {
   StoryLore,
   Achievement,
   Quest,
+  Relationship,
   Preset,
   UpgradeSettings,
   DEFAULT_UPGRADE_SETTINGS,
@@ -42,6 +43,7 @@ type CreatorStep =
   | "resources"
   | "inventory"
   | "lore"
+  | "relationships"
   | "achievements"
   | "quests"
   | "plot"
@@ -304,6 +306,7 @@ function AdventureCreatorContent() {
         setInventory(template.inventory || []);
         setPlotBeats(template.plot_beats || []);
         setLore(template.lore || []);
+        setRelationships(template.relationships || []);
         setAchievements(template.achievements || []);
         setQuests(template.quests || []);
         setUpgradeSettings(
@@ -358,6 +361,8 @@ function AdventureCreatorContent() {
             if (Array.isArray(saved.inventory)) setInventory(saved.inventory);
             if (Array.isArray(saved.plotBeats)) setPlotBeats(saved.plotBeats);
             if (Array.isArray(saved.lore)) setLore(saved.lore);
+            if (Array.isArray(saved.relationships))
+              setRelationships(saved.relationships);
             if (Array.isArray(saved.achievements))
               setAchievements(saved.achievements);
             if (Array.isArray(saved.quests)) setQuests(saved.quests);
@@ -504,6 +509,29 @@ function AdventureCreatorContent() {
   const [lorePage, setLorePage] = useState(1);
   const loreItemsPerPage = 10;
 
+  // Relationships
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [newRelationship, setNewRelationship] = useState<Partial<Relationship>>(
+    {
+      name: "",
+      value: 0,
+      description: "",
+      symbol: "🤝",
+    }
+  );
+  const [draggedRelationshipIndex, setDraggedRelationshipIndex] = useState<
+    number | null
+  >(null);
+  const [editingRelationshipIndex, setEditingRelationshipIndex] = useState<
+    number | null
+  >(null);
+  const [editRelationship, setEditRelationship] = useState<
+    Partial<Relationship>
+  >({});
+  const [relationshipSearchQuery, setRelationshipSearchQuery] = useState("");
+  const [relationshipPage, setRelationshipPage] = useState(1);
+  const relationshipItemsPerPage = 10;
+
   // Achievements
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [newAchievement, setNewAchievement] = useState<Partial<Achievement>>({
@@ -578,6 +606,7 @@ function AdventureCreatorContent() {
     { id: "resources", label: "Resources", icon: "Gem" },
     { id: "inventory", label: "Starting Items", icon: "Backpack" },
     { id: "lore", label: "Lore", icon: "Scroll" },
+    { id: "relationships", label: "Relationships", icon: "Users" },
     { id: "achievements", label: "Achievements", icon: "Trophy" },
     { id: "quests", label: "Quests", icon: "ClipboardList" },
     { id: "plot", label: "Plot Beats", icon: "Clapperboard" },
@@ -686,6 +715,7 @@ function AdventureCreatorContent() {
       inventory,
       plotBeats,
       lore,
+      relationships,
       achievements,
       quests,
       upgradeSettings,
@@ -728,6 +758,7 @@ function AdventureCreatorContent() {
     inventory,
     plotBeats,
     lore,
+    relationships,
     achievements,
     quests,
     upgradeSettings,
@@ -1374,6 +1405,71 @@ function AdventureCreatorContent() {
     }
   };
 
+  // Helper function to get relationship symbol based on value
+  const getRelationshipSymbol = (value: number): string => {
+    if (value >= 75) return "💚"; // Strong ally
+    if (value >= 50) return "💙"; // Ally
+    if (value >= 25) return "😊"; // Friendly
+    if (value >= 0) return "🤝"; // Neutral/Acquaintance
+    if (value >= -25) return "😐"; // Distant
+    if (value >= -50) return "😠"; // Unfriendly
+    if (value >= -75) return "💔"; // Hostile
+    return "⚔️"; // Enemy
+  };
+
+  const addRelationship = () => {
+    if (newRelationship.name && newRelationship.description) {
+      const value = Math.max(-100, Math.min(100, newRelationship.value ?? 0));
+      setRelationships([
+        ...relationships,
+        {
+          ...newRelationship,
+          value,
+          symbol: getRelationshipSymbol(value),
+        } as Relationship,
+      ]);
+      setNewRelationship({
+        name: "",
+        value: 0,
+        description: "",
+        symbol: "🤝",
+      });
+    }
+  };
+
+  const removeRelationship = (index: number) => {
+    setRelationships(relationships.filter((_, i) => i !== index));
+  };
+
+  const startEditRelationship = (index: number) => {
+    setEditingRelationshipIndex(index);
+    setEditRelationship({ ...relationships[index] });
+  };
+
+  const cancelEditRelationship = () => {
+    setEditingRelationshipIndex(null);
+    setEditRelationship({});
+  };
+
+  const saveEditRelationship = () => {
+    if (
+      editingRelationshipIndex !== null &&
+      editRelationship.name &&
+      editRelationship.description
+    ) {
+      const value = Math.max(-100, Math.min(100, editRelationship.value ?? 0));
+      const updated = [...relationships];
+      updated[editingRelationshipIndex] = {
+        ...editRelationship,
+        value,
+        symbol: getRelationshipSymbol(value),
+      } as Relationship;
+      setRelationships(updated);
+      setEditingRelationshipIndex(null);
+      setEditRelationship({});
+    }
+  };
+
   const addAchievement = () => {
     if (newAchievement.title && newAchievement.description) {
       setAchievements([
@@ -1424,6 +1520,7 @@ function AdventureCreatorContent() {
       inventory,
       achievements,
       lore,
+      relationships,
       quests,
       earnedPointsFromQuests: [],
       momentum,
@@ -1566,6 +1663,7 @@ function AdventureCreatorContent() {
       inventory,
       achievements,
       lore,
+      relationships,
       quests,
       earnedPointsFromQuests: [],
       momentum,
@@ -2117,6 +2215,9 @@ function AdventureCreatorContent() {
                                     inventory: JSON.parse(
                                       JSON.stringify(inventory)
                                     ),
+                                    relationships: JSON.parse(
+                                      JSON.stringify(relationships)
+                                    ),
                                     authorNotes,
                                   }
                                 : p
@@ -2135,6 +2236,7 @@ function AdventureCreatorContent() {
                             stats,
                             resources,
                             inventory,
+                            relationships,
                             authorNotes
                           );
                           setPresets([...presets, newPreset]);
@@ -2195,6 +2297,7 @@ function AdventureCreatorContent() {
                             setStats,
                             setResources,
                             setInventory,
+                            setRelationships,
                             setAuthorNotes
                           );
                           addNotification(
@@ -4857,6 +4960,381 @@ function AdventureCreatorContent() {
           </div>
         );
 
+      case "relationships":
+        return (
+          <div className="space-y-6">
+            <div className="bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-lg p-4">
+              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>Tip:</strong> Track relationships with characters,
+                  factions, or organizations. Value ranges from -100 (hostile
+                  enemy) to +100 (strong ally). The AI will use these to inform
+                  dialogue and plot decisions.
+                </span>
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+                Add Relationship
+              </h3>
+              <div className="space-y-4 mb-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Name * (Character/Faction/Organization)
+                  </label>
+                  <input
+                    type="text"
+                    value={newRelationship.name}
+                    onChange={(e) =>
+                      setNewRelationship({
+                        ...newRelationship,
+                        name: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., King's Guard, The Shadow Syndicate"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
+                    <span>
+                      Relationship Value * ({newRelationship.value ?? 0})
+                    </span>
+                    <span className="text-2xl">
+                      {getRelationshipSymbol(newRelationship.value ?? 0)}
+                    </span>
+                  </label>
+                  <input
+                    type="range"
+                    min="-100"
+                    max="100"
+                    value={newRelationship.value ?? 0}
+                    onChange={(e) =>
+                      setNewRelationship({
+                        ...newRelationship,
+                        value: parseInt(e.target.value),
+                      })
+                    }
+                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, 
+                        #ef4444 0%, 
+                        #f59e0b 25%, 
+                        #84cc16 50%, 
+                        #10b981 75%, 
+                        #06b6d4 100%)`,
+                    }}
+                  />
+                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    <span>⚔️ -100 (Enemy)</span>
+                    <span>🤝 0 (Neutral)</span>
+                    <span>💚 +100 (Ally)</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Description *
+                  </label>
+                  <textarea
+                    value={newRelationship.description}
+                    onChange={(e) =>
+                      setNewRelationship({
+                        ...newRelationship,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Describe the current state of this relationship..."
+                    rows={3}
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={addRelationship}
+                disabled={!newRelationship.name || !newRelationship.description}
+                className="w-full px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+              >
+                Add Relationship
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  Relationships ({relationships.length})
+                </h3>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={relationshipSearchQuery}
+                    onChange={(e) => {
+                      setRelationshipSearchQuery(e.target.value);
+                      setRelationshipPage(1);
+                    }}
+                    placeholder="Search relationships..."
+                    className="pl-8 pr-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-pink-500"
+                  />
+                  <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">
+                    <DynamicIcon name="Search" className="w-4 h-4" />
+                  </span>
+                </div>
+              </div>
+
+              {relationships.length === 0 ? (
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                  No relationships added yet
+                </p>
+              ) : (
+                (() => {
+                  const filteredRelationships = relationships
+                    .map((rel, index) => ({ rel, originalIndex: index }))
+                    .filter(
+                      (item) =>
+                        item.rel.name
+                          .toLowerCase()
+                          .includes(relationshipSearchQuery.toLowerCase()) ||
+                        item.rel.description
+                          .toLowerCase()
+                          .includes(relationshipSearchQuery.toLowerCase())
+                    )
+                    .sort((a, b) => a.rel.name.localeCompare(b.rel.name));
+
+                  const totalPages = Math.ceil(
+                    filteredRelationships.length / relationshipItemsPerPage
+                  );
+                  const displayedRelationships = filteredRelationships.slice(
+                    (relationshipPage - 1) * relationshipItemsPerPage,
+                    relationshipPage * relationshipItemsPerPage
+                  );
+
+                  if (
+                    filteredRelationships.length === 0 &&
+                    relationships.length > 0
+                  ) {
+                    return (
+                      <p className="text-gray-500 dark:text-gray-400 text-sm italic">
+                        No relationships match your search.
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {displayedRelationships.map(
+                        ({ rel, originalIndex: index }) => (
+                          <div
+                            key={index}
+                            draggable={false}
+                            className="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-lg border border-pink-200 dark:border-pink-800"
+                          >
+                            {editingRelationshipIndex === index ? (
+                              // Edit mode
+                              <div className="space-y-4">
+                                <h4 className="text-md font-bold text-pink-900 dark:text-pink-100 flex items-center gap-2">
+                                  <DynamicIcon
+                                    name="Edit2"
+                                    className="w-4 h-4"
+                                  />{" "}
+                                  Editing Relationship
+                                </h4>
+                                <div>
+                                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                    Name *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={editRelationship.name || ""}
+                                    onChange={(e) =>
+                                      setEditRelationship({
+                                        ...editRelationship,
+                                        name: e.target.value,
+                                      })
+                                    }
+                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
+                                    <span>
+                                      Relationship Value (
+                                      {editRelationship.value ?? 0})
+                                    </span>
+                                    <span className="text-2xl">
+                                      {getRelationshipSymbol(
+                                        editRelationship.value ?? 0
+                                      )}
+                                    </span>
+                                  </label>
+                                  <input
+                                    type="range"
+                                    min="-100"
+                                    max="100"
+                                    value={editRelationship.value ?? 0}
+                                    onChange={(e) =>
+                                      setEditRelationship({
+                                        ...editRelationship,
+                                        value: parseInt(e.target.value),
+                                      })
+                                    }
+                                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                    style={{
+                                      background: `linear-gradient(to right, 
+                                      #ef4444 0%, 
+                                      #f59e0b 25%, 
+                                      #84cc16 50%, 
+                                      #10b981 75%, 
+                                      #06b6d4 100%)`,
+                                    }}
+                                  />
+                                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                    <span>⚔️ -100 (Enemy)</span>
+                                    <span>🤝 0 (Neutral)</span>
+                                    <span>💚 +100 (Ally)</span>
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                    Description *
+                                  </label>
+                                  <textarea
+                                    value={editRelationship.description || ""}
+                                    onChange={(e) =>
+                                      setEditRelationship({
+                                        ...editRelationship,
+                                        description: e.target.value,
+                                      })
+                                    }
+                                    rows={3}
+                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                                  />
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={saveEditRelationship}
+                                    disabled={
+                                      !editRelationship.name ||
+                                      !editRelationship.description
+                                    }
+                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+                                  >
+                                    <DynamicIcon
+                                      name="Save"
+                                      className="inline-block w-4 h-4 mr-1"
+                                    />
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={cancelEditRelationship}
+                                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              // View mode
+                              <div className="flex items-start gap-3">
+                                <div className="text-3xl shrink-0">
+                                  {rel.symbol}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
+                                    <span>{rel.name}</span>
+                                    <span
+                                      className={`text-sm px-2 py-0.5 rounded-full ${
+                                        rel.value >= 50
+                                          ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
+                                          : rel.value >= 0
+                                          ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
+                                          : rel.value >= -50
+                                          ? "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200"
+                                          : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200"
+                                      }`}
+                                    >
+                                      {rel.value > 0 ? "+" : ""}
+                                      {rel.value}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    {rel.description}
+                                  </p>
+                                </div>
+                                <div className="flex gap-2 shrink-0">
+                                  <button
+                                    onClick={() => startEditRelationship(index)}
+                                    className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                                    title="Edit"
+                                  >
+                                    <DynamicIcon
+                                      name="Edit2"
+                                      className="w-4 h-4"
+                                    />
+                                  </button>
+                                  <button
+                                    onClick={() => removeRelationship(index)}
+                                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                                    title="Delete"
+                                  >
+                                    <DynamicIcon
+                                      name="Trash2"
+                                      className="w-4 h-4"
+                                    />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      )}
+
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between gap-2 pt-4">
+                          <button
+                            onClick={() =>
+                              setRelationshipPage(
+                                Math.max(1, relationshipPage - 1)
+                              )
+                            }
+                            disabled={relationshipPage === 1}
+                            className="px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:bg-gray-400 text-white rounded-lg transition-colors text-sm"
+                          >
+                            <DynamicIcon
+                              name="ChevronLeft"
+                              className="w-4 h-4"
+                            />
+                          </button>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            Page {relationshipPage} of {totalPages}
+                          </span>
+                          <button
+                            onClick={() =>
+                              setRelationshipPage(
+                                Math.min(totalPages, relationshipPage + 1)
+                              )
+                            }
+                            disabled={relationshipPage === totalPages}
+                            className="px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:bg-gray-400 text-white rounded-lg transition-colors text-sm"
+                          >
+                            <DynamicIcon
+                              name="ChevronRight"
+                              className="w-4 h-4"
+                            />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()
+              )}
+            </div>
+          </div>
+        );
+
       case "achievements":
         return (
           <div className="space-y-6">
@@ -6813,6 +7291,14 @@ function AdventureCreatorContent() {
                     </span>
                     <span className="ml-2 font-semibold text-gray-900 dark:text-white">
                       {lore.length}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Relationships:
+                    </span>
+                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                      {relationships.length}
                     </span>
                   </div>
                   <div>

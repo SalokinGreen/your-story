@@ -153,3 +153,18 @@ export function findQuestMatch(
 ) {
   return findBestMatch(searchTitle, quests, (quest) => quest.title, 0.6);
 }
+
+/**
+ * Convenience function for matching relationships by name
+ */
+export function findRelationshipMatch(
+  searchName: string | undefined,
+  relationships: Array<{ name: string; [key: string]: any }>
+) {
+  return findBestMatch(
+    searchName,
+    relationships,
+    (relationship) => relationship.name,
+    0.6
+  );
+}

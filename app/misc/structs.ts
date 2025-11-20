@@ -111,6 +111,13 @@ export interface Quest {
   points: number; // Points awarded upon completion
   createdAt?: Date; // When the quest was created (for ordering)
 }
+export interface Relationship {
+  name: string; // Character/faction name
+  value: number; // Relationship level (-100 to 100)
+  description: string; // Description of the relationship
+  symbol: string; // Icon representing the relationship
+  custom_symbol_url?: string;
+}
 export interface Choices {
   choices: Choice[];
 }
@@ -125,6 +132,7 @@ export interface Preset {
   stats: Stat[];
   resources: Resource[];
   inventory: InventoryItem[];
+  relationships: Relationship[];
   authorNotes: string;
 }
 
@@ -152,6 +160,7 @@ export interface StoryData {
   earnedPointsFromChapters: number[];
   quests: Quest[]; // Quest system
   earnedPointsFromQuests: string[]; // Array of quest IDs that have awarded points
+  relationships: Relationship[]; // Relationship tracking system
   author_notes?: string;
   player_notes?: string;
   selected_preset?: string; // ID of the preset used

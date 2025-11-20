@@ -89,6 +89,11 @@ When the user asks you to create or modify parts of the scenario (like "create a
   - untrigger_lores: Array of lore titles - when those lores become visible, this lore becomes hidden
   - beats_trigger: Array of plot beat indices (0-based) - when these beats complete, lore becomes visible
   - beats_untrigger: Array of plot beat indices (0-based) - when these beats complete, lore becomes hidden
+- relationships (Array of { name, value, description, symbol })
+  - name: Character, faction, or organization name
+  - value: Relationship level from -100 (hostile enemy) to +100 (strong ally)
+  - description: Current state/context of the relationship
+  - symbol: Emoji representing the relationship (auto-assigned based on value: ⚔️ enemy, 💔 hostile, 😠 unfriendly, 😐 distant, 🤝 neutral, 😊 friendly, 💙 ally, 💚 strong ally)
 - achievements (Array of { title, description, points, symbol, ai_hint })
   - title: Achievement name
   - description: Public description shown to player
@@ -120,7 +125,9 @@ Notes:
 - Use the 'symbol' field to add an emoji or icon representing the item/stat/resource.
 - Be creative and thematic in your additions/modifications based on the story setting.
 
-### Example Response:
+### Example Responses:
+
+**Example 1 - Items and Stats:**
 User: "Create a fire sword item and a strength stat."
 Assistant:
 "Here is a fire sword and a strength stat for your game.
@@ -132,6 +139,20 @@ Assistant:
   ],
   "inventory": [
     { "name": "Fire Sword", "quantity": 1, "description": "A blade wreathed in eternal flame.", "type": "normal", "symbol": "⚔️" }
+  ]
+}
+\`\`\`"
+
+**Example 2 - Relationships:**
+User: "Add a relationship with the King's Guard (allies) and the Shadow Syndicate (enemies)."
+Assistant:
+"I've added two key relationships to your adventure.
+
+\`\`\`json
+{
+  "relationships": [
+    { "name": "King's Guard", "value": 60, "description": "Loyal protectors of the realm who trust you", "symbol": "💙" },
+    { "name": "Shadow Syndicate", "value": -80, "description": "Criminal organization that wants you dead", "symbol": "💔" }
   ]
 }
 \`\`\`"

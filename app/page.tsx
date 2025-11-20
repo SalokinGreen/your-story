@@ -27,37 +27,39 @@ function InfoTabs() {
   return (
     <div className="w-full max-w-5xl mb-12">
       {/* Tab Navigation */}
-      <div className="flex justify-center mb-8">
-        <div className="inline-flex bg-white dark:bg-gray-800 rounded-xl shadow-lg p-1 border border-gray-200 dark:border-gray-700">
+      <div className="flex justify-center mb-8 px-2">
+        <div className="inline-flex flex-wrap justify-center bg-white dark:bg-gray-800 rounded-xl shadow-lg p-1 border border-gray-200 dark:border-gray-700 gap-1">
           <button
             onClick={() => setActiveTab("models")}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+            className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
               activeTab === "models"
                 ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
             }`}
           >
-            <DynamicIcon name="Bot" className="w-5 h-5" /> AI Models
+            <DynamicIcon name="Bot" className="w-4 h-4 sm:w-5 sm:h-5" /> AI
+            Models
           </button>
           <button
             onClick={() => setActiveTab("coins")}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+            className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
               activeTab === "coins"
                 ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
             }`}
           >
-            <DynamicIcon name="Coins" className="w-5 h-5" /> Coins Packages
+            <DynamicIcon name="Coins" className="w-4 h-4 sm:w-5 sm:h-5" /> Coins
+            Packages
           </button>
           <button
             onClick={() => setActiveTab("byok")}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+            className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
               activeTab === "byok"
                 ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
             }`}
           >
-            <DynamicIcon name="Key" className="w-5 h-5" /> BYOK
+            <DynamicIcon name="Key" className="w-4 h-4 sm:w-5 sm:h-5" /> BYOK
           </button>
         </div>
       </div>
@@ -877,11 +879,11 @@ export default function Home() {
             </div>
 
             {/* Navigation Buttons */}
-            <div className="flex items-center justify-center gap-4 mt-8">
+            <div className="flex items-center justify-center gap-2 sm:gap-4 mt-8 px-2">
               <button
                 onClick={() => setRoadmapIndex((prev) => Math.max(0, prev - 1))}
                 disabled={roadmapIndex === 0}
-                className={`px-6 py-3 rounded-lg font-semibold transition-all shadow-md ${
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all shadow-md ${
                   roadmapIndex === 0
                     ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed"
                     : "bg-purple-600 hover:bg-purple-700 text-white hover:shadow-lg"
@@ -925,7 +927,7 @@ export default function Home() {
                   )
                 }
                 disabled={roadmapIndex === road_map.length - 1}
-                className={`px-6 py-3 rounded-lg font-semibold transition-all shadow-md ${
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all shadow-md ${
                   roadmapIndex === road_map.length - 1
                     ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed"
                     : "bg-purple-600 hover:bg-purple-700 text-white hover:shadow-lg"

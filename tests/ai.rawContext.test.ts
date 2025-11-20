@@ -90,6 +90,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       earnedPointsFromBeats: [],
       earnedPointsFromChapters: [],
       earnedPointsFromQuests: [],
+      relationships: [],
       upgradeSettings: {
         enabled: true,
         allowStatUpgrade: true,
@@ -188,6 +189,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       earnedPointsFromBeats: [],
       earnedPointsFromChapters: [],
       earnedPointsFromQuests: [],
+      relationships: [],
       upgradeSettings: {
         enabled: true,
         allowStatUpgrade: true,
@@ -260,6 +262,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       earnedPointsFromBeats: [],
       earnedPointsFromChapters: [],
       earnedPointsFromQuests: [],
+      relationships: [],
       upgradeSettings: {
         enabled: true,
         allowStatUpgrade: true,
@@ -345,6 +348,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       earnedPointsFromBeats: [],
       earnedPointsFromChapters: [],
       earnedPointsFromQuests: [],
+      relationships: [],
       upgradeSettings: {
         enabled: true,
         allowStatUpgrade: true,

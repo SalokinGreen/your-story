@@ -146,28 +146,31 @@ export default function EncryptionMigration({
       </div>
 
       {showDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-2xl w-full shadow-2xl">
-            <div className="text-center mb-6">
-              <div className="flex justify-center mb-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 md:p-8 max-w-2xl w-full shadow-2xl my-4">
+            <div className="text-center mb-4 sm:mb-6">
+              <div className="flex justify-center mb-3 sm:mb-4">
                 <DynamicIcon
                   name="Lock"
-                  className="w-16 h-16 text-emerald-600 dark:text-emerald-400"
+                  className="w-12 h-12 sm:w-16 sm:h-16 text-emerald-600 dark:text-emerald-400"
                 />
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Enable Story Encryption
               </h2>
             </div>
 
             {!encrypting ? (
               <>
-                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-6 mb-6">
-                  <h3 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                    <DynamicIcon name="Clipboard" className="w-5 h-5" /> What
-                    will happen:
+                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6">
+                  <h3 className="font-bold text-sm sm:text-base text-gray-900 dark:text-white mb-2 sm:mb-3 flex items-center gap-2">
+                    <DynamicIcon
+                      name="Clipboard"
+                      className="w-4 h-4 sm:w-5 sm:h-5"
+                    />{" "}
+                    What will happen:
                   </h3>
-                  <ul className="space-y-2 text-gray-700 dark:text-gray-300">
+                  <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                     <li>
                       • All {unencryptedStories.length} unencrypted{" "}
                       {unencryptedStories.length === 1 ? "story" : "stories"}{" "}
@@ -186,12 +189,15 @@ export default function EncryptionMigration({
                   </ul>
                 </div>
 
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-700 rounded-xl p-6 mb-6">
-                  <h3 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                    <DynamicIcon name="AlertTriangle" className="w-5 h-5" />{" "}
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-700 rounded-xl p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6">
+                  <h3 className="font-bold text-sm sm:text-base text-gray-900 dark:text-white mb-2 sm:mb-3 flex items-center gap-2">
+                    <DynamicIcon
+                      name="AlertTriangle"
+                      className="w-4 h-4 sm:w-5 sm:h-5"
+                    />{" "}
                     Important:
                   </h3>
-                  <ul className="space-y-2 text-gray-700 dark:text-gray-300">
+                  <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                     <li>
                       • If you change your password, you won't be able to
                       decrypt old stories
@@ -204,19 +210,22 @@ export default function EncryptionMigration({
                   </ul>
                 </div>
 
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                   <button
                     onClick={() => setShowDialog(false)}
-                    className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold rounded-lg transition-colors"
+                    className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold text-sm sm:text-base rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleEncryptAll}
-                    className="flex-1 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
+                    className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm sm:text-base rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
                   >
-                    <DynamicIcon name="Lock" className="w-5 h-5" /> Encrypt All
-                    Stories
+                    <DynamicIcon
+                      name="Lock"
+                      className="w-4 h-4 sm:w-5 sm:h-5"
+                    />{" "}
+                    Encrypt All Stories
                   </button>
                 </div>
               </>

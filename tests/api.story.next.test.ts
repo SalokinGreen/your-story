@@ -235,7 +235,7 @@ You enter the goblin lair. The air is thick with the smell of decay.
     const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(callBody.model).toBe("deepseek-chat");
     expect(callBody.temperature).toBe(0.7);
-    expect(callBody.max_tokens).toBe(2000);
+    expect(callBody.max_tokens).toBe(4000);
     expect(callBody.stream).toBe(false);
     expect(callBody.messages).toBeDefined();
     expect(callBody.messages.length).toBeGreaterThan(0);
