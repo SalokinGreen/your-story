@@ -983,6 +983,13 @@ const road_map = [
     bannerUrl: undefined,
   },
   {
+    title: "Multiplayer Adventures",
+    description:
+      "Enabling multiple users to participate in the same adventure together. Play with friends, share the burden, and make collective choices.",
+    status: "planned" as const,
+    bannerUrl: undefined,
+  },
+  {
     title: "Finetuning",
     description:
       "Bringing to you in-house baked models for an enriched storytelling experience.",

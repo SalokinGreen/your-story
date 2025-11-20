@@ -2008,6 +2008,10 @@ function StoryPageContent() {
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
+          logger.action("Memory entries added", {
+            count: data.part.memoryEntries.length,
+            entries: data.part.memoryEntries,
+          });
           storyData.memory.push(...data.part.memoryEntries);
         }
 
@@ -2779,6 +2783,10 @@ function StoryPageContent() {
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
+          logger.action("Memory entries added", {
+            count: data.part.memoryEntries.length,
+            entries: data.part.memoryEntries,
+          });
           storyData.memory.push(...data.part.memoryEntries);
         }
 
@@ -3024,6 +3032,10 @@ function StoryPageContent() {
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
+          logger.action("Memory entries added", {
+            count: data.part.memoryEntries.length,
+            entries: data.part.memoryEntries,
+          });
           storyData.memory.push(...data.part.memoryEntries);
         }
 
