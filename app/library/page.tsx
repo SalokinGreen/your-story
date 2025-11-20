@@ -598,7 +598,7 @@ export default function LibraryPage() {
               onClick={() => router.push("/")}
               className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
             >
-              â† Home
+              Ã¢â€ Â Home
             </button>
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-3">
@@ -620,9 +620,8 @@ export default function LibraryPage() {
                 : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
             }`}
           >
-            ðŸ“–
             <DynamicIcon name="Book" className="w-5 h-5 inline-block mr-2" />
-            `nMy Stories ({filteredStories.length + filteredLocalStories.length}
+            My Stories ({filteredStories.length + filteredLocalStories.length}
             {stories.length + localStories.length !==
             filteredStories.length + filteredLocalStories.length
               ? ` / ${stories.length + localStories.length}`
@@ -637,12 +636,11 @@ export default function LibraryPage() {
                 : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
             }`}
           >
-            ðŸŽ®
             <DynamicIcon
               name="Gamepad2"
               className="w-5 h-5 inline-block mr-2"
             />
-            `nMy Adventures (
+            My Adventures (
             {filteredAdventures.length + localAdventures.length}
             {adventures.length + localAdventures.length !==
             filteredAdventures.length + localAdventures.length
@@ -1236,7 +1234,7 @@ export default function LibraryPage() {
                             />{" "}
                             {adventure.rating?.toFixed(1) || "N/A"}
                           </span>
-                          <span>â€¢</span>
+                          <span>Ã¢â‚¬Â¢</span>
                           <span className="flex items-center gap-1">
                             <DynamicIcon name="Users" className="w-4 h-4" />{" "}
                             {adventure.playCount || 0}

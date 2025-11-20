@@ -1,4 +1,4 @@
-import { Adventure } from "./structs";
+﻿import { Adventure } from "./structs";
 import { goblin_layer, kids_on_machines } from "./starter_stories";
 
 export const sampleAdventures: Adventure[] = [
@@ -21,6 +21,7 @@ export const sampleAdventures: Adventure[] = [
     updatedAt: new Date("2025-11-10"),
     isPublished: true,
     isFeatured: true,
+    nsfw: false,
     storyTemplate: goblin_layer,
   },
   {
@@ -42,6 +43,7 @@ export const sampleAdventures: Adventure[] = [
     updatedAt: new Date("2025-11-12"),
     isPublished: true,
     isFeatured: true,
+    nsfw: false,
     storyTemplate: kids_on_machines,
   },
   {
@@ -61,6 +63,7 @@ export const sampleAdventures: Adventure[] = [
     updatedAt: new Date("2025-11-08"),
     isPublished: true,
     isFeatured: false,
+    nsfw: false,
     storyTemplate: {
       story_name: "The Crystal Prophecy",
       premise: "A young mage's apprentice must find seven ancient crystals to prevent a dark ritual.",
@@ -97,6 +100,7 @@ export const sampleAdventures: Adventure[] = [
     updatedAt: new Date("2025-11-11"),
     isPublished: true,
     isFeatured: true,
+    nsfw: false,
     storyTemplate: {
       story_name: "Neon Shadows",
       premise: "A hacker navigates corporate warfare and resistance in dystopian Neo Tokyo.",
@@ -133,6 +137,7 @@ export const sampleAdventures: Adventure[] = [
     updatedAt: new Date("2025-11-09"),
     isPublished: true,
     isFeatured: false,
+    nsfw: false,
     storyTemplate: {
       story_name: "A Pirate's Fortune",
       premise: "Captain a pirate ship and hunt for legendary treasure in the Caribbean.",
@@ -169,6 +174,7 @@ export const sampleAdventures: Adventure[] = [
     updatedAt: new Date("2025-11-13"),
     isPublished: true,
     isFeatured: false,
+    nsfw: false,
     storyTemplate: {
       story_name: "The Quantum Detective",
       premise: "A detective solves a murder across multiple parallel realities.",
@@ -252,3 +258,5 @@ export function getAllTags(): string[] {
   sampleAdventures.forEach(a => a.tags.forEach(tag => tagSet.add(tag)));
   return Array.from(tagSet).sort();
 }
+
+

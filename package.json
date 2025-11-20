@@ -22,6 +22,7 @@
     "react-markdown": "^10.1.0"
   },
   "devDependencies": {
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@tailwindcss/postcss": "^4.1.17",
     "@types/react": "^19",
     "@types/react-dom": "^19",
