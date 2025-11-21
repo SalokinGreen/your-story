@@ -2832,7 +2832,7 @@ function RelationshipsEditor({
                   className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white font-semibold"
                 />
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center justify-between">
+                  <label className="flex text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 items-center justify-between">
                     <span>
                       Relationship Value: {editRelationship.value ?? 0}
                     </span>
@@ -3348,6 +3348,7 @@ interface MenuProps extends StoryData {
   onSaveProgress: () => Promise<void>;
   onUpdateStoryData: (updates: Partial<StoryData>) => void;
   onViewLogs?: () => void;
+  onViewContext?: () => void;
 }
 
 export default function MenuPage({
@@ -3355,6 +3356,7 @@ export default function MenuPage({
   onSaveProgress,
   onUpdateStoryData,
   onViewLogs,
+  onViewContext,
   ...storyData
 }: MenuProps) {
   const router = useRouter();
@@ -3611,6 +3613,17 @@ export default function MenuPage({
             >
               <DynamicIcon name="ClipboardList" className="w-5 h-5" />
               <span>View Debug Logs</span>
+            </button>
+          )}
+
+          {/* View Context */}
+          {onViewContext && (
+            <button
+              onClick={onViewContext}
+              className="flex items-center justify-center gap-3 px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+            >
+              <DynamicIcon name="Eye" className="w-5 h-5" />
+              <span>View AI Context</span>
             </button>
           )}
 

@@ -241,7 +241,7 @@ export async function POST(req: NextRequest) {
       index ===
       self.findIndex((m) => m.role === msg.role && m.content === msg.content)
   );
-  console.log("Built messages for Deepseek. Message count:", messages.length);
+  console.log("Built messages. Message count:", messages.length);
   console.log(
     "Last message length:",
     messages[messages.length - 1]?.content?.length || 0

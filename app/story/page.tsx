@@ -15,6 +15,7 @@ import QuestsPage from "./quests";
 import MenuPage from "./menu";
 import UpgradesPage from "./upgrades";
 import LogViewer from "./LogViewer";
+import ContextViewer from "./ContextViewer";
 import { logger } from "../misc/logger";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
@@ -73,6 +74,7 @@ enum StoryState {
   UPGRADES = "UPGRADES",
   MENU = "MENU",
   LOGS = "LOGS",
+  CONTEXT = "CONTEXT",
 }
 
 export function processCommands(
@@ -3757,9 +3759,13 @@ function StoryPageContent() {
             onSaveProgress={() => saveProgress(storyData)}
             onUpdateStoryData={updateStoryData}
             onViewLogs={() => setCurrentState(StoryState.LOGS)}
+            onViewContext={() => setCurrentState(StoryState.CONTEXT)}
           />
         )}
         {currentState === StoryState.LOGS && <LogViewer />}
+        {currentState === StoryState.CONTEXT && (
+          <ContextViewer storyData={storyData} />
+        )}
       </main>
 
       {/*ConfirmDialog*/}

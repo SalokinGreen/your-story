@@ -55,7 +55,7 @@ export const AI_MODELS = {
   Hercules: {
     name: "Gemini 2.5 Flash Lite",
     original_model: "Gemini 2.5 Flash Lite",
-    model: "google/gemini-2.2-flash-lite",
+    model: "google/gemini-2.5-flash-lite",
     maxTokens: 100000,
     maxOutputTokens: 4000,
     provider: "openrouter",
