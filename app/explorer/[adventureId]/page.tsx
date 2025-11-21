@@ -22,6 +22,7 @@ export default function AdventureDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [togglingFeatured, setTogglingFeatured] = useState(false);
+  const [togglingNsfw, setTogglingNsfw] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "lore">("overview");
   const [showSecretLore, setShowSecretLore] = useState(false);
   const [contentTab, setContentTab] = useState<
@@ -58,7 +59,19 @@ export default function AdventureDetailPage() {
   useEffect(() => {
     const fetchAdventure = async () => {
       try {
-        const response = await fetch(`/api/adventures/${adventureId}`);
+        // Get auth token if user is signed in
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        const headers: HeadersInit = {};
+        if (session?.access_token) {
+          headers.Authorization = `Bearer ${session.access_token}`;
+        }
+
+        const response = await fetch(`/api/adventures/${adventureId}`, {
+          headers,
+        });
         if (!response.ok) throw new Error("Adventure not found");
 
         const { adventure: fetchedAdventure } = await response.json();
@@ -115,6 +128,48 @@ export default function AdventureDetailPage() {
       addNotification(error.message, "failure");
     } finally {
       setTogglingFeatured(false);
+    }
+  };
+
+  const handleToggleNsfw = async () => {
+    if (!adventure) return;
+
+    try {
+      setTogglingNsfw(true);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const response = await fetch(`/api/adventures/${adventureId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          nsfw: !adventure.nsfw,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update NSFW status");
+      }
+
+      const { adventure: updatedAdventure } = await response.json();
+      setAdventure(updatedAdventure);
+      addNotification(
+        updatedAdventure.nsfw
+          ? "Adventure marked as NSFW"
+          : "Adventure unmarked as NSFW",
+        "success"
+      );
+    } catch (error: any) {
+      console.error("Error toggling NSFW status:", error);
+      addNotification(error.message, "failure");
+    } finally {
+      setTogglingNsfw(false);
     }
   };
 
@@ -437,30 +492,54 @@ export default function AdventureDetailPage() {
                       <h3 className="text-sm font-bold text-white/80 mb-2 uppercase tracking-wider">
                         Admin Controls
                       </h3>
-                      <button
-                        onClick={handleToggleFeatured}
-                        disabled={togglingFeatured}
-                        className={`px-4 py-2 rounded-lg font-semibold shadow-md transition-colors ${
-                          adventure.isFeatured
-                            ? "bg-yellow-500 hover:bg-yellow-600 text-white"
-                            : "bg-gray-700 hover:bg-gray-600 text-white"
-                        }`}
-                      >
-                        {togglingFeatured ? (
-                          <DynamicIcon
-                            name="Loader2"
-                            className="inline-block mr-2 w-4 h-4 animate-spin"
-                          />
-                        ) : (
-                          <DynamicIcon
-                            name="Star"
-                            className="inline-block mr-2 w-4 h-4"
-                          />
-                        )}
-                        {adventure.isFeatured
-                          ? "Un-feature"
-                          : "Feature Adventure"}
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={handleToggleFeatured}
+                          disabled={togglingFeatured}
+                          className={`px-4 py-2 rounded-lg font-semibold shadow-md transition-colors ${
+                            adventure.isFeatured
+                              ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                              : "bg-gray-700 hover:bg-gray-600 text-white"
+                          }`}
+                        >
+                          {togglingFeatured ? (
+                            <DynamicIcon
+                              name="Loader2"
+                              className="inline-block mr-2 w-4 h-4 animate-spin"
+                            />
+                          ) : (
+                            <DynamicIcon
+                              name="Star"
+                              className="inline-block mr-2 w-4 h-4"
+                            />
+                          )}
+                          {adventure.isFeatured
+                            ? "Un-feature"
+                            : "Feature Adventure"}
+                        </button>
+                        <button
+                          onClick={handleToggleNsfw}
+                          disabled={togglingNsfw}
+                          className={`px-4 py-2 rounded-lg font-semibold shadow-md transition-colors ${
+                            adventure.nsfw
+                              ? "bg-red-500 hover:bg-red-600 text-white"
+                              : "bg-gray-700 hover:bg-gray-600 text-white"
+                          }`}
+                        >
+                          {togglingNsfw ? (
+                            <DynamicIcon
+                              name="Loader2"
+                              className="inline-block mr-2 w-4 h-4 animate-spin"
+                            />
+                          ) : (
+                            <DynamicIcon
+                              name="ShieldAlert"
+                              className="inline-block mr-2 w-4 h-4"
+                            />
+                          )}
+                          {adventure.nsfw ? "Unmark NSFW" : "Mark as NSFW"}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -577,30 +656,54 @@ export default function AdventureDetailPage() {
                     <h3 className="text-sm font-bold text-white/80 mb-2 uppercase tracking-wider">
                       Admin Controls
                     </h3>
-                    <button
-                      onClick={handleToggleFeatured}
-                      disabled={togglingFeatured}
-                      className={`px-4 py-2 rounded-lg font-semibold shadow-md transition-colors ${
-                        adventure.isFeatured
-                          ? "bg-yellow-500 hover:bg-yellow-600 text-white"
-                          : "bg-gray-700 hover:bg-gray-600 text-white"
-                      }`}
-                    >
-                      {togglingFeatured ? (
-                        <DynamicIcon
-                          name="Loader2"
-                          className="inline-block mr-2 w-4 h-4 animate-spin"
-                        />
-                      ) : (
-                        <DynamicIcon
-                          name="Star"
-                          className="inline-block mr-2 w-4 h-4"
-                        />
-                      )}
-                      {adventure.isFeatured
-                        ? "Un-feature"
-                        : "Feature Adventure"}
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={handleToggleFeatured}
+                        disabled={togglingFeatured}
+                        className={`px-4 py-2 rounded-lg font-semibold shadow-md transition-colors ${
+                          adventure.isFeatured
+                            ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                            : "bg-gray-700 hover:bg-gray-600 text-white"
+                        }`}
+                      >
+                        {togglingFeatured ? (
+                          <DynamicIcon
+                            name="Loader2"
+                            className="inline-block mr-2 w-4 h-4 animate-spin"
+                          />
+                        ) : (
+                          <DynamicIcon
+                            name="Star"
+                            className="inline-block mr-2 w-4 h-4"
+                          />
+                        )}
+                        {adventure.isFeatured
+                          ? "Un-feature"
+                          : "Feature Adventure"}
+                      </button>
+                      <button
+                        onClick={handleToggleNsfw}
+                        disabled={togglingNsfw}
+                        className={`px-4 py-2 rounded-lg font-semibold shadow-md transition-colors ${
+                          adventure.nsfw
+                            ? "bg-red-500 hover:bg-red-600 text-white"
+                            : "bg-gray-700 hover:bg-gray-600 text-white"
+                        }`}
+                      >
+                        {togglingNsfw ? (
+                          <DynamicIcon
+                            name="Loader2"
+                            className="inline-block mr-2 w-4 h-4 animate-spin"
+                          />
+                        ) : (
+                          <DynamicIcon
+                            name="ShieldAlert"
+                            className="inline-block mr-2 w-4 h-4"
+                          />
+                        )}
+                        {adventure.nsfw ? "Unmark NSFW" : "Mark as NSFW"}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

@@ -283,6 +283,7 @@ function AdventureCreatorContent() {
         setDescription(adventure.description || "");
         setDifficulty(adventure.difficulty || "Medium");
         setVisibility(adventure.visibility || "public");
+        setNsfw(adventure.nsfw || false);
         setTags(adventure.tags || []);
         setThumbnailUrl(adventure.thumbnailUrl || "");
         setBannerUrl(adventure.bannerUrl || "");
@@ -334,6 +335,7 @@ function AdventureCreatorContent() {
             if (saved.description) setDescription(saved.description);
             if (saved.difficulty) setDifficulty(saved.difficulty);
             if (saved.visibility) setVisibility(saved.visibility);
+            if (saved.nsfw !== undefined) setNsfw(saved.nsfw);
             if (Array.isArray(saved.tags)) setTags(saved.tags);
             if (saved.thumbnailUrl) setThumbnailUrl(saved.thumbnailUrl);
             if (saved.bannerUrl) setBannerUrl(saved.bannerUrl);
@@ -633,6 +635,7 @@ function AdventureCreatorContent() {
       if (saved.description) setDescription(saved.description);
       if (saved.difficulty) setDifficulty(saved.difficulty);
       if (saved.visibility) setVisibility(saved.visibility);
+      if (saved.nsfw !== undefined) setNsfw(saved.nsfw);
       if (Array.isArray(saved.tags)) setTags(saved.tags);
       if (saved.thumbnailUrl) setThumbnailUrl(saved.thumbnailUrl);
       if (saved.bannerUrl) setBannerUrl(saved.bannerUrl);
@@ -5001,7 +5004,7 @@ function AdventureCreatorContent() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
+                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
                     <span>
                       Relationship Value * ({newRelationship.value ?? 0})
                     </span>
