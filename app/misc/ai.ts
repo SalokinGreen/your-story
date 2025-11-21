@@ -141,10 +141,10 @@ Inventory Commands:
 
 Resource & Stat Commands:
 - /add_resource: name | description | current | max - Adds a new resource to the player. Example: /add_resource: Stamina | Physical energy | 100 | 100
-- /modify_resource: name | current_delta | max_delta - Modifies existing resource values (can be negative). Example: /modify_resource: Health | -20 | 0
+- /modify_resource: name | current_delta | max_delta - ⚠️ IMPORTANT: Modifies resource by ADDING the delta to current values (NOT setting absolute values). Use positive numbers to increase, negative to decrease. If current Arousal is 30 and you want it to become 44, use +14. If current Tips is 50 and you want it to become 70, use +20. Example: /modify_resource: Health | -20 | 0 (decreases Health by 20 points)
 - /remove_resource: name - Removes a resource from the player. Use EXACT resource name.
 - /add_stat: name | description | value - Adds a new stat to the player. Example: /add_stat: Charisma | Force of personality | 45
-- /modify_stat: name | value_delta - Modifies existing stat value (can be negative). Example: /modify_stat: Strength | 5
+- /modify_stat: name | value_delta - ⚠️ IMPORTANT: Modifies stat by ADDING the delta to current value (NOT setting absolute value). Use positive to increase, negative to decrease. If current Strength is 50 and you want it at 55, use +5. Example: /modify_stat: Strength | 5 (increases Strength by 5 points)
 - /remove_stat: name - Removes a stat from the player. Use EXACT stat name.
 
 Quest Commands:
@@ -157,7 +157,7 @@ Quest Commands:
 
 Relationship Commands:
 - /add_relationship: name | value | description - Adds a new relationship with a character/faction. Value ranges from -100 (enemy) to 100 (ally). Example: /add_relationship: King's Guard | 30 | Respected by the royal guards
-- /modify_relationship: name | value_delta - Changes relationship value by delta (can be negative). Example: /modify_relationship: King's Guard | 15
+- /modify_relationship: name | value_delta - ⚠️ IMPORTANT: Changes relationship by ADDING the delta to current value (NOT setting absolute value). Use positive to improve, negative to worsen. If current relationship with Emma is 50 and you want it at 70, use +20 (not just 20). If Ms. Harper is at 60 and you want it at 85, use +25. Example: /modify_relationship: King's Guard | 15 (improves relationship by 15 points)
 - /remove_relationship: name - Removes a relationship from tracking. Use EXACT name.
 - /update_relationship_description: name | new description - Updates the description of an existing relationship. Example: /update_relationship_description: King's Guard | Now trusted advisors to the throne
 

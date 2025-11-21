@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
     const customModel = userSettings.custom_models.find(
       (m) => m.id === modelKey
     );
-    
+
     if (customModel) {
       modelConfig = {
         name: customModel.name,
