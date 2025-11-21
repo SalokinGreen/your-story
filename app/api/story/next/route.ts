@@ -146,38 +146,42 @@ export async function POST(req: NextRequest) {
   }
 
   // Get model configuration
-  // Get model configuration
   let modelKey =
     requestedModel || process.env.DEFAULT_AI_MODEL || "deep-seek/deepseek-chat";
 
   // Handle custom model from user settings
   let modelConfig = getModelConfig(modelKey);
   let customModelUsed = false;
+  let isCustomModel = false;
 
-  if (
-    isSubscriber &&
-    userSettings?.custom_model_config?.modelId &&
-    modelKey === "custom"
-  ) {
-    const custom = userSettings.custom_model_config;
-    modelConfig = {
-      name: custom.name || "Custom Model",
-      model: custom.modelId || "unknown",
-      provider: "openrouter", // Custom models assumed to be OpenRouter for now
-      contextWindow: custom.contextSize || 4096,
-      maxOutputTokens: custom.maxOutputTokens || 1000,
-      cost: 0, // BYOK doesn't cost tokens
-      original_model: custom.modelId || "unknown",
-      maxTokens: custom.contextSize || 4096,
-      inputPrice: 0,
-      outputPrice: 0,
-      finetunes: [],
-      strengths: [],
-      weaknesses: [],
-      description: "Custom User Model",
-    };
-    customModelUsed = true;
-    console.log("Using custom model config:", modelConfig);
+  // Check if the selected model is a custom BYOK model
+  if (isSubscriber && byokEnabled && userSettings?.custom_models) {
+    const customModel = userSettings.custom_models.find(
+      (m) => m.id === modelKey
+    );
+    
+    if (customModel) {
+      modelConfig = {
+        name: customModel.name,
+        model: customModel.modelId,
+        provider: "openrouter", // Custom models assumed to be OpenRouter
+        contextWindow: customModel.contextSize,
+        maxOutputTokens: customModel.maxOutputTokens,
+        cost: 0, // BYOK doesn't cost tokens
+        original_model: customModel.modelId,
+        maxTokens: customModel.contextSize,
+        inputPrice: 0,
+        outputPrice: 0,
+        finetunes: [],
+        strengths: [],
+        weaknesses: [],
+        description: "Custom User Model (BYOK)",
+      };
+      customModelUsed = true;
+      isCustomModel = true;
+      shouldUseTokens = false; // Custom models don't consume tokens
+      console.log("Using custom BYOK model:", modelConfig);
+    }
   }
 
   console.log(
@@ -185,6 +189,8 @@ export async function POST(req: NextRequest) {
     modelConfig.name,
     "Provider:",
     modelConfig.provider,
+    "Is Custom BYOK:",
+    isCustomModel,
     "Raw context:",
     useRawContext || false
   );

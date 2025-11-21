@@ -19,7 +19,7 @@ import { compressImage } from "../misc/imageCompression";
 import CustomVoiceManager from "../components/CustomVoiceManager";
 import { AI_MODELS } from "../misc/ai_prices";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { getUserSettings, updateUserSettings } from "../misc/user_settings";
+import { getUserSettings, updateUserSettings, CustomModel } from "../misc/user_settings";
 import { useAuth } from "../misc/AuthContext";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { IconPicker } from "../components/IconPicker";
@@ -48,18 +48,24 @@ function AIModelSelector({
   const [byokEnabled, setByokEnabled] = useState(false);
   const [isSubscriber, setIsSubscriber] = useState(false);
 
-  // Custom Model State
-  const [customModelId, setCustomModelId] = useState("");
-  const [customModelName, setCustomModelName] = useState("");
-  const [customContextSize, setCustomContextSize] = useState(4096);
-  const [customMaxOutput, setCustomMaxOutput] = useState(1000);
+  // Custom Models State (array of models)
+  const [customModels, setCustomModels] = useState<CustomModel[]>([]);
+  const [editingModelId, setEditingModelId] = useState<string | null>(null);
+  const [newModelId, setNewModelId] = useState("");
+  const [newModelName, setNewModelName] = useState("");
+  const [newContextSize, setNewContextSize] = useState(4096);
+  const [newMaxOutput, setNewMaxOutput] = useState(1000);
 
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
+  
+  // Show keys toggle
+  const [showKeys, setShowKeys] = useState(false);
 
   // Load settings
   useEffect(() => {
-    if (user) {
+    if (user && !hasLoadedSettings) {
       setIsLoadingSettings(true);
       // Load keys from localStorage
       if (typeof window !== "undefined") {
@@ -72,22 +78,41 @@ function AIModelSelector({
           if (settings) {
             setByokEnabled(settings.byok_enabled || false);
             setIsSubscriber(settings.is_subscriber || false);
-
-            if (settings.custom_model_config) {
-              setCustomModelId(settings.custom_model_config.modelId || "");
-              setCustomModelName(settings.custom_model_config.name || "");
-              setCustomContextSize(
-                settings.custom_model_config.contextSize || 4096
-              );
-              setCustomMaxOutput(
-                settings.custom_model_config.maxOutputTokens || 1000
-              );
-            }
+            setCustomModels(settings.custom_models || []);
           }
+          setHasLoadedSettings(true);
         })
         .finally(() => setIsLoadingSettings(false));
     }
-  }, [user]);
+  }, [user, hasLoadedSettings]);
+
+  const handleAddModel = () => {
+    if (!newModelId || !newModelName) {
+      addNotification("Please fill in model ID and name", "warning");
+      return;
+    }
+
+    const newModel: CustomModel = {
+      id: crypto.randomUUID(),
+      modelId: newModelId,
+      name: newModelName,
+      contextSize: newContextSize,
+      maxOutputTokens: newMaxOutput,
+    };
+
+    setCustomModels([...customModels, newModel]);
+    // Clear form
+    setNewModelId("");
+    setNewModelName("");
+    setNewContextSize(4096);
+    setNewMaxOutput(1000);
+    addNotification("Model added! Click Save Settings to persist.", "success");
+  };
+
+  const handleDeleteModel = (id: string) => {
+    setCustomModels(customModels.filter((m) => m.id !== id));
+    addNotification("Model removed! Click Save Settings to persist.", "warning");
+  };
 
   const handleSaveSettings = async () => {
     if (!user) return;
@@ -99,21 +124,12 @@ function AIModelSelector({
       localStorage.setItem("speechifyKey", speechifyKey);
     }
 
-    const customConfig = customModelId
-      ? {
-          modelId: customModelId,
-          name: customModelName || "Custom Model",
-          contextSize: customContextSize,
-          maxOutputTokens: customMaxOutput,
-        }
-      : undefined;
-
     const { error } = await updateUserSettings(
       user.id,
       {
         byok_enabled: byokEnabled,
-        is_subscriber: isSubscriber, // Keeping this updateable for testing purposes as requested
-        custom_model_config: customConfig,
+        is_subscriber: isSubscriber,
+        custom_models: customModels,
       },
       supabase
     );
@@ -127,15 +143,19 @@ function AIModelSelector({
     }
   };
 
+  // Build available models list including custom models
+  const availableModels: Record<string, any> = { ...AI_MODELS };
+  customModels.forEach((model) => {
+    availableModels[model.id] = {
+      name: model.name,
+      original_model: model.modelId,
+      cost: 0, // BYOK models don't cost tokens
+      maxTokens: model.contextSize,
+    };
+  });
+
   const currentModel =
-    currentModelKey === "custom" && customModelId
-      ? {
-          name: customModelName || "Custom Model",
-          original_model: customModelId,
-          cost: 0,
-          maxTokens: customContextSize,
-        }
-      : AI_MODELS[currentModelKey as keyof typeof AI_MODELS] ||
+    availableModels[currentModelKey] || AI_MODELS.Prometheus;
         AI_MODELS.Prometheus;
 
   const handleModelChange = (newModelKey: string) => {
@@ -143,11 +163,13 @@ function AIModelSelector({
       localStorage.setItem("aiModel", newModelKey);
       setCurrentModelKey(newModelKey);
 
-      if (newModelKey === "custom") {
-        addNotification(`Model changed to Custom Model`, "success");
-      } else {
-        const newModel = AI_MODELS[newModelKey as keyof typeof AI_MODELS];
-        addNotification(`Model changed to ${newModel.name}`, "success");
+      const selectedModel = availableModels[newModelKey];
+      if (selectedModel) {
+        const isByok = customModels.some((m) => m.id === newModelKey);
+        addNotification(
+          `Model changed to ${selectedModel.name}${isByok ? " (BYOK - FREE)" : ""}`,
+          "success"
+        );
       }
     }
   };
@@ -224,8 +246,14 @@ function AIModelSelector({
               {(config.maxTokens / 1000).toFixed(0)}K context)
             </option>
           ))}
-          {isSubscriber && byokEnabled && (
-            <option value="custom">Custom Model (BYOK)</option>
+          {isSubscriber && byokEnabled && customModels.length > 0 && (
+            <optgroup label="Custom Models (BYOK)">
+              {customModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name} - {model.modelId} (FREE, {(model.contextSize / 1000).toFixed(0)}K context)
+                </option>
+              ))}
+            </optgroup>
           )}
         </select>
 
@@ -278,16 +306,28 @@ function AIModelSelector({
 
             {/* API Keys */}
             <div className="space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  API Keys
+                </h4>
+                <button
+                  onClick={() => setShowKeys(!showKeys)}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                >
+                  <DynamicIcon name={showKeys ? "EyeOff" : "Eye"} className="w-3 h-3" />
+                  {showKeys ? "Hide Keys" : "Show Keys"}
+                </button>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
                   OpenRouter API Key
                 </label>
                 <input
-                  type="password"
+                  type={showKeys ? "text" : "password"}
                   value={openRouterKey}
                   onChange={(e) => setOpenRouterKey(e.target.value)}
                   placeholder="sk-or-..."
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono"
                 />
               </div>
               <div>
@@ -295,11 +335,11 @@ function AIModelSelector({
                   Speechify API Key
                 </label>
                 <input
-                  type="password"
+                  type={showKeys ? "text" : "password"}
                   value={speechifyKey}
                   onChange={(e) => setSpeechifyKey(e.target.value)}
                   placeholder="speechify-..."
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono"
                 />
               </div>
             </div>
@@ -307,46 +347,81 @@ function AIModelSelector({
             {/* Custom Model Config */}
             <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-600">
               <h4 className="text-sm font-bold text-gray-900 dark:text-white">
-                Custom Model Configuration
+                Custom Models
               </h4>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                  Model ID (OpenRouter)
-                </label>
-                <input
-                  type="text"
-                  value={customModelId}
-                  onChange={(e) => setCustomModelId(e.target.value)}
-                  placeholder="anthropic/claude-3-opus"
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+              
+              {/* Existing Custom Models */}
+              {customModels.length > 0 && (
+                <div className="space-y-2">
+                  {customModels.map((model) => (
+                    <div
+                      key={model.id}
+                      className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600"
+                    >
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {model.name}
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          {model.modelId} • {model.contextSize} tokens
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteModel(model.id)}
+                        className="ml-2 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add New Model Form */}
+              <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                <p className="text-xs font-medium text-gray-700 dark:text-gray-400">
+                  Add New Model
+                </p>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                    Display Name
-                  </label>
                   <input
                     type="text"
-                    value={customModelName}
-                    onChange={(e) => setCustomModelName(e.target.value)}
-                    placeholder="Claude 3 Opus"
+                    value={newModelId}
+                    onChange={(e) => setNewModelId(e.target.value)}
+                    placeholder="Model ID (e.g., anthropic/claude-3-opus)"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                    Context Size
-                  </label>
                   <input
-                    type="number"
-                    value={customContextSize}
-                    onChange={(e) =>
-                      setCustomContextSize(parseInt(e.target.value) || 4096)
-                    }
+                    type="text"
+                    value={newModelName}
+                    onChange={(e) => setNewModelName(e.target.value)}
+                    placeholder="Display Name (e.g., Claude 3 Opus)"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={newContextSize}
+                    onChange={(e) => setNewContextSize(parseInt(e.target.value) || 4096)}
+                    placeholder="Context Size"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={newMaxOutput}
+                    onChange={(e) => setNewMaxOutput(parseInt(e.target.value) || 1000)}
+                    placeholder="Max Output"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                  />
+                </div>
+                <button
+                  onClick={handleAddModel}
+                  className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium"
+                >
+                  Add Model
+                </button>
               </div>
             </div>
 
