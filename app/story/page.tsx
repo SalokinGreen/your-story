@@ -42,6 +42,7 @@ import {
   findQuestMatch,
   findRelationshipMatch,
 } from "../misc/fuzzyMatch";
+import { outputToScenePart } from "../misc/ai";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -1346,6 +1347,7 @@ function StoryPageContent() {
   const [loadingStory, setLoadingStory] = useState(true);
   const [started, setStarted] = useState(false);
   const [canRetry, setCanRetry] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
   const [showPresetSelection, setShowPresetSelection] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
   const [tokenBalance, setTokenBalance] = useState<number | null>(null);
@@ -2023,6 +2025,7 @@ function StoryPageContent() {
         setStoryData({ ...storyData });
         setStoryText(data.part.content);
         setCanRetry(true);
+        setCanUndo(true);
         setChoices({ choices: data.part.choices || [] });
         setLoading(false);
 
@@ -2833,6 +2836,7 @@ function StoryPageContent() {
         setChoices({ choices: data.part.choices || [] });
         setLoading(false);
         setCanRetry(true); //EnableretryaftersuccessfulAIresponse
+        setCanUndo(true); //EnableundoaftersuccessfulAIresponse
 
         //Saveprogresstodatabase
         await saveProgress(storyData);
@@ -3096,6 +3100,7 @@ function StoryPageContent() {
         setChoices({ choices: data.part.choices || [] });
         setLoading(false);
         setCanRetry(true);
+        setCanUndo(true);
         addNotification("✓ Response regenerated", "success");
 
         await saveProgress(storyData);
@@ -3106,6 +3111,122 @@ function StoryPageContent() {
         setLoading(false);
         setCanRetry(true);
       });
+  }
+
+  async function handleUndo() {
+    if (!storyData || loading) return;
+
+    // Check if there are at least 2 parts: user choice + AI response
+    if (storyData.scene.parts.length < 2) {
+      addNotification("Nothing to undo", "warning");
+      return;
+    }
+
+    const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
+    const secondLastPart =
+      storyData.scene.parts[storyData.scene.parts.length - 2];
+
+    // Last part should be AI response, second-to-last should be user choice
+    if (lastPart.user || !secondLastPart.user) {
+      addNotification("Cannot undo from current state", "warning");
+      return;
+    }
+
+    logger.action("User requested undo");
+
+    // Remove both the AI response and the user choice
+    storyData.scene.parts.pop();
+    storyData.scene.parts.pop();
+
+    // Update state to previous scene part
+    if (storyData.scene.parts.length > 0) {
+      const previousPart =
+        storyData.scene.parts[storyData.scene.parts.length - 1];
+      setStoryText(previousPart.content);
+      setChoices({ choices: previousPart.choices || [] });
+      const inputs =
+        previousPart.choices?.reduce(
+          (acc, choice) => ({ ...acc, [choice.text]: false }),
+          {} as Record<string, boolean>
+        ) || {};
+      setInput(inputs);
+    }
+
+    setCanRetry(false);
+    setCanUndo(storyData.scene.parts.length >= 2);
+    addNotification("Undone last action", "success");
+
+    // Save progress
+    await saveProgress(storyData);
+  }
+
+  async function handleEdit(rawText: string, partIndex: number) {
+    if (!storyData || loading) return;
+
+    if (partIndex < 0 || partIndex >= storyData.scene.parts.length) {
+      addNotification("Invalid part to edit", "failure");
+      return;
+    }
+
+    const partToEdit = storyData.scene.parts[partIndex];
+
+    // Only allow editing AI responses
+    if (partToEdit.user) {
+      addNotification("Can only edit AI responses", "warning");
+      return;
+    }
+
+    logger.action("User editing story part", { partIndex, rawText });
+
+    // Parse the edited text as if it was fresh AI output
+    const reparsedPart = outputToScenePart(rawText);
+
+    // Preserve original metadata
+    reparsedPart.user = false;
+    reparsedPart.role = "assistant";
+
+    // Replace the old part with the newly parsed one
+    storyData.scene.parts[partIndex] = reparsedPart;
+
+    // Process any commands from the re-parsed content
+    if (reparsedPart.commands && reparsedPart.commands.length > 0) {
+      processCommands(reparsedPart.commands, storyData, addNotification);
+    }
+
+    // Process any memory entries from the re-parsed content
+    if (reparsedPart.memoryEntries && reparsedPart.memoryEntries.length > 0) {
+      const existingMemoryLower = storyData.memory.map((m) =>
+        m.toLowerCase().trim()
+      );
+      const newMemories = reparsedPart.memoryEntries.filter(
+        (entry: string) =>
+          !existingMemoryLower.includes(entry.toLowerCase().trim())
+      );
+      if (newMemories.length > 0) {
+        storyData.memory.push(...newMemories);
+      }
+    }
+
+    // Process lore triggers
+    processLoreTriggers(storyData, addNotification);
+
+    // Update UI if this is the last/current part
+    if (partIndex === storyData.scene.parts.length - 1) {
+      setStoryText(reparsedPart.content);
+      setChoices({ choices: reparsedPart.choices || [] });
+      const inputs =
+        reparsedPart.choices?.reduce(
+          (acc, choice) => ({ ...acc, [choice.text]: false }),
+          {} as Record<string, boolean>
+        ) || {};
+      setInput(inputs);
+    }
+
+    setStoryData({ ...storyData });
+    addNotification("Story part edited and re-parsed", "success");
+
+    // Save progress
+    await saveProgress(storyData);
   }
 
   async function handlePurchase(cost: number, callback: () => void) {
@@ -3778,6 +3899,9 @@ function StoryPageContent() {
             onCustomInput={handleCustomInput}
             onRetry={handleRetry}
             canRetry={canRetry}
+            onUndo={handleUndo}
+            canUndo={canUndo}
+            onEdit={handleEdit}
           />
         )}
         {currentState === StoryState.STATS && <StatsPage {...storyData} />}

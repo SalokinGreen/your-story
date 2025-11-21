@@ -18,6 +18,9 @@ interface StoryProps {
   onCustomInput?: (text: string) => void; // optional callback for free-form input
   onRetry?: () => void; // callback to retry last AI response
   canRetry?: boolean; // whether retry is available
+  onUndo?: () => void; // callback to undo last action
+  canUndo?: boolean; // whether undo is available
+  onEdit?: (rawText: string, partIndex: number) => void; // callback to edit a story part
 }
 
 export default function Story({
@@ -33,6 +36,9 @@ export default function Story({
   onCustomInput,
   onRetry,
   canRetry,
+  onUndo,
+  canUndo,
+  onEdit,
 }: StoryProps) {
   const [freeInputEnabled, setFreeInputEnabled] = React.useState<boolean>(
     () => {
@@ -43,6 +49,9 @@ export default function Story({
   const [customInput, setCustomInput] = React.useState<string>("");
   const [submittingCustom, setSubmittingCustom] =
     React.useState<boolean>(false);
+  const [editMode, setEditMode] = React.useState<boolean>(false);
+  const [editedText, setEditedText] = React.useState<string>("");
+  const [isHovering, setIsHovering] = React.useState<boolean>(false);
   const selectedChoice = choices?.choices.find((c) => input[c.text]);
   const hasSkillCheck = selectedChoice?.skill_used !== undefined;
   const canUseReroll = storyData.momentum >= 1 && hasSkillCheck;
@@ -52,7 +61,93 @@ export default function Story({
     <div className="w-full">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col gap-6">
-          {prettify(storyText)}
+          {/* Story text with edit mode */}
+          <div
+            className="relative"
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+          >
+            {!editMode ? (
+              <>
+                {prettify(storyText)}
+                {/* Edit icon (show on hover) */}
+                {isHovering && onEdit && !loading && (
+                  <button
+                    onClick={() => {
+                      setEditMode(true);
+                      // Get raw text from the last AI scene part if available
+                      const lastPart =
+                        storyData.scene.parts[
+                          storyData.scene.parts.length - 1
+                        ];
+                      setEditedText(lastPart?.raw || storyText);
+                    }}
+                    className="absolute top-2 right-2 p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-lg transition-all flex items-center gap-2"
+                    title="Edit this response"
+                  >
+                    <DynamicIcon name="Pencil" className="w-4 h-4" />
+                    <span className="text-sm font-medium">Edit</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <DynamicIcon name="Pencil" className="w-5 h-5" />
+                    Edit AI Response
+                  </h3>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Use XML tags: &lt;story&gt;, &lt;choices&gt;,
+                    &lt;memory&gt;, &lt;commands&gt;
+                  </span>
+                </div>
+                <textarea
+                  value={editedText}
+                  onChange={(e) => setEditedText(e.target.value)}
+                  className="w-full h-96 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono resize-none"
+                  placeholder="Edit the raw AI output here..."
+                />
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {editedText.length} characters • Will reparse commands and
+                    memory
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setEditMode(false);
+                        setEditedText("");
+                      }}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (onEdit) {
+                          const lastPartIndex =
+                            storyData.scene.parts.length - 1;
+                          onEdit(editedText, lastPartIndex);
+                          setEditMode(false);
+                          setEditedText("");
+                        }
+                      }}
+                      disabled={editedText.trim().length === 0}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
+                        editedText.trim().length === 0
+                          ? "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                      }`}
+                    >
+                      <DynamicIcon name="Save" className="w-4 h-4" />
+                      Save & Reparse
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* TTS Controls - positioned between story and choices */}
           <div className="flex items-center justify-between py-4 border-y border-gray-200 dark:border-gray-700">
@@ -104,28 +199,51 @@ export default function Story({
             </div>
           )}
 
-          {/* Retry Button */}
-          {!loading && canRetry && onRetry && (
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={onRetry}
-                className="px-4 py-2 text-sm font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all flex items-center gap-2"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+          {/* Retry and Undo Buttons */}
+          {!loading && (canRetry || canUndo) && (
+            <div className="flex justify-end gap-3 mt-4">
+              {canUndo && onUndo && (
+                <button
+                  onClick={onUndo}
+                  className="px-4 py-2 text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all flex items-center gap-2"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                Retry AI Response
-              </button>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                    />
+                  </svg>
+                  Undo Last Action
+                </button>
+              )}
+              {canRetry && onRetry && (
+                <button
+                  onClick={onRetry}
+                  className="px-4 py-2 text-sm font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all flex items-center gap-2"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  Retry AI Response
+                </button>
+              )}
             </div>
           )}
         </div>
