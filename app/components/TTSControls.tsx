@@ -252,7 +252,6 @@ export default function TTSControls({
         autoGenerate &&
         text.trim() &&
         ttsEnabled &&
-        !disabled &&
         !autoGenerateTriggeredRef.current
       ) {
         autoGenerateTriggeredRef.current = true;
@@ -264,6 +263,23 @@ export default function TTSControls({
       }
     }
   }, [text, disabled, ttsEnabled, handlePlay, audioUrl]);
+
+  // Fallback auto-generate when loading finishes after text change occurred while disabled
+  useEffect(() => {
+    if (
+      !disabled &&
+      text.trim() &&
+      ttsEnabled &&
+      localStorage.getItem("ttsAutoGenerate") === "true" &&
+      !autoGenerateTriggeredRef.current
+    ) {
+      autoGenerateTriggeredRef.current = true;
+      const timer = setTimeout(() => {
+        handlePlay();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [disabled, text, ttsEnabled, handlePlay]);
 
   const handlePause = () => {
     if (audioRef.current) {

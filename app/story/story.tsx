@@ -52,8 +52,10 @@ export default function Story({
     <div className="w-full">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col gap-6">
-          {/* TTS Controls - positioned at top */}
-          <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
+          {prettify(storyText)}
+
+          {/* TTS Controls - positioned between story and choices */}
+          <div className="flex items-center justify-between py-4 border-y border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2">
               <DynamicIcon name="Volume2" className="w-6 h-6" />
               <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -62,8 +64,6 @@ export default function Story({
             </div>
             <TTSControls text={storyText} disabled={loading} />
           </div>
-
-          {prettify(storyText)}
 
           {loading ? (
             <div className="flex flex-col items-center justify-center w-full py-8 border-t border-gray-200 dark:border-gray-700">

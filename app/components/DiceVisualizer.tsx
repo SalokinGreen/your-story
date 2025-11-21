@@ -39,7 +39,7 @@ export function DiceVisualizer({
     rolling: 1500,
     stopped: 500,
     calculating: 800,
-    resultHold: 1500, // time after result appears
+    resultHold: 1900, // time after result appears
     numberInterval: 50,
   } as const;
 
