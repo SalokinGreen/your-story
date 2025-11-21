@@ -4,6 +4,7 @@ interface AdventureResponse {
   adventure?: {
     id: string;
     title: string;
+    author?: string;
     shortDescription?: string;
     description?: string;
     bannerUrl?: string;
@@ -11,8 +12,10 @@ interface AdventureResponse {
     difficulty?: string;
     rating?: number;
     playCount?: number;
+    estimatedDuration?: string;
     visibility?: string; // public | hidden | private
     nsfw?: boolean;
+    isFeatured?: boolean;
   };
   error?: string;
 }
@@ -52,54 +55,107 @@ export async function generateMetadata({
 
   // Privacy / fallback handling
   const isPrivate = adventure?.visibility === "private";
+
+  // Build personalized metadata
   const title =
-    adventure && !isPrivate ? adventure.title : "Your Story Adventure";
+    adventure && !isPrivate
+      ? `${adventure.title}${adventure.isFeatured ? " ⭐" : ""}`
+      : "Your Story Adventure";
+
   const rawDescription =
     adventure && !isPrivate
       ? adventure.shortDescription ||
         adventure.description ||
         "An interactive, choice-driven AI adventure."
       : "An interactive, choice-driven AI adventure on Your Story.";
+
   const description =
     rawDescription.length > 240
       ? rawDescription.slice(0, 237).trimEnd() + "..."
       : rawDescription;
+
   const banner = adventure && !isPrivate ? adventure.bannerUrl : undefined;
   const tags = adventure && !isPrivate ? adventure.tags : [];
-  const imageUrl = banner || `${baseUrl}/api/og/adventure-placeholder.png`; // Placeholder; ensure asset exists or adjust
+  const imageUrl = banner || `${baseUrl}/api/og/adventure-placeholder.png`;
 
-  // Build keywords
+  // Personalized author and stats
+  const author =
+    adventure && !isPrivate
+      ? adventure.author || "Unknown Creator"
+      : "Your Story";
+  const rating =
+    adventure && !isPrivate && adventure.rating
+      ? adventure.rating.toFixed(1)
+      : null;
+  const plays =
+    adventure && !isPrivate && adventure.playCount
+      ? adventure.playCount.toLocaleString()
+      : null;
+  const difficulty = adventure && !isPrivate ? adventure.difficulty : null;
+  const duration = adventure && !isPrivate ? adventure.estimatedDuration : null;
+
+  // Build rich title with metadata
+  const fullTitle = [
+    title,
+    difficulty && `[${difficulty}]`,
+    rating && `★${rating}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  // Enhanced description with stats
+  let enhancedDescription = description;
+  if (adventure && !isPrivate) {
+    const statsParts = [
+      author && `By ${author}`,
+      plays && `${plays} plays`,
+      duration,
+    ].filter(Boolean);
+
+    if (statsParts.length > 0) {
+      enhancedDescription = `${description}\n\n${statsParts.join(" • ")}`;
+    }
+  }
+
+  // Build keywords with adventure-specific tags
   const keywords = [
     "interactive story",
     "ai adventure",
     "choice based",
     "narrative game",
+    difficulty && `${difficulty} difficulty`,
+    author && `by ${author}`,
     ...tags,
-  ];
+  ].filter(Boolean) as string[];
 
   return {
-    title,
-    description,
+    title: fullTitle,
+    description: enhancedDescription,
     alternates: { canonical: adventureUrl },
     keywords,
+    authors: author ? [{ name: author }] : undefined,
     openGraph: {
-      title,
-      description,
+      title: fullTitle,
+      description: enhancedDescription,
       url: adventureUrl,
       siteName: "Your Story",
-      type: "website",
+      type: "article",
       images: [
         {
           url: imageUrl,
-          alt: `${title} – Adventure Preview`,
+          width: 1200,
+          height: 630,
+          alt: `${title} – ${author ? `by ${author}` : "Adventure Preview"}`,
         },
       ],
+      ...(author && { authors: [author] }),
     },
     twitter: {
       card: "summary_large_image",
-      title,
-      description,
+      title: fullTitle,
+      description: enhancedDescription,
       images: [imageUrl],
+      creator: author ? `@${author.replace(/\s+/g, "")}` : undefined,
     },
     metadataBase: new URL(baseUrl),
   };
