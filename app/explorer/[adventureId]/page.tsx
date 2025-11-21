@@ -59,6 +59,60 @@ export default function AdventureDetailPage() {
   useEffect(() => {
     const fetchAdventure = async () => {
       try {
+        // Check if this is a local adventure
+        if (adventureId.startsWith("local:")) {
+          const { getLocalAdventure } = await import(
+            "@/app/misc/localAdventureManager"
+          );
+          const localAdventure = await getLocalAdventure(adventureId);
+          
+          if (!localAdventure) {
+            setAdventure(null);
+            setLoading(false);
+            return;
+          }
+
+          // Convert LocalAdventure to Adventure format
+          const difficultyValue = localAdventure.adventureData.difficulty;
+          let normalizedDifficulty: "Easy" | "Medium" | "Hard" | "Expert" = "Medium";
+          
+          if (difficultyValue) {
+            const lower = difficultyValue.toLowerCase();
+            if (lower === "easy") normalizedDifficulty = "Easy";
+            else if (lower === "medium") normalizedDifficulty = "Medium";
+            else if (lower === "hard") normalizedDifficulty = "Hard";
+            else if (lower === "expert") normalizedDifficulty = "Expert";
+          }
+
+          const adventure: Adventure = {
+            id: localAdventure.id,
+            title: localAdventure.title,
+            shortDescription: localAdventure.description,
+            description: localAdventure.description,
+            thumbnailUrl: localAdventure.adventureData.thumbnailUrl || "",
+            bannerUrl: localAdventure.adventureData.bannerUrl || "",
+            tags: localAdventure.adventureData.tags || [],
+            difficulty: normalizedDifficulty,
+            nsfw: localAdventure.adventureData.nsfw || false,
+            estimatedDuration: localAdventure.adventureData.estimatedDuration || "1-2 hours",
+            storyTemplate: localAdventure.adventureData.storyTemplate || {},
+            presets: localAdventure.adventureData.presets || [],
+            rating: 0,
+            playCount: 0,
+            authorId: user?.id || "",
+            author: user?.user_metadata?.display_name || "You",
+            isPublished: false,
+            isFeatured: false,
+            popularity: 0,
+            createdAt: new Date(localAdventure.updatedAt),
+            updatedAt: new Date(localAdventure.updatedAt),
+          };
+          
+          setAdventure(adventure);
+          setLoading(false);
+          return;
+        }
+
         // Get auth token if user is signed in
         const {
           data: { session },
@@ -87,7 +141,7 @@ export default function AdventureDetailPage() {
     if (adventureId) {
       fetchAdventure();
     }
-  }, [adventureId]);
+  }, [adventureId, user]);
 
   const handleToggleFeatured = async () => {
     if (!adventure) return;
@@ -299,6 +353,17 @@ export default function AdventureDetailPage() {
         setConfirmDialog({ ...confirmDialog, isOpen: false });
         try {
           setDeleting(true);
+
+          // Check if this is a local adventure
+          if (adventureId.startsWith("local:")) {
+            const { deleteLocalAdventure } = await import(
+              "@/app/misc/localAdventureManager"
+            );
+            await deleteLocalAdventure(adventureId);
+            addNotification("Local adventure deleted successfully", "success");
+            router.push("/library");
+            return;
+          }
 
           // Get auth token
           const {

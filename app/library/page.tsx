@@ -17,6 +17,10 @@ import {
   LocalStory,
   deleteLocalStory,
 } from "@/app/misc/localStoryManager";
+import {
+  listLocalAdventures,
+  deleteLocalAdventure,
+} from "@/app/misc/localAdventureManager";
 
 interface Story {
   id: string;
@@ -148,21 +152,9 @@ export default function LibraryPage() {
         const data = await response.json();
         setAdventures(data.adventures || []);
 
-        // Load local adventures from localStorage
+        // Load local adventures from IndexedDB
         try {
-          const localAdvKeys = Object.keys(localStorage).filter((key) =>
-            key.startsWith("your-story:local-adventure:")
-          );
-          const localAdvs = localAdvKeys
-            .map((key) => {
-              try {
-                const data = JSON.parse(localStorage.getItem(key) || "{}");
-                return { ...data, id: key, isOffline: true };
-              } catch {
-                return null;
-              }
-            })
-            .filter(Boolean);
+          const localAdvs = await listLocalAdventures();
           setLocalAdventures(localAdvs);
         } catch (error) {
           console.error("Error loading local adventures:", error);
@@ -244,10 +236,8 @@ export default function LibraryPage() {
           setDeleting(adventureId);
 
           if (isOffline) {
-            // Delete local adventure
-            if (typeof window !== "undefined") {
-              localStorage.removeItem(adventureId);
-            }
+            // Delete local adventure using localAdventureManager
+            await deleteLocalAdventure(adventureId);
             setLocalAdventures(
               localAdventures.filter((a) => a.id !== adventureId)
             );
@@ -1273,11 +1263,11 @@ export default function LibraryPage() {
                       className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
                     >
                       {/* Thumbnail */}
-                      {adventure.thumbnailUrl ? (
+                      {adventure.adventureData.thumbnailUrl ? (
                         <div
                           className="h-40 bg-cover bg-center"
                           style={{
-                            backgroundImage: `url(${adventure.thumbnailUrl})`,
+                            backgroundImage: `url(${adventure.adventureData.thumbnailUrl})`,
                           }}
                         />
                       ) : (
@@ -1304,10 +1294,10 @@ export default function LibraryPage() {
                           </span>
                         </div>
                         <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
-                          {adventure.shortDescription}
+                          {adventure.description}
                         </p>
                         <div className="flex flex-wrap gap-2 mb-3">
-                          {adventure.tags?.slice(0, 3).map((tag: string) => (
+                          {adventure.adventureData.tags?.slice(0, 3).map((tag: string) => (
                             <span
                               key={tag}
                               className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-full"
@@ -1315,30 +1305,26 @@ export default function LibraryPage() {
                               {tag}
                             </span>
                           ))}
-                          {adventure.tags?.length > 3 && (
+                          {adventure.adventureData.tags && adventure.adventureData.tags.length > 3 && (
                             <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-full">
-                              +{adventure.tags.length - 3}
+                              +{adventure.adventureData.tags.length - 3}
                             </span>
                           )}
                         </div>
                         <div className="flex gap-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
                           <span>
-                            Saved:{" "}
-                            {new Date(adventure.savedAt).toLocaleDateString()}
+                            Updated:{" "}
+                            {new Date(adventure.updatedAt).toLocaleDateString()}
                           </span>
                         </div>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => {
-                              // Could implement a preview/import feature here
-                              addNotification(
-                                "Import feature coming soon!",
-                                "warning"
-                              );
-                            }}
+                            onClick={() =>
+                              router.push(`/explorer/${adventure.id}`)
+                            }
                             className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
                           >
-                            Import
+                            View
                           </button>
                           <button
                             onClick={() =>

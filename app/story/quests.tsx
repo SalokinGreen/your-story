@@ -65,6 +65,7 @@ export default function QuestsPage(storyData: StoryData) {
               {ongoingQuests.map((quest) => {
                 if (!quest.id) {
                   console.error("Quest missing id:", quest);
+                  quest.id = `quest-${Math.random()}`; // Fallback ID
                 }
                 return (
                   <div

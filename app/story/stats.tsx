@@ -436,7 +436,7 @@ export default function StatsPage(storyData: StoryData) {
                       .filter((q) => q.active)
                       .map((quest, index) => (
                         <div
-                          key={quest.id}
+                          key={index}
                           className={`flex flex-col gap-2 p-4 rounded-lg border-2 transition-all ${
                             quest.fulfilled
                               ? "bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600 shadow-md"

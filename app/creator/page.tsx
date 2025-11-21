@@ -16,6 +16,7 @@ import {
   Preset,
   UpgradeSettings,
   DEFAULT_UPGRADE_SETTINGS,
+  Adventure,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
@@ -1492,7 +1493,7 @@ function AdventureCreatorContent() {
     setAchievements(achievements.filter((_, i) => i !== index));
   };
 
-  const handleSaveLocally = () => {
+  const handleSaveLocally = async () => {
     // Validation
     if (!title.trim()) {
       addNotification("Please enter a title", "warning");
@@ -1537,50 +1538,35 @@ function AdventureCreatorContent() {
       upgradeSettings: upgradeSettings,
     };
 
-    //Save complete adventure template to localStorage
+    // Save complete adventure using localAdventureManager
     try {
-      const adventureTemplate = {
+      const adventureTemplate: Partial<Adventure> = {
         title,
         shortDescription,
         description,
-        thumbnailUrl: thumbnailUrl || null,
-        bannerUrl: bannerUrl || null,
+        thumbnailUrl: thumbnailUrl || "",
+        bannerUrl: bannerUrl || "",
         tags,
-        difficulty: difficulty.toLowerCase(),
-        visibility: visibility.toLowerCase(),
+        difficulty: difficulty as "Easy" | "Medium" | "Hard" | "Expert",
         nsfw,
         estimatedDuration: "1-2 hours",
         storyTemplate: storyData,
-        selectedPreset: selectedPreset,
         presets: presets,
-        savedAt: Date.now(),
       };
 
-      const localKey = `your-story:local-adventure:${Date.now()}`;
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          localKey,
-          JSON.stringify(adventureTemplate)
-        );
-      }
+      // Generate unique ID with 'local:' prefix
+      const localId = `local:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Save to IndexedDB using localAdventureManager
+      await saveLocalAdventure(localId, adventureTemplate);
 
       addNotification(
-        "Adventure saved locally! You can import it later.",
+        "Adventure saved locally! 🎮 You can find it in your library.",
         "success"
       );
 
-      // Optionally download as JSON file
-      const blob = new Blob([JSON.stringify(adventureTemplate, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${title.toLowerCase().replace(/\s+/g, "-")}-adventure.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Navigate to library to see the saved adventure
+      router.push("/library");
     } catch (error: any) {
       console.error("Error saving locally:", error);
       addNotification(`Failed to save locally: ${error.message}`, "failure");
@@ -5162,7 +5148,7 @@ function AdventureCreatorContent() {
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
+                                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
                                     <span>
                                       Relationship Value (
                                       {editRelationship.value ?? 0})
@@ -7479,15 +7465,17 @@ function AdventureCreatorContent() {
               <button
                 onClick={handleSaveLocally}
                 disabled={saving}
-                className="flex-1 sm:flex-none px-3 py-2 bg-white dark:bg-gray-700 border-2 border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
+                className="flex-1 sm:flex-none px-3 py-2 bg-white dark:bg-gray-700 border-2 border-gray-600 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
+                title="Save to your device without publishing"
               >
                 <DynamicIcon name="Save" className="w-4 h-4 inline mr-2" />
-                Save
+                Save Locally
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
                 className="flex-1 sm:flex-none px-3 py-2 bg-linear-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
+                title="Publish to the community"
               >
                 {saving ? (
                   "Publishing..."

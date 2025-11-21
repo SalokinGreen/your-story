@@ -4343,7 +4343,10 @@ export default function MenuPage({
               {/* Uniform top spacer (pt-8) keeps all tab bodies from touching tabs; Inventory previously appeared correct */}
               {activeTab === "basic" && (
                 <div className="mt-4">
-                  <BasicSettings form={settingsForm} onChange={setSettingsForm} />
+                  <BasicSettings
+                    form={settingsForm}
+                    onChange={setSettingsForm}
+                  />
                 </div>
               )}
 

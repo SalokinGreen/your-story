@@ -77,9 +77,7 @@ export default function Story({
                       setEditMode(true);
                       // Get raw text from the last AI scene part if available
                       const lastPart =
-                        storyData.scene.parts[
-                          storyData.scene.parts.length - 1
-                        ];
+                        storyData.scene.parts[storyData.scene.parts.length - 1];
                       setEditedText(lastPart?.raw || storyText);
                     }}
                     className="absolute top-2 right-2 p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-lg transition-all flex items-center gap-2"
