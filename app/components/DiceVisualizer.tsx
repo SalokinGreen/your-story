@@ -18,7 +18,15 @@ interface DiceVisualizerProps {
   hasDisadvantage?: boolean;
   onComplete?: () => void;
   diceRolls?: number[][]; // Individual dice for each roll (for 3d6 system)
-  rpgSystem?: "3d6" | "1d20" | "1d100" | "percentile" | "pbta" | "fate" | "yze"; // RPG system type
+  rpgSystem?:
+    | "3d6"
+    | "1d20"
+    | "1d100"
+    | "percentile"
+    | "pbta"
+    | "fate"
+    | "yze"
+    | "explosive"; // RPG system type
   // YZE-specific
   baseDice?: number[]; // Base dice from stat
   stressDice?: number[]; // Stress dice added
@@ -27,6 +35,9 @@ interface DiceVisualizerProps {
   panicEffect?: string;
   stressLevel?: number;
   stressRelief?: boolean;
+  // Explosive-specific
+  explosions?: number; // Number of explosions
+  dieSize?: number; // Die size (d4, d6, d8, d10, d12, d20)
 }
 
 export function DiceVisualizer({
@@ -52,17 +63,41 @@ export function DiceVisualizer({
   panicEffect,
   stressLevel,
   stressRelief,
+  explosions,
+  dieSize,
 }: DiceVisualizerProps) {
   // Determine dice system configuration
   const is3d6 = rpgSystem === "3d6";
   const is1d20 = rpgSystem === "1d20";
   const is1d100 = rpgSystem === "1d100";
   const isPercentile = rpgSystem === "percentile";
+  const isPbtA = rpgSystem === "pbta";
+  const isFate = rpgSystem === "fate";
   const isYZE = rpgSystem === "yze";
-  const diceCount = is3d6 ? 3 : 1;
-  const diceSides = is3d6 ? 6 : is1d20 ? 20 : 100;
-  const minRoll = is3d6 ? 3 : 1;
-  const maxRoll = is3d6 ? 18 : is1d20 ? 20 : 100;
+  const isExplosive = rpgSystem === "explosive";
+  const diceCount = is3d6 ? 3 : isPbtA ? 2 : isFate ? 4 : 1;
+  const diceSides =
+    is3d6 || isPbtA
+      ? 6
+      : is1d20
+      ? 20
+      : isFate
+      ? 3
+      : isExplosive
+      ? dieSize || 20
+      : 100;
+  const minRoll = is3d6 ? 3 : isPbtA ? 2 : isFate ? -4 : 1;
+  const maxRoll = is3d6
+    ? 18
+    : isPbtA
+    ? 12
+    : isFate
+    ? 4
+    : is1d20
+    ? 20
+    : isExplosive
+    ? 999
+    : 100;
 
   const [currentNumber, setCurrentNumber] = useState(minRoll);
   const [currentDice, setCurrentDice] = useState<number[]>(() => {
@@ -70,7 +105,10 @@ export function DiceVisualizer({
       const totalDice = (baseDice?.length || 0) + (stressDice?.length || 0);
       return Array(totalDice).fill(1);
     }
-    return is3d6 ? [1, 1, 1] : [1];
+    if (is3d6) return [1, 1, 1];
+    if (isPbtA) return [1, 1];
+    if (isFate) return [0, 0, 0, 0]; // Fudge dice start at 0
+    return [1];
   });
   const [showResult, setShowResult] = useState(false);
   const [animationPhase, setAnimationPhase] = useState<
@@ -125,15 +163,35 @@ export function DiceVisualizer({
         }
         setCurrentDice(randomDice);
         setCurrentNumber(randomDice.reduce((a, b) => a + b, 0));
-      } else if (is3d6) {
-        // Animate 3 dice
-        const randomDice = [
-          Math.floor(Math.random() * diceSides) + 1,
-          Math.floor(Math.random() * diceSides) + 1,
-          Math.floor(Math.random() * diceSides) + 1,
-        ];
+      } else if (is3d6 || isPbtA) {
+        // Animate 3d6 or 2d6
+        const count = is3d6 ? 3 : 2;
+        const randomDice: number[] = [];
+        for (let i = 0; i < count; i++) {
+          randomDice.push(Math.floor(Math.random() * diceSides) + 1);
+        }
         setCurrentDice(randomDice);
         setCurrentNumber(randomDice.reduce((a, b) => a + b, 0));
+      } else if (isFate) {
+        // Animate 4dF (Fudge dice: -1, 0, +1)
+        const randomDice: number[] = [];
+        for (let i = 0; i < 4; i++) {
+          randomDice.push(Math.floor(Math.random() * 3) - 1);
+        }
+        setCurrentDice(randomDice);
+        setCurrentNumber(randomDice.reduce((a, b) => a + b, 0));
+      } else if (isExplosive) {
+        // Animate explosive dice - show all rolls in sequence
+        if (diceRolls && diceRolls[rolls.length - 1]) {
+          const allRolls = diceRolls[rolls.length - 1];
+          const randomRoll = Math.floor(Math.random() * diceSides) + 1;
+          setCurrentDice([randomRoll]);
+          setCurrentNumber(randomRoll);
+        } else {
+          const randomRoll = Math.floor(Math.random() * diceSides) + 1;
+          setCurrentDice([randomRoll]);
+          setCurrentNumber(randomRoll);
+        }
       } else {
         // Animate single die
         const randomRoll = Math.floor(Math.random() * diceSides) + 1;
@@ -149,10 +207,22 @@ export function DiceVisualizer({
           const finalDice = [...(baseDice || []), ...(stressDice || [])];
           setCurrentDice(finalDice);
           setCurrentNumber(finalDice.reduce((a, b) => a + b, 0));
+        } else if (isExplosive) {
+          // Explosive: Show all rolls from explosions
+          setCurrentNumber(finalRoll);
+          if (diceRolls && diceRolls[rolls.length - 1]) {
+            setCurrentDice(diceRolls[rolls.length - 1]);
+          } else {
+            setCurrentDice([finalRoll]);
+          }
         } else {
           setCurrentNumber(finalRoll);
           // Set the actual final dice if available
-          if (is3d6 && diceRolls && diceRolls[rolls.length - 1]) {
+          if (
+            (is3d6 || isPbtA || isFate) &&
+            diceRolls &&
+            diceRolls[rolls.length - 1]
+          ) {
             setCurrentDice(diceRolls[rolls.length - 1]);
           } else {
             setCurrentDice([finalRoll]);
@@ -180,7 +250,10 @@ export function DiceVisualizer({
   }, [
     finalRoll,
     is3d6,
+    isPbtA,
+    isFate,
     isYZE,
+    isExplosive,
     baseDice,
     stressDice,
     diceSides,
@@ -198,10 +271,22 @@ export function DiceVisualizer({
       const finalDice = [...(baseDice || []), ...(stressDice || [])];
       setCurrentDice(finalDice);
       setCurrentNumber(finalDice.reduce((a, b) => a + b, 0));
+    } else if (isExplosive) {
+      // Explosive: Show all rolls
+      setCurrentNumber(finalRoll);
+      if (diceRolls && diceRolls[rolls.length - 1]) {
+        setCurrentDice(diceRolls[rolls.length - 1]);
+      } else {
+        setCurrentDice([finalRoll]);
+      }
     } else {
       setCurrentNumber(finalRoll);
       // Set the actual final dice if available
-      if (is3d6 && diceRolls && diceRolls[rolls.length - 1]) {
+      if (
+        (is3d6 || isPbtA || isFate) &&
+        diceRolls &&
+        diceRolls[rolls.length - 1]
+      ) {
         setCurrentDice(diceRolls[rolls.length - 1]);
       } else {
         setCurrentDice([finalRoll]);
@@ -214,7 +299,18 @@ export function DiceVisualizer({
     scheduleTimeout(() => {
       onCompleteRef.current?.();
     }, 800);
-  }, [finalRoll, is3d6, isYZE, baseDice, stressDice, diceRolls, rolls.length]);
+  }, [
+    finalRoll,
+    is3d6,
+    isPbtA,
+    isFate,
+    isYZE,
+    isExplosive,
+    baseDice,
+    stressDice,
+    diceRolls,
+    rolls.length,
+  ]);
 
   useEffect(() => {
     startSequence();
@@ -414,8 +510,8 @@ export function DiceVisualizer({
           ) : (
             <>
               <div className="flex items-center justify-center gap-4 mb-4">
-                {is3d6 ? (
-                  // 3d6 System: Show 3 individual dice
+                {is3d6 || isPbtA || isFate ? (
+                  // Multi-dice systems: 3d6, 2d6 (PbtA), or 4dF (Fate)
                   <div className="flex gap-3 items-center">
                     {currentDice.map((die, index) => (
                       <div
@@ -425,21 +521,73 @@ export function DiceVisualizer({
                         }`}
                       >
                         <DynamicIcon
-                          name="Dice6"
+                          name={isFate ? "Dices" : "Dice6"}
                           className={`w-16 h-16 ${diceColor} drop-shadow-lg`}
                         />
                         {animationPhase !== "rolling" && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-2xl font-bold text-white drop-shadow-md">
-                              {die}
+                              {isFate ? (die > 0 ? `+${die}` : die) : die}
                             </span>
                           </div>
                         )}
                       </div>
                     ))}
                   </div>
+                ) : isExplosive ? (
+                  // Explosive dice system: Show individual rolls with explosion markers
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex gap-2 items-center flex-wrap justify-center">
+                      {currentDice.map((die, index) => {
+                        const isExplosion = index > 0; // First roll is normal, rest are explosions
+                        const isLastRoll = index === currentDice.length - 1;
+                        return (
+                          <div key={index} className="flex items-center gap-1">
+                            <div
+                              className={`relative ${
+                                animationPhase === "rolling"
+                                  ? "animate-spin"
+                                  : ""
+                              }`}
+                            >
+                              <DynamicIcon
+                                name="Dices"
+                                className={`w-16 h-16 ${
+                                  isExplosion ? "text-orange-400" : diceColor
+                                } drop-shadow-lg`}
+                              />
+                              {animationPhase !== "rolling" && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className="text-2xl font-bold text-white drop-shadow-md">
+                                    {die}
+                                  </span>
+                                </div>
+                              )}
+                              {isExplosion && animationPhase !== "rolling" && (
+                                <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                                  💥
+                                </div>
+                              )}
+                            </div>
+                            {!isLastRoll && animationPhase !== "rolling" && (
+                              <span className="text-2xl font-bold text-white">
+                                +
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {explosions &&
+                      explosions > 0 &&
+                      animationPhase !== "rolling" && (
+                        <div className="bg-orange-500/30 text-orange-200 px-3 py-1 rounded-full text-sm font-bold border border-orange-400 animate-pulse">
+                          💥 {explosions} Explosion{explosions > 1 ? "s" : ""}!
+                        </div>
+                      )}
+                  </div>
                 ) : (
-                  // 1d20 System: Show single die
+                  // Single die systems: 1d20, 1d100, percentile
                   <div
                     className={`relative ${
                       animationPhase === "rolling" ? "animate-spin" : ""
@@ -518,6 +666,18 @@ export function DiceVisualizer({
                         >
                           {effectiveStat}
                         </span>
+                      </div>
+                    ) : isExplosive ? (
+                      <div className="flex items-center gap-4 text-6xl font-bold text-white">
+                        <span
+                          className={`${resultColor} transition-all duration-500 ${
+                            isResultPhase ? "scale-150" : "scale-100"
+                          }`}
+                        >
+                          {finalRoll}
+                        </span>
+                        <span className="text-gray-300 text-4xl">vs</span>
+                        <span className="text-blue-300">DC {dc}</span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-4 text-6xl font-bold text-white">

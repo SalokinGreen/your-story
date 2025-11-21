@@ -1391,7 +1391,8 @@ function StoryPageContent() {
       | "percentile"
       | "pbta"
       | "fate"
-      | "yze"; // RPG system type
+      | "yze"
+      | "explosive"; // RPG system type
     baseDice?: number[]; // YZE: base dice rolls
     stressDice?: number[]; // YZE: stress dice rolls
     successes?: number; // YZE: count of 6s
@@ -1399,6 +1400,8 @@ function StoryPageContent() {
     panicEffect?: string; // YZE: panic table result
     stressLevel?: number; // YZE: current stress (0-10)
     stressRelief?: boolean; // YZE: strong success (-1 stress)
+    explosions?: number; // Explosive: number of explosions
+    dieSize?: number; // Explosive: die size (d4-d20)
   } | null>(null);
 
   // YZE: Stress dice selection state
@@ -1595,6 +1598,7 @@ function StoryPageContent() {
 
     //Applypresettostorydata(skipifcustom)
     if (preset.id !== "custom") {
+      if (preset.playerName) updatedStoryData.player_name = preset.playerName;
       if (preset.playerSummary)
         updatedStoryData.player_summary = preset.playerSummary;
       if (preset.stats.length > 0)
@@ -2134,15 +2138,16 @@ function StoryPageContent() {
 
     // Get RPG system configuration (already fetched above, remove duplicate)
 
-    // For YZE: Need stat value before rolling, so defer the initial roll
+    // For YZE and Explosive: Need stat value before rolling, so defer the initial roll
     let dice_roll = 0;
-    let diceResult: { rolls: number[]; total: number } = {
+    let diceResult: { rolls: number[]; total: number; explosions?: number } = {
       rolls: [],
       total: 0,
     };
+    let explosionCount = 0; // Track explosions for explosive system
 
-    if (rpgSystem.id !== "yze") {
-      // Roll dice according to system (non-YZE systems roll once globally)
+    if (rpgSystem.id !== "yze" && rpgSystem.id !== "explosive") {
+      // Roll dice according to system (non-YZE, non-Explosive systems roll once globally)
       diceResult = rollDice(rpgSystem);
       dice_roll = diceResult.total;
       logger.action("Initial dice roll", {
@@ -2167,6 +2172,20 @@ function StoryPageContent() {
     let resourceUsedAfter = 0;
     let insufficientResource = false;
     let skillCheckResult = "";
+
+    // YZE: Panic data for user message
+    // Explosive: Explosion data for user message
+    let yzeData: {
+      baseDice?: number[];
+      stressDice?: number[];
+      successes?: number;
+      panicTriggered?: boolean;
+      panicEffect?: string;
+      stressLevel?: number;
+      stressRelief?: boolean;
+      explosions?: number; // For explosive system
+      dieSize?: number; // For explosive system
+    } = {};
 
     //Processitemusage
     if (choice.item_used) {
@@ -2209,29 +2228,33 @@ function StoryPageContent() {
             `Used item: ${choice.item_used} (Advantage!)`,
             "info"
           );
-          const secondResult = rollDice(rpgSystem);
-          const second_roll = secondResult.total;
-          allDiceRolls.push(second_roll);
-          allDiceDetails.push(secondResult.rolls);
-          logger.action("Advantage roll from item", {
-            item: choice.item_used,
-            firstRoll: dice_roll,
-            secondRoll: second_roll,
-          });
-          // Advantage: higher is better for roll-over, lower is better for roll-under
-          if (rpgSystem.rollUnder) {
-            if (second_roll < dice_roll) {
-              dice_roll = second_roll;
-            }
-          } else {
-            if (second_roll > dice_roll) {
-              dice_roll = second_roll;
+          // For explosive: we'll roll advantage later when we have stat value
+          if (rpgSystem.id !== "explosive") {
+            const secondResult = rollDice(rpgSystem);
+            const second_roll = secondResult.total;
+            allDiceRolls.push(second_roll);
+            allDiceDetails.push(secondResult.rolls);
+            logger.action("Advantage roll from item", {
+              item: choice.item_used,
+              firstRoll: dice_roll,
+              secondRoll: second_roll,
+            });
+            // Advantage: higher is better for roll-over, lower is better for roll-under
+            if (rpgSystem.rollUnder) {
+              if (second_roll < dice_roll) {
+                dice_roll = second_roll;
+              }
+            } else {
+              if (second_roll > dice_roll) {
+                dice_roll = second_roll;
+              }
             }
           }
         }
 
-        if (momentumMode === "reroll") {
+        if (momentumMode === "reroll" && rpgSystem.id !== "explosive") {
           // Reroll: Roll two more times and take the best
+          // (Explosive dice rerolls handled later when we have stat value)
           const reroll1Result = rollDice(rpgSystem);
           const reroll2Result = rollDice(rpgSystem);
           const reroll1 = reroll1Result.total;
@@ -2404,6 +2427,7 @@ function StoryPageContent() {
       const statValue = matchResult?.item.value || 0;
 
       // For YZE: Roll dice NOW using stat value
+      // For Explosive: Roll dice NOW using stat value to determine die size
       if (rpgSystem.id === "yze") {
         const baseDiceCount = Math.floor(statValue / 20); // 0-5 base dice from stat
         const stressDiceCount = yzeStressDiceChoice; // Use player's choice
@@ -2444,6 +2468,118 @@ function StoryPageContent() {
         // Reset YZE state
         setYzeAwaitingStressChoice(false);
         setYzePendingChoice(null);
+      } else if (rpgSystem.id === "explosive") {
+        // Explosive dice: Determine die size from stat
+        const dieSize = rpgSystem.statToDieSize
+          ? rpgSystem.statToDieSize(statValue)
+          : 20;
+        yzeData.dieSize = dieSize;
+
+        // Check if we have item advantage
+        const hasItemForAdvantage =
+          choice.item_used &&
+          storyData.inventory.find((i) => i.name === choice.item_used);
+        const itemType = hasItemForAdvantage
+          ? hasItemForAdvantage.type || "normal"
+          : null;
+        const hasAdvantage =
+          hasItemForAdvantage && itemType && itemType !== "misc";
+        const hasDisadvantage = choice.item_used && !hasItemForAdvantage;
+
+        // Roll initial die with explosions
+        diceResult = rollDice(rpgSystem, dieSize);
+        dice_roll = diceResult.total;
+        explosionCount = diceResult.explosions || 0;
+
+        logger.action("Explosive dice roll", {
+          system: "explosive",
+          dieSize,
+          rolls: diceResult.rolls,
+          total: dice_roll,
+          explosions: explosionCount,
+          stat: statValue,
+        });
+
+        // Handle advantage (roll second die, take higher)
+        if (hasAdvantage) {
+          const secondResult = rollDice(rpgSystem, dieSize);
+          const second_roll = secondResult.total;
+          allDiceRolls.push(dice_roll, second_roll);
+          allDiceDetails.push(diceResult.rolls, secondResult.rolls);
+
+          logger.action("Explosive advantage roll from item", {
+            item: choice.item_used,
+            firstRoll: dice_roll,
+            firstExplosions: explosionCount,
+            secondRoll: second_roll,
+            secondExplosions: secondResult.explosions || 0,
+          });
+
+          if (second_roll > dice_roll) {
+            dice_roll = second_roll;
+            explosionCount = secondResult.explosions || 0;
+            diceResult = secondResult;
+          }
+        } else if (hasDisadvantage) {
+          // Disadvantage: roll second die, take lower
+          const secondResult = rollDice(rpgSystem, dieSize);
+          const second_roll = secondResult.total;
+          allDiceRolls.push(dice_roll, second_roll);
+          allDiceDetails.push(diceResult.rolls, secondResult.rolls);
+
+          logger.action("Explosive disadvantage roll from missing item", {
+            item: choice.item_used,
+            firstRoll: dice_roll,
+            secondRoll: second_roll,
+          });
+
+          if (second_roll < dice_roll) {
+            dice_roll = second_roll;
+            explosionCount = secondResult.explosions || 0;
+            diceResult = secondResult;
+          }
+        } else {
+          // No advantage/disadvantage
+          allDiceRolls.push(dice_roll);
+          allDiceDetails.push(diceResult.rolls);
+        }
+
+        // Handle momentum reroll for explosive
+        if (momentumMode === "reroll") {
+          const reroll1Result = rollDice(rpgSystem, dieSize);
+          const reroll2Result = rollDice(rpgSystem, dieSize);
+          const reroll1 = reroll1Result.total;
+          const reroll2 = reroll2Result.total;
+          allDiceRolls.push(reroll1, reroll2);
+          allDiceDetails.push(reroll1Result.rolls, reroll2Result.rolls);
+
+          const oldRoll = dice_roll;
+          const bestRoll = Math.max(dice_roll, reroll1, reroll2);
+          if (bestRoll === reroll1) {
+            dice_roll = reroll1;
+            explosionCount = reroll1Result.explosions || 0;
+            diceResult = reroll1Result;
+          } else if (bestRoll === reroll2) {
+            dice_roll = reroll2;
+            explosionCount = reroll2Result.explosions || 0;
+            diceResult = reroll2Result;
+          }
+
+          logger.action("Explosive momentum reroll", {
+            oldRoll,
+            reroll1,
+            reroll2,
+            finalRoll: dice_roll,
+            finalExplosions: explosionCount,
+          });
+
+          addNotification(
+            `⚡ Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} → Best: ${dice_roll}`,
+            "success"
+          );
+        }
+
+        yzeData.explosions = explosionCount;
       }
 
       // Log fuzzy match result
@@ -2495,16 +2631,6 @@ function StoryPageContent() {
         let total: number;
 
         // For YZE: calculate success count and panic FIRST
-        let yzeData: {
-          baseDice?: number[];
-          stressDice?: number[];
-          successes?: number;
-          panicTriggered?: boolean;
-          panicEffect?: string;
-          stressLevel?: number;
-          stressRelief?: boolean;
-        } = {};
-
         if (rpgSystem.id === "yze" && allDiceDetails.length > 0) {
           const lastRoll = allDiceDetails[allDiceDetails.length - 1];
           const currentStress = storyData.stress || 0;
@@ -2555,21 +2681,26 @@ function StoryPageContent() {
             }
           }
         } else {
-          // Non-YZE systems: use traditional roll-under/roll-over logic
+          // All other systems: use checkSuccess function
           const effectiveDiceRoll = Math.max(1, dice_roll - dicePenalty);
-          total = effectiveDiceRoll + statValue;
 
-          if (rpgSystem.rollUnder) {
-            // Roll-under: success if roll <= stat (after penalty applied to stat)
-            const effectiveStat = Math.max(1, statValue - dicePenalty);
-            dc_passed = dice_roll <= effectiveStat;
-            isCritical =
-              dice_roll <= (rpgSystem.success.criticalThreshold || 5) &&
-              dc_passed;
-          } else {
-            // Roll-over: success if roll + stat >= DC
-            dc_passed = dice_roll === rpgSystem.dice.max || total >= dc;
-            isCritical = dice_roll === rpgSystem.dice.max && dc_passed;
+          const successResult = checkSuccess(
+            rpgSystem,
+            dice_roll,
+            statValue,
+            dc,
+            dicePenalty
+          );
+
+          dc_passed = successResult.success;
+          isCritical = successResult.critical;
+          total = successResult.total;
+
+          // Store partial success for PbtA
+          if (successResult.partial) {
+            // PbtA partial success counts as "success" for progression but with complications
+            dc_passed = true;
+            skillCheckResult = "partial";
           }
         }
 
@@ -2591,12 +2722,17 @@ function StoryPageContent() {
           !!usedItem && (usedItem.type || "normal") !== "misc";
         const hasItemDisadvantage = !!(choice.item_used && !usedItem);
 
+        // For display: use modifier instead of raw stat for systems with statToModifier
+        const displayBonus = rpgSystem.statToModifier
+          ? rpgSystem.statToModifier(statValue)
+          : statValue;
+
         setDiceRoll({
           show: true,
           rolls: allDiceRolls,
           finalRoll: dice_roll,
           skillName: choice.skill_used,
-          skillBonus: statValue,
+          skillBonus: displayBonus,
           dc,
           isSuccess: dc_passed,
           isCritical: isCritical,
@@ -2636,6 +2772,20 @@ function StoryPageContent() {
                 storyData.stress--;
               }
             }
+            // Show panic effect if triggered
+            if (yzeData.panicTriggered && yzeData.panicEffect) {
+              addNotification(`💀 PANIC! ${yzeData.panicEffect}`, "failure");
+            }
+          } else if (rpgSystem.id === "explosive") {
+            // Explosive: Show die size, roll, and explosions
+            const dieSize = yzeData.dieSize || 20;
+            const explosions = yzeData.explosions || 0;
+            const explosionText =
+              explosions > 0 ? ` 💥x${explosions} BOOM!` : "";
+            addNotification(
+              `✓ Check Passed! (${choice.skill_used}: d${dieSize} rolled ${dice_roll} ≥ ${dc}${explosionText})`,
+              "success"
+            );
           } else if (rpgSystem.rollUnder) {
             const effectiveStat = Math.max(1, statValue - dicePenalty);
             addNotification(
@@ -2646,6 +2796,28 @@ function StoryPageContent() {
               })${penaltyText}`,
               "success"
             );
+          } else if (rpgSystem.statToModifier) {
+            // Fate/PbtA: Show modifier instead of raw stat
+            const modifier = rpgSystem.statToModifier(statValue);
+            const effectiveModifier = modifier - dicePenalty;
+
+            if (rpgSystem.hasPartialSuccess && skillCheckResult === "partial") {
+              // PbtA partial success
+              addNotification(
+                `⚠️ Partial Success! (${choice.skill_used}: ${dice_roll}${
+                  modifier >= 0 ? "+" : ""
+                }${effectiveModifier} = ${total} [7-9])${penaltyText}`,
+                "warning"
+              );
+            } else {
+              // Full success (Fate or PbtA 10+)
+              addNotification(
+                `✓ Check Passed! (${choice.skill_used}: ${dice_roll}${
+                  modifier >= 0 ? "+" : ""
+                }${effectiveModifier} = ${total} ≥ ${dc})${penaltyText}`,
+                "success"
+              );
+            }
           } else {
             addNotification(
               `✓ Check Passed! (${choice.skill_used}: ${dice_roll}${
@@ -2728,6 +2900,20 @@ function StoryPageContent() {
               `✗ Check Failed! (${choice.skill_used}: ${yzeData.successes} successes < ${dc})`,
               "failure"
             );
+            // Show panic effect if triggered
+            if (yzeData.panicTriggered && yzeData.panicEffect) {
+              addNotification(`💀 PANIC! ${yzeData.panicEffect}`, "failure");
+            }
+          } else if (rpgSystem.id === "explosive") {
+            // Explosive: Show die size, roll, and explosions
+            const dieSize = yzeData.dieSize || 20;
+            const explosions = yzeData.explosions || 0;
+            const explosionText =
+              explosions > 0 ? ` (${explosions} explosions)` : "";
+            addNotification(
+              `✗ Check Failed! (${choice.skill_used}: d${dieSize} rolled ${dice_roll}${explosionText} < ${dc})`,
+              "failure"
+            );
           } else if (rpgSystem.rollUnder) {
             const effectiveStat = Math.max(1, statValue - dicePenalty);
             addNotification(
@@ -2736,6 +2922,16 @@ function StoryPageContent() {
               }: ${dice_roll} > ${effectiveStat}${
                 insufficientResource ? ` (${statValue} - ${dicePenalty})` : ""
               })${penaltyText}`,
+              "failure"
+            );
+          } else if (rpgSystem.statToModifier) {
+            // Fate/PbtA: Show modifier instead of raw stat
+            const modifier = rpgSystem.statToModifier(statValue);
+            const effectiveModifier = modifier - dicePenalty;
+            addNotification(
+              `✗ Check Failed! (${choice.skill_used}: ${dice_roll}${
+                modifier >= 0 ? "+" : ""
+              }${effectiveModifier} = ${total} < ${dc})${penaltyText}`,
               "failure"
             );
           } else {
@@ -2812,6 +3008,15 @@ function StoryPageContent() {
       choiceDetails.push(
         `[${choice.skill_used}:${skillCheckResult}${insufficientText}]`
       );
+
+      // YZE: Add panic details if triggered
+      if (
+        rpgSystem.id === "yze" &&
+        yzeData.panicTriggered &&
+        yzeData.panicEffect
+      ) {
+        choiceDetails.push(`[PANIC!${yzeData.panicEffect}]`);
+      }
     }
 
     //Builditemusageline

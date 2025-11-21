@@ -169,7 +169,15 @@ export interface StoryData {
   newGamePlusCount?: number; // Number of NG+ runs completed
   newGamePlusMode?: boolean; // Whether current run is NG+
   nsfw?: boolean; // Whether the story contains NSFW content
-  rpgSystem?: "3d6" | "1d20" | "1d100" | "percentile" | "pbta" | "fate" | "yze"; // RPG dice system
+  rpgSystem?:
+    | "3d6"
+    | "1d20"
+    | "1d100"
+    | "percentile"
+    | "pbta"
+    | "fate"
+    | "yze"
+    | "explosive"; // RPG dice system
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)
 }

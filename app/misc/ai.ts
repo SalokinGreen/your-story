@@ -78,6 +78,7 @@ Story prose here. Write your narrative content between these tags.
 
 IMPORTANT: The <story></story> tags are MANDATORY. Never write story text without wrapping it in <story> tags. All narrative content must be enclosed in <story></story> tags.
 
+Choice Syntax:
 ${rpgSystem.aiInstructions.choiceSyntax}
 
 Memory Guidelines:

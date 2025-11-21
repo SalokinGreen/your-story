@@ -20,7 +20,8 @@ export type RPGSystemType =
   | "percentile"
   | "pbta"
   | "fate"
-  | "yze";
+  | "yze"
+  | "explosive";
 
 export interface RPGSystem {
   id: RPGSystemType;
@@ -41,11 +42,15 @@ export interface RPGSystem {
   hasSuccessWithStyle?: boolean; // If true, system supports success with style (Fate-style)
   hasStressDice?: boolean; // If true, system uses stress dice (YZE-style)
   hasPushMechanic?: boolean; // If true, system supports pushing rolls (YZE-style)
+  hasExplodingDice?: boolean; // If true, dice explode on max values and reroll (Kids on Bikes style)
   stressDiceMax?: number; // Maximum stress dice that can be added per roll
   panicTable?: PanicEntry[]; // Panic table for stress dice systems
 
   // Stat to modifier conversion (for unified 0-100 stat system)
   statToModifier: (stat: number) => number; // Convert 0-100 stat to system-appropriate modifier
+
+  // Stat to die size conversion (for exploding dice systems)
+  statToDieSize?: (stat: number) => number; // Convert 0-100 stat to die size (4, 6, 8, 10, 12, 20)
 
   // Ladder naming (Fate systems)
   getLadderName?: (value: number) => string; // Convert modifier to descriptive ladder name
@@ -162,7 +167,7 @@ export const SYSTEM_3D6: RPGSystem = {
     choiceSyntax:
       "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none>\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 25); use_resource: Stamina; use_item: none>",
     dcGuidelines:
-      "⚠️ DC GUIDELINES:\n- Use DCs that scale with the adventure's stat range (typically 0-100).\n- 8-15: Easy challenge (most characters can succeed)\n- 20: Medium challenge (requires decent stats)\n- 25: Hard challenge (high stats or items needed)\n- 30-35: Very Hard challenge (only the most prepared succeed)",
+      "⚠️ DC GUIDELINES:\n- Use DCs that scale with the adventure's stat range.\n- 8-15: Easy challenge (most characters can succeed)\n- 20: Medium challenge (requires decent stats)\n- 25: Hard challenge (high stats or items needed)\n- 30-35: Very Hard challenge (only the most prepared succeed)",
   },
 };
 
@@ -939,6 +944,88 @@ Remember: Stress creates tension, panic creates drama, pushing creates desperati
 };
 
 /**
+ * Exploding Dice System - Kids on Bikes / Cortex-style
+ * Each stat determines die size (d4 to d20)
+ * Roll that die vs DC, explode on max and add again (unlimited!)
+ * Pure luck-based with potential for dramatic come-from-behind moments
+ */
+export const SYSTEM_EXPLOSIVE: RPGSystem = {
+  id: "explosive",
+  name: "Exploding Dice",
+  description:
+    "Roll die based on stat (d4-d20). Max rolls explode! Add another roll. Unlimited explosions for epic moments.",
+
+  hasExplodingDice: true,
+
+  dice: {
+    count: 1, // Always roll 1 die
+    sides: 20, // Max die size
+    min: 1,
+    max: 999, // Theoretical max with explosions
+  },
+
+  // Stat to die size conversion
+  // 0-16 = d4, 17-33 = d6, 34-50 = d8, 51-66 = d10, 67-83 = d12, 84-100 = d20
+  statToDieSize: (stat: number) => {
+    if (stat <= 16) return 4;
+    if (stat <= 33) return 6;
+    if (stat <= 50) return 8;
+    if (stat <= 66) return 10;
+    if (stat <= 83) return 12;
+    return 20; // 84-100
+  },
+
+  // No modifiers - just pure die rolls
+  statToModifier: (stat: number) => 0,
+
+  success: {
+    formula: "Roll die (size based on stat) ≥ DC, explode on max",
+    criticalThreshold: 20, // Max explosion on d20
+  },
+
+  dc: {
+    trivial: 4, // d4 auto-succeeds
+    easy: 8, // d6+ can hit easily
+    medium: 12, // Needs d8+ or lucky explosion
+    hard: 16, // Needs d12+ or good explosion
+    veryHard: 20, // Needs d20 or multiple explosions
+    impossible: 30, // Requires explosions
+    description:
+      "DC 8 = easy, DC 12 = medium, DC 16 = hard, DC 20 = very hard, DC 25+ = explosive luck needed",
+  },
+
+  resources: {
+    requiredDivisor: 3, // DC 12 requires 4 resource
+    penaltyDivisor: 0, // No dice penalties (die size is fixed)
+    recoverDivisor: 4, // DC 12 success recovers 3
+    lossDivisor: 3, // DC 12 failure loses 4
+    minRequired: 2,
+    minPenalty: 0,
+    minRecover: 1,
+    minLoss: 2,
+  },
+
+  upgrades: {
+    statUpgradeAmount: 8, // +8 moves through die size brackets (17-point ranges)
+    resourceUpgradeAmount: 5, // +5 per upgrade
+    shopStatStartingValue: 25, // 25 = d6 (below average)
+  },
+
+  aiInstructions: {
+    diceSystem:
+      "The game uses an EXPLODING DICE system. Each stat (0-100) determines die size: 0-16=d4, 17-33=d6, 34-50=d8, 51-66=d10, 67-83=d12, 84-100=d20. Roll the die vs DC. When you roll the MAXIMUM (4 on d4, 20 on d20), the die EXPLODES - roll again and ADD it to the total! Explosions chain infinitely. A lucky d4 roller can beat a d20 through explosions!",
+    dcGuidance:
+      "DC system: Roll die (no modifiers) ≥ DC. Explosions add to total. Average d20 roll is 10.5, but explosions make high DCs possible. DC 8 is easy for d8+, DC 12 is medium for d10+, DC 16 is hard (needs d12+ or explosion), DC 20 is very hard (needs d20 or multiple explosions), DC 25+ requires explosive luck.",
+    challengeGuidance:
+      "⚠️ IMPORTANT: Challenge the player with DCs that feel risky! Use DC 10-14 for normal challenges, DC 14-18 for difficult ones, DC 18-22 for desperate moments, DC 25+ for impossible odds. Remember: even a d4 can explode multiple times for heroic victories! Explosions are RARE but EXCITING - a d10 has only 10% chance to explode, and only 1% to explode twice. This creates dramatic tension where the underdog can win through luck.",
+    choiceSyntax:
+      "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none>\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 14); use_resource: Stamina; use_item: none>\n- You leap across the chasm. <use_skill: Athletics (DC 18); use_resource: none; use_item: none>",
+    dcGuidelines:
+      "⚠️ EXPLODING DICE DC GUIDELINES:\n- Die sizes: d4 (weak 0-16), d6 (below avg 17-33), d8 (average 34-50), d10 (good 51-66), d12 (great 67-83), d20 (exceptional 84-100)\n- DC 8-12: Easy for most characters (d6+ succeed 50%+)\n- DC 12-16: Medium challenge (needs d10+ or luck)\n- DC 16-20: Hard challenge (needs d12+ or explosion)\n- DC 20-25: Very hard (needs d20 or multiple explosions)\n- DC 25+: Heroic/impossible (requires explosive luck)\n- When narrating explosions, describe the excitement: 'Your die explodes! Roll again...'\n- Remember: A character with 50 stat (d8) can still beat DC 20 through explosions, making every roll exciting!",
+  },
+};
+
+/**
  * Registry of all available RPG systems
  */
 export const RPG_SYSTEMS: Record<RPGSystemType, RPGSystem> = {
@@ -949,6 +1036,7 @@ export const RPG_SYSTEMS: Record<RPGSystemType, RPGSystem> = {
   pbta: SYSTEM_PBTA,
   fate: SYSTEM_FATE,
   yze: SYSTEM_YZE,
+  explosive: SYSTEM_EXPLOSIVE,
 };
 
 /**
@@ -961,17 +1049,51 @@ export function getRPGSystem(systemId: RPGSystemType = "3d6"): RPGSystem {
 /**
  * Roll dice according to a system's configuration
  * Returns individual die results and their sum
+ * For exploding dice, returns array of all rolls including explosions
  */
-export function rollDice(system: RPGSystem): {
+export function rollDice(
+  system: RPGSystem,
+  dieSides?: number // For exploding dice: override die size based on stat
+): {
   rolls: number[];
   total: number;
+  explosions?: number; // Count of explosions that occurred
 } {
   const rolls: number[] = [];
 
+  if (system.hasExplodingDice && dieSides) {
+    // Exploding dice system: roll one die, explode on max
+    let explosions = 0;
+    let keepRolling = true;
+
+    while (keepRolling) {
+      const dieRoll: number = Math.floor(Math.random() * dieSides) + 1;
+      rolls.push(dieRoll);
+
+      if (dieRoll === dieSides) {
+        // Explosion! Roll again
+        explosions++;
+        keepRolling = true;
+      } else {
+        keepRolling = false;
+      }
+    }
+
+    const total = rolls.reduce((sum, roll) => sum + roll, 0);
+    return { rolls, total, explosions };
+  }
+
+  // Standard dice rolling for other systems
   for (let i = 0; i < system.dice.count; i++) {
-    // Secure random integer from 1 to sides
-    const roll = Math.floor(Math.random() * system.dice.sides) + 1;
-    rolls.push(roll);
+    if (system.id === "fate") {
+      // Fate/Fudge dice: -1, 0, or +1
+      const roll = Math.floor(Math.random() * 3) - 1;
+      rolls.push(roll);
+    } else {
+      // Standard dice: 1 to sides
+      const roll = Math.floor(Math.random() * system.dice.sides) + 1;
+      rolls.push(roll);
+    }
   }
 
   const total = rolls.reduce((sum, roll) => sum + roll, 0);
@@ -1014,6 +1136,11 @@ export function checkSuccess(
     const stressRelief = success && margin >= styleThreshold; // 3+ successes beyond requirement
 
     return { success, critical, successes, total: successes, stressRelief };
+  } else if (system.hasExplodingDice) {
+    // Explosive Dice: pure dice roll vs DC, no modifiers
+    const success = roll >= dc;
+    const critical = roll >= (system.success.criticalThreshold || 20) && success;
+    return { success, critical, total: roll };
   } else if (system.rollUnder) {
     // Roll-under system: need to roll <= stat
     const effectiveStat = Math.max(1, statValue - penalty);

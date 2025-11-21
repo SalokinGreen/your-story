@@ -94,7 +94,14 @@ function AdventureCreatorContent() {
     "Easy" | "Medium" | "Hard" | "Expert"
   >("Medium");
   const [rpgSystem, setRpgSystem] = useState<
-    "3d6" | "1d20" | "1d100" | "percentile" | "pbta" | "fate" | "yze"
+    | "3d6"
+    | "1d20"
+    | "1d100"
+    | "percentile"
+    | "pbta"
+    | "fate"
+    | "yze"
+    | "explosive"
   >("3d6");
   const [visibility, setVisibility] = useState<"public" | "hidden" | "private">(
     "private"
@@ -1860,7 +1867,8 @@ function AdventureCreatorContent() {
                 swingy. <strong>1d100:</strong> Rolls 1d100 (1-100), granular.{" "}
                 <strong>Classic Percentile:</strong> Roll-under d100, lower is
                 better! <strong>PbtA:</strong> Roll 2d6+mod, partial success on
-                7-9!
+                7-9! <strong>Explosive:</strong> Stat determines die size, max
+                rolls explode!
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <button
@@ -1962,6 +1970,20 @@ function AdventureCreatorContent() {
                   Year Zero Engine (YZE)
                   <div className="text-xs opacity-75 mt-1">
                     Roll d6 pool (count 6s), stress dice add power + panic risk
+                  </div>
+                </button>
+                <button
+                  onClick={() => setRpgSystem("explosive")}
+                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
+                    rpgSystem === "explosive"
+                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                  }`}
+                >
+                  <DynamicIcon name="Flame" className="w-5 h-5 inline mr-2" />
+                  Exploding Dice
+                  <div className="text-xs opacity-75 mt-1">
+                    Stat → die size (d4-d20), max rolls explode and add!
                   </div>
                 </button>
               </div>

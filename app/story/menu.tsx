@@ -470,7 +470,15 @@ interface BasicSettingsForm {
   points: number;
   momentum: number;
   maxMomentum: number;
-  rpgSystem: "3d6" | "1d20" | "1d100" | "percentile" | "pbta" | "fate" | "yze";
+  rpgSystem:
+    | "3d6"
+    | "1d20"
+    | "1d100"
+    | "percentile"
+    | "pbta"
+    | "fate"
+    | "yze"
+    | "explosive";
 }
 
 function BasicSettings({
@@ -638,6 +646,13 @@ function BasicSettings({
               name: "Year Zero Engine",
               desc: "d6 pool (count 6s), stress dice + panic",
               icon: "Skull",
+              fullWidth: true,
+            },
+            {
+              id: "explosive" as const,
+              name: "Exploding Dice",
+              desc: "Stat→die size (d4-d20), max rolls explode!",
+              icon: "Flame",
               fullWidth: true,
             },
           ].map((sys) => (
