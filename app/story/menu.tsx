@@ -4324,7 +4324,7 @@ export default function MenuPage({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`shrink-0 px-6 py-4 text-lg font-bold rounded-xl transition-colors whitespace-nowrap flex items-center gap-3 ${
+                  className={`shrink-0 px-6 py-4 text-lg font-bold rounded-xl transition-colors whitespace-nowrap flex items-center gap-3 overflow-visible ${
                     activeTab === tab.id
                       ? "bg-purple-600 text-white"
                       : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
@@ -4337,7 +4337,7 @@ export default function MenuPage({
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-2">
               {activeTab === "basic" && (
                 <BasicSettings form={settingsForm} onChange={setSettingsForm} />
               )}
