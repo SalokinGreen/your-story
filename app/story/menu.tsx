@@ -872,7 +872,7 @@ function StatsResourcesEditor({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Stats Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -4283,7 +4283,8 @@ export default function MenuPage({
       {/* Comprehensive Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-6xl w-full border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col">
+          {/* Added min-h to stabilize modal height across tab switches */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-6xl w-full border border-gray-200 dark:border-gray-700 h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -4309,8 +4310,8 @@ export default function MenuPage({
               </button>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-3 px-6 py-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto overflow-y-hidden scrollbar-thin">
+            {/* Tabs - Made sticky with background to prevent content overlap */}
+            <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 flex gap-3 px-6 py-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto overflow-y-hidden scrollbar-thin">
               {[
                 { id: "basic", label: "Basic", icon: "FileText" },
                 { id: "stats", label: "Stats & Resources", icon: "BarChart2" },
@@ -4324,75 +4325,91 @@ export default function MenuPage({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`shrink-0 px-6 py-4 text-lg font-bold rounded-xl transition-colors whitespace-nowrap flex items-center gap-3 overflow-visible ${
+                  className={`shrink-0 h-14 px-6 text-base font-semibold rounded-xl transition-colors whitespace-nowrap flex items-center gap-3 overflow-visible ${
                     activeTab === tab.id
-                      ? "bg-purple-600 text-white"
+                      ? "bg-purple-600 text-white shadow-md"
                       : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                   }`}
                 >
-                  <DynamicIcon name={tab.icon} className="w-6 h-6 shrink-0" />
-                  <span>{tab.label}</span>
+                  <DynamicIcon name={tab.icon} className="w-5 h-5 shrink-0" />
+                  <span className="leading-none">{tab.label}</span>
                 </button>
               ))}
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-2">
+            {/* Ensure consistent inner spacing and prevent layout shift */}
+            <div className="flex-1 overflow-y-auto px-6 pb-6 pt-8 min-h-0">
+              {/* Uniform top spacer (pt-8) keeps all tab bodies from touching tabs; Inventory previously appeared correct */}
               {activeTab === "basic" && (
-                <BasicSettings form={settingsForm} onChange={setSettingsForm} />
+                <div className="mt-4">
+                  <BasicSettings form={settingsForm} onChange={setSettingsForm} />
+                </div>
               )}
 
               {activeTab === "stats" && (
-                <StatsResourcesEditor
-                  stats={storyData.stats}
-                  resources={storyData.resources}
-                  achievements={storyData.achievements}
-                  onUpdate={(updates) => onUpdateStoryData(updates)}
-                />
+                <div className="mt-4">
+                  <StatsResourcesEditor
+                    stats={storyData.stats}
+                    resources={storyData.resources}
+                    achievements={storyData.achievements}
+                    onUpdate={(updates) => onUpdateStoryData(updates)}
+                  />
+                </div>
               )}
 
               {activeTab === "inventory" && (
-                <InventoryEditor
-                  inventory={storyData.inventory}
-                  onUpdate={(inventory) => onUpdateStoryData({ inventory })}
-                />
+                <div className="mt-4">
+                  <InventoryEditor
+                    inventory={storyData.inventory}
+                    onUpdate={(inventory) => onUpdateStoryData({ inventory })}
+                  />
+                </div>
               )}
 
               {activeTab === "quests" && (
-                <QuestEditor
-                  quests={storyData.quests || []}
-                  onUpdate={(quests) => onUpdateStoryData({ quests })}
-                />
+                <div className="mt-4">
+                  <QuestEditor
+                    quests={storyData.quests || []}
+                    onUpdate={(quests) => onUpdateStoryData({ quests })}
+                  />
+                </div>
               )}
 
               {activeTab === "lore" && (
-                <LoreEditor
-                  lore={storyData.lore}
-                  plotBeats={storyData.plot_beats}
-                  onUpdate={(lore) => onUpdateStoryData({ lore })}
-                />
+                <div className="mt-4">
+                  <LoreEditor
+                    lore={storyData.lore}
+                    plotBeats={storyData.plot_beats}
+                    onUpdate={(lore) => onUpdateStoryData({ lore })}
+                  />
+                </div>
               )}
 
               {activeTab === "relationships" && (
-                <RelationshipsEditor
-                  relationships={storyData.relationships}
-                  onUpdate={(relationships) =>
-                    onUpdateStoryData({ relationships })
-                  }
-                />
+                <div className="mt-4">
+                  <RelationshipsEditor
+                    relationships={storyData.relationships}
+                    onUpdate={(relationships) =>
+                      onUpdateStoryData({ relationships })
+                    }
+                  />
+                </div>
               )}
 
               {activeTab === "story" && (
-                <StoryMetaEditor
-                  plotBeats={storyData.plot_beats}
-                  memory={storyData.memory}
-                  premise={storyData.premise}
-                  onUpdate={(updates) => onUpdateStoryData(updates)}
-                />
+                <div className="mt-4">
+                  <StoryMetaEditor
+                    plotBeats={storyData.plot_beats}
+                    memory={storyData.memory}
+                    premise={storyData.premise}
+                    onUpdate={(updates) => onUpdateStoryData(updates)}
+                  />
+                </div>
               )}
 
               {activeTab === "tts" && (
-                <div className="space-y-6">
+                <div className="space-y-6 mt-4">
                   <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
                     <DynamicIcon name="Bot" className="w-6 h-6" /> AI
                     Configuration
