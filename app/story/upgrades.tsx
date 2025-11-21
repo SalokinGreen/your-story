@@ -5,6 +5,7 @@ import {
   UPGRADE_COSTS,
   DEFAULT_UPGRADE_SETTINGS,
 } from "../misc/structs";
+import { getSystemUpgradeDefaults } from "../misc/rpgSystems";
 import { useState } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
 
@@ -27,6 +28,14 @@ export default function UpgradesPage({
 
   // Use custom upgrade settings or fallback to defaults
   const upgradeSettings = storyData.upgradeSettings || DEFAULT_UPGRADE_SETTINGS;
+
+  // Get system-appropriate upgrade amounts
+  const systemDefaults = getSystemUpgradeDefaults(storyData.rpgSystem);
+  const effectiveStatUpgradeAmount =
+    upgradeSettings.statUpgradeAmount || systemDefaults.statUpgradeAmount;
+  const effectiveResourceUpgradeAmount =
+    upgradeSettings.resourceUpgradeAmount ||
+    systemDefaults.resourceUpgradeAmount;
 
   // If upgrade system is disabled, show message
   if (!upgradeSettings.enabled) {
@@ -56,10 +65,7 @@ export default function UpgradesPage({
     onPurchase(upgradeSettings.statUpgradeCost, () => {
       const stat = storyData.stats.find((s) => s.name === selectedStat);
       if (stat && stat.value < 100) {
-        stat.value = Math.min(
-          100,
-          stat.value + upgradeSettings.statUpgradeAmount
-        );
+        stat.value = Math.min(100, stat.value + effectiveStatUpgradeAmount);
       }
     });
   };
@@ -72,9 +78,9 @@ export default function UpgradesPage({
         (r) => r.name === selectedResource
       );
       if (resource) {
-        resource.maxValue += upgradeSettings.resourceUpgradeAmount;
+        resource.maxValue += effectiveResourceUpgradeAmount;
         resource.value = Math.min(
-          resource.value + upgradeSettings.resourceUpgradeAmount,
+          resource.value + effectiveResourceUpgradeAmount,
           resource.maxValue
         );
       }
@@ -218,7 +224,7 @@ export default function UpgradesPage({
                 <span className="font-bold text-blue-600 dark:text-blue-400">
                   {upgradeSettings.statUpgradeCost} points
                 </span>{" "}
-                per +{upgradeSettings.statUpgradeAmount} stat point
+                per +{effectiveStatUpgradeAmount} stat point
               </p>
 
               <div className="space-y-3">
@@ -291,9 +297,8 @@ export default function UpgradesPage({
                   <span className="font-bold text-green-600 dark:text-green-400">
                     {upgradeSettings.resourceUpgradeCost} points
                   </span>{" "}
-                  per +{upgradeSettings.resourceUpgradeAmount} max value
+                  per +{effectiveResourceUpgradeAmount} max value
                 </p>
-
                 <div className="space-y-3">
                   {storyData.resources.map((resource) => (
                     <div

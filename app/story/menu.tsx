@@ -470,6 +470,7 @@ interface BasicSettingsForm {
   points: number;
   momentum: number;
   maxMomentum: number;
+  rpgSystem: "3d6" | "1d20" | "1d100" | "percentile" | "pbta" | "fate" | "yze";
 }
 
 function BasicSettings({
@@ -580,6 +581,84 @@ function BasicSettings({
             }
             className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
+        </div>
+      </div>
+
+      {/* RPG System Selection */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+          RPG Dice System
+        </label>
+        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+          Change the core dice mechanics. Affects DCs, upgrade values, and
+          resource scaling.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            {
+              id: "3d6" as const,
+              name: "3d6",
+              desc: "Roll 3-18, add to stat",
+              icon: "Dices",
+            },
+            {
+              id: "1d20" as const,
+              name: "1d20",
+              desc: "Roll 1-20, add to stat",
+              icon: "Dices",
+            },
+            {
+              id: "1d100" as const,
+              name: "1d100",
+              desc: "Roll 1-100, add to stat",
+              icon: "Dices",
+            },
+            {
+              id: "percentile" as const,
+              name: "Classic Percentile",
+              desc: "Roll 1-100, under stat wins",
+              icon: "TrendingDown",
+            },
+            {
+              id: "pbta" as const,
+              name: "PbtA",
+              desc: "2d6+mod: 10+ success, 7-9 partial",
+              icon: "Zap",
+              fullWidth: true,
+            },
+            {
+              id: "fate" as const,
+              name: "Fate Core",
+              desc: "4dF+ladder: fail/tie/succeed/style",
+              icon: "Scale",
+              fullWidth: true,
+            },
+            {
+              id: "yze" as const,
+              name: "Year Zero Engine",
+              desc: "d6 pool (count 6s), stress dice + panic",
+              icon: "Skull",
+              fullWidth: true,
+            },
+          ].map((sys) => (
+            <button
+              key={sys.id}
+              onClick={() => onChange({ ...form, rpgSystem: sys.id })}
+              className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all text-left ${
+                (sys as any).fullWidth ? "col-span-2" : ""
+              } ${
+                form.rpgSystem === sys.id
+                  ? "bg-purple-600 text-white border-purple-600"
+                  : "bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-500 hover:border-purple-400"
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <DynamicIcon name={sys.icon} className="w-4 h-4" />
+                <span className="text-sm font-bold">{sys.name}</span>
+              </div>
+              <div className="text-xs opacity-75">{sys.desc}</div>
+            </button>
+          ))}
         </div>
       </div>
     </div>
@@ -1619,7 +1698,7 @@ function QuestEditor({
               </div>
             ) : (
               <div
-                key={quest.id}
+                key={index}
                 draggable
                 onDragStart={() => handleQuestDragStart(index)}
                 onDragOver={(e) => handleQuestDragOver(e, index)}
@@ -3469,6 +3548,7 @@ export default function MenuPage({
     points: storyData.points,
     momentum: storyData.momentum,
     maxMomentum: storyData.maxMomentum,
+    rpgSystem: storyData.rpgSystem || "3d6",
   });
 
   // Advanced editing states
@@ -3537,6 +3617,7 @@ export default function MenuPage({
         points: settingsForm.points,
         momentum: settingsForm.momentum,
         maxMomentum: settingsForm.maxMomentum,
+        rpgSystem: settingsForm.rpgSystem,
       });
       await onSaveProgress();
       setShowSettings(false);
@@ -4624,6 +4705,7 @@ export default function MenuPage({
                     points: storyData.points,
                     momentum: storyData.momentum,
                     maxMomentum: storyData.maxMomentum,
+                    rpgSystem: storyData.rpgSystem || "3d6",
                   });
                   setShowSettings(false);
                 }}

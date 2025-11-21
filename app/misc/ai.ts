@@ -4,6 +4,7 @@ import {
   Choice,
   UPGRADE_COSTS,
 } from "@/app/misc/structs";
+import { getRPGSystem, RPGSystem } from "@/app/misc/rpgSystems";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -43,6 +44,9 @@ export function buildMessages({
   useRawContext?: boolean;
   maxTokens?: number;
 }): ChatMessage[] {
+  // Get the RPG system configuration
+  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+
   const system = `You are a helpful, creative narrative engine for a choice-driven, text-only adventure game.
 Stay in character and respond in the style of an interactive fiction game. You're the narrator and the characters.
 
@@ -74,10 +78,7 @@ Story prose here. Write your narrative content between these tags.
 
 IMPORTANT: The <story></story> tags are MANDATORY. Never write story text without wrapping it in <story> tags. All narrative content must be enclosed in <story></story> tags.
 
-Choice Syntax:
-- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none>
-Example:
-- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 50); use_resource: Stamina; use_item: Stamina Potion>
+${rpgSystem.aiInstructions.choiceSyntax}
 
 Memory Guidelines:
 - The <memory> section is for NEW memory entries that will be ADDED to the existing memory list.
@@ -103,11 +104,27 @@ Resource System:
 - When a choice uses a resource (use_resource), that resource is AUTOMATICALLY at risk if the skill check fails.
 - Choose resources that thematically fit the action: use Stamina for running/escaping, Health for combat/dangerous situations, Mana for spellcasting, etc.
 - Resource requirements are DYNAMIC based on DC:
-  * Required amount: DC ÷ 10 (rounded down, minimum 5)
-  * If player has insufficient resource: dice roll receives -DC÷10 penalty (minimum -5)
-  * On success: RECOVERS DC ÷ 20 points (minimum 1), capped at max value
-  * On failure: loses DC ÷ 10 points (minimum 5)
-- Example: DC 120 requires 12 resource points. Insufficient resources = -12 to dice roll. Success recovers 6 points, failure loses 12 points.
+  * Required amount: DC ÷ ${
+    rpgSystem.resources.requiredDivisor
+  } (rounded down, minimum ${rpgSystem.resources.minRequired})
+  * If player has insufficient resource: dice roll receives -DC÷${
+    rpgSystem.resources.penaltyDivisor
+  } penalty (minimum -${rpgSystem.resources.minPenalty})
+  * On success: RECOVERS DC ÷ ${
+    rpgSystem.resources.recoverDivisor
+  } points (minimum ${rpgSystem.resources.minRecover}), capped at max value
+  * On failure: loses DC ÷ ${rpgSystem.resources.lossDivisor} points (minimum ${
+    rpgSystem.resources.minLoss
+  })
+- Example: DC ${rpgSystem.dc.medium * 2} requires ${Math.floor(
+    (rpgSystem.dc.medium * 2) / rpgSystem.resources.requiredDivisor
+  )} resource points. Insufficient resources = -${Math.floor(
+    (rpgSystem.dc.medium * 2) / rpgSystem.resources.penaltyDivisor
+  )} to dice roll. Success recovers ${Math.floor(
+    (rpgSystem.dc.medium * 2) / rpgSystem.resources.recoverDivisor
+  )} points, failure loses ${Math.floor(
+    (rpgSystem.dc.medium * 2) / rpgSystem.resources.lossDivisor
+  )} points.
 - This creates meaningful risk/reward - higher DC actions demand more resources but reward success with recovery.
 
 Guidelines:
@@ -119,11 +136,12 @@ Guidelines:
 - Choices should be distinct and lead to different outcomes.
 - Incorporate the player's stats, resources, inventory, and achievements into the story and choices.
 - Adapt the story based on the player's previous choices and current state.
-- DC system: Roll (1-100) + Stat Value ≥ DC. For average stats (~50): DC 50 is trivial, DC 100 is easy, DC 120 is medium, DC 140 is hard, DC 160+ is very hard, DC 200+ is impossible.
-- ⚠️ IMPORTANT: Challenge the player! Use DC 120-140 for normal challenges, DC 140-160 for difficult ones, DC 160-180+ for epic moments. Avoid DCs below 100 unless the task is truly trivial.
-- Consider player stats when setting DCs: if their relevant stat is 70, a DC of 130-150 creates exciting tension. Match DC to the drama of the moment.
+- ${rpgSystem.aiInstructions.diceSystem}
+- ${rpgSystem.aiInstructions.dcGuidance}
+- ${rpgSystem.aiInstructions.challengeGuidance}
 - Balance challenge with narrative flow: not every choice needs a skill check. Include some "automatic success" choices that advance the story.
 - Use skill checks for dramatic moments, high-stakes decisions, and character-defining actions.
+- ${rpgSystem.aiInstructions.dcGuidelines}
 
 Item Types:
 - normal: Gives advantage when used. Doesn't get consumed on use, but breaks on skill check failure.

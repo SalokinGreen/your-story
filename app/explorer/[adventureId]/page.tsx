@@ -65,7 +65,7 @@ export default function AdventureDetailPage() {
             "@/app/misc/localAdventureManager"
           );
           const localAdventure = await getLocalAdventure(adventureId);
-          
+
           if (!localAdventure) {
             setAdventure(null);
             setLoading(false);
@@ -74,8 +74,9 @@ export default function AdventureDetailPage() {
 
           // Convert LocalAdventure to Adventure format
           const difficultyValue = localAdventure.adventureData.difficulty;
-          let normalizedDifficulty: "Easy" | "Medium" | "Hard" | "Expert" = "Medium";
-          
+          let normalizedDifficulty: "Easy" | "Medium" | "Hard" | "Expert" =
+            "Medium";
+
           if (difficultyValue) {
             const lower = difficultyValue.toLowerCase();
             if (lower === "easy") normalizedDifficulty = "Easy";
@@ -94,7 +95,8 @@ export default function AdventureDetailPage() {
             tags: localAdventure.adventureData.tags || [],
             difficulty: normalizedDifficulty,
             nsfw: localAdventure.adventureData.nsfw || false,
-            estimatedDuration: localAdventure.adventureData.estimatedDuration || "1-2 hours",
+            estimatedDuration:
+              localAdventure.adventureData.estimatedDuration || "1-2 hours",
             storyTemplate: localAdventure.adventureData.storyTemplate || {},
             presets: localAdventure.adventureData.presets || [],
             rating: 0,
@@ -107,7 +109,7 @@ export default function AdventureDetailPage() {
             createdAt: new Date(localAdventure.updatedAt),
             updatedAt: new Date(localAdventure.updatedAt),
           };
-          
+
           setAdventure(adventure);
           setLoading(false);
           return;

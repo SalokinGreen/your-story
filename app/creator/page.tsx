@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/misc/AuthContext";
+import { getSystemUpgradeDefaults } from "@/app/misc/rpgSystems";
 import {
   StoryData,
   Stat,
@@ -92,9 +93,22 @@ function AdventureCreatorContent() {
   const [difficulty, setDifficulty] = useState<
     "Easy" | "Medium" | "Hard" | "Expert"
   >("Medium");
+  const [rpgSystem, setRpgSystem] = useState<
+    "3d6" | "1d20" | "1d100" | "percentile" | "pbta" | "fate" | "yze"
+  >("3d6");
   const [visibility, setVisibility] = useState<"public" | "hidden" | "private">(
     "private"
   );
+
+  // Update upgrade values when RPG system changes
+  useEffect(() => {
+    const systemDefaults = getSystemUpgradeDefaults(rpgSystem);
+    setUpgradeSettings((prev) => ({
+      ...prev,
+      statUpgradeAmount: systemDefaults.statUpgradeAmount,
+      resourceUpgradeAmount: systemDefaults.resourceUpgradeAmount,
+    }));
+  }, [rpgSystem]);
   const [nsfw, setNsfw] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
@@ -283,6 +297,7 @@ function AdventureCreatorContent() {
         setShortDescription(adventure.shortDescription || "");
         setDescription(adventure.description || "");
         setDifficulty(adventure.difficulty || "Medium");
+        setRpgSystem(adventure.storyTemplate?.rpgSystem || "3d6");
         setVisibility(adventure.visibility || "public");
         setNsfw(adventure.nsfw || false);
         setTags(adventure.tags || []);
@@ -335,6 +350,7 @@ function AdventureCreatorContent() {
               setShortDescription(saved.shortDescription);
             if (saved.description) setDescription(saved.description);
             if (saved.difficulty) setDifficulty(saved.difficulty);
+            if (saved.rpgSystem) setRpgSystem(saved.rpgSystem);
             if (saved.visibility) setVisibility(saved.visibility);
             if (saved.nsfw !== undefined) setNsfw(saved.nsfw);
             if (Array.isArray(saved.tags)) setTags(saved.tags);
@@ -698,6 +714,7 @@ function AdventureCreatorContent() {
       shortDescription,
       description,
       difficulty,
+      rpgSystem,
       visibility,
       nsfw,
       tags,
@@ -1536,6 +1553,7 @@ function AdventureCreatorContent() {
       selected_preset: selectedPreset,
       presets: presets,
       upgradeSettings: upgradeSettings,
+      rpgSystem: rpgSystem,
     };
 
     // Save complete adventure using localAdventureManager
@@ -1555,8 +1573,10 @@ function AdventureCreatorContent() {
       };
 
       // Generate unique ID with 'local:' prefix
-      const localId = `local:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+      const localId = `local:${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+
       // Save to IndexedDB using localAdventureManager
       await saveLocalAdventure(localId, adventureTemplate);
 
@@ -1664,6 +1684,7 @@ function AdventureCreatorContent() {
       selected_preset: selectedPreset,
       presets: presets,
       upgradeSettings: upgradeSettings,
+      rpgSystem: rpgSystem,
     };
 
     //Save to database
@@ -1826,6 +1847,123 @@ function AdventureCreatorContent() {
                     {diff}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                RPG Dice System
+              </label>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                <strong>3d6 (Bell Curve):</strong> Rolls 3d6 (3-18),
+                predictable. <strong>1d20 (D&D):</strong> Rolls 1d20 (1-20),
+                swingy. <strong>1d100:</strong> Rolls 1d100 (1-100), granular.{" "}
+                <strong>Classic Percentile:</strong> Roll-under d100, lower is
+                better! <strong>PbtA:</strong> Roll 2d6+mod, partial success on
+                7-9!
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setRpgSystem("3d6")}
+                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
+                    rpgSystem === "3d6"
+                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                  }`}
+                >
+                  <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
+                  3d6
+                  <div className="text-xs opacity-75 mt-1">
+                    Roll 3-18, add to stat
+                  </div>
+                </button>
+                <button
+                  onClick={() => setRpgSystem("1d20")}
+                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
+                    rpgSystem === "1d20"
+                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                  }`}
+                >
+                  <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
+                  1d20
+                  <div className="text-xs opacity-75 mt-1">
+                    Roll 1-20, add to stat
+                  </div>
+                </button>
+                <button
+                  onClick={() => setRpgSystem("1d100")}
+                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
+                    rpgSystem === "1d100"
+                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                  }`}
+                >
+                  <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
+                  1d100
+                  <div className="text-xs opacity-75 mt-1">
+                    Roll 1-100, add to stat
+                  </div>
+                </button>
+                <button
+                  onClick={() => setRpgSystem("percentile")}
+                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
+                    rpgSystem === "percentile"
+                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                  }`}
+                >
+                  <DynamicIcon
+                    name="TrendingDown"
+                    className="w-5 h-5 inline mr-2"
+                  />
+                  Classic Percentile
+                  <div className="text-xs opacity-75 mt-1">
+                    Roll 1-100, under stat wins
+                  </div>
+                </button>
+                <button
+                  onClick={() => setRpgSystem("pbta")}
+                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
+                    rpgSystem === "pbta"
+                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                  }`}
+                >
+                  <DynamicIcon name="Zap" className="w-5 h-5 inline mr-2" />
+                  Powered by the Apocalypse (PbtA)
+                  <div className="text-xs opacity-75 mt-1">
+                    Roll 2d6+modifier, 10+ success, 7-9 partial, 6- failure
+                  </div>
+                </button>
+                <button
+                  onClick={() => setRpgSystem("fate")}
+                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
+                    rpgSystem === "fate"
+                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                  }`}
+                >
+                  <DynamicIcon name="Scale" className="w-5 h-5 inline mr-2" />
+                  Fate Core (4dF)
+                  <div className="text-xs opacity-75 mt-1">
+                    Roll 4 Fudge dice + ladder: fail/tie/succeed/style
+                  </div>
+                </button>
+                <button
+                  onClick={() => setRpgSystem("yze")}
+                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
+                    rpgSystem === "yze"
+                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                  }`}
+                >
+                  <DynamicIcon name="Skull" className="w-5 h-5 inline mr-2" />
+                  Year Zero Engine (YZE)
+                  <div className="text-xs opacity-75 mt-1">
+                    Roll d6 pool (count 6s), stress dice add power + panic risk
+                  </div>
+                </button>
               </div>
             </div>
 

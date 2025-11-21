@@ -8,6 +8,12 @@ import {
   UPGRADE_COSTS,
   Preset,
 } from "../misc/structs";
+import {
+  getRPGSystem,
+  rollDice,
+  checkSuccess,
+  calculateResourceRequirements,
+} from "../misc/rpgSystems";
 import Story from "./story";
 import StatsPage from "./stats";
 import LorePage from "./lore";
@@ -1373,10 +1379,33 @@ function StoryPageContent() {
     skillBonus: number;
     dc: number;
     isSuccess: boolean;
+    isPartial?: boolean; // For PbtA partial success
     isCritical: boolean;
     hasAdvantage: boolean;
     hasDisadvantage: boolean;
+    diceRolls?: number[][]; // Individual dice for each roll (for 3d6 system)
+    rpgSystem?:
+      | "3d6"
+      | "1d20"
+      | "1d100"
+      | "percentile"
+      | "pbta"
+      | "fate"
+      | "yze"; // RPG system type
+    baseDice?: number[]; // YZE: base dice rolls
+    stressDice?: number[]; // YZE: stress dice rolls
+    successes?: number; // YZE: count of 6s
+    panicTriggered?: boolean; // YZE: if stress dice showed 1s
+    panicEffect?: string; // YZE: panic table result
+    stressLevel?: number; // YZE: current stress (0-10)
+    stressRelief?: boolean; // YZE: strong success (-1 stress)
   } | null>(null);
+
+  // YZE: Stress dice selection state
+  const [yzeStressDiceChoice, setYzeStressDiceChoice] = useState<number>(0);
+  const [yzeAwaitingStressChoice, setYzeAwaitingStressChoice] =
+    useState<boolean>(false);
+  const [yzePendingChoice, setYzePendingChoice] = useState<Choice | null>(null);
 
   // Fetch token balance on mount
   useEffect(() => {
@@ -1834,6 +1863,7 @@ function StoryPageContent() {
       player_name: storyData.player_name,
       player_summary: storyData.player_summary?.substring(0, 800) || "",
       intro: storyData.intro?.substring(0, 1500) || "",
+      rpgSystem: storyData.rpgSystem || "3d6",
       stats: storyData.stats,
       resources: storyData.resources,
       inventory: storyData.inventory,
@@ -2040,7 +2070,15 @@ function StoryPageContent() {
 
   async function handleChoice() {
     if (!storyData) return;
-    const choice = choices.choices.find((c) => input[c.text]);
+
+    // If we're resuming from YZE stress dice selection, use the pending choice
+    let choice: Choice | undefined;
+    if (yzePendingChoice && yzeAwaitingStressChoice) {
+      choice = yzePendingChoice;
+    } else {
+      choice = choices.choices.find((c) => input[c.text]);
+    }
+
     if (!choice) return;
     const key = choices.choices.indexOf(choice);
 
@@ -2049,6 +2087,22 @@ function StoryPageContent() {
     if (!user) {
       addNotification("Please sign in to continue the story", "warning");
       return;
+    }
+
+    // Get RPG system configuration
+    const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+
+    // YZE: If this choice has a skill check, show stress dice selection UI first
+    if (
+      rpgSystem.id === "yze" &&
+      choice.skill_used &&
+      !yzeAwaitingStressChoice &&
+      true
+    ) {
+      setYzePendingChoice(choice);
+      setYzeAwaitingStressChoice(true);
+      setYzeStressDiceChoice(0); // Default to 0 stress dice
+      return; // Wait for player to choose stress dice
     }
 
     setLoading(true);
@@ -2078,11 +2132,29 @@ function StoryPageContent() {
       );
     }
 
-    let dice_roll = getSecureRandomInt(1, 100);
-    logger.action("Initial dice roll", { roll: dice_roll });
+    // Get RPG system configuration (already fetched above, remove duplicate)
+
+    // For YZE: Need stat value before rolling, so defer the initial roll
+    let dice_roll = 0;
+    let diceResult: { rolls: number[]; total: number } = {
+      rolls: [],
+      total: 0,
+    };
+
+    if (rpgSystem.id !== "yze") {
+      // Roll dice according to system (non-YZE systems roll once globally)
+      diceResult = rollDice(rpgSystem);
+      dice_roll = diceResult.total;
+      logger.action("Initial dice roll", {
+        system: rpgSystem.id,
+        rolls: diceResult.rolls,
+        total: dice_roll,
+      });
+    }
 
     //Track all dice rolls for visualization
     const allDiceRolls: number[] = [dice_roll];
+    const allDiceDetails: number[][] = [diceResult.rolls]; // Track individual dice per roll
 
     //BuilddetailedRPG-stylechoicetextwithbrackets
     let choiceDetails: string[] = [];
@@ -2137,23 +2209,35 @@ function StoryPageContent() {
             `Used item: ${choice.item_used} (Advantage!)`,
             "info"
           );
-          const second_roll = getSecureRandomInt(1, 100);
+          const secondResult = rollDice(rpgSystem);
+          const second_roll = secondResult.total;
           allDiceRolls.push(second_roll);
+          allDiceDetails.push(secondResult.rolls);
           logger.action("Advantage roll from item", {
             item: choice.item_used,
             firstRoll: dice_roll,
             secondRoll: second_roll,
           });
-          if (second_roll > dice_roll) {
-            dice_roll = second_roll;
+          // Advantage: higher is better for roll-over, lower is better for roll-under
+          if (rpgSystem.rollUnder) {
+            if (second_roll < dice_roll) {
+              dice_roll = second_roll;
+            }
+          } else {
+            if (second_roll > dice_roll) {
+              dice_roll = second_roll;
+            }
           }
         }
 
         if (momentumMode === "reroll") {
           // Reroll: Roll two more times and take the best
-          const reroll1 = getSecureRandomInt(1, 100);
-          const reroll2 = getSecureRandomInt(1, 100);
+          const reroll1Result = rollDice(rpgSystem);
+          const reroll2Result = rollDice(rpgSystem);
+          const reroll1 = reroll1Result.total;
+          const reroll2 = reroll2Result.total;
           allDiceRolls.push(reroll1, reroll2);
+          allDiceDetails.push(reroll1Result.rolls, reroll2Result.rolls);
           const oldRoll = dice_roll;
           dice_roll = Math.max(dice_roll, reroll1, reroll2);
           logger.action("Momentum reroll (with item)", {
@@ -2194,21 +2278,33 @@ function StoryPageContent() {
           `Missing item: ${choice.item_used} (Disadvantage!)`,
           "warning"
         );
-        const second_roll = getSecureRandomInt(1, 100);
+        const secondResult = rollDice(rpgSystem);
+        const second_roll = secondResult.total;
         allDiceRolls.push(second_roll);
+        allDiceDetails.push(secondResult.rolls);
         logger.action("Disadvantage roll (missing item)", {
           item: choice.item_used,
           firstRoll: dice_roll,
           secondRoll: second_roll,
         });
-        if (second_roll < dice_roll) {
-          dice_roll = second_roll;
+        // Disadvantage: lower is worse for roll-over, higher is worse for roll-under
+        if (rpgSystem.rollUnder) {
+          if (second_roll > dice_roll) {
+            dice_roll = second_roll;
+          }
+        } else {
+          if (second_roll < dice_roll) {
+            dice_roll = second_roll;
+          }
         }
         if (momentumMode === "reroll") {
           //Rerollstillhelpswithdisadvantage
-          const reroll1 = getSecureRandomInt(1, 100);
-          const reroll2 = getSecureRandomInt(1, 100);
+          const reroll1Result = rollDice(rpgSystem);
+          const reroll2Result = rollDice(rpgSystem);
+          const reroll1 = reroll1Result.total;
+          const reroll2 = reroll2Result.total;
           allDiceRolls.push(reroll1, reroll2);
+          allDiceDetails.push(reroll1Result.rolls, reroll2Result.rolls);
           const oldRoll = dice_roll;
           dice_roll = Math.max(dice_roll, reroll1, reroll2);
           logger.action("Momentum reroll (missing item)", {
@@ -2225,8 +2321,10 @@ function StoryPageContent() {
       }
     } else if (momentumMode === "reroll") {
       //Noitem-justreroll
-      const reroll = getSecureRandomInt(1, 100);
+      const rerollResult = rollDice(rpgSystem);
+      const reroll = rerollResult.total;
       allDiceRolls.push(reroll);
+      allDiceDetails.push(rerollResult.rolls);
       const oldRoll = dice_roll;
       if (reroll > dice_roll) {
         dice_roll = reroll;
@@ -2270,14 +2368,15 @@ function StoryPageContent() {
 
       if (resource) {
         const dc = choice.skill_dc || 0;
-        const requiredAmount = Math.max(5, Math.floor(dc / 10)); //DCï¿½10,minimum5
+        const resourceReqs = calculateResourceRequirements(rpgSystem, dc);
+        const requiredAmount = resourceReqs.required;
 
         resourceUsedBefore = resource.value;
 
         //Checkifplayerhasenoughresource
         if (resource.value < requiredAmount) {
           insufficientResource = true;
-          const penalty = Math.max(5, Math.floor(dc / 10)); //DCï¿½10,minimum5
+          const penalty = resourceReqs.penalty;
           logger.action("Insufficient resource", {
             resource: choice.resource_used,
             required: requiredAmount,
@@ -2304,6 +2403,49 @@ function StoryPageContent() {
       const matchResult = findStatMatch(choice.skill_used, storyData.stats);
       const statValue = matchResult?.item.value || 0;
 
+      // For YZE: Roll dice NOW using stat value
+      if (rpgSystem.id === "yze") {
+        const baseDiceCount = Math.floor(statValue / 20); // 0-5 base dice from stat
+        const stressDiceCount = yzeStressDiceChoice; // Use player's choice
+        const totalDiceCount = baseDiceCount + stressDiceCount;
+
+        // Roll all dice (base + stress)
+        const rolls: number[] = [];
+        for (let i = 0; i < totalDiceCount; i++) {
+          rolls.push(Math.floor(Math.random() * 6) + 1);
+        }
+
+        // Add stress to character
+        if (stressDiceCount > 0) {
+          const currentStress = storyData.stress || 0;
+          storyData.stress = Math.min(10, currentStress + stressDiceCount);
+          addNotification(
+            `Added ${stressDiceCount} stress dice (+${stressDiceCount} stress → ${storyData.stress}/10)`,
+            "warning"
+          );
+        }
+
+        logger.action("YZE dice roll", {
+          system: "yze",
+          baseDice: baseDiceCount,
+          stressDice: stressDiceCount,
+          rolls,
+          stat: statValue,
+        });
+
+        // Ensure dice visualizer gets the actual dice rolled for YZE
+        if (Array.isArray(allDiceDetails) && allDiceDetails.length > 0) {
+          allDiceDetails[0] = rolls;
+        }
+
+        diceResult = { rolls, total: 0 }; // Total doesn't matter for YZE
+        dice_roll = 0; // Not used for YZE
+
+        // Reset YZE state
+        setYzeAwaitingStressChoice(false);
+        setYzePendingChoice(null);
+      }
+
       // Log fuzzy match result
       if (matchResult && !matchResult.isExact) {
         logger.info("Fuzzy matched skill", {
@@ -2329,10 +2471,11 @@ function StoryPageContent() {
 
       const dc = choice.skill_dc || 0;
 
+      //Calculate resource requirements based on RPG system
+      const resourceReqs = calculateResourceRequirements(rpgSystem, dc);
+
       //Calculatedicepenaltyifinsufficientresource
-      const dicePenalty = insufficientResource
-        ? Math.max(5, Math.floor(dc / 10))
-        : 0;
+      const dicePenalty = insufficientResource ? resourceReqs.penalty : 0;
       const effectiveDiceRoll = Math.max(1, dice_roll - dicePenalty);
 
       //Handleguaranteedsuccess
@@ -2347,8 +2490,88 @@ function StoryPageContent() {
           "success"
         );
       } else {
-        const total = effectiveDiceRoll + statValue;
-        const dc_passed = dice_roll === 100 || total >= dc;
+        let dc_passed: boolean;
+        let isCritical: boolean;
+        let total: number;
+
+        // For YZE: calculate success count and panic FIRST
+        let yzeData: {
+          baseDice?: number[];
+          stressDice?: number[];
+          successes?: number;
+          panicTriggered?: boolean;
+          panicEffect?: string;
+          stressLevel?: number;
+          stressRelief?: boolean;
+        } = {};
+
+        if (rpgSystem.id === "yze" && allDiceDetails.length > 0) {
+          const lastRoll = allDiceDetails[allDiceDetails.length - 1];
+          const currentStress = storyData.stress || 0;
+          const stressDiceCount = yzeStressDiceChoice; // Use player's chosen stress dice
+
+          // Split dice into base and stress dice
+          const baseDiceCount = lastRoll.length - stressDiceCount;
+          yzeData.baseDice = lastRoll.slice(0, baseDiceCount);
+          yzeData.stressDice =
+            stressDiceCount > 0 ? lastRoll.slice(baseDiceCount) : [];
+
+          // Calculate success using checkSuccess (pass rolls array)
+          const successResult = checkSuccess(
+            rpgSystem,
+            dice_roll,
+            statValue,
+            dc,
+            0,
+            lastRoll
+          );
+
+          yzeData.successes = successResult.successes;
+          yzeData.stressRelief = successResult.stressRelief;
+          yzeData.stressLevel = currentStress;
+
+          // For YZE: use success count to determine if check passed
+          dc_passed = successResult.success;
+          isCritical = successResult.critical;
+          total = successResult.successes || 0;
+
+          // Check for panic (1s on stress dice)
+          if (stressDiceCount > 0 && yzeData.stressDice) {
+            const hasOnes = yzeData.stressDice.some((die) => die === 1);
+            if (hasOnes) {
+              yzeData.panicTriggered = true;
+              // Roll panic: d6 + stress
+              const panicRoll =
+                Math.floor(Math.random() * 6) + 1 + currentStress;
+              // Find panic effect from table
+              if (rpgSystem.panicTable) {
+                const panicEntry = rpgSystem.panicTable.find(
+                  (entry) => panicRoll >= entry.min && panicRoll <= entry.max
+                );
+                if (panicEntry) {
+                  yzeData.panicEffect = `${panicEntry.effect}: ${panicEntry.description}`;
+                }
+              }
+            }
+          }
+        } else {
+          // Non-YZE systems: use traditional roll-under/roll-over logic
+          const effectiveDiceRoll = Math.max(1, dice_roll - dicePenalty);
+          total = effectiveDiceRoll + statValue;
+
+          if (rpgSystem.rollUnder) {
+            // Roll-under: success if roll <= stat (after penalty applied to stat)
+            const effectiveStat = Math.max(1, statValue - dicePenalty);
+            dc_passed = dice_roll <= effectiveStat;
+            isCritical =
+              dice_roll <= (rpgSystem.success.criticalThreshold || 5) &&
+              dc_passed;
+          } else {
+            // Roll-over: success if roll + stat >= DC
+            dc_passed = dice_roll === rpgSystem.dice.max || total >= dc;
+            isCritical = dice_roll === rpgSystem.dice.max && dc_passed;
+          }
+        }
 
         logger.action("Skill check result", {
           skill: choice.skill_used,
@@ -2376,9 +2599,12 @@ function StoryPageContent() {
           skillBonus: statValue,
           dc,
           isSuccess: dc_passed,
-          isCritical: dice_roll === 100,
+          isCritical: isCritical,
           hasAdvantage: hasItemAdvantage,
           hasDisadvantage: hasItemDisadvantage,
+          diceRolls: allDiceDetails, // Individual dice for each roll
+          rpgSystem: storyData.rpgSystem || "3d6", // Pass system type
+          ...yzeData, // Spread YZE-specific data
         });
 
         // Wait for dice visualizer animation to complete before continuing.
@@ -2390,14 +2616,44 @@ function StoryPageContent() {
         if (dc_passed) {
           skillCheckResult = "success";
           const penaltyText = insufficientResource
-            ? ` (-${dicePenalty} dice penalty from insufficient resource)`
+            ? ` (-${dicePenalty} ${
+                rpgSystem.rollUnder ? "stat penalty" : "dice penalty"
+              } from insufficient resource)`
             : "";
-          addNotification(
-            `✓ Check Passed! (${choice.skill_used}: ${dice_roll}${
-              insufficientResource ? ` - ${dicePenalty}` : ""
-            } + ${statValue} = ${total} ≥ ${dc})${penaltyText}`,
-            "success"
-          );
+
+          if (rpgSystem.id === "yze") {
+            // YZE: Show success count
+            addNotification(
+              `✓ Check Passed! (${choice.skill_used}: ${yzeData.successes} successes ≥ ${dc})`,
+              "success"
+            );
+            if (yzeData.stressRelief) {
+              addNotification(
+                `💚 Strong Success! Stress reduced by 1`,
+                "success"
+              );
+              if (storyData.stress && storyData.stress > 0) {
+                storyData.stress--;
+              }
+            }
+          } else if (rpgSystem.rollUnder) {
+            const effectiveStat = Math.max(1, statValue - dicePenalty);
+            addNotification(
+              `✓ Check Passed! (${
+                choice.skill_used
+              }: ${dice_roll} ≤ ${effectiveStat}${
+                insufficientResource ? ` (${statValue} - ${dicePenalty})` : ""
+              })${penaltyText}`,
+              "success"
+            );
+          } else {
+            addNotification(
+              `✓ Check Passed! (${choice.skill_used}: ${dice_roll}${
+                insufficientResource ? ` - ${dicePenalty}` : ""
+              } + ${statValue} = ${total} ≥ ${dc})${penaltyText}`,
+              "success"
+            );
+          }
 
           //Recoverresourceonsuccess
           if (choice.resource_used) {
@@ -2405,7 +2661,7 @@ function StoryPageContent() {
               (r) => r.name === choice.resource_used
             );
             if (resource) {
-              const recovery = Math.max(1, Math.floor(dc / 20)); //DCï¿½20,minimum1
+              const recovery = resourceReqs.recovery; // Use system-specific recovery formula
               const beforeRecovery = resource.value;
               resource.value = Math.min(
                 resource.maxValue,
@@ -2426,7 +2682,7 @@ function StoryPageContent() {
 
           //Earnmomentumonsuccess(notwhenusingguaranteeorreroll)
           if (momentumMode === "none") {
-            if (dice_roll === 100) {
+            if (isCritical) {
               // Critical success: Earn 2 momentum
               if (storyData.momentum < storyData.maxMomentum) {
                 const earned = Math.min(
@@ -2443,8 +2699,8 @@ function StoryPageContent() {
                   "success"
                 );
               }
-            } else if (total >= dc + 20) {
-              //Strongsuccess(beatDCby20+):earn1momentum
+            } else if (!rpgSystem.rollUnder && total >= dc + 20) {
+              //Strongsuccess(beatDCby20+):earn1momentum (only for roll-over systems)
               if (storyData.momentum < storyData.maxMomentum) {
                 storyData.momentum++;
                 logger.action("Momentum earned (Strong Success)", {
@@ -2461,14 +2717,35 @@ function StoryPageContent() {
         } else {
           skillCheckResult = "failure";
           const penaltyText = insufficientResource
-            ? ` (-${dicePenalty} dice penalty from insufficient resource)`
+            ? ` (-${dicePenalty} ${
+                rpgSystem.rollUnder ? "stat penalty" : "dice penalty"
+              } from insufficient resource)`
             : "";
-          addNotification(
-            `✗ Check Failed! (${choice.skill_used}: ${dice_roll}${
-              insufficientResource ? ` - ${dicePenalty}` : ""
-            } + ${statValue} = ${total} < ${dc})${penaltyText}`,
-            "failure"
-          );
+
+          if (rpgSystem.id === "yze") {
+            // YZE: Show success count failure
+            addNotification(
+              `✗ Check Failed! (${choice.skill_used}: ${yzeData.successes} successes < ${dc})`,
+              "failure"
+            );
+          } else if (rpgSystem.rollUnder) {
+            const effectiveStat = Math.max(1, statValue - dicePenalty);
+            addNotification(
+              `✗ Check Failed! (${
+                choice.skill_used
+              }: ${dice_roll} > ${effectiveStat}${
+                insufficientResource ? ` (${statValue} - ${dicePenalty})` : ""
+              })${penaltyText}`,
+              "failure"
+            );
+          } else {
+            addNotification(
+              `✗ Check Failed! (${choice.skill_used}: ${dice_roll}${
+                insufficientResource ? ` - ${dicePenalty}` : ""
+              } + ${statValue} = ${total} < ${dc})${penaltyText}`,
+              "failure"
+            );
+          }
 
           // On failure: Lose additional resource if one was used (DC-based penalty)
           if (choice.resource_used) {
@@ -2477,7 +2754,7 @@ function StoryPageContent() {
             );
             if (resource) {
               const lossBefore = resource.value;
-              const penalty = Math.max(5, Math.floor(dc / 10)); //DCï¿½10,minimum5
+              const penalty = resourceReqs.loss; // Use system-specific loss formula
               resource.value = Math.max(0, resource.value - penalty);
               const lossAfter = resource.value;
               logger.action("Resource lost (Failure)", {
@@ -2638,6 +2915,7 @@ function StoryPageContent() {
       player_name: storyData.player_name,
       player_summary: storyData.player_summary?.substring(0, 800) || "",
       intro: storyData.intro?.substring(0, 1500) || "",
+      rpgSystem: storyData.rpgSystem || "3d6",
       //Currentgamestate-sendas-is
       stats: storyData.stats,
       resources: storyData.resources,
@@ -2950,6 +3228,7 @@ function StoryPageContent() {
       player_name: storyData.player_name,
       player_summary: storyData.player_summary?.substring(0, 800) || "",
       intro: storyData.intro?.substring(0, 1500) || "",
+      rpgSystem: storyData.rpgSystem || "3d6",
       stats: storyData.stats,
       resources: storyData.resources,
       inventory: storyData.inventory,
@@ -3937,8 +4216,111 @@ function StoryPageContent() {
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
       />
+
+      {/* YZE: Stress Dice Selection UI */}
+      {yzeAwaitingStressChoice && yzePendingChoice && storyData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-linear-to-br from-gray-900 via-red-950 to-gray-900 border-4 border-red-600 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <DynamicIcon name="Skull" className="w-10 h-10 text-red-400" />
+              <h2 className="text-3xl font-black text-red-100 uppercase tracking-wide">
+                Add Stress Dice?
+              </h2>
+            </div>
+
+            <div className="bg-gray-950/50 rounded-lg p-4 mb-6 border border-red-900">
+              <p className="text-white text-center mb-4">
+                <span className="font-bold text-red-300">Skill:</span>{" "}
+                {yzePendingChoice.skill_used}
+              </p>
+              <p className="text-gray-300 text-sm text-center mb-2">
+                Base Dice:{" "}
+                <span className="font-bold text-blue-400">
+                  {Math.floor(
+                    (storyData.stats.find(
+                      (s) => s.name === yzePendingChoice.skill_used
+                    )?.value || 0) / 20
+                  )}
+                </span>
+              </p>
+              <p className="text-gray-300 text-sm text-center mb-4">
+                Current Stress:{" "}
+                <span
+                  className={`font-bold ${
+                    (storyData.stress || 0) >= 8
+                      ? "text-red-400 animate-pulse"
+                      : "text-yellow-400"
+                  }`}
+                >
+                  {storyData.stress || 0}/10
+                </span>
+              </p>
+              <p className="text-gray-400 text-xs text-center border-t border-gray-700 pt-3">
+                ⚠️ Stress dice increase your chances (count 6s) but add stress
+                and risk PANIC on 1s!
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-white font-bold mb-3 text-center">
+                Stress Dice:{" "}
+                <span className="text-red-400 text-2xl">
+                  {yzeStressDiceChoice}
+                </span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max={Math.min(5, 10 - (storyData.stress || 0))}
+                value={yzeStressDiceChoice}
+                onChange={(e) =>
+                  setYzeStressDiceChoice(parseInt(e.target.value))
+                }
+                className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-600"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>0 (Safe)</span>
+                <span>{Math.min(5, 10 - (storyData.stress || 0))} (Max)</span>
+              </div>
+            </div>
+
+            {yzeStressDiceChoice > 0 && (
+              <div className="bg-red-950/30 border border-red-800 rounded-lg p-3 mb-6">
+                <p className="text-red-200 text-sm text-center">
+                  +{yzeStressDiceChoice} stress →{" "}
+                  <span className="font-bold">
+                    {(storyData.stress || 0) + yzeStressDiceChoice}/10
+                  </span>
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setYzeAwaitingStressChoice(false);
+                  setYzePendingChoice(null);
+                  setYzeStressDiceChoice(0);
+                }}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleChoice(); // Resume with chosen stress dice
+                }}
+                className="flex-1 bg-linear-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg"
+              >
+                Roll!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/*DiceVisualizer*/}
-      {diceRoll?.show && (
+      {diceRoll && diceRoll.show && (
         <DiceVisualizer
           rolls={diceRoll.rolls}
           finalRoll={diceRoll.finalRoll}
@@ -3949,6 +4331,15 @@ function StoryPageContent() {
           isCritical={diceRoll.isCritical}
           hasAdvantage={diceRoll.hasAdvantage}
           hasDisadvantage={diceRoll.hasDisadvantage}
+          diceRolls={diceRoll.diceRolls}
+          rpgSystem={diceRoll.rpgSystem}
+          baseDice={diceRoll.baseDice}
+          stressDice={diceRoll.stressDice}
+          successes={diceRoll.successes}
+          panicTriggered={diceRoll.panicTriggered}
+          panicEffect={diceRoll.panicEffect}
+          stressLevel={diceRoll.stressLevel}
+          stressRelief={diceRoll.stressRelief}
           onComplete={() => setDiceRoll(null)}
         />
       )}

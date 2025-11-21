@@ -1297,19 +1297,22 @@ export default function LibraryPage() {
                           {adventure.description}
                         </p>
                         <div className="flex flex-wrap gap-2 mb-3">
-                          {adventure.adventureData.tags?.slice(0, 3).map((tag: string) => (
-                            <span
-                              key={tag}
-                              className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-full"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                          {adventure.adventureData.tags && adventure.adventureData.tags.length > 3 && (
-                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-full">
-                              +{adventure.adventureData.tags.length - 3}
-                            </span>
-                          )}
+                          {adventure.adventureData.tags
+                            ?.slice(0, 3)
+                            .map((tag: string) => (
+                              <span
+                                key={tag}
+                                className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-full"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          {adventure.adventureData.tags &&
+                            adventure.adventureData.tags.length > 3 && (
+                              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-full">
+                                +{adventure.adventureData.tags.length - 3}
+                              </span>
+                            )}
                         </div>
                         <div className="flex gap-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
                           <span>

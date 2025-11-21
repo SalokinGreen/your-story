@@ -247,6 +247,7 @@ export async function POST(req: NextRequest) {
       index ===
       self.findIndex((m) => m.role === msg.role && m.content === msg.content)
   );
+  console.log("MESSAGES:", messages);
   console.log("Built messages. Message count:", messages.length);
   console.log(
     "Last message length:",

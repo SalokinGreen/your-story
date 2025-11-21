@@ -64,4 +64,27 @@ You walk into the cave. It's cold and dripping, the smell of wet stone filling y
     expect(part.choices?.[1].item_used).toBe("Health Potion");
     expect(part.choices?.[1].resource_used).toBe("Mana");
   });
+
+  it("parses YZE success-based format", () => {
+    const text = `<story>Year Zero Engine test.</story>\n<choices>\n- Sneak past guards <use_skill: Stealth (1 success needed); use_resource: none; use_item: none>\n- Hack terminal <use_skill: Technology (2 successes needed); use_resource: none; use_item: Data Pad>\n- Defuse bomb <use_skill: Explosives (3 successes needed); use_resource: none; use_item: Toolkit>\n</choices>`;
+    const part = outputToScenePart(text);
+    expect(part.choices).toHaveLength(3);
+    expect(part.choices?.[0].skill_used).toBe("Stealth");
+    expect(part.choices?.[0].skill_dc).toBe(1);
+    expect(part.choices?.[1].skill_used).toBe("Technology");
+    expect(part.choices?.[1].skill_dc).toBe(2);
+    expect(part.choices?.[1].item_used).toBe("Data Pad");
+    expect(part.choices?.[2].skill_used).toBe("Explosives");
+    expect(part.choices?.[2].skill_dc).toBe(3);
+    expect(part.choices?.[2].item_used).toBe("Toolkit");
+  });
+
+  it("parses alternative success formats", () => {
+    const text = `<story>Alternative formats test.</story>\n<choices>\n- Option A <use_skill: Skill A (needs 2 successes); use_resource: none; use_item: none>\n- Option B <use_skill: Skill B (1 success required); use_resource: none; use_item: none>\n- Option C <use_skill: Skill C (2 succ needed); use_resource: none; use_item: none>\n</choices>`;
+    const part = outputToScenePart(text);
+    expect(part.choices).toHaveLength(3);
+    expect(part.choices?.[0].skill_dc).toBe(2);
+    expect(part.choices?.[1].skill_dc).toBe(1);
+    expect(part.choices?.[2].skill_dc).toBe(2);
+  });
 });
