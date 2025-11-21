@@ -75,6 +75,7 @@ export default function DiceRollVisualization({ rollData, onComplete }: Props) {
   };
 
   const getRollTypeColor = () => {
+    if (phase === "rolling") return "text-blue-500";
     if (rollData.type === "advantage" || rollData.momentumUsed === "reroll")
       return "text-green-500";
     if (rollData.type === "disadvantage") return "text-red-500";
@@ -82,7 +83,12 @@ export default function DiceRollVisualization({ rollData, onComplete }: Props) {
   };
 
   const getDiceColor = () => {
-    if (phase === "rolling") return "text-gray-400 dark:text-gray-500";
+    if (phase === "rolling") return "text-blue-500";
+    if (phase === "result") {
+      if (rollData.critical) return "text-purple-500";
+      if (rollData.success) return "text-green-500";
+      return "text-red-500";
+    }
     if (rollData.critical) return "text-purple-500";
     if (rollData.success) return "text-green-500";
     return "text-red-500";
@@ -90,7 +96,7 @@ export default function DiceRollVisualization({ rollData, onComplete }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border-2 border-gray-700 animate-scale-in">
+      <div className="bg-linear-to-b from-gray-800 to-gray-900 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border-2 border-gray-700 animate-scale-in">
         {/* Roll Type Badge */}
         <div className="text-center mb-6">
           <div

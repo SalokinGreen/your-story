@@ -75,11 +75,13 @@ Story prose here. Write your narrative content between these tags.
 IMPORTANT: The <story></story> tags are MANDATORY. Never write story text without wrapping it in <story> tags. All narrative content must be enclosed in <story></story> tags.
 
 Choice Syntax:
-- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; item_loss: true or false>
+- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none>
 Example:
-- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 50); use_resource: Stamina; use_item: Stamina Potion; item_loss: true>
+- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 50); use_resource: Stamina; use_item: Stamina Potion>
 
 Memory Guidelines:
+- The <memory> section is for NEW memory entries that will be ADDED to the existing memory list.
+- Do NOT repeat entries that already exist in the Memory section below. Only add genuinely new information.
 - Make memory entries DETAILED and SPECIFIC. Include names, locations, consequences, and emotional context.
 - BAD: "Met a merchant" GOOD: "Met Aldric, a suspicious merchant in Darkwater who tried to sell cursed artifacts and fled when confronted"
 - BAD: "Fought goblins" GOOD: "Slaughtered goblin war party at Blackridge Pass, their chieftain swore revenge before dying"
@@ -182,8 +184,8 @@ Relationship Change Guidelines:
 - Don't track every minor NPC - focus on recurring characters and important factions
 
 Achievement & Beat Commands:
-- /trigger_achievement: achievement title - Triggers/unlocks an existing achievement. Use EXACT title from Achievements section below. Example: /trigger_achievement: First Blood
-- /mark_beat: beat index - Marks a story beat as fulfilled. IMPORTANT: Only mark a beat as fulfilled after ALL events, objectives, and key moments described in that beat's content have been completed in the narrative. Do not mark it early.
+- /trigger_achievement: achievement title - Triggers/unlocks an existing achievement. ⚠️ CRITICAL: You MUST use the EXACT title from the "Achievements Available to Unlock" section below. Do NOT make up achievement names or paraphrase them. Only trigger achievements that are explicitly listed in the context. Example: /trigger_achievement: First Blood
+- /mark_beat: beat index - Marks a story beat as COMPLETE/FULFILLED (past tense). ⚠️ CRITICAL: Only use this command AFTER all events in the beat have concluded in the narrative. Do NOT mark a beat while its events are actively happening. Example: If beat says "infiltrate the castle," mark it AFTER the infiltration is complete, not during. Marking means "this objective is done," not "this is happening now."
 
 Lore Commands:
 - /create_lore: title | content | on_triggers | off_triggers - Creates a new lore entry. Triggers are comma-separated keywords. Set on_triggers to empty if lore should be visible from start. Example: /create_lore: The Ancient Order | A secret society of mages | ancient,order,mages | disbanded,destroyed
@@ -194,10 +196,12 @@ Lore Commands:
 Plot Beat Guidelines:
 - Each plot beat represents a significant story milestone with multiple scenes and events.
 - The "Current Plot Beat" section shows what needs to be accomplished - read it carefully.
-- Only use /mark_beat when the player has fully experienced and completed everything described in that beat's content.
+- ⚠️ IMPORTANT: /mark_beat means "this is DONE" (past tense), NOT "this is happening now" (present tense).
+- Only use /mark_beat AFTER the player has fully experienced and completed everything described in that beat's content.
 - If a beat describes multiple events or objectives, ensure ALL of them happen before marking it complete.
 - Beats should feel substantial - don't rush through them. Let the story breathe and develop naturally.
-- After marking a beat complete, the next beat becomes current. Reference it to smoothly transition the narrative forward.
+- After marking a beat complete, it moves to "Previous Plot Beat" for context, and the next beat becomes current.
+- Reference the "Previous Plot Beat" if you need context about recently completed objectives.
 
 Progression System:
 - Players earn upgrade points from story progression and achievements.
@@ -360,6 +364,12 @@ export function storyDataToString(storyData: StoryData): string {
     (beat) => !beat.fulfilled
   );
 
+  // Show previous beat (most recently completed) for context
+  if (currentBeatIndex > 0) {
+    const previousBeat = storyData.plot_beats[currentBeatIndex - 1];
+    result += `\n### Previous Plot Beat (Recently Completed)\n#### ${currentBeatIndex}. ${previousBeat.title}\n${previousBeat.content}\n`;
+  }
+
   // Show current beat (with full content)
   if (
     currentBeatIndex !== -1 &&
@@ -433,10 +443,14 @@ export function storyDataToString(storyData: StoryData): string {
   result += `\n## Author Notes (AI instructions from the author of the story):\n`;
   if (storyData.author_notes) {
     result += `${storyData.author_notes}\n\n`;
+  } else {
+    result += "None\n\n";
   }
   result += `## Player Notes (Notes added by the player during the story):\n`;
   if (storyData.player_notes) {
     result += `${storyData.player_notes}\n\n`;
+  } else {
+    result += "None\n\n";
   }
 
   console.log("storyDataToString result:", result);

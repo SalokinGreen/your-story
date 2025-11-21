@@ -16,7 +16,7 @@ You walk into the cave. It's cold and dripping, the smell of wet stone filling y
 <choices>
 - Enter deeper <use_skill: Stealth (DC 12)>
 - Return to village
-- Light a torch <use_item: Torch; item_loss: false>
+- Light a torch <use_item: Torch>
 </choices>
 !!! END CHAPTER !!!
 `;
@@ -54,7 +54,7 @@ You walk into the cave. It's cold and dripping, the smell of wet stone filling y
   });
 
   it("parses choice metadata correctly", () => {
-    const text = `<story>A challenge appears.</story>\n<choices>\n- Fight the beast <use_skill: Combat (DC 75); use_resource: Health>\n- Use potion <use_item: Health Potion; item_loss: true; use_resource: Mana>\n</choices>`;
+    const text = `<story>A challenge appears.</story>\n<choices>\n- Fight the beast <use_skill: Combat (DC 75); use_resource: Health>\n- Use potion <use_item: Health Potion; use_resource: Mana>\n</choices>`;
     const part = outputToScenePart(text);
     expect(part.choices).toHaveLength(2);
     expect(part.choices?.[0].text).toBe("Fight the beast");
@@ -62,7 +62,6 @@ You walk into the cave. It's cold and dripping, the smell of wet stone filling y
     expect(part.choices?.[0].skill_dc).toBe(75);
     expect(part.choices?.[0].resource_used).toBe("Health");
     expect(part.choices?.[1].item_used).toBe("Health Potion");
-    expect(part.choices?.[1].item_loss).toBe(true);
     expect(part.choices?.[1].resource_used).toBe("Mana");
   });
 });

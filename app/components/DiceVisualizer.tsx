@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 
 interface DiceVisualizerProps {
@@ -30,62 +30,150 @@ export function DiceVisualizer({
 }: DiceVisualizerProps) {
   const [currentNumber, setCurrentNumber] = useState(1);
   const [showResult, setShowResult] = useState(false);
-  const [animationPhase, setAnimationPhase] = useState<"rolling" | "result">(
-    "rolling"
-  );
+  const [animationPhase, setAnimationPhase] = useState<
+    "rolling" | "stopped" | "calculating" | "result"
+  >("rolling");
+
+  // Tunable durations (ms)
+  const DURATIONS = {
+    rolling: 1500,
+    stopped: 500,
+    calculating: 800,
+    resultHold: 1500, // time after result appears
+    numberInterval: 50,
+  } as const;
+
+  const onCompleteRef = useRef(onComplete);
+  const intervalRef = useRef<number | null>(null);
+  const timeoutsRef = useRef<number[]>([]);
+  const skippedRef = useRef(false);
 
   useEffect(() => {
-    // Rolling animation - count up rapidly
-    const rollDuration = 1500; // 1.5 seconds of rolling
-    const interval = 50; // Update every 50ms
-    const steps = rollDuration / interval;
-    let step = 0;
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
-    const rollInterval = setInterval(() => {
-      step++;
-      // Random numbers during roll
+  const clearAllTimers = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    timeoutsRef.current.forEach((id) => clearTimeout(id));
+    timeoutsRef.current = [];
+  };
+
+  const scheduleTimeout = (fn: () => void, ms: number) => {
+    const id = window.setTimeout(fn, ms);
+    timeoutsRef.current.push(id);
+  };
+
+  const startSequence = useCallback(() => {
+    // Rolling phase
+    let elapsed = 0;
+    intervalRef.current = window.setInterval(() => {
+      elapsed += DURATIONS.numberInterval;
       setCurrentNumber(Math.floor(Math.random() * 100) + 1);
-
-      if (step >= steps) {
-        clearInterval(rollInterval);
-        // Show final result
+      if (elapsed >= DURATIONS.rolling) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        intervalRef.current = null;
         setCurrentNumber(finalRoll);
-        setAnimationPhase("result");
-
-        // Show full result breakdown after a delay
-        setTimeout(() => {
-          setShowResult(true);
-          setTimeout(() => {
-            onComplete?.();
-          }, 2000);
-        }, 500);
+        setAnimationPhase("stopped");
+        // Stopped -> calculating
+        scheduleTimeout(() => {
+          if (skippedRef.current) return;
+          setAnimationPhase("calculating");
+          // Calculating -> result
+          scheduleTimeout(() => {
+            if (skippedRef.current) return;
+            setAnimationPhase("result");
+            setShowResult(true);
+            // Result hold then complete
+            scheduleTimeout(() => {
+              onCompleteRef.current?.();
+            }, DURATIONS.resultHold);
+          }, DURATIONS.calculating);
+        }, DURATIONS.stopped);
       }
-    }, interval);
+    }, DURATIONS.numberInterval);
+  }, [finalRoll]);
 
-    return () => clearInterval(rollInterval);
-  }, [finalRoll, onComplete]);
+  const skipAnimation = useCallback(() => {
+    if (skippedRef.current) return;
+    skippedRef.current = true;
+    clearAllTimers();
+    setCurrentNumber(finalRoll);
+    setAnimationPhase("result");
+    setShowResult(true);
+    // Shorter hold after skip
+    scheduleTimeout(() => {
+      onCompleteRef.current?.();
+    }, 800);
+  }, [finalRoll]);
+
+  useEffect(() => {
+    startSequence();
+    return () => clearAllTimers();
+  }, [startSequence]);
+
+  // Keyboard skip
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (["Enter", " ", "Spacebar", "Escape"].includes(e.key)) {
+        skipAnimation();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [skipAnimation]);
 
   const total = finalRoll + skillBonus;
-  const resultColor = isCritical
-    ? "text-yellow-500"
-    : isSuccess
-    ? "text-green-500"
-    : "text-red-500";
 
-  const bgColor = isCritical
-    ? "bg-gradient-to-br from-yellow-500/20 to-amber-500/20 border-yellow-500"
-    : isSuccess
-    ? "bg-gradient-to-br from-green-500/20 to-emerald-500/20 border-green-500"
-    : "bg-gradient-to-br from-red-500/20 to-rose-500/20 border-red-500";
+  // Colors based on animation phase
+  const isResultPhase = animationPhase === "result";
+  const isCalculating = animationPhase === "calculating";
+  const isStopped = animationPhase === "stopped";
+  const isRolling = animationPhase === "rolling";
 
-  const diceColor = isCritical
-    ? "text-yellow-400"
-    : isSuccess
-    ? "text-green-400"
-    : "text-red-400";
+  const resultColor =
+    isRolling || isStopped || isCalculating
+      ? "text-blue-500"
+      : isCritical
+      ? "text-yellow-500"
+      : isSuccess
+      ? "text-green-500"
+      : "text-red-500";
+
+  const bgColor =
+    isRolling || isStopped || isCalculating
+      ? "bg-linear-to-br from-blue-500/20 to-cyan-500/20 border-blue-500"
+      : isCritical
+      ? "bg-linear-to-br from-yellow-500/20 to-amber-500/20 border-yellow-500"
+      : isSuccess
+      ? "bg-linear-to-br from-green-500/20 to-emerald-500/20 border-green-500"
+      : "bg-linear-to-br from-red-500/20 to-rose-500/20 border-red-500";
+
+  const diceColor =
+    isRolling || isStopped || isCalculating
+      ? "text-blue-400"
+      : isCritical
+      ? "text-yellow-400"
+      : isSuccess
+      ? "text-green-400"
+      : "text-red-400";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn"
+      onClick={skipAnimation}
+      role="button"
+      aria-label="Skip dice animation"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (["Enter", " ", "Spacebar", "Escape"].includes(e.key)) {
+          e.preventDefault();
+          skipAnimation();
+        }
+      }}
+    >
       <div
         className={`${bgColor} border-4 rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl animate-scaleIn`}
       >
@@ -139,61 +227,65 @@ export function DiceVisualizer({
           )}
 
           {/* Rolling Number */}
-          <div className="mb-4">
+          <div className="mb-4 relative h-32 flex items-center justify-center">
+            {/* Main Number */}
             <div
-              className={`text-8xl font-bold ${resultColor} ${
-                animationPhase === "rolling"
+              className={`absolute inset-0 flex items-center justify-center text-8xl font-bold ${resultColor} transition-all duration-500 ${
+                isRolling
                   ? "animate-pulse"
-                  : "animate-bounce"
+                  : isStopped
+                  ? "scale-100 opacity-100"
+                  : "scale-50 opacity-0"
               } drop-shadow-2xl`}
             >
               {currentNumber}
             </div>
+
+            {/* Calculation Animation */}
+            {(isCalculating || isResultPhase) && (
+              <div className="absolute inset-0 flex items-center justify-center animate-fadeIn">
+                <div className="flex items-center gap-4 text-6xl font-bold text-white">
+                  <span
+                    className={`${resultColor} transition-all duration-500 ${
+                      isResultPhase ? "scale-0 w-0 opacity-0" : "scale-100"
+                    }`}
+                  >
+                    {finalRoll}
+                  </span>
+                  <span
+                    className={`text-blue-300 transition-all duration-500 ${
+                      isResultPhase ? "scale-0 w-0 opacity-0" : "scale-100"
+                    }`}
+                  >
+                    +{skillBonus}
+                  </span>
+                  <span
+                    className={`transition-all duration-500 ${
+                      isResultPhase ? "scale-150" : "scale-0 opacity-0 w-0"
+                    } ${resultColor}`}
+                  >
+                    {total}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Skill Name */}
-          <div className="text-2xl font-semibold text-white mb-2">
-            {skillName}
+          {/* Skill Name & DC */}
+          <div className="flex flex-col items-center gap-1 mb-2">
+            <div className="text-2xl font-semibold text-white">{skillName}</div>
+            <div className="flex items-center gap-2 text-white/80 bg-black/20 px-3 py-1 rounded-full">
+              <span className="text-sm uppercase tracking-wider font-bold">
+                DC
+              </span>
+              <span className="text-xl font-bold text-purple-300">{dc}</span>
+            </div>
           </div>
         </div>
 
         {/* Result Breakdown */}
         {showResult && (
           <div className="space-y-3 animate-slideUp">
-            {/* Calculation */}
-            <div className="bg-black/30 rounded-xl p-4 backdrop-blur-sm border border-white/10">
-              <div className="flex items-center justify-center gap-3 text-xl font-mono">
-                <span className={`${resultColor} font-bold text-3xl`}>
-                  {finalRoll}
-                </span>
-                <span className="text-white/60">+</span>
-                <span className="text-blue-300 font-semibold">
-                  {skillBonus}
-                </span>
-                <span className="text-white/60">=</span>
-                <span className={`${resultColor} font-bold text-3xl`}>
-                  {total}
-                </span>
-              </div>
-              <div className="text-center mt-2 text-sm text-white/70">
-                Roll + Skill Bonus = Total
-              </div>
-            </div>
-
-            {/* DC Comparison */}
-            <div className="bg-black/30 rounded-xl p-4 backdrop-blur-sm border border-white/10">
-              <div className="flex items-center justify-center gap-3 text-xl">
-                <span className={`${resultColor} font-bold text-2xl`}>
-                  {total}
-                </span>
-                <span className="text-white/60">{isSuccess ? "≥" : "<"}</span>
-                <span className="text-purple-300 font-bold text-2xl">{dc}</span>
-              </div>
-              <div className="text-center mt-2 text-sm text-white/70">
-                Total vs DC
-              </div>
-            </div>
-
             {/* Success/Failure Message */}
             <div
               className={`text-center py-3 px-4 rounded-xl font-bold text-xl ${

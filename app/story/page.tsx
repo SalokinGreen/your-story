@@ -190,27 +190,10 @@ export function processCommands(
     if (achievementMatch) {
       const achievementTitle = achievementMatch[1].trim();
 
-      // Try fuzzy matching first
-      const matchResult = findAchievementMatch(
-        achievementTitle,
-        storyData.achievements
+      // Use exact match only - no fuzzy matching
+      const existing = storyData.achievements.find(
+        (a) => a.title.toLowerCase() === achievementTitle.toLowerCase()
       );
-      const existing = matchResult?.item;
-
-      // Log fuzzy match result
-      if (matchResult && !matchResult.isExact) {
-        logger.info("Fuzzy matched achievement", {
-          aiProvided: achievementTitle,
-          matched: matchResult.name,
-          score: matchResult.score,
-        });
-        addNotification(
-          `📝 Matched "${achievementTitle}" → "${
-            matchResult.name
-          }" (${Math.round(matchResult.score * 100)}% match)`,
-          "info"
-        );
-      }
 
       if (existing && !existing.dateAchieved) {
         existing.dateAchieved = new Date();
@@ -228,8 +211,9 @@ export function processCommands(
           "success"
         );
       } else if (!existing) {
-        logger.warn("Achievement not found or no fuzzy match", {
+        logger.warn("Achievement not found - exact match required", {
           achievement: achievementTitle,
+          availableAchievements: storyData.achievements.map((a) => a.title),
         });
         addNotification(
           `⚠️ Achievement not found: ${achievementTitle}`,
@@ -2010,11 +1994,27 @@ function StoryPageContent() {
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
-          logger.action("Memory entries added", {
-            count: data.part.memoryEntries.length,
-            entries: data.part.memoryEntries,
-          });
-          storyData.memory.push(...data.part.memoryEntries);
+          const existingMemoryLower = storyData.memory.map((m) =>
+            m.toLowerCase().trim()
+          );
+          const newMemories = data.part.memoryEntries.filter(
+            (entry: string) =>
+              !existingMemoryLower.includes(entry.toLowerCase().trim())
+          );
+          if (newMemories.length > 0) {
+            logger.action("New memory entries added", {
+              count: newMemories.length,
+              entries: newMemories,
+              skippedDuplicates:
+                data.part.memoryEntries.length - newMemories.length,
+            });
+            storyData.memory.push(...newMemories);
+          } else {
+            logger.action("Memory entries skipped (all duplicates)", {
+              count: data.part.memoryEntries.length,
+              entries: data.part.memoryEntries,
+            });
+          }
         }
 
         processLoreTriggers(storyData, addNotification);
@@ -2378,8 +2378,10 @@ function StoryPageContent() {
           hasDisadvantage: hasItemDisadvantage,
         });
 
-        // Wait for animation to complete before showing notification
-        await new Promise((resolve) => setTimeout(resolve, 4000));
+        // Wait for dice visualizer animation to complete before continuing.
+        // Total phases: rolling (1800ms) + stopped (800ms) + calculating (1200ms) + result hold (5000ms) = 8800ms.
+        // Add small buffer.
+        await new Promise((resolve) => setTimeout(resolve, 9000));
         setDiceRoll(null);
 
         if (dc_passed) {
@@ -2785,11 +2787,27 @@ function StoryPageContent() {
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
-          logger.action("Memory entries added", {
-            count: data.part.memoryEntries.length,
-            entries: data.part.memoryEntries,
-          });
-          storyData.memory.push(...data.part.memoryEntries);
+          const existingMemoryLower = storyData.memory.map((m) =>
+            m.toLowerCase().trim()
+          );
+          const newMemories = data.part.memoryEntries.filter(
+            (entry: string) =>
+              !existingMemoryLower.includes(entry.toLowerCase().trim())
+          );
+          if (newMemories.length > 0) {
+            logger.action("New memory entries added", {
+              count: newMemories.length,
+              entries: newMemories,
+              skippedDuplicates:
+                data.part.memoryEntries.length - newMemories.length,
+            });
+            storyData.memory.push(...newMemories);
+          } else {
+            logger.action("Memory entries skipped (all duplicates)", {
+              count: data.part.memoryEntries.length,
+              entries: data.part.memoryEntries,
+            });
+          }
         }
 
         //ProcessLoretriggersbasedonnew content
@@ -3034,11 +3052,27 @@ function StoryPageContent() {
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
-          logger.action("Memory entries added", {
-            count: data.part.memoryEntries.length,
-            entries: data.part.memoryEntries,
-          });
-          storyData.memory.push(...data.part.memoryEntries);
+          const existingMemoryLower = storyData.memory.map((m) =>
+            m.toLowerCase().trim()
+          );
+          const newMemories = data.part.memoryEntries.filter(
+            (entry: string) =>
+              !existingMemoryLower.includes(entry.toLowerCase().trim())
+          );
+          if (newMemories.length > 0) {
+            logger.action("New memory entries added", {
+              count: newMemories.length,
+              entries: newMemories,
+              skippedDuplicates:
+                data.part.memoryEntries.length - newMemories.length,
+            });
+            storyData.memory.push(...newMemories);
+          } else {
+            logger.action("Memory entries skipped (all duplicates)", {
+              count: data.part.memoryEntries.length,
+              entries: data.part.memoryEntries,
+            });
+          }
         }
 
         //ProcessLoretriggersbasedonnew content

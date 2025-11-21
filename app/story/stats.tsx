@@ -13,7 +13,20 @@ type StatsTab =
   | "relationships";
 
 export default function StatsPage(storyData: StoryData) {
-  const [activeTab, setActiveTab] = useState<StatsTab>("stats");
+  const [activeTab, setActiveTab] = useState<StatsTab>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("statsActiveTab");
+      return (saved as StatsTab) || "stats";
+    }
+    return "stats";
+  });
+
+  const handleTabChange = (tab: StatsTab) => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("statsActiveTab", tab);
+    }
+  };
 
   return (
     <div className="w-full">
@@ -89,7 +102,7 @@ export default function StatsPage(storyData: StoryData) {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as StatsTab)}
+              onClick={() => handleTabChange(tab.id as StatsTab)}
               className={`px-3 sm:px-4 py-2 font-semibold rounded-t-lg transition-colors whitespace-nowrap flex items-center gap-2 text-sm sm:text-base ${
                 activeTab === tab.id
                   ? `bg-${tab.color}-600 text-white`
@@ -347,6 +360,13 @@ export default function StatsPage(storyData: StoryData) {
                 <div className="space-y-3">
                   {storyData.achievements
                     .filter((a) => !a.hidden || a.dateAchieved)
+                    .sort((a, b) => {
+                      // Sort by achieved status first (achieved first)
+                      if (a.dateAchieved && !b.dateAchieved) return -1;
+                      if (!a.dateAchieved && b.dateAchieved) return 1;
+                      // If both achieved or both not achieved, maintain original order
+                      return 0;
+                    })
                     .map((achievement, index) => (
                       <div
                         key={index}
