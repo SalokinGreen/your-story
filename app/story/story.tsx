@@ -21,6 +21,10 @@ interface StoryProps {
   onUndo?: () => void; // callback to undo last action
   canUndo?: boolean; // whether undo is available
   onEdit?: (rawText: string, partIndex: number) => void; // callback to edit a story part
+  viewingPartIndex?: number | null; // current viewing index for history navigation
+  onNavigateLeft?: () => void; // navigate to previous part
+  onNavigateRight?: () => void; // navigate to next part
+  onResetToCurrentPart?: () => void; // return to current/latest part
 }
 
 export default function Story({
@@ -39,6 +43,10 @@ export default function Story({
   onUndo,
   canUndo,
   onEdit,
+  viewingPartIndex,
+  onNavigateLeft,
+  onNavigateRight,
+  onResetToCurrentPart,
 }: StoryProps) {
   const [freeInputEnabled, setFreeInputEnabled] = React.useState<boolean>(
     () => {
@@ -61,6 +69,47 @@ export default function Story({
     <div className="w-full">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col gap-6">
+          {/* Navigation arrows */}
+          {storyData.scene.parts.length > 1 && (
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={onNavigateLeft}
+                disabled={viewingPartIndex === 0}
+                className="p-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                title="Previous message"
+              >
+                <DynamicIcon name="ChevronLeft" className="w-4 h-4" />
+              </button>
+              
+              {viewingPartIndex !== null ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {viewingPartIndex + 1} / {storyData.scene.parts.length}
+                  </span>
+                  <button
+                    onClick={onResetToCurrentPart}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    current
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {storyData.scene.parts.length}
+                </span>
+              )}
+
+              <button
+                onClick={onNavigateRight}
+                disabled={viewingPartIndex === null || viewingPartIndex === storyData.scene.parts.length - 1}
+                className="p-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                title="Next message"
+              >
+                <DynamicIcon name="ChevronRight" className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* Story text with edit mode */}
           <div
             className="relative"

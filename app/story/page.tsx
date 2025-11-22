@@ -1430,6 +1430,9 @@ function StoryPageContent() {
     CommandResponse[]
   >([]);
 
+  // Story part navigation
+  const [viewingPartIndex, setViewingPartIndex] = useState<number | null>(null);
+
   // Helper to process multiple scene parts from API
   function processSceneParts(
     parts: any[],
@@ -1548,6 +1551,45 @@ function StoryPageContent() {
 
     processLoreTriggers(storyData, addNotification);
     return lastPartWithContent || parts[parts.length - 1];
+  }
+
+  // Navigation handlers
+  function handleNavigateLeft() {
+    if (!storyData) return;
+    const currentIndex = viewingPartIndex ?? storyData.scene.parts.length - 1;
+    if (currentIndex > 0) {
+      const newIndex = currentIndex - 1;
+      setViewingPartIndex(newIndex);
+      const part = storyData.scene.parts[newIndex];
+      setStoryText(part.content);
+      setChoices({ choices: part.choices || [] });
+    }
+  }
+
+  function handleNavigateRight() {
+    if (!storyData) return;
+    const currentIndex = viewingPartIndex ?? storyData.scene.parts.length - 1;
+    if (currentIndex < storyData.scene.parts.length - 1) {
+      const newIndex = currentIndex + 1;
+      setViewingPartIndex(newIndex);
+      const part = storyData.scene.parts[newIndex];
+      setStoryText(part.content);
+      setChoices({ choices: part.choices || [] });
+    } else {
+      // At the end, return to current
+      setViewingPartIndex(null);
+      const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
+      setStoryText(lastPart.content);
+      setChoices({ choices: lastPart.choices || [] });
+    }
+  }
+
+  function resetToCurrentPart() {
+    if (!storyData) return;
+    setViewingPartIndex(null);
+    const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
+    setStoryText(lastPart.content);
+    setChoices({ choices: lastPart.choices || [] });
   }
 
   // Fetch token balance on mount
@@ -4658,6 +4700,10 @@ function StoryPageContent() {
             onUndo={handleUndo}
             canUndo={canUndo}
             onEdit={handleEdit}
+            viewingPartIndex={viewingPartIndex}
+            onNavigateLeft={handleNavigateLeft}
+            onNavigateRight={handleNavigateRight}
+            onResetToCurrentPart={resetToCurrentPart}
           />
         )}
         {currentState === StoryState.STATS && <StatsPage {...storyData} />}
