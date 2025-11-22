@@ -9,6 +9,7 @@ import {
 } from "@/app/misc/tokens";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import { getUserSettings } from "@/app/misc/user_settings";
+import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,11 @@ interface RequestBody {
 
 interface AIChoice {
   index: number;
-  message: { role: "assistant" | "user" | "system"; content: string };
+  message: {
+    role: "assistant" | "user" | "system";
+    content: string;
+    tool_calls?: ToolCall[];
+  };
   finish_reason?: string;
 }
 
@@ -237,15 +242,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let messages: ChatMessage[] = buildMessages({
+  const { messages: rawMessages, tools } = buildMessages({
     storyData,
     userChoice,
     useRawContext,
     maxTokens: modelConfig.maxTokens,
     commandResponses,
+    supportsToolCalling: modelConfig.supportsToolCalling || false,
   });
   // Filter out duplicate messages
-  messages = messages.filter(
+  let messages = rawMessages.filter(
     (msg, index, self) =>
       index ===
       self.findIndex((m) => m.role === msg.role && m.content === msg.content)
@@ -277,16 +283,24 @@ export async function POST(req: NextRequest) {
       headers["X-Title"] = "Your Story - Interactive Fiction";
     }
 
+    const requestBody: any = {
+      model: modelConfig.model,
+      messages,
+      temperature: 0.7,
+      max_tokens: modelConfig.maxOutputTokens,
+      stream: false,
+    };
+
+    // Only include tools if model supports them
+    if (tools.length > 0) {
+      requestBody.tools = tools;
+      requestBody.tool_choice = "auto";
+    }
+
     const resp = await fetch(apiUrl, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        model: modelConfig.model,
-        messages,
-        temperature: 0.7,
-        max_tokens: modelConfig.maxOutputTokens,
-        stream: false,
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -310,14 +324,48 @@ export async function POST(req: NextRequest) {
       data.choices?.length || 0
     );
 
-    const content = data.choices?.[0]?.message?.content ?? "";
+    const aiMessage = data.choices?.[0]?.message;
+    const content = aiMessage?.content ?? "";
+    const toolCalls = aiMessage?.tool_calls || [];
+
     console.log("Content:", content);
     console.log("Content length:", content.length);
+    console.log("Tool calls:", toolCalls.length);
+    if (toolCalls.length > 0) {
+      console.log(
+        "Tool call names:",
+        toolCalls.map((tc: any) => tc.function?.name).join(", ")
+      );
+    }
     console.log("Content preview:", content.substring(0, 200));
+
+    // Execute tool calls if any
+    let toolResponses: CommandResponse[] = [];
+    if (toolCalls.length > 0) {
+      console.log("Executing tool calls...");
+      toolResponses = executeTools(toolCalls, storyData);
+      console.log("Tool execution complete. Responses:", toolResponses.length);
+      toolResponses.forEach((resp, idx) => {
+        console.log(
+          `  Tool ${idx + 1}: ${resp.command} - ${
+            resp.success ? "SUCCESS" : "FAILED"
+          } - ${resp.message}`
+        );
+      });
+    }
 
     let part;
     try {
       part = coerceToScenePart(content);
+
+      // Store tool calls and responses in the ScenePart for conversation history
+      if (toolCalls.length > 0) {
+        part.toolCalls = toolCalls;
+      }
+      if (toolResponses.length > 0) {
+        part.toolResponses = toolResponses;
+      }
+
       console.log(
         "Successfully parsed ScenePart. Choices:",
         part.choices?.length || 0
@@ -364,6 +412,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       part,
+      toolResponses, // Include tool execution results
       meta: {
         model: data.model,
         modelName: modelConfig.name,

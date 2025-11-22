@@ -50,9 +50,10 @@ export interface Achievement {
 
 export interface CommandResponse {
   command: string; // The original command that was executed
-  success: boolean | 'partial'; // True if succeeded, false if failed, 'partial' if partially successful
+  success: boolean | "partial"; // True if succeeded, false if failed, 'partial' if partially successful
   message: string; // Human-readable description of what happened
   timestamp: number; // When the command was executed
+  toolCallId?: string; // Optional: links response to specific tool call for conversation coherency
 }
 
 export interface StoryLore {
@@ -86,7 +87,9 @@ export interface ScenePart {
   role: "system" | "user" | "assistant";
   choices?: Choice[];
   memoryEntries?: string[];
-  commands?: string[];
+  commands?: string[]; // Legacy: XML commands
+  toolCalls?: any[]; // Tool calls made by AI (OpenAI/DeepSeek format)
+  toolResponses?: CommandResponse[]; // Execution results of tool calls
   endChapter?: boolean;
   endStory?: boolean;
   gameOver?: boolean;

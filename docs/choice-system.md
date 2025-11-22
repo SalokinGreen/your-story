@@ -104,16 +104,17 @@ The choice system is the core gameplay loop:
 
 ```typescript
 interface Choice {
-  text: string;              // Display text for player
-  skill_used?: string;       // Skill name for check
-  dc?: number;              // Difficulty class (not used for PbtA/percentile)
-  resource_used?: string;   // Resource required/at-risk
-  item_used?: string;       // Item required for advantage
-  item_loss?: boolean;      // Whether item breaks/consumed
+  text: string; // Display text for player
+  skill_used?: string; // Skill name for check
+  dc?: number; // Difficulty class (not used for PbtA/percentile)
+  resource_used?: string; // Resource required/at-risk
+  item_used?: string; // Item required for advantage
+  item_loss?: boolean; // Whether item breaks/consumed
 }
 ```
 
 **Example from AI**:
+
 ```xml
 <choices>
 - You carefully pick the lock. <use_skill: Lockpicking (DC 15); use_resource: none; use_item: Lockpicks>
@@ -137,18 +138,18 @@ const item = matchResult?.item;
 
 if (item) {
   // Item exists
-  if (itemType === 'misc') {
+  if (itemType === "misc") {
     // Misc items: prevent disadvantage only
   } else {
     // Normal/consumable/story: grant advantage
     advantageCount++;
     advantageSources.push(item.name);
   }
-  
+
   // Handle consumption
-  if (itemType === 'consumable') {
+  if (itemType === "consumable") {
     // Consume immediately
-  } else if (itemType === 'normal') {
+  } else if (itemType === "normal") {
     // May break on failure
   }
   // Story/misc never consumed or broken
@@ -160,6 +161,7 @@ if (item) {
 ```
 
 **Item Type Behaviors**:
+
 - **normal**: Advantage on use, breaks on failure
 - **consumable**: Advantage on use, consumed immediately
 - **story**: Advantage on use, never breaks (quest items)
@@ -175,10 +177,10 @@ const resourceReqs = calculateResourceRequirements(rpgSystem, dc);
 if (resource.value < resourceReqs.required) {
   // Insufficient resources
   insufficientResource = true;
-  
+
   // Apply dice penalty (system-specific)
   const dicePenalty = resourceReqs.penalty;
-  
+
   // For PbtA/Fate: apply as modifier penalty
   // For roll systems: apply as roll penalty
   // For YZE/Explosive: no automatic penalty
@@ -186,6 +188,7 @@ if (resource.value < resourceReqs.required) {
 ```
 
 **Resource Flow**:
+
 1. **Before check**: Validate sufficient resources
 2. **On success**: Recover some resources (DC ÷ 20)
 3. **On failure**: Lose additional resources (DC ÷ 10)
@@ -294,7 +297,7 @@ if (successResult.tie) {
 }
 
 // YZE: panic check
-if (stressDice.some(die => die === 1)) {
+if (stressDice.some((die) => die === 1)) {
   triggerPanic();
 }
 ```
@@ -344,6 +347,7 @@ choiceDetails.push(skillCheckLine);
 ### Format Examples by System
 
 **Standard (3d6, 1d20, 1d100, Percentile)**:
+
 ```
 [Lockpicking: success]
 [Stealth: failure]
@@ -351,6 +355,7 @@ choiceDetails.push(skillCheckLine);
 ```
 
 **PbtA**:
+
 ```
 [Technique: partial success (7-9)]
 [Charm: success]
@@ -358,6 +363,7 @@ choiceDetails.push(skillCheckLine);
 ```
 
 **Fate**:
+
 ```
 [Diplomacy: tie (margin 0)]
 [Combat: success with style (+5)]
@@ -366,6 +372,7 @@ choiceDetails.push(skillCheckLine);
 ```
 
 **Explosive**:
+
 ```
 [Acrobatics: success (d8 exploded x2)]
 [Lockpicking: failure (d6)]
@@ -373,6 +380,7 @@ choiceDetails.push(skillCheckLine);
 ```
 
 **YZE**:
+
 ```
 [Mechanics: success (3 successes vs 2)]
 [Survival: failure (1 successes vs 2)]
@@ -419,18 +427,18 @@ const minimalStoryData = {
   resources: storyData.resources,
   inventory: storyData.inventory,
   achievements: storyData.achievements,
-  lore: storyData.lore.filter(l => l.on !== false),
+  lore: storyData.lore.filter((l) => l.on !== false),
   // ... other minimal fields
   scene: {
-    parts: recentParts // Only last 6 parts
-  }
+    parts: recentParts, // Only last 6 parts
+  },
 };
 
 const payload = {
   storyData: minimalStoryData,
   userChoice: null, // Choice already added to scene parts
   model: localStorage.getItem("aiModel"),
-  useRawContext: localStorage.getItem("useRawContext") === "true"
+  useRawContext: localStorage.getItem("useRawContext") === "true",
 };
 ```
 
@@ -477,6 +485,7 @@ Commands let AI modify story state:
 ```
 
 **Processing**:
+
 1. Parse command syntax
 2. Fuzzy match entity names
 3. Apply state changes
@@ -496,7 +505,7 @@ When player submits free-form text (no predefined choices):
 storyData.scene.parts.push({
   content: ">" + customText,
   user: true,
-  role: "user"
+  role: "user",
 });
 
 // Send directly to AI
@@ -514,6 +523,7 @@ The AI receives choice details and should respond appropriately:
 **Context**: `[Technique: partial success (7-9)]`
 
 **AI Should**:
+
 - Achieve player's stated goal
 - Add ONE of:
   - Cost (lose resource, take damage)
@@ -522,8 +532,9 @@ The AI receives choice details and should respond appropriately:
   - Lesser effect (succeed imperfectly)
 
 **Example**:
+
 ```
-You successfully pick the lock, but the mechanism clicks loudly. 
+You successfully pick the lock, but the mechanism clicks loudly.
 You hear footsteps approaching from the hallway—time to move!
 ```
 
@@ -532,12 +543,14 @@ You hear footsteps approaching from the hallway—time to move!
 **Context**: `[Diplomacy: tie (margin 0)]`
 
 **AI Should**:
+
 - Succeed at minor cost or introduce complication
 - "Yes, but..." outcomes
 
 **Example**:
+
 ```
-The guard agrees to let you pass, but demands you leave your 
+The guard agrees to let you pass, but demands you leave your
 weapon with him. He'll return it when you leave the compound.
 ```
 
@@ -546,6 +559,7 @@ weapon with him. He'll return it when you leave the compound.
 **Context**: `[Combat: success with style (+5)]`
 
 **AI Should**:
+
 - Full success PLUS bonus:
   - Extra effect beyond intent
   - Grant advantage for next action
@@ -553,8 +567,9 @@ weapon with him. He'll return it when you leave the compound.
   - Discover useful information
 
 **Example**:
+
 ```
-Your strike connects perfectly! The bandit drops his sword and 
+Your strike connects perfectly! The bandit drops his sword and
 staggers back, giving you a clear opening [+advantage on next attack].
 You also notice a map sticking out of his pocket—looks important.
 ```
@@ -564,38 +579,44 @@ You also notice a map sticking out of his pocket—looks important.
 **Context**: `[Acrobatics: success (d8 exploded x2)]`
 
 **AI Should**:
+
 - Describe moment dramatically (luck, heroism, improbability)
 - Success should feel earned and spectacular
 
 **Example**:
+
 ```
-Against all odds, you launch yourself into the air. Your foot finds 
-purchase on a loose brick, then another—each impossible foothold 
-appearing just as you need it. You soar over the chasm, landing in 
+Against all odds, you launch yourself into the air. Your foot finds
+purchase on a loose brick, then another—each impossible foothold
+appearing just as you need it. You soar over the chasm, landing in
 a perfect roll on the far side. Even you can't believe that worked!
 ```
 
 ### YZE Success Count
 
 **High Count** (3+ over DC): `[Mechanics: success (5 successes vs 2)]`
+
 - Confident, capable outcome
 - "You make it look easy"
 
 **Low Count** (barely met DC): `[Combat: success (2 successes vs 2)]`
+
 - Tense, barely scraped by
 - "You succeed, but only just"
 
 **Panic**: `[PANIC! Freeze: You can't take actions for one round]`
+
 - Narrate panic effect dramatically
 - Player achieved goal but panic triggers anyway
 
 **Example**:
+
 ```
-Your shot hits the alien square in the chest. It screeches and 
+Your shot hits the alien square in the chest. It screeches and
 collapses. [SUCCESS]
 
-But the sound of your gunshot echoing in the dark corridor, the 
-alien blood splattered across your visor—it's too much. Your hands 
+But the sound of your gunshot echoing in the dark corridor, the
+alien blood splattered across your visor—it's too much. Your hands
 shake uncontrollably and you can't move. [PANIC: Freeze]
 ```
 
@@ -608,6 +629,7 @@ shake uncontrollably and you can't move. [PANIC: Freeze]
 **Context**: `[Stealth: failure]` with disadvantage from missing item
 
 **System Behavior**:
+
 - Disadvantage applied automatically
 - AI receives standard failure context
 - Item not mentioned in details
@@ -619,6 +641,7 @@ shake uncontrollably and you can't move. [PANIC: Freeze]
 **Context**: `[Athletics: success (no skill bonus)]`
 
 **System Behavior**:
+
 - Dice penalty applied
 - Check may succeed despite penalty
 - Resources depleted on failure
@@ -630,6 +653,7 @@ shake uncontrollably and you can't move. [PANIC: Freeze]
 **Context**: No skill check details (auto-success)
 
 **System Behavior**:
+
 - No dice rolled
 - Player spent 2 momentum for guaranteed success
 - No context sent to AI
@@ -641,6 +665,7 @@ shake uncontrollably and you can't move. [PANIC: Freeze]
 **Context**: Standard success/failure with `isCritical: true` flag
 
 **System Behavior**:
+
 - Notification shows "CRITICAL!"
 - No special context to AI (currently)
 

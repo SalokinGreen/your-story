@@ -76,7 +76,7 @@ describe("AI Context Building", () => {
 
   describe("buildMessages", () => {
     it("should include story data in the user message", () => {
-      const messages = buildMessages({ storyData: mockStoryData });
+      const { messages } = buildMessages({ storyData: mockStoryData });
       const userMessage = messages.find((m) => m.role === "user");
       expect(userMessage).toBeDefined();
       expect(userMessage?.content).toContain("Lore: Active Lore");

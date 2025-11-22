@@ -7,10 +7,13 @@ import {
 } from "@/app/misc/structs";
 import { getRPGSystem, RPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
+import { TOOL_SCHEMAS, TOOL_NAMES } from "@/app/misc/toolSchemas";
 
 export type ChatMessage = {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  tool_calls?: any[]; // OpenAI/DeepSeek format tool calls
+  tool_call_id?: string; // For tool role messages
 };
 
 export interface BuildPromptInput {
@@ -45,10 +48,12 @@ export function buildMessages({
   useRawContext = false,
   maxTokens = 120000,
   commandResponses,
+  supportsToolCalling = false,
 }: BuildPromptInput & {
   useRawContext?: boolean;
   maxTokens?: number;
-}): ChatMessage[] {
+  supportsToolCalling?: boolean;
+}): { messages: ChatMessage[]; tools: any[] } {
   // Get the RPG system configuration
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
@@ -58,7 +63,20 @@ Stay in character and respond in the style of an interactive fiction game. You'r
 CRITICAL: Always use the exact XML-style tags in your response. Your output MUST follow this structure:
 
 Output Format (REQUIRED):
+${
+  supportsToolCalling
+    ? `
 \`\`\`
+<story>
+Story prose here. Write your narrative content between these tags.
+</story>
+
+<choices>
+- Choice 1
+- Choice 2
+</choices>
+\`\`\` `
+    : `\`\`\`
 <story>
 Story prose here. Write your narrative content between these tags.
 </story>
@@ -80,19 +98,30 @@ Story prose here. Write your narrative content between these tags.
 </commands>
 !!! GAME OVER !!! (Optional to indicate game over)
 \`\`\`
-
+`
+}
 IMPORTANT: The <story></story> tags are MANDATORY. Never write story text without wrapping it in <story> tags. All narrative content must be enclosed in <story></story> tags.
 
 Choice Syntax:
-${rpgSystem.aiInstructions.choiceSyntax}
+${rpgSystem.aiInstructions.choiceSyntax}q
 
-Memory Guidelines:
+${
+  supportsToolCalling
+    ? `Memory Guidelines:
+- Add new memory entries with the add memory tool call.
+- Do NOT repeat entries that already exist in the Memory section below. Only add genuinely new information.
+- Make memory entries DETAILED and SPECIFIC. Include names, locations, consequences, and emotional context.
+- BAD: "Met a merchant" GOOD: "Met Aldric, a suspicious merchant in Darkwater who tried to sell cursed artifacts and fled when confronted"
+- BAD: "Fought goblins" GOOD: "Slaughtered goblin war party at Blackridge Pass, their chieftain swore revenge before dying"
+- Use memory to track important story developments, character actions, and world changes, or anything else that should influence future scenes and shall be remembered by the narrative.`
+    : `Memory Guidelines:
 - The <memory> section is for NEW memory entries that will be ADDED to the existing memory list.
 - Do NOT repeat entries that already exist in the Memory section below. Only add genuinely new information.
 - Make memory entries DETAILED and SPECIFIC. Include names, locations, consequences, and emotional context.
 - BAD: "Met a merchant" GOOD: "Met Aldric, a suspicious merchant in Darkwater who tried to sell cursed artifacts and fled when confronted"
 - BAD: "Fought goblins" GOOD: "Slaughtered goblin war party at Blackridge Pass, their chieftain swore revenge before dying"
-- Use memory to track important story developments, character actions, and world changes, or anything else that should influence future scenes and shall be remembered by the narrative.
+- Use memory to track important story developments, character actions, and world changes, or anything else that should influence future scenes and shall be remembered by the narrative.`
+}
 
 ⚠️ EXACT NAME MATCHING REQUIREMENT:
 When referencing skills, resources, or items in choices and commands, you MUST use the EXACT names as they appear in the game state below.
@@ -155,6 +184,30 @@ Item Types:
 - story: Gives advantage when used. Never breaks and never gets consumed. Important quest items.
 - misc: Doesn't give advantage, but prevents disadvantage from not having an item. Never breaks or gets consumed.
 
+${
+  supportsToolCalling
+    ? `## TOOL CALLING
+
+You have access to structured tools (functions) to modify game state.
+
+Available tools: ${TOOL_NAMES.join(", ")}
+
+Tool Usage:
+- Call tools to modify game state (create quests, add items, adjust stats, etc.)
+- You'll receive feedback in the next user message showing success/failure
+- If a tool fails, you'll see why and can retry with corrections
+- Tools use fuzzy matching for names, so close matches work
+- You can call multiple tools in one response
+
+Example (you just call the tool - no special format needed):
+  Story output: "You find a mysterious potion on the shelf."
+  Tool call: add_item with parameters {name: "Mysterious Potion", description: "A bubbling green liquid", type: "consumable", quantity: 1}
+  Next turn you'll see: "✓ Added Mysterious Potion to inventory"
+`
+    : `## COMMANDS
+
+You can use commands in the <commands> section to modify game state. Commands are parsed and executed after story generation.
+
 Commands (EXACT NAME MATCHING APPLIES):
 
 Inventory Commands:
@@ -185,6 +238,17 @@ Relationship Commands:
 - /remove_relationship: name - Removes a relationship from tracking. Use EXACT name.
 - /update_relationship_description: name | new description - Updates the description of an existing relationship. Example: /update_relationship_description: King's Guard | Now trusted advisors to the throne
 
+Achievement & Beat Commands:
+- /trigger_achievement: achievement title - Triggers/unlocks an existing achievement. ⚠️ CRITICAL: You MUST use the EXACT title from the "Achievements Available to Unlock" section below. Do NOT make up achievement names or paraphrase them. Only trigger achievements that are explicitly listed in the context. Example: /trigger_achievement: First Blood
+- /mark_beat: beat index - Marks a story beat as COMPLETE/FULFILLED (past tense). ⚠️ CRITICAL: Only use this command AFTER all events in the beat have concluded in the narrative. Do NOT mark a beat while its events are actively happening. Example: If beat says "infiltrate the castle," mark it AFTER the infiltration is complete, not during. Marking means "this objective is done," not "this is happening now."
+
+Lore Commands:
+- /create_lore: title | content | on_triggers | off_triggers - Creates a new lore entry. Triggers are comma-separated keywords. Set on_triggers to empty if lore should be visible from start. Example: /create_lore: The Ancient Order | A secret society of mages | ancient,order,mages | disbanded,destroyed
+- /lore_replace_content: lore title | old text | new text - Replaces specific text within an existing lore entry. Use EXACT lore title. Example: /lore_replace_content: The Ancient Order | secret society | powerful organization
+- /lore_add_content: lore title | new text - Adds new content on a new line at the bottom of an existing lore entry. Use EXACT lore title. Example: /lore_add_content: The Ancient Order | Their influence spans across the kingdom.
+- /lore_delete_content: lore title | text to delete - Removes specific text from an existing lore entry. Use EXACT lore title. Example: /lore_delete_content: The Ancient Order | disbanded`
+}
+
 Relationship Guidelines:
 Value Ranges & Meanings:
 - 75 to 100: Strong Ally/Friend - Will go out of their way to help, trust implicitly, may offer special favors or discounts
@@ -206,16 +270,6 @@ Relationship Change Guidelines:
 - Track key NPCs, factions, guilds, kingdoms - anyone with ongoing story relevance
 - Use relationships to open/close narrative paths: high reputation unlocks exclusive quests, low reputation creates obstacles
 - Don't track every minor NPC - focus on recurring characters and important factions
-
-Achievement & Beat Commands:
-- /trigger_achievement: achievement title - Triggers/unlocks an existing achievement. ⚠️ CRITICAL: You MUST use the EXACT title from the "Achievements Available to Unlock" section below. Do NOT make up achievement names or paraphrase them. Only trigger achievements that are explicitly listed in the context. Example: /trigger_achievement: First Blood
-- /mark_beat: beat index - Marks a story beat as COMPLETE/FULFILLED (past tense). ⚠️ CRITICAL: Only use this command AFTER all events in the beat have concluded in the narrative. Do NOT mark a beat while its events are actively happening. Example: If beat says "infiltrate the castle," mark it AFTER the infiltration is complete, not during. Marking means "this objective is done," not "this is happening now."
-
-Lore Commands:
-- /create_lore: title | content | on_triggers | off_triggers - Creates a new lore entry. Triggers are comma-separated keywords. Set on_triggers to empty if lore should be visible from start. Example: /create_lore: The Ancient Order | A secret society of mages | ancient,order,mages | disbanded,destroyed
-- /lore_replace_content: lore title | old text | new text - Replaces specific text within an existing lore entry. Use EXACT lore title. Example: /lore_replace_content: The Ancient Order | secret society | powerful organization
-- /lore_add_content: lore title | new text - Adds new content on a new line at the bottom of an existing lore entry. Use EXACT lore title. Example: /lore_add_content: The Ancient Order | Their influence spans across the kingdom.
-- /lore_delete_content: lore title | text to delete - Removes specific text from an existing lore entry. Use EXACT lore title. Example: /lore_delete_content: The Ancient Order | disbanded
 
 Plot Beat Guidelines:
 - Each plot beat represents a significant story milestone with multiple scenes and events.
@@ -317,17 +371,47 @@ Narrative Best Practices:
     }
 
     partsToInclude.forEach((part) => {
-      const role = part.user ? "user" : "assistant";
-      // Use raw AI output if available and useRawContext is enabled, otherwise use parsed content
-      const content =
-        useRawContext && part.raw && !part.user ? part.raw : part.content;
-      context.push({ role: role, content: cleanString(content) });
+      if (part.user) {
+        // User message
+        context.push({ role: "user", content: cleanString(part.content) });
+      } else {
+        // Assistant message (with optional tool calls)
+        const content = useRawContext && part.raw ? part.raw : part.content;
+        const assistantMessage: ChatMessage = {
+          role: "assistant",
+          content: cleanString(content),
+        };
+
+        // Include tool calls if present
+        if (part.toolCalls && part.toolCalls.length > 0) {
+          assistantMessage.tool_calls = part.toolCalls;
+        }
+
+        context.push(assistantMessage);
+
+        // Add tool responses as separate tool messages
+        if (part.toolResponses && part.toolResponses.length > 0) {
+          for (const response of part.toolResponses) {
+            context.push({
+              role: "tool",
+              tool_call_id: response.toolCallId || "unknown",
+              content: `${
+                response.success === true
+                  ? "✓"
+                  : response.success === "partial"
+                  ? "⚠"
+                  : "✗"
+              } ${response.message}`,
+            });
+          }
+        }
+      }
     });
   }
 
   // Build new user message with command responses and/or user choice
   // This ensures we create a proper user message rather than corrupting the last assistant message
-  let newUserMessage = '';
+  let newUserMessage = "";
 
   // Prepend command responses (if any)
   if (commandResponses && commandResponses.length > 0) {
@@ -346,10 +430,13 @@ Narrative Best Practices:
 
   // Add as new user message if we have content
   if (newUserMessage) {
-    context.push({ role: 'user', content: newUserMessage });
+    context.push({ role: "user", content: newUserMessage });
   }
 
-  return context;
+  return {
+    messages: context,
+    tools: supportsToolCalling ? TOOL_SCHEMAS : [],
+  };
 }
 export function storyDataToString(storyData: StoryData): string {
   let result = `# Story Name: ${storyData.story_name}\n`;
@@ -571,16 +658,18 @@ export function outputToScenePart(text: string): ScenePart {
     if (metaMatch) {
       const metadata = metaMatch[1];
 
-      // Parse use_skill: name (DC number)
+      // Parse use_skill: name (DC number) or (X success(es) needed/required)
       const skillMatch = metadata.match(
-        /use_skill:\s*([^(;]+?)(?:\s*\(DC\s*(\d+)\))?(?:;|$)/i
+        /use_skill:\s*([^(;]+?)(?:\s*\((?:DC\s*(\d+)|(?:needs?\s*)?(\d+)\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?)\))?(?:;|$)/i
       );
       if (skillMatch) {
         const skillName = skillMatch[1].trim();
         if (skillName.toLowerCase() !== "none") {
           choice.skill_used = skillName;
-          if (skillMatch[2]) {
-            choice.skill_dc = parseInt(skillMatch[2], 10);
+          // Try DC format first (group 2), then success count format (group 3)
+          const dc = skillMatch[2] || skillMatch[3];
+          if (dc) {
+            choice.skill_dc = parseInt(dc, 10);
           }
         }
       }

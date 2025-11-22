@@ -1870,6 +1870,9 @@ function StoryPageContent() {
         user: part.user,
         role: part.role,
         raw: part.raw,
+        // Preserve tool call history so AI can see prior structured function usage
+        toolCalls: part.toolCalls,
+        toolResponses: part.toolResponses,
       });
 
       currentChars += content.length;
@@ -1927,7 +1930,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("openRouterKey") || undefined
           : undefined,
-      commandResponses: pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined,
+      commandResponses:
+        pendingCommandResponses.length > 0
+          ? pendingCommandResponses
+          : undefined,
     };
 
     const payloadSize = JSON.stringify(payload).length;
@@ -2041,24 +2047,34 @@ function StoryPageContent() {
           }
         }
 
-        if (data.part.commands && data.part.commands.length > 0) {
+        // Handle tool calls (new system)
+        if (data.part.toolCalls && data.part.toolResponses) {
+          // Extract commands from tool responses
+          const commands = data.part.toolResponses
+            .map((r: CommandResponse) => r.command)
+            .filter(
+              (cmd: string): cmd is string => cmd !== undefined && cmd !== null
+            );
+
+          // Execute commands to mutate game state
+          if (commands.length > 0) {
+            processCommands(commands, storyData, addNotification);
+          }
+
+          // Store tool responses for AI feedback in next turn
+          setPendingCommandResponses(data.part.toolResponses);
+        }
+        // Handle legacy XML commands
+        else if (data.part.commands && data.part.commands.length > 0) {
+          // Execute commands to mutate game state
+          processCommands(data.part.commands, storyData, addNotification);
+
           // Generate command responses for AI feedback
           const responses = generateCommandResponses(
             data.part.commands,
             storyData
           );
           setPendingCommandResponses(responses);
-
-          // Also show notifications for user
-          responses.forEach((r) => {
-            if (r.success === true) {
-              addNotification(r.message, "success");
-            } else if (r.success === 'partial') {
-              addNotification(r.message, "warning");
-            } else {
-              addNotification(r.message, "warning");
-            }
-          });
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
@@ -2088,6 +2104,13 @@ function StoryPageContent() {
         processLoreTriggers(storyData, addNotification);
 
         storyData.scene.parts.push(data.part);
+        console.log("[handleChoice] Pushed scene part:", {
+          hasToolCalls: !!data.part.toolCalls,
+          toolCallsCount: data.part.toolCalls?.length || 0,
+          hasToolResponses: !!data.part.toolResponses,
+          toolResponsesCount: data.part.toolResponses?.length || 0,
+          totalParts: storyData.scene.parts.length,
+        });
         setStoryData({ ...storyData });
         setStoryText(data.part.content);
         setCanRetry(true);
@@ -3256,6 +3279,8 @@ function StoryPageContent() {
         user: part.user,
         role: part.role,
         raw: part.raw,
+        toolCalls: part.toolCalls,
+        toolResponses: part.toolResponses,
       });
 
       currentChars += content.length;
@@ -3318,7 +3343,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("openRouterKey") || undefined
           : undefined,
-      commandResponses: pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined,
+      commandResponses:
+        pendingCommandResponses.length > 0
+          ? pendingCommandResponses
+          : undefined,
     };
 
     const payloadSize = JSON.stringify(payload).length;
@@ -3418,24 +3446,35 @@ function StoryPageContent() {
           },
         });
 
-        if (data.part.commands && data.part.commands.length > 0) {
+        // Handle tool calls (new system)
+        if (data.part.toolCalls && data.part.toolResponses) {
+          // Extract commands from tool responses
+          const commands = data.part.toolResponses
+            .map((r: CommandResponse) => r.command)
+            .filter(
+              (cmd: string | undefined): cmd is string =>
+                cmd !== undefined && cmd !== null
+            );
+
+          // Execute commands to mutate game state
+          if (commands.length > 0) {
+            processCommands(commands, storyData, addNotification);
+          }
+
+          // Store tool responses for AI feedback in next turn
+          setPendingCommandResponses(data.part.toolResponses);
+        }
+        // Handle legacy XML commands
+        else if (data.part.commands && data.part.commands.length > 0) {
+          // Execute commands to mutate game state
+          processCommands(data.part.commands, storyData, addNotification);
+
           // Generate command responses for AI feedback
           const responses = generateCommandResponses(
             data.part.commands,
             storyData
           );
           setPendingCommandResponses(responses);
-
-          // Also show notifications for user (processCommands behavior preserved via generateCommandResponses)
-          responses.forEach((r) => {
-            if (r.success === true) {
-              addNotification(r.message, "success");
-            } else if (r.success === 'partial') {
-              addNotification(r.message, "warning");
-            } else {
-              addNotification(r.message, "warning");
-            }
-          });
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
@@ -3590,6 +3629,8 @@ function StoryPageContent() {
         user: part.user,
         role: part.role,
         raw: part.raw,
+        toolCalls: part.toolCalls,
+        toolResponses: part.toolResponses,
       });
 
       currentChars += content.length;
@@ -3640,7 +3681,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("useRawContext") === "true"
           : false,
-      commandResponses: pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined,
+      commandResponses:
+        pendingCommandResponses.length > 0
+          ? pendingCommandResponses
+          : undefined,
     };
 
     await fetch("/api/story/next", {
@@ -3705,24 +3749,35 @@ function StoryPageContent() {
           },
         });
 
-        if (data.part.commands && data.part.commands.length > 0) {
+        // Handle tool calls (new system)
+        if (data.part.toolCalls && data.part.toolResponses) {
+          // Extract commands from tool responses
+          const commands = data.part.toolResponses
+            .map((r: CommandResponse) => r.command)
+            .filter(
+              (cmd: string | undefined): cmd is string =>
+                cmd !== undefined && cmd !== null
+            );
+
+          // Execute commands to mutate game state
+          if (commands.length > 0) {
+            processCommands(commands, storyData, addNotification);
+          }
+
+          // Store tool responses for AI feedback in next turn
+          setPendingCommandResponses(data.part.toolResponses);
+        }
+        // Handle legacy XML commands
+        else if (data.part.commands && data.part.commands.length > 0) {
+          // Execute commands to mutate game state
+          processCommands(data.part.commands, storyData, addNotification);
+
           // Generate command responses for AI feedback
           const responses = generateCommandResponses(
             data.part.commands,
             storyData
           );
           setPendingCommandResponses(responses);
-
-          // Also show notifications for user
-          responses.forEach((r) => {
-            if (r.success === true) {
-              addNotification(r.message, "success");
-            } else if (r.success === 'partial') {
-              addNotification(r.message, "warning");
-            } else {
-              addNotification(r.message, "warning");
-            }
-          });
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
@@ -3868,13 +3923,14 @@ function StoryPageContent() {
         reparsedPart.commands,
         storyData
       );
+      console.log("Command responses from edited part:", responses);
       setPendingCommandResponses(responses);
 
       // Also show notifications for user
       responses.forEach((r) => {
         if (r.success === true) {
           addNotification(r.message, "success");
-        } else if (r.success === 'partial') {
+        } else if (r.success === "partial") {
           addNotification(r.message, "warning");
         } else {
           addNotification(r.message, "warning");

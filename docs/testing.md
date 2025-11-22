@@ -40,14 +40,14 @@ npm run test -- --coverage
 #### RPG Systems (`rpgSystems.*.test.ts`)
 
 ```typescript
-describe('3d6 System', () => {
-  test('rolls between 3-18', () => {
+describe("3d6 System", () => {
+  test("rolls between 3-18", () => {
     const result = rollDice(SYSTEM_3D6);
     expect(result.total).toBeGreaterThanOrEqual(3);
     expect(result.total).toBeLessThanOrEqual(18);
   });
 
-  test('checkSuccess compares total vs DC', () => {
+  test("checkSuccess compares total vs DC", () => {
     const result = checkSuccess(SYSTEM_3D6, 10, 50, 15, 0);
     expect(result.success).toBe(true); // 10 + 9 (50*0.18) = 19 >= 15
   });
@@ -57,7 +57,7 @@ describe('3d6 System', () => {
 #### AI Parsing (`ai.outputToScenePart.test.ts`)
 
 ```typescript
-test('parses XML tags correctly', () => {
+test("parses XML tags correctly", () => {
   const response = `
     <story>The dragon roars!</story>
     <memory>Dragon appeared</memory>
@@ -66,10 +66,10 @@ test('parses XML tags correctly', () => {
     - Run away
     </choices>
   `;
-  
+
   const part = outputToScenePart(response);
-  expect(part.content).toBe('The dragon roars!');
-  expect(part.memory).toContain('Dragon appeared');
+  expect(part.content).toBe("The dragon roars!");
+  expect(part.memory).toContain("Dragon appeared");
   expect(part.choices).toHaveLength(2);
 });
 ```
@@ -77,11 +77,11 @@ test('parses XML tags correctly', () => {
 #### Command Processing (`story.processCommands.test.ts`)
 
 ```typescript
-test('processes stat modification', () => {
+test("processes stat modification", () => {
   const storyData = createTestStory();
-  processCommands(['/modify_stat: Strength +5'], storyData, mockNotify);
-  
-  expect(storyData.stats.find(s => s.name === 'Strength').value).toBe(55);
+  processCommands(["/modify_stat: Strength +5"], storyData, mockNotify);
+
+  expect(storyData.stats.find((s) => s.name === "Strength").value).toBe(55);
 });
 ```
 
@@ -92,6 +92,7 @@ test('processes stat modification', () => {
 ### RPG Systems
 
 #### 3d6 System
+
 - [ ] Base roll is 3-18
 - [ ] Stat modifier applies correctly (stat × 0.18)
 - [ ] Success when roll + modifier ≥ DC
@@ -101,6 +102,7 @@ test('processes stat modification', () => {
 - [ ] Notification shows selected dice from pool
 
 #### 1d20 System
+
 - [ ] Base roll is 1-20
 - [ ] Stat modifier applies correctly (stat × 0.2)
 - [ ] Success when roll + modifier ≥ DC
@@ -111,6 +113,7 @@ test('processes stat modification', () => {
 - [ ] Stacking works (extra rolls per source)
 
 #### PbtA System
+
 - [ ] Base roll is 2d6 + modifier
 - [ ] 10+ = full success (no complications)
 - [ ] 7-9 = partial success
@@ -122,6 +125,7 @@ test('processes stat modification', () => {
 - [ ] Max ±5 modifier
 
 #### Fate System
+
 - [ ] Base roll is 4dF (4 dice showing -1/0/+1)
 - [ ] Ladder modifier applies (stat → -2 to +7)
 - [ ] Margin = total - DC calculated correctly
@@ -137,6 +141,7 @@ test('processes stat modification', () => {
 - [ ] Disadvantage: -1 per source
 
 #### YZE System
+
 - [ ] Base dice = stat ÷ 20 (0-5 dice)
 - [ ] Each 6 = 1 success
 - [ ] Success when successes ≥ DC
@@ -152,6 +157,7 @@ test('processes stat modification', () => {
 - [ ] Choice details show `[Skill: result (X successes vs Y)]`
 
 #### Explosive Dice System
+
 - [ ] Die size determined by stat:
   - [ ] 0-16 = d4
   - [ ] 17-33 = d6
@@ -171,6 +177,7 @@ test('processes stat modification', () => {
   - [ ] `[Skill: failure (d12)]` (no explosions)
 
 #### Percentile System
+
 - [ ] Roll 1d100
 - [ ] Success when roll ≤ stat (no DC!)
 - [ ] Roll 1-5 = critical success
@@ -180,6 +187,7 @@ test('processes stat modification', () => {
 - [ ] Resource penalty reduces effective stat, not roll
 
 #### 1d100 System
+
 - [ ] Roll 1d100 + stat ≥ DC
 - [ ] Stat scaling 1:1 (no conversion)
 - [ ] DCs in 30-140 range
@@ -190,7 +198,8 @@ test('processes stat modification', () => {
 ### Item System
 
 #### Item Types
-- [ ] **Normal**: 
+
+- [ ] **Normal**:
   - [ ] Grants advantage when used
   - [ ] Breaks on failure (quantity - 1)
   - [ ] Removed when quantity reaches 0
@@ -206,6 +215,7 @@ test('processes stat modification', () => {
   - [ ] Never breaks or consumed
 
 #### Item Interactions
+
 - [ ] Missing item = disadvantage
 - [ ] Fuzzy matching works (AI says "lockpicks" → matches "Lockpicks")
 - [ ] Match notification shows similarity %
@@ -233,6 +243,7 @@ test('processes stat modification', () => {
 ### Advantage/Disadvantage Stacking
 
 #### Sources Tracked
+
 - [ ] Items (normal/consumable/story)
 - [ ] Achievements (`advOn`/`disadvOn` arrays)
 - [ ] Momentum reroll
@@ -241,6 +252,7 @@ test('processes stat modification', () => {
 - [ ] Misc items (prevent disadvantage only)
 
 #### Stacking Rules
+
 - [ ] Net advantage = advantage count - disadvantage count
 - [ ] Max ±5 (clamped)
 - [ ] Sources displayed in notification
@@ -255,6 +267,7 @@ test('processes stat modification', () => {
 ### AI Integration
 
 #### Choice Details Format
+
 - [ ] Skill checks include result: `[SkillName: result]`
 - [ ] PbtA partial: `[Skill: partial success (7-9)]`
 - [ ] Fate tie: `[Skill: tie (margin 0)]`
@@ -265,6 +278,7 @@ test('processes stat modification', () => {
 - [ ] YZE panic: Separate line `[PANIC! Effect]`
 
 #### AI Response Parsing
+
 - [ ] Extracts `<story>` content
 - [ ] Extracts `<memory>` updates
 - [ ] Parses `<choices>` list
@@ -274,6 +288,7 @@ test('processes stat modification', () => {
 - [ ] Handles responses with/without tags
 
 #### AI Behavior Validation
+
 - [ ] PbtA partial (7-9): AI adds complication/cost
 - [ ] Fate tie: AI narrates "yes, but..." outcome
 - [ ] Fate style: AI includes bonus effect
@@ -287,6 +302,7 @@ test('processes stat modification', () => {
 ### Dice Visualizer Component
 
 #### Animation Phases
+
 - [ ] Phase 1: Rolling (dice tumbling)
 - [ ] Phase 2: Stopped (show final values)
 - [ ] Phase 3: Calculating (fade out non-kept dice)
@@ -299,6 +315,7 @@ test('processes stat modification', () => {
   - [ ] Press Escape
 
 #### System-Specific Display
+
 - [ ] 3d6: Shows all dice in pool, highlights kept 3
 - [ ] 1d20: Shows single die + modifier
 - [ ] PbtA: Shows 2d6 + modifier, highlights partial range (7-9)
@@ -311,6 +328,7 @@ test('processes stat modification', () => {
   - [ ] Total accumulated
 
 #### Visual Feedback
+
 - [ ] Success: Green highlight
 - [ ] Failure: Red highlight
 - [ ] Partial: Yellow/orange highlight (PbtA)
@@ -339,6 +357,7 @@ Test each command type:
 - [ ] `/advance_beat: 2` (marks beat as fulfilled)
 
 #### Fuzzy Matching
+
 - [ ] Commands fuzzy match entity names (70% threshold)
 - [ ] Notifications show matched name and similarity %
 - [ ] Logs matched results for debugging
@@ -373,12 +392,14 @@ Test each command type:
 ### Edge Cases
 
 #### Empty States
+
 - [ ] No inventory: Missing item = disadvantage
 - [ ] No resources: Insufficient resource penalty applies
 - [ ] Zero stats: Rolls with 0 modifier
 - [ ] No achievements: No advantage/disadvantage from achievements
 
 #### Boundary Values
+
 - [ ] Stat 0: Minimum modifier
 - [ ] Stat 100+: Maximum modifier (capped per system)
 - [ ] DC 0: Trivial (auto-success in some systems)
@@ -386,12 +407,14 @@ Test each command type:
 - [ ] Advantage/disadvantage ±10: Capped at ±5
 
 #### Race Conditions
+
 - [ ] Rapid choice selection doesn't break state
 - [ ] Dice animation completes before next choice
 - [ ] Skip animation doesn't break subsequent rolls
 - [ ] Multiple notifications don't overlap
 
 #### Payload Size
+
 - [ ] Story with 100+ parts trims correctly (<4.5MB)
 - [ ] Large descriptions don't break generation
 - [ ] Many items/stats/resources handled
@@ -404,13 +427,13 @@ Test each command type:
 ### Logger (`app/misc/logger.ts`)
 
 ```typescript
-import { logger } from '../misc/logger';
+import { logger } from "../misc/logger";
 
-logger.action('User selected choice', { choice, index });
-logger.ai_request('Sending to AI', { model, payload });
-logger.ai_response('Received from AI', { content });
-logger.info('Fuzzy matched', { provided, matched, score });
-logger.error('Failed to parse', { error });
+logger.action("User selected choice", { choice, index });
+logger.ai_request("Sending to AI", { model, payload });
+logger.ai_response("Received from AI", { content });
+logger.info("Fuzzy matched", { provided, matched, score });
+logger.error("Failed to parse", { error });
 ```
 
 **Browser Console**: `localStorage.setItem('debug', 'true')` to enable verbose logging
@@ -443,8 +466,8 @@ Opens interactive test runner in browser.
 
 When making changes, verify:
 
-1. **RPG System Changes**: Run all rpgSystems.*.test.ts
-2. **AI Changes**: Run ai.*.test.ts
+1. **RPG System Changes**: Run all rpgSystems.\*.test.ts
+2. **AI Changes**: Run ai.\*.test.ts
 3. **Command Changes**: Run story.processCommands.test.ts
 4. **UI Changes**: Manual test dice visualizer + choice flow
 5. **Build**: `npm run build` succeeds

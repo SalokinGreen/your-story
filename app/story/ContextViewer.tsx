@@ -40,11 +40,12 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     });
 
     // Build messages using the same function as the API
-    const contextMessages = buildMessages({
+    const { messages: contextMessages } = buildMessages({
       storyData,
       userChoice: undefined,
       useRawContext,
       maxTokens,
+      supportsToolCalling: false, // Context viewer doesn't need tool schemas
     });
 
     setMessages(contextMessages);

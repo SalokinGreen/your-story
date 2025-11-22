@@ -1,6 +1,6 @@
 /**
  * Command response generation for AI feedback loop.
- * 
+ *
  * When the AI sends commands like `/add_quest`, `/give_item`, etc.,
  * this module executes them and generates responses describing what happened.
  * These responses are sent back to the AI in the next message, allowing it to:
@@ -98,7 +98,7 @@ export function executeCommandWithResponse(
     if (quest.active) {
       return {
         command: trimmed,
-        success: 'partial',
+        success: "partial",
         message: `Quest "${quest.title}" was already active`,
         timestamp,
       };
@@ -111,7 +111,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -145,7 +147,7 @@ export function executeCommandWithResponse(
     if (quest.fulfilled) {
       return {
         command: trimmed,
-        success: 'partial',
+        success: "partial",
         message: `Quest "${quest.title}" was already completed`,
         timestamp,
       };
@@ -167,7 +169,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -201,7 +205,7 @@ export function executeCommandWithResponse(
     if (!quest.active) {
       return {
         command: trimmed,
-        success: 'partial',
+        success: "partial",
         message: `Quest "${quest.title}" was already inactive`,
         timestamp,
       };
@@ -214,7 +218,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -256,7 +262,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -298,7 +306,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -346,7 +356,9 @@ export function executeCommandWithResponse(
         return {
           command: trimmed,
           success: true,
-          message: `${itemName}: ${oldQuantity} → ${storyData.inventory[itemIndex].quantity} (${amount > 0 ? "+" : ""}${amount})`,
+          message: `${itemName}: ${oldQuantity} → ${
+            storyData.inventory[itemIndex].quantity
+          } (${amount > 0 ? "+" : ""}${amount})`,
           timestamp,
         };
       }
@@ -436,7 +448,9 @@ export function executeCommandWithResponse(
   }
 
   // /remove_item: item name | quantity
-  const removeItemMatch = trimmed.match(/^\/remove_item:\s*(.+?)\s*\|\s*(\d+)$/i);
+  const removeItemMatch = trimmed.match(
+    /^\/remove_item:\s*(.+?)\s*\|\s*(\d+)$/i
+  );
   if (removeItemMatch) {
     const itemName = removeItemMatch[1].trim();
     const quantity = parseInt(removeItemMatch[2], 10);
@@ -483,7 +497,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${itemName}" → "${item.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${itemName}" → "${item.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -539,13 +555,17 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${itemName}" → "${item.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${itemName}" → "${item.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
       command: trimmed,
       success: true,
-      message: `${item.name}: ${actualDelta > 0 ? "+" : ""}${actualDelta} (now ${newQuantity})${fuzzyNote}`,
+      message: `${item.name}: ${
+        actualDelta > 0 ? "+" : ""
+      }${actualDelta} (now ${newQuantity})${fuzzyNote}`,
       timestamp,
     };
   }
@@ -604,7 +624,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${oldItemName}" → "${oldItem.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${oldItemName}" → "${oldItem.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -687,19 +709,25 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${stat.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${name}" → "${stat.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
       command: trimmed,
       success: true,
-      message: `${stat.name}: ${oldValue} → ${stat.value} (${actualDelta > 0 ? "+" : ""}${actualDelta})${fuzzyNote}`,
+      message: `${stat.name}: ${oldValue} → ${stat.value} (${
+        actualDelta > 0 ? "+" : ""
+      }${actualDelta})${fuzzyNote}`,
       timestamp,
     };
   }
 
   // /adjust_stat: stat name | delta
-  const adjustStatMatch = trimmed.match(/^\/adjust_stat:\s*(.+?)\s*\|\s*(-?\d+)$/i);
+  const adjustStatMatch = trimmed.match(
+    /^\/adjust_stat:\s*(.+?)\s*\|\s*(-?\d+)$/i
+  );
   if (adjustStatMatch) {
     const statName = adjustStatMatch[1].trim();
     const delta = parseInt(adjustStatMatch[2], 10);
@@ -728,13 +756,17 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${statName}" → "${stat.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${statName}" → "${stat.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
       command: trimmed,
       success: true,
-      message: `${stat.name}: ${oldValue} → ${stat.value} (${delta > 0 ? "+" : ""}${delta})${fuzzyNote}`,
+      message: `${stat.name}: ${oldValue} → ${stat.value} (${
+        delta > 0 ? "+" : ""
+      }${delta})${fuzzyNote}`,
       timestamp,
     };
   }
@@ -762,7 +794,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${stat.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${name}" → "${stat.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -838,7 +872,10 @@ export function executeCommandWithResponse(
     }
 
     const oldValue = resource.value;
-    resource.value = Math.max(0, Math.min(resource.maxValue, resource.value + delta));
+    resource.value = Math.max(
+      0,
+      Math.min(resource.maxValue, resource.value + delta)
+    );
     const actualDelta = resource.value - oldValue;
 
     logger.action("Resource adjusted via command response", {
@@ -850,13 +887,17 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${resourceName}" → "${resource.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${resourceName}" → "${resource.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
       command: trimmed,
       success: true,
-      message: `${resource.name}: ${oldValue} → ${resource.value}/${resource.maxValue} (${actualDelta > 0 ? "+" : ""}${actualDelta})${fuzzyNote}`,
+      message: `${resource.name}: ${oldValue} → ${resource.value}/${
+        resource.maxValue
+      } (${actualDelta > 0 ? "+" : ""}${actualDelta})${fuzzyNote}`,
       timestamp,
     };
   }
@@ -897,7 +938,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${resourceName}" → "${resource.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${resourceName}" → "${resource.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -950,7 +993,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${resource.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${name}" → "${resource.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -988,7 +1033,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${resource.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${name}" → "${resource.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -1023,7 +1070,7 @@ export function executeCommandWithResponse(
     if (existing.dateAchieved) {
       return {
         command: trimmed,
-        success: 'partial',
+        success: "partial",
         message: `Achievement "${existing.title}" was already unlocked`,
         timestamp,
       };
@@ -1107,7 +1154,9 @@ export function executeCommandWithResponse(
   }
 
   // /lore_add_content: lore title | new text
-  const loreAddMatch = trimmed.match(/^\/lore_add_content:\s*(.+?)\s*\|\s*(.+)$/i);
+  const loreAddMatch = trimmed.match(
+    /^\/lore_add_content:\s*(.+?)\s*\|\s*(.+)$/i
+  );
   if (loreAddMatch) {
     const loreTitle = loreAddMatch[1].trim();
     const newText = loreAddMatch[2].trim();
@@ -1253,8 +1302,10 @@ export function executeCommandWithResponse(
     if (beat.fulfilled) {
       return {
         command: trimmed,
-        success: 'partial',
-        message: `Beat ${beatIndex + 1} ("${beat.title}") was already completed`,
+        success: "partial",
+        message: `Beat ${beatIndex + 1} ("${
+          beat.title
+        }") was already completed`,
         timestamp,
       };
     }
@@ -1277,7 +1328,9 @@ export function executeCommandWithResponse(
       return {
         command: trimmed,
         success: true,
-        message: `Completed beat ${beatIndex + 1} ("${beat.title}") (+${pointsAwarded} points)`,
+        message: `Completed beat ${beatIndex + 1} ("${
+          beat.title
+        }") (+${pointsAwarded} points)`,
         timestamp,
       };
     }
@@ -1440,7 +1493,9 @@ export function executeCommandWithResponse(
     return {
       command: trimmed,
       success: true,
-      message: `Momentum: ${oldValue} → ${storyData.momentum}/${storyData.maxMomentum} (${actualDelta > 0 ? "+" : ""}${actualDelta})`,
+      message: `Momentum: ${oldValue} → ${storyData.momentum}/${
+        storyData.maxMomentum
+      } (${actualDelta > 0 ? "+" : ""}${actualDelta})`,
       timestamp,
     };
   }
@@ -1566,13 +1621,17 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${relationship.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${name}" → "${relationship.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
       command: trimmed,
       success: true,
-      message: `${relationship.name}: ${oldValue} → ${relationship.value} (${actualDelta > 0 ? "+" : ""}${actualDelta}) ${relationship.symbol}${fuzzyNote}`,
+      message: `${relationship.name}: ${oldValue} → ${relationship.value} (${
+        actualDelta > 0 ? "+" : ""
+      }${actualDelta}) ${relationship.symbol}${fuzzyNote}`,
       timestamp,
     };
   }
@@ -1609,7 +1668,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${relationship.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${name}" → "${relationship.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -1651,7 +1712,9 @@ export function executeCommandWithResponse(
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${relationship.name}", ${Math.round(matchResult.score * 100)}%)`
+        ? ` (matched "${name}" → "${relationship.name}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
         : "";
 
     return {
@@ -1694,7 +1757,7 @@ export function generateCommandResponses(
   logger.info("Generated command responses", {
     totalCommands: commands.length,
     successCount: responses.filter((r) => r.success === true).length,
-    partialCount: responses.filter((r) => r.success === 'partial').length,
+    partialCount: responses.filter((r) => r.success === "partial").length,
     failureCount: responses.filter((r) => r.success === false).length,
   });
 
@@ -1710,11 +1773,7 @@ export function formatResponsesForAI(responses: CommandResponse[]): string {
 
   const lines = responses.map((r) => {
     const status =
-      r.success === true
-        ? "✓"
-        : r.success === 'partial'
-        ? "⚠"
-        : "✗";
+      r.success === true ? "✓" : r.success === "partial" ? "⚠" : "✗";
     return `${status} ${r.message}`;
   });
 

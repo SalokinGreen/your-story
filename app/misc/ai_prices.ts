@@ -6,6 +6,7 @@ export const AI_MODELS = {
     maxTokens: 400000,
     maxOutputTokens: 4000,
     provider: "openrouter",
+    supportsToolCalling: true,
     strengths: ["creative", "nsfw"],
     weaknesses: ["price"],
     description:
@@ -24,6 +25,7 @@ export const AI_MODELS = {
     maxTokens: 120000,
     maxOutputTokens: 4000,
     provider: "deepseek",
+    supportsToolCalling: true,
     cost: 1,
     inputPrice: 0.14,
     outputPrice: 0.28,
@@ -41,6 +43,7 @@ export const AI_MODELS = {
     maxTokens: 100000,
     maxOutputTokens: 4000,
     provider: "openrouter",
+    supportsToolCalling: true,
     cost: 1,
     inputPrice: 0.075,
     outputPrice: 0.3,
@@ -59,6 +62,7 @@ export const AI_MODELS = {
     maxTokens: 100000,
     maxOutputTokens: 4000,
     provider: "openrouter",
+    supportsToolCalling: true,
     cost: 1,
     inputPrice: 0.0375,
     outputPrice: 0.15,
@@ -80,6 +84,7 @@ export const AI_MODELS = {
     inputPrice: 10.0,
     outputPrice: 10.0,
     provider: "openrouter",
+    supportsToolCalling: true,
     finetunes: [],
     strengths: ["long context", "powerful", "nsfw"],
     weaknesses: ["price"],
@@ -94,6 +99,7 @@ export const AI_MODELS = {
     maxTokens: 200000,
     maxOutputTokens: 4000,
     provider: "openrouter",
+    supportsToolCalling: true,
     cost: 1,
     inputPrice: 0.35,
     outputPrice: 0.4,
@@ -112,6 +118,7 @@ export const AI_MODELS = {
     maxTokens: 131000,
     maxOutputTokens: 4000,
     provider: "openrouter",
+    supportsToolCalling: true,
     cost: 4,
     inputPrice: 2.5,
     outputPrice: 10.0,
@@ -129,6 +136,7 @@ export const AI_MODELS = {
     maxTokens: 200000,
     maxOutputTokens: 4000,
     provider: "openrouter",
+    supportsToolCalling: true,
     cost: 15,
     inputPrice: 3.5,
     outputPrice: 10.5,
@@ -146,6 +154,7 @@ export const AI_MODELS = {
     maxTokens: 128000,
     maxOutputTokens: 4000,
     provider: "deepseek",
+    supportsToolCalling: true,
     cost: 2,
     inputPrice: 0.55,
     outputPrice: 2.19,
@@ -165,6 +174,7 @@ export interface AIModelConfig {
   maxTokens: number;
   maxOutputTokens: number;
   provider: "openrouter" | "deepseek";
+  supportsToolCalling?: boolean; // Whether this model supports function calling
   cost: number;
   inputPrice: number;
   outputPrice: number;

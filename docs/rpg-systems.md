@@ -9,6 +9,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 **Location**: [`app/misc/rpgSystems.ts`](../app/misc/rpgSystems.ts)
 
 **Key Functions**:
+
 - `getRPGSystem(systemId)`: Get system configuration
 - `rollDice(system, dieSides?)`: Roll dice according to system rules
 - `checkSuccess(system, roll, stat, dc, penalty, rolls?)`: Determine success/failure with system-specific outcomes
@@ -27,6 +28,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 **Stat Scaling**: 0-100 stat → 0-18 modifier (stat × 0.18)
 
 **DC Guidelines**:
+
 - DC 8: Trivial
 - DC 15: Easy
 - DC 20: Medium (default for normal challenges)
@@ -49,6 +51,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 **Stat Scaling**: 0-100 stat → 0-20 modifier (stat × 0.2)
 
 **DC Guidelines**:
+
 - DC 5: Trivial
 - DC 10: Easy
 - DC 15: Medium (default for normal challenges)
@@ -71,6 +74,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 **Stat Scaling**: 0-100 stat → 0-100 modifier (1:1, no conversion)
 
 **DC Guidelines**:
+
 - DC 30: Trivial
 - DC 60: Easy
 - DC 80: Medium (default)
@@ -97,6 +101,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 **AI Context**: Standard `[SkillName: success]` or `[SkillName: failure]`
 
 **Special Notes**:
+
 - Roll 1-5: Critical success
 - Roll 96-100: Critical failure
 - AI should NEVER set DC values for this system
@@ -113,6 +118,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 **Formula**: `2d6 + Modifier` (no DC comparison!)
 
 **Stat Scaling**: 0-100 stat → -2 to +3 modifier
+
 - 0-20: -2
 - 21-40: -1
 - 41-60: 0
@@ -121,16 +127,19 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 - 100+: +3
 
 **Fixed Thresholds** (DO NOT VARY):
+
 - **10+**: Full Success - achieve goal cleanly
 - **7-9**: Partial Success - succeed with complication/cost/hard choice
 - **6-**: Failure - fail with consequences
 
 **AI Context Examples**:
+
 - `[Charm: success]` (rolled 10+)
 - `[Stealth: partial success (7-9)]` (rolled 7-9)
 - `[Combat: failure]` (rolled 6-)
 
 **AI Behavior**:
+
 - **On 10+**: Clean success, no complications
 - **On 7-9**: MUST add one of:
   - Success with cost (lose resource, take damage)
@@ -140,6 +149,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 - **On 6-**: Failure AND make hard move (danger, damage, reveal unwelcome truth)
 
 **Special Notes**:
+
 - AI should NEVER vary the 7/10 thresholds
 - Difficulty comes from consequences, not DC changes
 - Momentum can add +1 to roll
@@ -155,6 +165,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 **Formula**: `4dF + Ladder Modifier`
 
 **Stat Scaling**: 0-100 stat → -2 to +7 ladder modifier
+
 - 0-10: -2 (Terrible)
 - 11-20: -1 (Poor)
 - 21-30: 0 (Mediocre)
@@ -167,6 +178,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 - 91-100: +7 (Epic)
 
 **DC Guidelines** (Opposition Ladder):
+
 - DC 0: Mediocre
 - DC 2: Fair (typical difficulty)
 - DC 4: Great (challenging)
@@ -174,18 +186,21 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 - DC 8+: Legendary
 
 **Four Outcomes** (based on margin = total - DC):
+
 - **Margin < 0**: Fail
 - **Margin = 0**: Tie (succeed at cost)
 - **Margin 1-2**: Success
 - **Margin ≥ 3**: Success with Style (bonus effect)
 
 **AI Context Examples**:
+
 - `[Athletics: success (margin +2)]`
 - `[Diplomacy: tie (margin 0)]`
 - `[Combat: success with style (+5)]`
 - `[Stealth: failure]`
 
 **AI Behavior**:
+
 - **Tie**: Success at cost or partial success
 - **Success with Style**: MUST include bonus:
   - Extra effect beyond intent
@@ -194,6 +209,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
   - Discover useful information
 
 **Special Notes**:
+
 - Use Fate ladder names in narration ("That's a Great result!")
 - Aspects (items) can be invoked for +2 (costs 1 Fate Point resource)
 - Stress/Consequences replace traditional HP
@@ -209,6 +225,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 **Formula**: Count 6s in pool ≥ DC (DC = required successes)
 
 **Stat Scaling**: 0-100 stat → 0-5 base dice (stat ÷ 20)
+
 - Stat 0-19: 0 base dice
 - Stat 20-39: 1 base die
 - Stat 40-59: 2 base dice
@@ -217,28 +234,33 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 - Stat 100+: 5 base dice
 
 **DC Guidelines** (Success Count Required):
+
 - DC 1: Simple task (most common)
 - DC 2: Moderate challenge
 - DC 3: Difficult task
 - DC 4+: Extremely challenging
 
 **Stress Dice Mechanic**:
+
 - Player can add 0-5 stress dice BEFORE rolling
 - Each stress die: +1 stress to character (max 10 stress)
 - Stress dice also count 6s (more success chance)
 - **BUT**: Rolling 1 on ANY stress die triggers PANIC
 
 **Panic System** (when stress die shows 1):
+
 1. Roll 1d6 + current stress level
 2. Consult panic table (1-6 = Shaken, 7-25+ = escalating effects)
 3. Apply panic effect immediately (even if skill check succeeded!)
 
 **AI Context Examples**:
+
 - `[Mechanics: success (3 successes vs 2)]`
 - `[Combat: failure (1 successes vs 2)]`
 - `[PANIC! Freeze: You can't take actions for one round]` (separate line)
 
 **AI Behavior**:
+
 - **Strong Success** (3+ successes beyond DC): -1 stress relief
 - **Panic Triggered**: Narrate panic effect dramatically (even on success)
 - Describe stress building (sweating, shaking, fear)
@@ -246,6 +268,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 **Push Mechanic**: After failure, reroll non-6s for +1 stress and risk item breaking.
 
 **Special Notes**:
+
 - More stress = worse panic effects (stress is tracked 0-10)
 - Panic creates drama: successful shot followed by dropping weapon
 - Base dice = competency, stress dice = desperation
@@ -261,6 +284,7 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 **Formula**: Roll dX ≥ DC (where X = die size)
 
 **Stat to Die Size**:
+
 - Stat 0-16: d4 (weak)
 - Stat 17-33: d6 (below average)
 - Stat 34-50: d8 (average)
@@ -269,11 +293,13 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 - Stat 84-100: d20 (exceptional)
 
 **Explosion Mechanic**:
+
 - When die shows max (4 on d4, 20 on d20), roll again and ADD
 - Explosions chain infinitely (rare but possible)
 - Example: d10 rolls 10 → roll again: 7 = 17 total
 
 **DC Guidelines**:
+
 - DC 4: Trivial (d4 auto-succeeds)
 - DC 8: Easy (d6+ can hit easily)
 - DC 12: Medium (default)
@@ -282,16 +308,19 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 - DC 25+: Requires explosive luck
 
 **AI Context Examples**:
+
 - `[Acrobatics: success (d8 exploded x2)]` (rolled d8: 8, 8, 3 = 19)
 - `[Stealth: failure (d12)]` (rolled d12: 7, no explosions)
 - `[Combat: success (d20)]`
 
 **AI Behavior**:
+
 - **Multiple Explosions**: Describe as heroic, lucky, or dramatic moment
 - **No Explosions**: Show character competency level (d4 vs d20)
 - Explosions are RARE (10% for d10, 5% for d20) - treat as special
 
 **Special Notes**:
+
 - Pure luck-based system
 - Even d4 can beat d20 through explosions (creates underdog victories)
 - No modifiers - stat determines die size only
@@ -306,26 +335,31 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 All systems support advantage/disadvantage mechanics:
 
 ### Standard Systems (1d20, 1d100, Percentile)
+
 - **Advantage**: Roll twice, take higher
 - **Disadvantage**: Roll twice, take lower
 - **Stacking**: Multiple sources add extra rolls (max ±5 rolls)
 
 ### 3d6 System
+
 - **Advantage**: Roll 3 + advantage count dice, keep highest 3
 - **Disadvantage**: Roll 3 + disadvantage count dice, keep lowest 3
 - **Stacking**: Add extra dice per source (max ±5 extra dice)
 
 ### PbtA / Fate
+
 - **Advantage**: +1 per source (stacking)
 - **Disadvantage**: -1 per source (stacking)
 - **Max**: ±5 modifier total
 
 ### YZE
+
 - **Advantage**: Roll additional base dice
 - **Disadvantage**: Remove base dice
 - **Stacking**: Add/remove dice per source
 
 ### Explosive
+
 - **Advantage**: Roll two dice, keep higher
 - **Disadvantage**: Roll two dice, keep lower
 - **No Stacking**: Only 1 extra roll regardless of sources
@@ -344,6 +378,7 @@ Failure Loss = DC ÷ divisor
 ```
 
 **Divisors by System**:
+
 - 3d6: 2 (DC 20 requires 10 resource)
 - 1d20: 3 (DC 15 requires 5 resource)
 - 1d100: 10 (DC 100 requires 10 resource)
@@ -364,6 +399,7 @@ When a skill check occurs, the system constructs choice details sent to the AI:
 **Format**: `[SkillName: result (context)]`
 
 **Examples**:
+
 ```
 [Lockpicking: success]
 [Stealth: failure]
@@ -408,6 +444,7 @@ The AI uses these details to calibrate narrative:
 ### Unit Tests
 
 See `tests/rpgSystems.*.test.ts` for:
+
 - Core dice rolling mechanics
 - Success checking logic
 - Advantage/disadvantage stacking

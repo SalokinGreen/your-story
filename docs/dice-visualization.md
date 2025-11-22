@@ -9,12 +9,14 @@ Baldur's Gate 3-inspired dice roll animation that displays during skill checks t
 **Active Component**: [`app/components/DiceVisualizer.tsx`](../app/components/DiceVisualizer.tsx)
 
 The current dice visualizer supports **all 8 RPG systems** with a 4-phase animation:
+
 1. **Rolling** (1.8s): Dice tumbling
 2. **Stopped** (0.8s): Show final values
 3. **Calculating** (1.2s): Fade non-kept dice
 4. **Result** (5s): Display success/failure
 
 **Key Features**:
+
 - System-specific visuals (PbtA partial success, Fate ladder, YZE stress/panic, Explosive explosions)
 - Click or keyboard (Enter/Space/Escape) to skip
 - Advantage/disadvantage stacking with source tracking

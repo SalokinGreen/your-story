@@ -110,7 +110,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       },
     };
 
-    const messages = buildMessages({ storyData, useRawContext: false });
+    const { messages } = buildMessages({ storyData, useRawContext: false });
 
     // Find the assistant message
     const assistantMessage = messages.find(
@@ -209,7 +209,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       },
     };
 
-    const messages = buildMessages({ storyData, useRawContext: true });
+    const { messages } = buildMessages({ storyData, useRawContext: true });
 
     // Find the assistant message
     const assistantMessage = messages.find(
@@ -282,8 +282,11 @@ You enter the dungeon. Dark shadows dance on the walls.
       },
     };
 
-    const messagesWithRaw = buildMessages({ storyData, useRawContext: true });
-    const messagesWithoutRaw = buildMessages({
+    const { messages: messagesWithRaw } = buildMessages({
+      storyData,
+      useRawContext: true,
+    });
+    const { messages: messagesWithoutRaw } = buildMessages({
       storyData,
       useRawContext: false,
     });
@@ -368,7 +371,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       },
     };
 
-    const messages = buildMessages({ storyData, useRawContext: true });
+    const { messages } = buildMessages({ storyData, useRawContext: true });
 
     const assistantMessage = messages.find((m) => m.role === "assistant");
 

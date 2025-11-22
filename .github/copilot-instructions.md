@@ -27,6 +27,8 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Achievement**: Includes optional `ai_hint` field for precise AI triggering conditions separate from user-facing descriptions.
   - **InventoryItem**: Strict type union 'normal' | 'consumable' | 'story' | 'misc' with specific behaviors per type.
   - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `beats_trigger` (number[]), `beats_untrigger` (number[]) for dynamic visibility.
+  - **ScenePart**: Includes optional `toolCalls` (ToolCall[]) and `toolResponses` (CommandResponse[]) for preserving tool calling conversation history.
+  - **CommandResponse**: Includes optional `toolCallId` for linking responses to specific tool calls in conversation history.
 - app/misc/rpgSystems.ts: RPG system configurations and mechanics. Exports 8 systems (3d6, 1d20, 1d100, percentile, pbta, fate, yze, explosive) with dice rolling, DC calculation, and success checking. Key exports: getRPGSystem(), rollDice(), checkSuccess(), calculateResourceRequirements(). Each system has unique mechanics (PbtA partial success, Fate ladder/style, YZE stress/panic, Explosive dice chains).
 - app/misc/starter_stories.ts: Example datasets for testing and development.
 
@@ -53,8 +55,14 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
     - Explosive: `[Acrobatics: success (d8 exploded x2)]` shows dramatic lucky moments
     - YZE: `[Mechanics: success (3 successes vs 2)]` calibrates tension and panic context
     - All systems include skill name, result (success/failure/partial/tie/style), and system-specific details
+  - **Tool Call History**: Preserves complete conversation history including tool calls and responses:
+    - Stores `toolCalls` array and `toolResponses` array in each ScenePart
+    - `buildMessages` reconstructs tool_calls in assistant messages and tool role messages with proper tool_call_id linking
+    - Enables AI self-reference ("I just gave you that sword") and multi-turn tool interactions
+    - Tool responses marked with ✓ (success), ✗ (failure), ⚠ (partial success)
+- app/misc/toolExecutor.ts: Executes tool calls from AI responses, mapping AI tool names to XML command format. Returns CommandResponse array with success/failure status and toolCallId linking.
 - app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter). Includes getModelConfig() helper for dynamic model selection.
-- app/api/story/next/route.ts: POST endpoint supporting multiple AI providers (DeepSeek, OpenRouter); accepts optional `model` parameter; deducts tokens via service role; returns { part: ScenePart, meta: { model, modelName, provider, usage, tokenCost, balance } }.
+- app/api/story/next/route.ts: POST endpoint supporting multiple AI providers (DeepSeek, OpenRouter); accepts optional `model` parameter; deducts tokens via service role; stores tool calls in returned ScenePart; returns { part: ScenePart, meta: { model, modelName, provider, usage, tokenCost, balance } }.
 - app/api/tts/generate/route.ts: POST endpoint for Speechify text-to-speech generation; deducts 3 tokens per generation; returns audio blob with token metadata.
 
 ### API Routes
@@ -218,6 +226,8 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Sample dataset used on the story page: app/misc/starter_stories.ts (goblin_layer)
 - Rendering the current scene vs intro: app/story/story.tsx
 - AI prompt construction and parsing: app/misc/ai.ts (buildMessages, outputToScenePart)
+- Tool call history preservation: app/misc/ai.ts (buildMessages reconstructs tool_calls and tool role messages)
+- Tool execution and response linking: app/misc/toolExecutor.ts (executeTools populates toolCallId)
 - DeepSeek API integration: app/api/story/next/route.ts
 - Token balance with aggregate counts: app/misc/tokens.ts (getUserTokenBalance)
 - Authentication patterns: app/misc/getAuthToken.ts (authenticatedFetch)
@@ -225,6 +235,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Lore trigger system: app/story/page.tsx (processLoreTriggers)
 - Custom input handling: app/story/page.tsx (handleCustomInput)
 - Achievement with ai_hint: app/creator/page.tsx and app/story/menu.tsx (achievement editors)
+- Tool history test suite: tests/ai.toolHistory.test.ts (comprehensive validation of conversation history preservation)
 
 ## Guardrails for AI edits
 
