@@ -73,9 +73,9 @@ export function executeTools(
         responses.push({
           command: toolCall.function.name,
           success: false,
-          message: `Unknown tool: ${toolCall.function.name} (called with args=${serializeArgs(
-            args
-          )})`,
+          message: `Unknown tool: ${
+            toolCall.function.name
+          } (called with args=${serializeArgs(args)})`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -90,9 +90,9 @@ export function executeTools(
         responses.push({
           command: toolCall.function.name,
           success: false,
-          message: `Missing required parameters: ${missingParams.join(", ")} (tool ${toolCall.function.name} args=${serializeArgs(
-            args
-          )})`,
+          message: `Missing required parameters: ${missingParams.join(
+            ", "
+          )} (tool ${toolCall.function.name} args=${serializeArgs(args)})`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -122,9 +122,9 @@ export function executeTools(
         responses.push({
           command: toolCall.function.name,
           success: false,
-          message: `Tool cannot be converted to command (tool ${toolCall.function.name} args=${serializeArgs(
-            args
-          )})`,
+          message: `Tool cannot be converted to command (tool ${
+            toolCall.function.name
+          } args=${serializeArgs(args)})`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -139,9 +139,9 @@ export function executeTools(
         responses.push({
           command: toolCall.function.name,
           success: false,
-          message: `Command execution returned null (tool ${toolCall.function.name} args=${serializeArgs(
-            args
-          )} command=${command})`,
+          message: `Command execution returned null (tool ${
+            toolCall.function.name
+          } args=${serializeArgs(args)} command=${command})`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -150,9 +150,9 @@ export function executeTools(
       responses.push({
         command: toolCall.function.name,
         success: false,
-        message: `Execution error: ${error.message} (tool ${toolCall.function.name} args=${serializeArgs(
-          toolCall.function.arguments
-        )})`,
+        message: `Execution error: ${error.message} (tool ${
+          toolCall.function.name
+        } args=${serializeArgs(toolCall.function.arguments)})`,
         timestamp: Date.now(),
         toolCallId: toolCall.id,
       });
@@ -264,7 +264,7 @@ function convertToolToCommand(
 
     // Achievement
     case "trigger_achievement":
-      return `/unlock_achievement: ${args.title}`;
+      return `/trigger_achievement: ${args.title}`;
 
     // Lore Management
     case "create_lore": {

@@ -1201,23 +1201,44 @@ export function calculateResourceRequirements(
   recovery: number;
   loss: number;
 } {
+  // For systems with 0 divisors or 0 DC, use minimum values
+  const safeRequired = 
+    system.resources.requiredDivisor === 0 || dc === 0
+      ? system.resources.minRequired
+      : Math.max(
+          system.resources.minRequired,
+          Math.floor(dc / system.resources.requiredDivisor)
+        );
+
+  const safePenalty =
+    system.resources.penaltyDivisor === 0 || dc === 0
+      ? system.resources.minPenalty
+      : Math.max(
+          system.resources.minPenalty,
+          Math.floor(dc / system.resources.penaltyDivisor)
+        );
+
+  const safeRecovery =
+    system.resources.recoverDivisor === 0 || dc === 0
+      ? system.resources.minRecover
+      : Math.max(
+          system.resources.minRecover,
+          Math.floor(dc / system.resources.recoverDivisor)
+        );
+
+  const safeLoss =
+    system.resources.lossDivisor === 0 || dc === 0
+      ? system.resources.minLoss
+      : Math.max(
+          system.resources.minLoss,
+          Math.floor(dc / system.resources.lossDivisor)
+        );
+
   return {
-    required: Math.max(
-      system.resources.minRequired,
-      Math.floor(dc / system.resources.requiredDivisor)
-    ),
-    penalty: Math.max(
-      system.resources.minPenalty,
-      Math.floor(dc / system.resources.penaltyDivisor)
-    ),
-    recovery: Math.max(
-      system.resources.minRecover,
-      Math.floor(dc / system.resources.recoverDivisor)
-    ),
-    loss: Math.max(
-      system.resources.minLoss,
-      Math.floor(dc / system.resources.lossDivisor)
-    ),
+    required: safeRequired,
+    penalty: safePenalty,
+    recovery: safeRecovery,
+    loss: safeLoss,
   };
 }
 

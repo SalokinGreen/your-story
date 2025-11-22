@@ -264,124 +264,203 @@ export async function POST(req: NextRequest) {
   );
 
   try {
-    console.log(`Calling ${modelConfig.provider} API...`);
-
-    // Add timeout to prevent hanging requests
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-    // Build headers based on provider
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    };
-
-    // Add OpenRouter-specific headers
-    if (modelConfig.provider === "openrouter") {
-      headers["HTTP-Referer"] =
-        process.env.NEXT_PUBLIC_SITE_URL || "https://your-story.app";
-      headers["X-Title"] = "Your Story - Interactive Fiction";
-    }
-
-    const requestBody: any = {
-      model: modelConfig.model,
-      messages,
-      temperature: 0.7,
-      max_tokens: modelConfig.maxOutputTokens,
-      stream: false,
-    };
-
-    // Only include tools if model supports them
-    if (tools.length > 0) {
-      requestBody.tools = tools;
-      requestBody.tool_choice = "auto";
-    }
-
-    const resp = await fetch(apiUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    console.log(`${modelConfig.provider} response status:`, resp.status);
-
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error(`${modelConfig.provider} error response:`, text);
-      return NextResponse.json(
-        {
-          error: `${modelConfig.provider} error: ${resp.status} ${resp.statusText}`,
-          details: text,
-        },
-        { status: 502 }
-      );
-    }
-
-    const data = (await resp.json()) as AIResponse;
-    console.log(
-      `${modelConfig.provider} response received. Choices:`,
-      data.choices?.length || 0
-    );
-
-    const aiMessage = data.choices?.[0]?.message;
-    const content = aiMessage?.content ?? "";
-    const toolCalls = aiMessage?.tool_calls || [];
-
-    console.log("Content:", content);
-    console.log("Content length:", content.length);
-    console.log("Tool calls:", toolCalls.length);
-    if (toolCalls.length > 0) {
-      console.log(
-        "Tool call names:",
-        toolCalls.map((tc: any) => tc.function?.name).join(", ")
-      );
-    }
-    console.log("Content preview:", content.substring(0, 200));
-
-    // Execute tool calls if any
-    let toolResponses: CommandResponse[] = [];
-    if (toolCalls.length > 0) {
-      console.log("Executing tool calls...");
-      toolResponses = executeTools(toolCalls, storyData);
-      console.log("Tool execution complete. Responses:", toolResponses.length);
-      toolResponses.forEach((resp, idx) => {
-        console.log(
-          `  Tool ${idx + 1}: ${resp.command} - ${
-            resp.success ? "SUCCESS" : "FAILED"
-          } - ${resp.message}`
-        );
+    // Helper to perform a single AI call
+    async function callAI(currentMessages: ChatMessage[]) {
+      console.log(`Calling ${modelConfig.provider} API...`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      };
+      if (modelConfig.provider === "openrouter") {
+        headers["HTTP-Referer"] =
+          process.env.NEXT_PUBLIC_SITE_URL || "https://your-story.app";
+        headers["X-Title"] = "Your Story - Interactive Fiction";
+      }
+      const requestBody: any = {
+        model: modelConfig.model,
+        messages: currentMessages,
+        temperature: 0.7,
+        max_tokens: modelConfig.maxOutputTokens,
+        stream: false,
+      };
+      if (tools.length > 0) {
+        requestBody.tools = tools;
+        requestBody.tool_choice = "auto";
+      }
+      const resp = await fetch(apiUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+      console.log(`${modelConfig.provider} response status:`, resp.status);
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.error(`${modelConfig.provider} error response:`, text);
+        const providerError = new Error(
+          `${modelConfig.provider} error: ${resp.status} ${resp.statusText}`
+        );
+        (providerError as any).isProviderError = true;
+        (providerError as any).details = text;
+        (
+          providerError as any
+        ).rawMessage = `${modelConfig.provider} error: ${resp.status} ${resp.statusText}`;
+        throw providerError;
+      }
+      return (await resp.json()) as AIResponse;
     }
 
-    let part;
-    try {
-      part = coerceToScenePart(content);
+    const maxChainAttempts = parseInt(
+      process.env.AI_MAX_TOOL_CHAIN_ATTEMPTS || "10",
+      10
+    );
+    let chainAttempt = 0;
+    let collectedParts: any[] = []; // Array to store each ScenePart from chain
+    let finalData: AIResponse | null = null;
 
-      // Store tool calls and responses in the ScenePart for conversation history
-      if (toolCalls.length > 0) {
-        part.toolCalls = toolCalls;
-      }
-      if (toolResponses.length > 0) {
-        part.toolResponses = toolResponses;
-      }
+    // Work on a mutable copy of messages
+    let workingMessages: ChatMessage[] = [...messages];
 
+    while (chainAttempt <= maxChainAttempts) {
       console.log(
-        "Successfully parsed ScenePart. Choices:",
-        part.choices?.length || 0
+        `AI chain attempt ${chainAttempt + 1} / ${maxChainAttempts + 1}`
       );
-    } catch (parseError) {
-      console.error("Error parsing ScenePart:", parseError);
-      console.error("Raw content:", content);
+      const data = await callAI(workingMessages);
+      const aiMessage = data.choices?.[0]?.message;
+      const content = aiMessage?.content || "";
+      const toolCalls = aiMessage?.tool_calls || [];
+      console.log("Received content length:", content.length);
+      console.log("Tool calls count:", toolCalls.length);
+      if (toolCalls.length > 0) {
+        console.log(
+          "Tool call names:",
+          toolCalls.map((tc: any) => tc.function?.name).join(", ")
+        );
+      }
+
+      // Execute tool calls if present
+      let toolResponses: CommandResponse[] = [];
+      if (toolCalls.length > 0) {
+        console.log("Executing tool calls...");
+        toolResponses = executeTools(toolCalls, storyData);
+        toolResponses.forEach((resp, idx) => {
+          console.log(
+            `  Tool ${idx + 1}: ${resp.command} - ${
+              resp.success ? "SUCCESS" : "FAILED"
+            } - ${resp.message}`
+          );
+        });
+      }
+
+      // Check if we should continue chaining
+      const contentIsEmpty = content.trim().length < 50 && toolCalls.length > 0;
+
+      // Create a ScenePart for this iteration
+      let iterationPart: any = null;
+      try {
+        // If content exists (even if short), try to parse it as a ScenePart
+        if (content.trim().length > 0) {
+          iterationPart = coerceToScenePart(content);
+          iterationPart.role = "assistant";
+          iterationPart.user = false;
+        } else if (toolCalls.length > 0) {
+          // Tool-only response - create minimal part to preserve tool calls
+          iterationPart = {
+            content: "", // Empty content, just tools
+            imageUrl: "",
+            user: false,
+            role: "assistant" as const,
+            choices: [],
+          };
+        }
+
+        // Attach tool data to this part
+        if (iterationPart && toolCalls.length > 0) {
+          iterationPart.toolCalls = toolCalls;
+        }
+        if (iterationPart && toolResponses.length > 0) {
+          iterationPart.toolResponses = toolResponses;
+        }
+
+        // Add to collected parts if we have something
+        if (iterationPart) {
+          collectedParts.push(iterationPart);
+        }
+      } catch (parseError) {
+        console.error(
+          `Parse error on iteration ${chainAttempt + 1}:`,
+          parseError
+        );
+        // Continue with next iteration if parsing fails
+      }
+
+      // Append tool role messages for next iteration if we need to chain
+      if (contentIsEmpty && chainAttempt < maxChainAttempts) {
+        // Add assistant message with tool calls to conversation
+        if (toolCalls.length > 0) {
+          workingMessages.push({
+            role: "assistant" as const,
+            content: content || null,
+            tool_calls: toolCalls,
+          } as any);
+        }
+
+        // Add tool response messages
+        toolResponses.forEach((tr) => {
+          workingMessages.push({
+            role: "tool" as const,
+            tool_call_id: tr.toolCallId || "",
+            content: JSON.stringify({
+              command: tr.command,
+              success: tr.success,
+              message: tr.message,
+            }),
+          } as any);
+        });
+      }
+
+      // Check if we should stop (have substantial content)
+      if (!contentIsEmpty) {
+        finalData = data;
+        break;
+      }
+
+      chainAttempt++;
+      if (chainAttempt > maxChainAttempts) {
+        finalData = data;
+        console.warn(
+          "Max tool chain attempts reached without substantial content."
+        );
+        break;
+      }
+    }
+
+    if (!finalData) {
+      return NextResponse.json(
+        { error: "AI response missing after attempts" },
+        { status: 500 }
+      );
+    }
+
+    // If no parts were collected, something went wrong
+    if (collectedParts.length === 0) {
       return NextResponse.json(
         {
-          error: "Failed to parse AI response",
-          details: (parseError as Error).message,
-          rawContent: content,
+          error: "No valid scene parts generated",
+          attempts: chainAttempt + 1,
         },
         { status: 500 }
       );
     }
+
+    console.log(
+      `Generated ${collectedParts.length} scene part(s) across ${
+        chainAttempt + 1
+      } iteration(s)`
+    );
 
     // Deduct tokens after successful generation IF using tokens
     if (shouldUseTokens) {
@@ -411,21 +490,32 @@ export async function POST(req: NextRequest) {
     const updatedBalance = await getUserTokenBalance(userId, supabaseAdmin);
 
     return NextResponse.json({
-      part,
-      toolResponses, // Include tool execution results
+      parts: collectedParts, // Return array of parts
       meta: {
-        model: data.model,
+        model: finalData.model,
         modelName: modelConfig.name,
         provider: modelConfig.provider,
-        usage: data.usage,
+        usage: finalData.usage,
         tokensDeducted: shouldUseTokens ? REQUIRED_TOKENS : 0,
         tokenCost: shouldUseTokens ? modelConfig.cost : 0,
         remainingBalance: updatedBalance,
+        chainAttempts: chainAttempt + 1,
+        maxChainAttempts,
       },
     });
   } catch (err) {
     const error = err as Error;
     console.error("Error in /api/story/next:", error);
+
+    if ((error as any).isProviderError) {
+      return NextResponse.json(
+        {
+          error: (error as any).rawMessage || error.message,
+          details: (error as any).details,
+        },
+        { status: 502 }
+      );
+    }
 
     // Check if it's an abort error (timeout)
     if (error.name === "AbortError") {

@@ -832,6 +832,11 @@ export function processCommands(
           name,
         });
       } else {
+        // Ensure resource.value is a valid number (prevent NaN)
+        if (typeof resource.value !== "number" || isNaN(resource.value)) {
+          resource.value = 0;
+        }
+
         const oldValue = resource.value;
         const oldMax = resource.maxValue;
 
@@ -1424,6 +1429,126 @@ function StoryPageContent() {
   const [pendingCommandResponses, setPendingCommandResponses] = useState<
     CommandResponse[]
   >([]);
+
+  // Helper to process multiple scene parts from API
+  function processSceneParts(
+    parts: any[],
+    storyData: StoryData,
+    addNotification: (
+      message: string,
+      type: "success" | "failure" | "info" | "warning"
+    ) => void
+  ) {
+    if (!parts || parts.length === 0) return null;
+
+    let lastPartWithContent = null;
+
+    for (const part of parts) {
+      // Handle tool calls (new system)
+      if (part.toolCalls && part.toolResponses) {
+        // Execute commands from tool responses to mutate game state
+        // Use executeCommandWithResponse for proper command handling
+        const commands = part.toolResponses
+          .map((r: CommandResponse) => r.command)
+          .filter(
+            (cmd: string | undefined): cmd is string =>
+              cmd !== undefined && cmd !== null
+          );
+
+        if (commands.length > 0) {
+          // Import executeCommandWithResponse from commandResponses
+          const {
+            executeCommandWithResponse,
+          } = require("@/app/misc/commandResponses");
+
+          for (const command of commands) {
+            try {
+              executeCommandWithResponse(command, storyData);
+            } catch (error) {
+              console.error("Error executing command:", command, error);
+            }
+          }
+        }
+
+        // Handle add_memory tool calls
+        try {
+          const memoryToolCalls = (part.toolCalls || []).filter(
+            (tc: any) => tc?.function?.name === "add_memory"
+          );
+          if (memoryToolCalls.length > 0) {
+            const existingMemoryLower = storyData.memory.map((m) =>
+              m.toLowerCase().trim()
+            );
+            for (const tc of memoryToolCalls) {
+              let args: any = tc.function?.arguments;
+              if (typeof args === "string") {
+                try {
+                  args = JSON.parse(args);
+                } catch (e) {
+                  continue;
+                }
+              }
+              const entry: string | undefined = args?.entry?.trim();
+              if (
+                entry &&
+                !existingMemoryLower.includes(entry.toLowerCase().trim())
+              ) {
+                storyData.memory.push(entry);
+                existingMemoryLower.push(entry.toLowerCase().trim());
+                addNotification(
+                  `🧠 Memory added: ${entry.substring(0, 80)}${
+                    entry.length > 80 ? "..." : ""
+                  }`,
+                  "success"
+                );
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Failed processing add_memory tool calls", e);
+        }
+
+        // Store tool responses for AI feedback in next turn
+        setPendingCommandResponses(part.toolResponses);
+      }
+      // Handle legacy XML commands
+      else if (part.commands && part.commands.length > 0) {
+        processCommands(part.commands, storyData, addNotification);
+
+        const responses = generateCommandResponses(part.commands, storyData);
+        setPendingCommandResponses(responses);
+      }
+
+      // Handle memory entries (legacy system)
+      if (part.memoryEntries && part.memoryEntries.length > 0) {
+        const existingMemoryLower = storyData.memory.map((m) =>
+          m.toLowerCase().trim()
+        );
+        const newMemories = part.memoryEntries.filter(
+          (entry: string) =>
+            !existingMemoryLower.includes(entry.toLowerCase().trim())
+        );
+        if (newMemories.length > 0) {
+          logger.action("New memory entries added", {
+            count: newMemories.length,
+            entries: newMemories,
+          });
+          storyData.memory.push(...newMemories);
+        }
+      }
+
+      // Push part to scene
+      storyData.scene.parts.push(part);
+
+      // Track the last part with actual content for UI display
+      if (part.content && part.content.trim().length > 0) {
+        lastPartWithContent = part;
+      }
+    }
+
+    processLoreTriggers(storyData, addNotification);
+    return lastPartWithContent || parts[parts.length - 1];
+  }
 
   // Fetch token balance on mount
   useEffect(() => {
@@ -2022,16 +2147,16 @@ function StoryPageContent() {
           return;
         }
 
-        logger.ai_response("AI response received", {
+        // Handle parts array response
+        if (!data.parts || data.parts.length === 0) {
+          addNotification("⚠️ Empty response from AI", "failure");
+          setLoading(false);
+          return;
+        }
+
+        logger.ai_response("AI response received (custom input)", {
           tokensDeducted: data.meta?.tokensDeducted,
-          partLength: data.part.content.length,
-          raw: data.part.raw || data.part.content,
-          parsed: {
-            content: data.part.content,
-            choices: data.part.choices?.length || 0,
-            commands: data.part.commands?.length || 0,
-            memoryEntries: data.part.memoryEntries?.length || 0,
-          },
+          partsCount: data.parts.length,
         });
 
         if (data.meta?.tokensDeducted) {
@@ -2041,81 +2166,30 @@ function StoryPageContent() {
           );
           if (data.meta.remainingBalance) {
             addNotification(
-              `Balance:${data.meta.remainingBalance.total}tokensremaining(${data.meta.remainingBalance.tradable}tradable)`,
+              `Balance: ${data.meta.remainingBalance.total} tokens remaining (${data.meta.remainingBalance.tradable} tradable)`,
               "info"
             );
           }
         }
 
-        // Handle tool calls (new system)
-        if (data.part.toolCalls && data.part.toolResponses) {
-          // Extract commands from tool responses
-          const commands = data.part.toolResponses
-            .map((r: CommandResponse) => r.command)
-            .filter(
-              (cmd: string): cmd is string => cmd !== undefined && cmd !== null
-            );
+        // Process all parts from the chain
+        const lastPart = processSceneParts(
+          data.parts,
+          storyData,
+          addNotification
+        );
 
-          // Execute commands to mutate game state
-          if (commands.length > 0) {
-            processCommands(commands, storyData, addNotification);
-          }
-
-          // Store tool responses for AI feedback in next turn
-          setPendingCommandResponses(data.part.toolResponses);
-        }
-        // Handle legacy XML commands
-        else if (data.part.commands && data.part.commands.length > 0) {
-          // Execute commands to mutate game state
-          processCommands(data.part.commands, storyData, addNotification);
-
-          // Generate command responses for AI feedback
-          const responses = generateCommandResponses(
-            data.part.commands,
-            storyData
-          );
-          setPendingCommandResponses(responses);
+        if (!lastPart) {
+          addNotification("⚠️ No valid content generated", "failure");
+          setLoading(false);
+          return;
         }
 
-        if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
-          const existingMemoryLower = storyData.memory.map((m) =>
-            m.toLowerCase().trim()
-          );
-          const newMemories = data.part.memoryEntries.filter(
-            (entry: string) =>
-              !existingMemoryLower.includes(entry.toLowerCase().trim())
-          );
-          if (newMemories.length > 0) {
-            logger.action("New memory entries added", {
-              count: newMemories.length,
-              entries: newMemories,
-              skippedDuplicates:
-                data.part.memoryEntries.length - newMemories.length,
-            });
-            storyData.memory.push(...newMemories);
-          } else {
-            logger.action("Memory entries skipped (all duplicates)", {
-              count: data.part.memoryEntries.length,
-              entries: data.part.memoryEntries,
-            });
-          }
-        }
-
-        processLoreTriggers(storyData, addNotification);
-
-        storyData.scene.parts.push(data.part);
-        console.log("[handleChoice] Pushed scene part:", {
-          hasToolCalls: !!data.part.toolCalls,
-          toolCallsCount: data.part.toolCalls?.length || 0,
-          hasToolResponses: !!data.part.toolResponses,
-          toolResponsesCount: data.part.toolResponses?.length || 0,
-          totalParts: storyData.scene.parts.length,
-        });
         setStoryData({ ...storyData });
-        setStoryText(data.part.content);
+        setStoryText(lastPart.content || "");
         setCanRetry(true);
         setCanUndo(true);
-        setChoices({ choices: data.part.choices || [] });
+        setChoices({ choices: lastPart.choices || [] });
         setLoading(false);
 
         // Clear command responses after successful AI generation
@@ -2369,6 +2443,11 @@ function StoryPageContent() {
       }
 
       if (resource) {
+        // Ensure resource.value is a valid number (prevent NaN)
+        if (typeof resource.value !== "number" || isNaN(resource.value)) {
+          resource.value = 0;
+        }
+
         const dc = choice.skill_dc || 0;
         const resourceReqs = calculateResourceRequirements(rpgSystem, dc);
         const requiredAmount = resourceReqs.required;
@@ -2972,6 +3051,11 @@ function StoryPageContent() {
               (r) => r.name === choice.resource_used
             );
             if (resource) {
+              // Ensure resource.value is a valid number (prevent NaN)
+              if (typeof resource.value !== "number" || isNaN(resource.value)) {
+                resource.value = 0;
+              }
+
               const recovery = resourceReqs.recovery; // Use system-specific recovery formula
               const beforeRecovery = resource.value;
               resource.value = Math.min(
@@ -3086,6 +3170,11 @@ function StoryPageContent() {
               (r) => r.name === choice.resource_used
             );
             if (resource) {
+              // Ensure resource.value is a valid number (prevent NaN)
+              if (typeof resource.value !== "number" || isNaN(resource.value)) {
+                resource.value = 0;
+              }
+
               const lossBefore = resource.value;
               const penalty = resourceReqs.loss; // Use system-specific loss formula
               resource.value = Math.max(0, resource.value - penalty);
@@ -3216,7 +3305,7 @@ function StoryPageContent() {
       const maxValue = resource?.maxValue || 100;
       const currentValue = resource?.value || 0;
       choiceDetails.push(
-        `[Resource:${choice.resource_used}${resourceUsedBefore}?${currentValue}/${maxValue}]`
+        `[Resource: ${choice.resource_used} used; ${resourceUsedBefore} -> ${currentValue}/${maxValue}]`
       );
     }
 
@@ -3434,97 +3523,50 @@ function StoryPageContent() {
           setTokenBalance(data.meta.remainingBalance.total);
         }
 
+        // Handle parts array response
+        if (!data.parts || data.parts.length === 0) {
+          addNotification("⚠️ Empty response from AI", "failure");
+          setLoading(false);
+          return;
+        }
+
         logger.ai_response("AI response received (choice)", {
           tokensDeducted: data.meta?.tokensDeducted,
-          partLength: data.part.content.length,
-          raw: data.part.raw || data.part.content,
-          parsed: {
-            content: data.part.content,
-            choices: data.part.choices?.length || 0,
-            commands: data.part.commands?.length || 0,
-            memoryEntries: data.part.memoryEntries?.length || 0,
-          },
+          partsCount: data.parts.length,
         });
 
-        // Handle tool calls (new system)
-        if (data.part.toolCalls && data.part.toolResponses) {
-          // Extract commands from tool responses
-          const commands = data.part.toolResponses
-            .map((r: CommandResponse) => r.command)
-            .filter(
-              (cmd: string | undefined): cmd is string =>
-                cmd !== undefined && cmd !== null
-            );
+        // Process all parts from the chain
+        const lastPart = processSceneParts(
+          data.parts,
+          storyData,
+          addNotification
+        );
 
-          // Execute commands to mutate game state
-          if (commands.length > 0) {
-            processCommands(commands, storyData, addNotification);
-          }
-
-          // Store tool responses for AI feedback in next turn
-          setPendingCommandResponses(data.part.toolResponses);
+        if (!lastPart) {
+          addNotification("⚠️ No valid content generated", "failure");
+          setLoading(false);
+          return;
         }
-        // Handle legacy XML commands
-        else if (data.part.commands && data.part.commands.length > 0) {
-          // Execute commands to mutate game state
-          processCommands(data.part.commands, storyData, addNotification);
-
-          // Generate command responses for AI feedback
-          const responses = generateCommandResponses(
-            data.part.commands,
-            storyData
-          );
-          setPendingCommandResponses(responses);
-        }
-
-        if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
-          const existingMemoryLower = storyData.memory.map((m) =>
-            m.toLowerCase().trim()
-          );
-          const newMemories = data.part.memoryEntries.filter(
-            (entry: string) =>
-              !existingMemoryLower.includes(entry.toLowerCase().trim())
-          );
-          if (newMemories.length > 0) {
-            logger.action("New memory entries added", {
-              count: newMemories.length,
-              entries: newMemories,
-              skippedDuplicates:
-                data.part.memoryEntries.length - newMemories.length,
-            });
-            storyData.memory.push(...newMemories);
-          } else {
-            logger.action("Memory entries skipped (all duplicates)", {
-              count: data.part.memoryEntries.length,
-              entries: data.part.memoryEntries,
-            });
-          }
-        }
-
-        //ProcessLoretriggersbasedonnew content
-        processLoreTriggers(storyData, addNotification);
-
-        storyData.scene.parts.push(data.part);
 
         //Checkforchaptercompletionandawardpoints
-        if (data.part.content.includes("!!!ENDCHAPTER!!!")) {
+        if (lastPart.content && lastPart.content.includes("!!!ENDCHAPTER!!!")) {
           const currentChapter = storyData.chapters.length;
           if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
             storyData.earnedPointsFromChapters.push(currentChapter);
             storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
             addNotification(
-              `??Chapter${currentChapter}Complete!Earned${UPGRADE_COSTS.CHAPTER_REWARD}points!Total:${storyData.points}`,
+              `✨ Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
               "success"
             );
           }
         }
 
         setStoryData({ ...storyData });
-        setStoryText(data.part.content);
-        setChoices({ choices: data.part.choices || [] });
+        setStoryText(lastPart.content || "");
+        setChoices({ choices: lastPart.choices || [] });
         setLoading(false);
-        setCanRetry(true); //EnableretryaftersuccessfulAIresponse
-        setCanUndo(true); //EnableundoaftersuccessfulAIresponse
+        setCanRetry(true);
+        setCanUndo(true);
 
         // Clear command responses after successful AI generation
         setPendingCommandResponses([]);
@@ -3732,97 +3774,50 @@ function StoryPageContent() {
           return;
         }
 
-        //Updatetokenbalance
+        // Update token balance
         if (data.meta?.remainingBalance?.total !== undefined) {
           setTokenBalance(data.meta.remainingBalance.total);
         }
 
+        // Process all parts from the multi-part response
+        const lastPart = processSceneParts(
+          data.parts,
+          storyData,
+          addNotification
+        );
+
         logger.ai_response("AI response received (retry)", {
           tokensDeducted: data.meta?.tokensDeducted,
-          partLength: data.part.content.length,
-          raw: data.part.raw || data.part.content,
+          partsCount: data.parts.length,
+          lastPartLength: lastPart.content.length,
+          raw: lastPart.raw || lastPart.content,
           parsed: {
-            content: data.part.content,
-            choices: data.part.choices?.length || 0,
-            commands: data.part.commands?.length || 0,
-            memoryEntries: data.part.memoryEntries?.length || 0,
+            content: lastPart.content,
+            choices: lastPart.choices?.length || 0,
+            commands: lastPart.commands?.length || 0,
+            memoryEntries: lastPart.memoryEntries?.length || 0,
           },
         });
 
-        // Handle tool calls (new system)
-        if (data.part.toolCalls && data.part.toolResponses) {
-          // Extract commands from tool responses
-          const commands = data.part.toolResponses
-            .map((r: CommandResponse) => r.command)
-            .filter(
-              (cmd: string | undefined): cmd is string =>
-                cmd !== undefined && cmd !== null
-            );
-
-          // Execute commands to mutate game state
-          if (commands.length > 0) {
-            processCommands(commands, storyData, addNotification);
-          }
-
-          // Store tool responses for AI feedback in next turn
-          setPendingCommandResponses(data.part.toolResponses);
-        }
-        // Handle legacy XML commands
-        else if (data.part.commands && data.part.commands.length > 0) {
-          // Execute commands to mutate game state
-          processCommands(data.part.commands, storyData, addNotification);
-
-          // Generate command responses for AI feedback
-          const responses = generateCommandResponses(
-            data.part.commands,
-            storyData
-          );
-          setPendingCommandResponses(responses);
-        }
-
-        if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
-          const existingMemoryLower = storyData.memory.map((m) =>
-            m.toLowerCase().trim()
-          );
-          const newMemories = data.part.memoryEntries.filter(
-            (entry: string) =>
-              !existingMemoryLower.includes(entry.toLowerCase().trim())
-          );
-          if (newMemories.length > 0) {
-            logger.action("New memory entries added", {
-              count: newMemories.length,
-              entries: newMemories,
-              skippedDuplicates:
-                data.part.memoryEntries.length - newMemories.length,
-            });
-            storyData.memory.push(...newMemories);
-          } else {
-            logger.action("Memory entries skipped (all duplicates)", {
-              count: data.part.memoryEntries.length,
-              entries: data.part.memoryEntries,
-            });
-          }
-        }
-
-        //ProcessLoretriggersbasedonnew content
+        // Process lore triggers based on new content
         processLoreTriggers(storyData, addNotification);
-        storyData.scene.parts.push(data.part);
 
-        if (data.part.content.includes("!!!ENDCHAPTER!!!")) {
+        // Check for chapter completion
+        if (lastPart.content.includes("!!!ENDCHAPTER!!!")) {
           const currentChapter = storyData.chapters.length;
           if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
             storyData.earnedPointsFromChapters.push(currentChapter);
             storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
             addNotification(
-              `??Chapter${currentChapter}Complete!Earned${UPGRADE_COSTS.CHAPTER_REWARD}points!Total:${storyData.points}`,
+              `🎉 Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
               "success"
             );
           }
         }
 
         setStoryData({ ...storyData });
-        setStoryText(data.part.content);
-        setChoices({ choices: data.part.choices || [] });
+        setStoryText(lastPart.content);
+        setChoices({ choices: lastPart.choices || [] });
         setLoading(false);
         setCanRetry(true);
         setCanUndo(true);

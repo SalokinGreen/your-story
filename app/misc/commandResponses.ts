@@ -871,6 +871,11 @@ export function executeCommandWithResponse(
       };
     }
 
+    // Ensure resource.value is a valid number (prevent NaN)
+    if (typeof resource.value !== 'number' || isNaN(resource.value)) {
+      resource.value = 0;
+    }
+
     const oldValue = resource.value;
     resource.value = Math.max(
       0,
@@ -922,6 +927,11 @@ export function executeCommandWithResponse(
       };
     }
 
+    // Ensure resource.value is a valid number (prevent NaN)
+    if (typeof resource.value !== 'number' || isNaN(resource.value)) {
+      resource.value = 0;
+    }
+
     const oldMax = resource.maxValue;
     resource.maxValue = newMax;
 
@@ -970,6 +980,11 @@ export function executeCommandWithResponse(
         message: `Resource "${name}" not found`,
         timestamp,
       };
+    }
+
+    // Ensure resource.value is a valid number (prevent NaN)
+    if (typeof resource.value !== 'number' || isNaN(resource.value)) {
+      resource.value = 0;
     }
 
     const oldValue = resource.value;
