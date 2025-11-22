@@ -51,6 +51,12 @@ function AIModelSelector({
   const [speechifyKey, setSpeechifyKey] = useState("");
   const [byokEnabled, setByokEnabled] = useState(false);
   const [isSubscriber, setIsSubscriber] = useState(false);
+  const [toolCallingEnabled, setToolCallingEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("toolCallingEnabled") !== "false"; // Default true
+    }
+    return true;
+  });
 
   // Custom Models State (array of models)
   const [customModels, setCustomModels] = useState<CustomModel[]>([]);
@@ -59,6 +65,8 @@ function AIModelSelector({
   const [newModelName, setNewModelName] = useState("");
   const [newContextSize, setNewContextSize] = useState(4096);
   const [newMaxOutput, setNewMaxOutput] = useState(1000);
+  const [newInputPrice, setNewInputPrice] = useState(0);
+  const [newOutputPrice, setNewOutputPrice] = useState(0);
 
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -75,6 +83,10 @@ function AIModelSelector({
       if (typeof window !== "undefined") {
         setOpenRouterKey(localStorage.getItem("openRouterKey") || "");
         setSpeechifyKey(localStorage.getItem("speechifyKey") || "");
+        const toolCalling = localStorage.getItem("toolCallingEnabled");
+        if (toolCalling !== null) {
+          setToolCallingEnabled(toolCalling !== "false");
+        }
       }
 
       getUserSettings(user.id, supabase)
@@ -102,6 +114,8 @@ function AIModelSelector({
       name: newModelName,
       contextSize: newContextSize,
       maxOutputTokens: newMaxOutput,
+      inputPrice: newInputPrice,
+      outputPrice: newOutputPrice,
     };
 
     setCustomModels([...customModels, newModel]);
@@ -110,6 +124,8 @@ function AIModelSelector({
     setNewModelName("");
     setNewContextSize(4096);
     setNewMaxOutput(1000);
+    setNewInputPrice(0);
+    setNewOutputPrice(0);
     addNotification("Model added! Click Save Settings to persist.", "success");
   };
 
@@ -119,6 +135,61 @@ function AIModelSelector({
       "Model removed! Click Save Settings to persist.",
       "warning"
     );
+  };
+
+  const handleEditModel = (model: CustomModel) => {
+    setEditingModelId(model.id);
+    setNewModelId(model.modelId);
+    setNewModelName(model.name);
+    setNewContextSize(model.contextSize);
+    setNewMaxOutput(model.maxOutputTokens);
+    setNewInputPrice(model.inputPrice || 0);
+    setNewOutputPrice(model.outputPrice || 0);
+  };
+
+  const handleUpdateModel = () => {
+    if (!editingModelId || !newModelId || !newModelName) {
+      addNotification("Please fill in model ID and name", "warning");
+      return;
+    }
+
+    const updatedModels = customModels.map((m) =>
+      m.id === editingModelId
+        ? {
+            ...m,
+            modelId: newModelId,
+            name: newModelName,
+            contextSize: newContextSize,
+            maxOutputTokens: newMaxOutput,
+            inputPrice: newInputPrice,
+            outputPrice: newOutputPrice,
+          }
+        : m
+    );
+
+    setCustomModels(updatedModels);
+    // Clear form and editing state
+    setEditingModelId(null);
+    setNewModelId("");
+    setNewModelName("");
+    setNewContextSize(4096);
+    setNewMaxOutput(1000);
+    setNewInputPrice(0);
+    setNewOutputPrice(0);
+    addNotification(
+      "Model updated! Click Save Settings to persist.",
+      "success"
+    );
+  };
+
+  const handleCancelEdit = () => {
+    setEditingModelId(null);
+    setNewModelId("");
+    setNewModelName("");
+    setNewContextSize(4096);
+    setNewMaxOutput(1000);
+    setNewInputPrice(0);
+    setNewOutputPrice(0);
   };
 
   const handleSaveSettings = async () => {
@@ -158,6 +229,8 @@ function AIModelSelector({
       original_model: model.modelId,
       cost: 0, // BYOK models don't cost tokens
       maxTokens: model.contextSize,
+      inputPrice: model.inputPrice || 0,
+      outputPrice: model.outputPrice || 0,
     };
   });
 
@@ -313,6 +386,39 @@ function AIModelSelector({
               </button>
             </div>
 
+            {/* Tool Calling Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Enable Tool Calling
+                </span>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Allow AI to modify stats, inventory, and story state
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const newValue = !toolCallingEnabled;
+                  setToolCallingEnabled(newValue);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem(
+                      "toolCallingEnabled",
+                      String(newValue)
+                    );
+                  }
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  toolCallingEnabled ? "bg-green-600" : "bg-gray-400"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    toolCallingEnabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
             {/* API Keys */}
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-2">
@@ -368,77 +474,270 @@ function AIModelSelector({
                   {customModels.map((model) => (
                     <div
                       key={model.id}
-                      className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600"
+                      className="p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600"
                     >
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {model.name}
-                        </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                          {model.modelId} • {model.contextSize} tokens
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteModel(model.id)}
-                        className="ml-2 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
-                      >
-                        Delete
-                      </button>
+                      {editingModelId === model.id ? (
+                        // Edit Mode
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Model ID
+                            </label>
+                            <input
+                              type="text"
+                              value={newModelId}
+                              onChange={(e) => setNewModelId(e.target.value)}
+                              className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Display Name
+                            </label>
+                            <input
+                              type="text"
+                              value={newModelName}
+                              onChange={(e) => setNewModelName(e.target.value)}
+                              className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Context
+                              </label>
+                              <input
+                                type="number"
+                                value={newContextSize}
+                                onChange={(e) =>
+                                  setNewContextSize(
+                                    parseInt(e.target.value) || 4096
+                                  )
+                                }
+                                className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Max Output
+                              </label>
+                              <input
+                                type="number"
+                                value={newMaxOutput}
+                                onChange={(e) =>
+                                  setNewMaxOutput(
+                                    parseInt(e.target.value) || 1000
+                                  )
+                                }
+                                className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Input Price
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={newInputPrice}
+                                onChange={(e) =>
+                                  setNewInputPrice(
+                                    parseFloat(e.target.value) || 0
+                                  )
+                                }
+                                className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Output Price
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={newOutputPrice}
+                                onChange={(e) =>
+                                  setNewOutputPrice(
+                                    parseFloat(e.target.value) || 0
+                                  )
+                                }
+                                className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2 pt-2">
+                            <button
+                              onClick={handleUpdateModel}
+                              className="flex-1 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="flex-1 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        // View Mode
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {model.name}
+                            </p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {model.modelId} • {model.contextSize} tokens
+                              {(model.inputPrice || model.outputPrice) && (
+                                <span className="ml-1">
+                                  • ${model.inputPrice || 0}/
+                                  {model.outputPrice || 0} per M
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="flex gap-1 ml-2">
+                            <button
+                              onClick={() => handleEditModel(model)}
+                              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteModel(model.id)}
+                              className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
 
               {/* Add New Model Form */}
-              <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-gray-600">
-                <p className="text-xs font-medium text-gray-700 dark:text-gray-400">
-                  Add New Model
-                </p>
-                <div>
-                  <input
-                    type="text"
-                    value={newModelId}
-                    onChange={(e) => setNewModelId(e.target.value)}
-                    placeholder="Model ID (e.g., anthropic/claude-3-opus)"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
-                  />
+              {!editingModelId && (
+                <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                  <p className="text-xs font-medium text-gray-700 dark:text-gray-400">
+                    Add New Model
+                  </p>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Model ID
+                    </label>
+                    <input
+                      type="text"
+                      value={newModelId}
+                      onChange={(e) => setNewModelId(e.target.value)}
+                      placeholder="anthropic/claude-3-opus"
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      The API model identifier (e.g., anthropic/claude-3-opus)
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Display Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newModelName}
+                      onChange={(e) => setNewModelName(e.target.value)}
+                      placeholder="Claude 3 Opus"
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Human-readable name shown in the model selector
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Context Size
+                      </label>
+                      <input
+                        type="number"
+                        value={newContextSize}
+                        onChange={(e) =>
+                          setNewContextSize(parseInt(e.target.value) || 4096)
+                        }
+                        placeholder="4096"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Max input tokens
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Max Output
+                      </label>
+                      <input
+                        type="number"
+                        value={newMaxOutput}
+                        onChange={(e) =>
+                          setNewMaxOutput(parseInt(e.target.value) || 1000)
+                        }
+                        placeholder="1000"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Max output tokens
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Input Price
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newInputPrice}
+                        onChange={(e) =>
+                          setNewInputPrice(parseFloat(e.target.value) || 0)
+                        }
+                        placeholder="0.00"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        $/M input tokens
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Output Price
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newOutputPrice}
+                        onChange={(e) =>
+                          setNewOutputPrice(parseFloat(e.target.value) || 0)
+                        }
+                        placeholder="0.00"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        $/M output tokens
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleAddModel}
+                    className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium"
+                  >
+                    Add Model
+                  </button>
                 </div>
-                <div>
-                  <input
-                    type="text"
-                    value={newModelName}
-                    onChange={(e) => setNewModelName(e.target.value)}
-                    placeholder="Display Name (e.g., Claude 3 Opus)"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="number"
-                    value={newContextSize}
-                    onChange={(e) =>
-                      setNewContextSize(parseInt(e.target.value) || 4096)
-                    }
-                    placeholder="Context Size"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
-                  />
-                  <input
-                    type="number"
-                    value={newMaxOutput}
-                    onChange={(e) =>
-                      setNewMaxOutput(parseInt(e.target.value) || 1000)
-                    }
-                    placeholder="Max Output"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
-                  />
-                </div>
-                <button
-                  onClick={handleAddModel}
-                  className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium"
-                >
-                  Add Model
-                </button>
-              </div>
+              )}
             </div>
 
             <button

@@ -6,6 +6,8 @@ export interface CustomModel {
   name: string;
   contextSize: number;
   maxOutputTokens: number;
+  inputPrice?: number; // Price per million input tokens (optional, defaults to 0 for BYOK)
+  outputPrice?: number; // Price per million output tokens (optional, defaults to 0 for BYOK)
 }
 
 export interface UserSettings {

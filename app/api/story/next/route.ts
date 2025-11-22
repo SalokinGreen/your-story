@@ -20,6 +20,7 @@ interface RequestBody {
   useRawContext?: boolean; // Use raw AI output in context instead of parsed content
   openRouterKey?: string; // BYOK key from client
   commandResponses?: CommandResponse[]; // AI feedback from last commands
+  toolCallingEnabled?: boolean; // Enable/disable tool calling
 }
 
 interface AIChoice {
@@ -285,7 +286,9 @@ export async function POST(req: NextRequest) {
         max_tokens: modelConfig.maxOutputTokens,
         stream: false,
       };
-      if (tools.length > 0) {
+      // Only include tools if explicitly enabled (defaults to true for backwards compatibility)
+      const enableTools = body.toolCallingEnabled !== false;
+      if (tools.length > 0 && enableTools) {
         requestBody.tools = tools;
         requestBody.tool_choice = "auto";
       }
@@ -410,11 +413,12 @@ export async function POST(req: NextRequest) {
               type: "function",
               function: {
                 name: tc.function?.name,
-                arguments: typeof tc.function?.arguments === 'string' 
-                  ? tc.function.arguments 
-                  : JSON.stringify(tc.function?.arguments || {})
-              }
-            }))
+                arguments:
+                  typeof tc.function?.arguments === "string"
+                    ? tc.function.arguments
+                    : JSON.stringify(tc.function?.arguments || {}),
+              },
+            })),
           } as any);
         }
 
