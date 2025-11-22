@@ -80,7 +80,7 @@ export default function Story({
               >
                 <DynamicIcon name="ChevronLeft" className="w-4 h-4" />
               </button>
-              
+
               {viewingPartIndex !== null ? (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -101,7 +101,10 @@ export default function Story({
 
               <button
                 onClick={onNavigateRight}
-                disabled={viewingPartIndex === null || viewingPartIndex === storyData.scene.parts.length - 1}
+                disabled={
+                  viewingPartIndex === null ||
+                  viewingPartIndex === storyData.scene.parts.length - 1
+                }
                 className="p-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
                 title="Next message"
               >
