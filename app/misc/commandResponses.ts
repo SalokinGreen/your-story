@@ -872,7 +872,7 @@ export function executeCommandWithResponse(
     }
 
     // Ensure resource.value is a valid number (prevent NaN)
-    if (typeof resource.value !== 'number' || isNaN(resource.value)) {
+    if (typeof resource.value !== "number" || isNaN(resource.value)) {
       resource.value = 0;
     }
 
@@ -928,7 +928,7 @@ export function executeCommandWithResponse(
     }
 
     // Ensure resource.value is a valid number (prevent NaN)
-    if (typeof resource.value !== 'number' || isNaN(resource.value)) {
+    if (typeof resource.value !== "number" || isNaN(resource.value)) {
       resource.value = 0;
     }
 
@@ -983,7 +983,7 @@ export function executeCommandWithResponse(
     }
 
     // Ensure resource.value is a valid number (prevent NaN)
-    if (typeof resource.value !== 'number' || isNaN(resource.value)) {
+    if (typeof resource.value !== "number" || isNaN(resource.value)) {
       resource.value = 0;
     }
 

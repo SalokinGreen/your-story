@@ -1202,7 +1202,7 @@ export function calculateResourceRequirements(
   loss: number;
 } {
   // For systems with 0 divisors or 0 DC, use minimum values
-  const safeRequired = 
+  const safeRequired =
     system.resources.requiredDivisor === 0 || dc === 0
       ? system.resources.minRequired
       : Math.max(

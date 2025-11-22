@@ -154,7 +154,7 @@ export const AI_MODELS = {
     maxTokens: 128000,
     maxOutputTokens: 4000,
     provider: "deepseek",
-    supportsToolCalling: true,
+    supportsToolCalling: false,
     cost: 2,
     inputPrice: 0.55,
     outputPrice: 2.19,

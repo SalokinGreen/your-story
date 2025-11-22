@@ -400,18 +400,28 @@ export async function POST(req: NextRequest) {
       // Append tool role messages for next iteration if we need to chain
       if (contentIsEmpty && chainAttempt < maxChainAttempts) {
         // Add assistant message with tool calls to conversation
+        // For DeepSeek/OpenAI compatibility, we need to add the full assistant message
         if (toolCalls.length > 0) {
           workingMessages.push({
-            role: "assistant" as const,
-            content: content || null,
-            tool_calls: toolCalls,
+            role: "assistant",
+            content: content || "",
+            tool_calls: toolCalls.map((tc: any) => ({
+              id: tc.id,
+              type: "function",
+              function: {
+                name: tc.function?.name,
+                arguments: typeof tc.function?.arguments === 'string' 
+                  ? tc.function.arguments 
+                  : JSON.stringify(tc.function?.arguments || {})
+              }
+            }))
           } as any);
         }
 
         // Add tool response messages
         toolResponses.forEach((tr) => {
           workingMessages.push({
-            role: "tool" as const,
+            role: "tool",
             tool_call_id: tr.toolCallId || "",
             content: JSON.stringify({
               command: tr.command,
