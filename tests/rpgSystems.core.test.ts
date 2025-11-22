@@ -87,38 +87,38 @@ describe("3d6 System", () => {
 
   describe("checkSuccess for 3d6", () => {
     it("should succeed when roll + stat >= DC", () => {
-      const result = checkSuccess(SYSTEM_3D6, 12, 50, 60, 0);
+      const result = checkSuccess(SYSTEM_3D6, 12, 50, 20, 0);
 
-      expect(result.success).toBe(true); // 12 + 50 = 62 >= 60
-      expect(result.total).toBe(62);
+      expect(result.success).toBe(true); // 12 + floor(50*0.18) = 12 + 9 = 21 >= 20
+      expect(result.total).toBe(21);
     });
 
     it("should fail when roll + stat < DC", () => {
-      const result = checkSuccess(SYSTEM_3D6, 8, 40, 60, 0);
+      const result = checkSuccess(SYSTEM_3D6, 8, 40, 20, 0);
 
-      expect(result.success).toBe(false); // 8 + 40 = 48 < 60
-      expect(result.total).toBe(48);
+      expect(result.success).toBe(false); // 8 + floor(40*0.18) = 8 + 7 = 15 < 20
+      expect(result.total).toBe(15);
     });
 
     it("should detect critical success (max roll)", () => {
-      const result = checkSuccess(SYSTEM_3D6, 18, 50, 60, 0);
+      const result = checkSuccess(SYSTEM_3D6, 18, 50, 20, 0);
 
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(true); // 18 + 9 = 27 >= 20
       expect(result.critical).toBe(true); // 18 is max
     });
 
     it("should handle penalties", () => {
-      const result = checkSuccess(SYSTEM_3D6, 12, 50, 60, 5);
+      const result = checkSuccess(SYSTEM_3D6, 12, 50, 20, 5);
 
-      expect(result.success).toBe(false); // (12-5) + 50 = 57 < 60
-      expect(result.total).toBe(57);
+      expect(result.success).toBe(false); // 12 + (9-5) = 16 < 20
+      expect(result.total).toBe(16);
     });
 
     it("should succeed exactly at DC", () => {
-      const result = checkSuccess(SYSTEM_3D6, 10, 50, 60, 0);
+      const result = checkSuccess(SYSTEM_3D6, 11, 50, 20, 0);
 
-      expect(result.success).toBe(true); // 10 + 50 = 60 >= 60
-      expect(result.total).toBe(60);
+      expect(result.success).toBe(true); // 11 + 9 = 20 >= 20
+      expect(result.total).toBe(20);
     });
   });
 
@@ -222,10 +222,10 @@ describe("1d20 System", () => {
 
   describe("checkSuccess for 1d20", () => {
     it("should succeed when roll + stat >= DC", () => {
-      const result = checkSuccess(SYSTEM_1D20, 12, 5, 15, 0);
+      const result = checkSuccess(SYSTEM_1D20, 12, 50, 15, 0);
 
-      expect(result.success).toBe(true); // 12 + 5 = 17 >= 15
-      expect(result.total).toBe(17);
+      expect(result.success).toBe(true); // 12 + floor(50*0.2) = 12 + 10 = 22 >= 15
+      expect(result.total).toBe(22);
     });
 
     it("should detect critical success (natural 20)", () => {
@@ -236,10 +236,10 @@ describe("1d20 System", () => {
     });
 
     it("should not be critical on high roll that's not 20", () => {
-      const result = checkSuccess(SYSTEM_1D20, 19, 10, 25, 0);
+      const result = checkSuccess(SYSTEM_1D20, 19, 50, 15, 0);
 
-      expect(result.success).toBe(true);
-      expect(result.critical).toBe(false);
+      expect(result.success).toBe(true); // 19 + 10 = 29 >= 15
+      expect(result.critical).toBe(false); // Not natural 20
     });
   });
 });

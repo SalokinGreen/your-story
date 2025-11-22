@@ -1383,6 +1383,11 @@ function StoryPageContent() {
     isCritical: boolean;
     hasAdvantage: boolean;
     hasDisadvantage: boolean;
+    advantageCount?: number;
+    disadvantageCount?: number;
+    netAdvantage?: number;
+    advantageSources?: string;
+    disadvantageSources?: string;
     diceRolls?: number[][]; // Individual dice for each roll (for 3d6 system)
     rpgSystem?:
       | "3d6"
@@ -2160,6 +2165,13 @@ function StoryPageContent() {
     //Track all dice rolls for visualization
     const allDiceRolls: number[] = [dice_roll];
     const allDiceDetails: number[][] = [diceResult.rolls]; // Track individual dice per roll
+    let insufficientResourceDisadvantage = false; // Track if disadvantage from low resources
+
+    // Track advantage/disadvantage sources for stacking
+    let advantageCount = 0;
+    let disadvantageCount = 0;
+    const advantageSources: string[] = [];
+    const disadvantageSources: string[] = [];
 
     //BuilddetailedRPG-stylechoicetextwithbrackets
     let choiceDetails: string[] = [];
@@ -2224,54 +2236,11 @@ function StoryPageContent() {
           );
         } else {
           //Normal, consumable, and story items give advantage
+          advantageCount++;
+          advantageSources.push(choice.item_used);
           addNotification(
             `Used item: ${choice.item_used} (Advantage!)`,
             "info"
-          );
-          // For explosive: we'll roll advantage later when we have stat value
-          if (rpgSystem.id !== "explosive") {
-            const secondResult = rollDice(rpgSystem);
-            const second_roll = secondResult.total;
-            allDiceRolls.push(second_roll);
-            allDiceDetails.push(secondResult.rolls);
-            logger.action("Advantage roll from item", {
-              item: choice.item_used,
-              firstRoll: dice_roll,
-              secondRoll: second_roll,
-            });
-            // Advantage: higher is better for roll-over, lower is better for roll-under
-            if (rpgSystem.rollUnder) {
-              if (second_roll < dice_roll) {
-                dice_roll = second_roll;
-              }
-            } else {
-              if (second_roll > dice_roll) {
-                dice_roll = second_roll;
-              }
-            }
-          }
-        }
-
-        if (momentumMode === "reroll" && rpgSystem.id !== "explosive") {
-          // Reroll: Roll two more times and take the best
-          // (Explosive dice rerolls handled later when we have stat value)
-          const reroll1Result = rollDice(rpgSystem);
-          const reroll2Result = rollDice(rpgSystem);
-          const reroll1 = reroll1Result.total;
-          const reroll2 = reroll2Result.total;
-          allDiceRolls.push(reroll1, reroll2);
-          allDiceDetails.push(reroll1Result.rolls, reroll2Result.rolls);
-          const oldRoll = dice_roll;
-          dice_roll = Math.max(dice_roll, reroll1, reroll2);
-          logger.action("Momentum reroll (with item)", {
-            oldRoll,
-            reroll1,
-            reroll2,
-            finalRoll: dice_roll,
-          });
-          addNotification(
-            `⚡ Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} → Best: ${dice_roll}`,
-            "success"
           );
         }
 
@@ -2297,70 +2266,23 @@ function StoryPageContent() {
         }
       } else {
         //Item missing - disadvantage
+        disadvantageCount++;
+        disadvantageSources.push(`missing ${choice.item_used}`);
         addNotification(
           `Missing item: ${choice.item_used} (Disadvantage!)`,
           "warning"
         );
-        const secondResult = rollDice(rpgSystem);
-        const second_roll = secondResult.total;
-        allDiceRolls.push(second_roll);
-        allDiceDetails.push(secondResult.rolls);
-        logger.action("Disadvantage roll (missing item)", {
-          item: choice.item_used,
-          firstRoll: dice_roll,
-          secondRoll: second_roll,
-        });
-        // Disadvantage: lower is worse for roll-over, higher is worse for roll-under
-        if (rpgSystem.rollUnder) {
-          if (second_roll > dice_roll) {
-            dice_roll = second_roll;
-          }
-        } else {
-          if (second_roll < dice_roll) {
-            dice_roll = second_roll;
-          }
-        }
-        if (momentumMode === "reroll") {
-          //Rerollstillhelpswithdisadvantage
-          const reroll1Result = rollDice(rpgSystem);
-          const reroll2Result = rollDice(rpgSystem);
-          const reroll1 = reroll1Result.total;
-          const reroll2 = reroll2Result.total;
-          allDiceRolls.push(reroll1, reroll2);
-          allDiceDetails.push(reroll1Result.rolls, reroll2Result.rolls);
-          const oldRoll = dice_roll;
-          dice_roll = Math.max(dice_roll, reroll1, reroll2);
-          logger.action("Momentum reroll (missing item)", {
-            oldRoll,
-            reroll1,
-            reroll2,
-            finalRoll: dice_roll,
-          });
-          addNotification(
-            `⚡ Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} → Best: ${dice_roll}`,
-            "success"
-          );
-        }
       }
-    } else if (momentumMode === "reroll") {
-      //Noitem-justreroll
-      const rerollResult = rollDice(rpgSystem);
-      const reroll = rerollResult.total;
-      allDiceRolls.push(reroll);
-      allDiceDetails.push(rerollResult.rolls);
-      const oldRoll = dice_roll;
-      if (reroll > dice_roll) {
-        dice_roll = reroll;
-      }
-      logger.action("Momentum reroll (no item)", {
-        oldRoll,
-        reroll,
-        finalRoll: dice_roll,
-      });
-      addNotification(
-        `⚡ Reroll Used! Rolls: ${oldRoll}, ${reroll} → Best: ${dice_roll}`,
-        "success"
-      );
+    }
+
+    // Track momentum reroll as advantage (for all cases: with item, missing item, no item)
+    if (
+      momentumMode === "reroll" &&
+      rpgSystem.id !== "yze" &&
+      rpgSystem.id !== "explosive"
+    ) {
+      advantageCount++;
+      advantageSources.push("momentum reroll");
     }
 
     //Processresourceusage(resourceisautomaticallyatriskonskillcheckfailure)
@@ -2396,18 +2318,20 @@ function StoryPageContent() {
 
         resourceUsedBefore = resource.value;
 
-        //Checkifplayerhasenoughresource
+        //Check if player has enough resource
         if (resource.value < requiredAmount) {
           insufficientResource = true;
-          const penalty = resourceReqs.penalty;
+          insufficientResourceDisadvantage = true; // Set disadvantage flag
+          disadvantageCount++;
+          disadvantageSources.push(`insufficient ${resource.name}`);
           logger.action("Insufficient resource", {
             resource: choice.resource_used,
             required: requiredAmount,
             available: resource.value,
-            penalty,
+            disadvantage: true,
           });
           addNotification(
-            `⚠️ Insufficient ${resource.name}! Need ${requiredAmount}, have ${resource.value}. Roll penalty: -${penalty}`,
+            `⚠️ Insufficient ${resource.name}! Need ${requiredAmount}, have ${resource.value}. Disadvantage on roll!`,
             "warning"
           );
         }
@@ -2417,6 +2341,127 @@ function StoryPageContent() {
           `⚠️ Resource not found: ${choice.resource_used}`,
           "warning"
         );
+      }
+    }
+
+    // Apply stacking advantage/disadvantage system.
+    // - PbtA: each net advantage adds +1 to modifier; each net disadvantage adds -1 (no extra rolls).
+    // - Other non-YZE/non-Explosive systems: roll extra sets equal to |netAdvantage| and pick best/worst.
+    let pbtaPenalty = 0; // Negative for advantage (adds), positive for disadvantage (subtracts)
+    if (rpgSystem.id === "pbta") {
+      const netAdvantage = advantageCount - disadvantageCount;
+      if (netAdvantage !== 0) {
+        // Convert net advantage into modifier shift.
+        pbtaPenalty = -netAdvantage; // penalty negative => increases modifier
+        const isAdvantage = netAdvantage > 0;
+        const sourcesList = isAdvantage
+          ? advantageSources.join(", ")
+          : disadvantageSources.join(", ");
+        const stackText =
+          Math.abs(netAdvantage) > 1
+            ? ` (x${Math.abs(netAdvantage)} stacked)`
+            : "";
+        addNotification(
+          `${
+            isAdvantage ? "✨ Advantage" : "⚠️ Disadvantage"
+          }${stackText}: ${isAdvantage ? "+" : "-"}${Math.abs(
+            netAdvantage
+          )} modifier from ${sourcesList}`,
+          isAdvantage ? "success" : "warning"
+        );
+        logger.action("PbtA modifier shift from advantage/disadvantage", {
+          netAdvantage,
+          pbtaPenalty,
+          sources: sourcesList,
+        });
+      }
+    } else if (rpgSystem.id !== "yze" && rpgSystem.id !== "explosive") {
+      const netAdvantage = advantageCount - disadvantageCount;
+      if (netAdvantage !== 0) {
+        const isAdvantage = netAdvantage > 0;
+        const sourcesList = isAdvantage
+          ? advantageSources.join(", ")
+          : disadvantageSources.join(", ");
+        // 3d6 special handling: add extra dice to a single pool and keep best/worst 3
+        if (rpgSystem.id === "3d6") {
+          const extraDiceCount = Math.abs(netAdvantage); // number of additional dice beyond base 3
+            // Roll extra individual dice
+          const pool: number[] = [...diceResult.rolls]; // base 3 dice from initial roll
+          for (let i = 0; i < extraDiceCount; i++) {
+            const die = Math.floor(Math.random() * 6) + 1;
+            pool.push(die);
+          }
+          // Determine selected dice indices
+          const sortedIndices = pool
+            .map((v, idx) => ({ v, idx }))
+            .sort((a, b) => (isAdvantage ? b.v - a.v : a.v - b.v))
+            .slice(0, 3) // keep best or worst 3
+            .map((o) => o.idx);
+          // Compute final total from selected dice
+          const selectedDice = sortedIndices.map((i) => pool[i]);
+          dice_roll = selectedDice.reduce((a, b) => a + b, 0);
+          // Overwrite diceResult.rolls with the chosen 3 for downstream success calc
+          diceResult.rolls = selectedDice;
+          // Store full pool (for visualization). Replace first entry in allDiceDetails.
+          allDiceDetails[0] = pool;
+          allDiceRolls[0] = dice_roll; // update displayed base roll value
+          logger.action("3d6 pooled advantage/disadvantage", {
+            netAdvantage,
+            isAdvantage,
+            pool,
+            selectedDice,
+            finalTotal: dice_roll,
+            sources: sourcesList,
+          });
+          const stackText = extraDiceCount > 1 ? ` (+${extraDiceCount} dice)` : " (+1 die)";
+          addNotification(
+            `${isAdvantage ? "✨ Advantage" : "⚠️ Disadvantage"}${stackText}: kept ${selectedDice.join(",")} from [${pool.join(",")}]`,
+            isAdvantage ? "success" : "warning"
+          );
+        } else {
+          // Existing multi-roll set logic for other systems
+          const rollsToMake = Math.abs(netAdvantage);
+          logger.action(
+            `${isAdvantage ? "Advantage" : "Disadvantage"} stacking`,
+            {
+              advantageCount,
+              disadvantageCount,
+              netAdvantage,
+              advantageSources,
+              disadvantageSources,
+              rollsToMake,
+            }
+          );
+          for (let i = 0; i < rollsToMake; i++) {
+            const extraResult = rollDice(rpgSystem);
+            const extraRoll = extraResult.total;
+            allDiceRolls.push(extraRoll);
+            allDiceDetails.push(extraResult.rolls);
+            if (isAdvantage) {
+              if (rpgSystem.rollUnder) {
+                if (extraRoll < dice_roll) dice_roll = extraRoll;
+              } else {
+                if (extraRoll > dice_roll) dice_roll = extraRoll;
+              }
+            } else {
+              if (rpgSystem.rollUnder) {
+                if (extraRoll > dice_roll) dice_roll = extraRoll;
+              } else {
+                if (extraRoll < dice_roll) dice_roll = extraRoll;
+              }
+            }
+          }
+          const stackText =
+            Math.abs(netAdvantage) > 1
+              ? ` (x${Math.abs(netAdvantage)} stacked)`
+              : "";
+          addNotification(
+            `${
+              isAdvantage ? "✨ Advantage" : "⚠️ Disadvantage"
+            }${stackText} from: ${sourcesList}`,
+            isAdvantage ? "success" : "warning"
+          );
+        }
       }
     }
 
@@ -2610,10 +2655,6 @@ function StoryPageContent() {
       //Calculate resource requirements based on RPG system
       const resourceReqs = calculateResourceRequirements(rpgSystem, dc);
 
-      //Calculatedicepenaltyifinsufficientresource
-      const dicePenalty = insufficientResource ? resourceReqs.penalty : 0;
-      const effectiveDiceRoll = Math.max(1, dice_roll - dicePenalty);
-
       //Handleguaranteedsuccess
       if (momentumMode === "guarantee") {
         skillCheckResult = "success";
@@ -2648,7 +2689,7 @@ function StoryPageContent() {
             dice_roll,
             statValue,
             dc,
-            0,
+            0, // No penalty - disadvantage handled via dice rolls
             lastRoll
           );
 
@@ -2682,14 +2723,12 @@ function StoryPageContent() {
           }
         } else {
           // All other systems: use checkSuccess function
-          const effectiveDiceRoll = Math.max(1, dice_roll - dicePenalty);
-
           const successResult = checkSuccess(
             rpgSystem,
             dice_roll,
             statValue,
             dc,
-            dicePenalty
+            rpgSystem.id === "pbta" ? pbtaPenalty : 0 // PbtA uses +/-1 per net advantage/disadv; others use extra rolls
           );
 
           dc_passed = successResult.success;
@@ -2709,7 +2748,6 @@ function StoryPageContent() {
           dc,
           roll: dice_roll,
           stat: statValue,
-          penalty: dicePenalty,
           total,
           passed: dc_passed,
         });
@@ -2723,9 +2761,14 @@ function StoryPageContent() {
         const hasItemDisadvantage = !!(choice.item_used && !usedItem);
 
         // For display: use modifier instead of raw stat for systems with statToModifier
-        const displayBonus = rpgSystem.statToModifier
+        const baseDisplayBonus = rpgSystem.statToModifier
           ? rpgSystem.statToModifier(statValue)
           : statValue;
+        const displayBonus =
+          rpgSystem.id === "pbta" ? baseDisplayBonus - pbtaPenalty : baseDisplayBonus; // pbtaPenalty negative increases modifier
+
+        // Calculate net advantage/disadvantage for display
+        const netAdvantage = advantageCount - disadvantageCount;
 
         setDiceRoll({
           show: true,
@@ -2738,6 +2781,11 @@ function StoryPageContent() {
           isCritical: isCritical,
           hasAdvantage: hasItemAdvantage,
           hasDisadvantage: hasItemDisadvantage,
+          advantageCount,
+          disadvantageCount,
+          netAdvantage,
+          advantageSources: advantageSources.join(", "),
+          disadvantageSources: disadvantageSources.join(", "),
           diceRolls: allDiceDetails, // Individual dice for each roll
           rpgSystem: storyData.rpgSystem || "3d6", // Pass system type
           ...yzeData, // Spread YZE-specific data
@@ -2751,10 +2799,8 @@ function StoryPageContent() {
 
         if (dc_passed) {
           skillCheckResult = "success";
-          const penaltyText = insufficientResource
-            ? ` (-${dicePenalty} ${
-                rpgSystem.rollUnder ? "stat penalty" : "dice penalty"
-              } from insufficient resource)`
+          const disadvantageText = insufficientResourceDisadvantage
+            ? " (disadvantage from insufficient resource)"
             : "";
 
           if (rpgSystem.id === "yze") {
@@ -2787,26 +2833,31 @@ function StoryPageContent() {
               "success"
             );
           } else if (rpgSystem.rollUnder) {
-            const effectiveStat = Math.max(1, statValue - dicePenalty);
+            const effectiveStat = statValue;
             addNotification(
               `✓ Check Passed! (${
                 choice.skill_used
               }: ${dice_roll} ≤ ${effectiveStat}${
-                insufficientResource ? ` (${statValue} - ${dicePenalty})` : ""
-              })${penaltyText}`,
+                insufficientResourceDisadvantage
+                  ? " (disadvantage from insufficient resource)"
+                  : ""
+              })`,
               "success"
             );
           } else if (rpgSystem.statToModifier) {
             // Fate/PbtA: Show modifier instead of raw stat
             const modifier = rpgSystem.statToModifier(statValue);
-            const effectiveModifier = modifier - dicePenalty;
+            const effectiveModifier = modifier;
+            const disadvantageText = insufficientResourceDisadvantage
+              ? " (disadvantage from insufficient resource)"
+              : "";
 
             if (rpgSystem.hasPartialSuccess && skillCheckResult === "partial") {
               // PbtA partial success
               addNotification(
                 `⚠️ Partial Success! (${choice.skill_used}: ${dice_roll}${
                   modifier >= 0 ? "+" : ""
-                }${effectiveModifier} = ${total} [7-9])${penaltyText}`,
+                }${effectiveModifier} = ${total} [7-9])${disadvantageText}`,
                 "warning"
               );
             } else {
@@ -2814,15 +2865,16 @@ function StoryPageContent() {
               addNotification(
                 `✓ Check Passed! (${choice.skill_used}: ${dice_roll}${
                   modifier >= 0 ? "+" : ""
-                }${effectiveModifier} = ${total} ≥ ${dc})${penaltyText}`,
+                }${effectiveModifier} = ${total} ≥ ${dc})${disadvantageText}`,
                 "success"
               );
             }
           } else {
+            const disadvantageText = insufficientResourceDisadvantage
+              ? " (disadvantage from insufficient resource)"
+              : "";
             addNotification(
-              `✓ Check Passed! (${choice.skill_used}: ${dice_roll}${
-                insufficientResource ? ` - ${dicePenalty}` : ""
-              } + ${statValue} = ${total} ≥ ${dc})${penaltyText}`,
+              `✓ Check Passed! (${choice.skill_used}: ${dice_roll} + ${statValue} = ${total} ≥ ${dc})${disadvantageText}`,
               "success"
             );
           }
@@ -2888,10 +2940,8 @@ function StoryPageContent() {
           }
         } else {
           skillCheckResult = "failure";
-          const penaltyText = insufficientResource
-            ? ` (-${dicePenalty} ${
-                rpgSystem.rollUnder ? "stat penalty" : "dice penalty"
-              } from insufficient resource)`
+          const disadvantageText = insufficientResourceDisadvantage
+            ? " (disadvantage from insufficient resource)"
             : "";
 
           if (rpgSystem.id === "yze") {
@@ -2915,30 +2965,30 @@ function StoryPageContent() {
               "failure"
             );
           } else if (rpgSystem.rollUnder) {
-            const effectiveStat = Math.max(1, statValue - dicePenalty);
+            const effectiveStat = statValue;
             addNotification(
               `✗ Check Failed! (${
                 choice.skill_used
               }: ${dice_roll} > ${effectiveStat}${
-                insufficientResource ? ` (${statValue} - ${dicePenalty})` : ""
-              })${penaltyText}`,
+                insufficientResourceDisadvantage
+                  ? " (disadvantage from insufficient resource)"
+                  : ""
+              })`,
               "failure"
             );
           } else if (rpgSystem.statToModifier) {
             // Fate/PbtA: Show modifier instead of raw stat
             const modifier = rpgSystem.statToModifier(statValue);
-            const effectiveModifier = modifier - dicePenalty;
+            const effectiveModifier = modifier;
             addNotification(
               `✗ Check Failed! (${choice.skill_used}: ${dice_roll}${
                 modifier >= 0 ? "+" : ""
-              }${effectiveModifier} = ${total} < ${dc})${penaltyText}`,
+              }${effectiveModifier} = ${total} < ${dc})${disadvantageText}`,
               "failure"
             );
           } else {
             addNotification(
-              `✗ Check Failed! (${choice.skill_used}: ${dice_roll}${
-                insufficientResource ? ` - ${dicePenalty}` : ""
-              } + ${statValue} = ${total} < ${dc})${penaltyText}`,
+              `✗ Check Failed! (${choice.skill_used}: ${dice_roll} + ${statValue} = ${total} < ${dc})${disadvantageText}`,
               "failure"
             );
           }

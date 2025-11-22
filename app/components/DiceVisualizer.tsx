@@ -18,6 +18,11 @@ interface DiceVisualizerProps {
   hasDisadvantage?: boolean;
   onComplete?: () => void;
   diceRolls?: number[][]; // Individual dice for each roll (for 3d6 system)
+  advantageCount?: number;
+  disadvantageCount?: number;
+  netAdvantage?: number;
+  advantageSources?: string;
+  disadvantageSources?: string;
   rpgSystem?:
     | "3d6"
     | "1d20"
@@ -512,28 +517,118 @@ export function DiceVisualizer({
               <div className="flex items-center justify-center gap-4 mb-4">
                 {is3d6 || isPbtA || isFate ? (
                   // Multi-dice systems: 3d6, 2d6 (PbtA), or 4dF (Fate)
-                  <div className="flex gap-3 items-center">
-                    {currentDice.map((die, index) => (
-                      <div
-                        key={index}
-                        className={`relative ${
-                          animationPhase === "rolling" ? "animate-spin" : ""
-                        }`}
-                      >
-                        <DynamicIcon
-                          name={isFate ? "Dices" : "Dice6"}
-                          className={`w-16 h-16 ${diceColor} drop-shadow-lg`}
-                        />
-                        {animationPhase !== "rolling" && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-2xl font-bold text-white drop-shadow-md">
-                              {isFate ? (die > 0 ? `+${die}` : die) : die}
-                            </span>
+                  <>
+                    {/* 3d6 pooled advantage/disadvantage: diceRolls[0] may contain >3 dice; highlight kept 3 */}
+                    {animationPhase === "result" && is3d6 && diceRolls && diceRolls.length === 1 && diceRolls[0].length > 3 ? (
+                      (() => {
+                        const pool = diceRolls[0];
+                        const keptCount = 3;
+                        const isAdv = (typeof (rolls as any).netAdvantage === 'number' ? (rolls as any).netAdvantage : 0) > 0; // fallback, netAdvantage passed separately not bound here
+                        // We don't have netAdvantage prop wired; infer by comparing finalRoll to possible sums.
+                        // Determine selected dice by trying all combos of 3 that sum to finalRoll.
+                        let selectedIndices: number[] = [];
+                        for (let a = 0; a < pool.length && selectedIndices.length === 0; a++) {
+                          for (let b = a + 1; b < pool.length && selectedIndices.length === 0; b++) {
+                            for (let c = b + 1; c < pool.length && selectedIndices.length === 0; c++) {
+                              if (pool[a] + pool[b] + pool[c] === finalRoll) {
+                                selectedIndices = [a, b, c];
+                              }
+                            }
+                          }
+                        }
+                        if (selectedIndices.length === 0) {
+                          // Fallback: select highest or lowest 3 based on comparison of finalRoll
+                          const sorted = pool.map((v,i)=>({v,i})).sort((a,b)=>b.v - a.v);
+                          const highSum = sorted.slice(0,3).reduce((s,o)=>s+o.v,0);
+                          if (highSum === finalRoll) {
+                            selectedIndices = sorted.slice(0,3).map(o=>o.i);
+                          } else {
+                            const lowSorted = pool.map((v,i)=>({v,i})).sort((a,b)=>a.v - b.v).slice(0,3);
+                            selectedIndices = lowSorted.map(o=>o.i);
+                          }
+                        }
+                        return (
+                          <div className="flex flex-col items-center gap-4">
+                            <div className="flex gap-3 items-center flex-wrap justify-center">
+                              {pool.map((die, idx) => {
+                                const kept = selectedIndices.includes(idx);
+                                return (
+                                  <div key={idx} className="relative">
+                                    <DynamicIcon name="Dice6" className={`w-14 h-14 ${kept ? diceColor : 'text-gray-600'} drop-shadow-lg`} />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <span className={`text-xl font-bold ${kept ? 'text-white' : 'text-gray-500'} drop-shadow-md`}>{die}</span>
+                                    </div>
+                                    {!kept && <div className="absolute -top-1 -right-1 text-xs text-gray-400 font-bold">X</div>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="text-xs text-gray-300 font-semibold">Kept dice sum = {finalRoll}</div>
                           </div>
-                        )}
+                        );
+                      })()
+                    ) : /* Show stacked sets for Fate (multi-roll) or original single set */ animationPhase === "result" && diceRolls && diceRolls.length > 1 && (isFate) ? (
+                      <div className="flex flex-wrap gap-4 justify-center">
+                        {diceRolls.map((set, setIdx) => {
+                          const setTotal = set.reduce((a, b) => a + b, 0);
+                          const isUsed = setTotal === finalRoll;
+                          return (
+                            <div
+                              key={`set-${setIdx}`}
+                              className={`flex flex-col gap-2 items-center ${isUsed ? '' : 'opacity-40'}`}
+                            >
+                              <div className="flex gap-2 items-center">
+                                {set.map((die, dieIdx) => (
+                                  <div key={dieIdx} className="relative">
+                                    <DynamicIcon
+                                      name={isFate ? 'Dice6' : 'Dice6'}
+                                      className={`w-12 h-12 ${isUsed ? diceColor : 'text-gray-500'} transition-colors`}
+                                    />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <span className={`text-lg font-black ${isUsed ? 'text-white' : 'text-gray-600'} drop-shadow`}>{isFate ? (die > 0 ? `+${die}` : die) : die}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="text-center text-xs font-bold">
+                                <span className={`${isUsed ? 'text-white' : 'text-gray-500'}`}>= {setTotal}</span>
+                                {isUsed && (
+                                  <div className="flex items-center justify-center gap-1 mt-1">
+                                    <DynamicIcon name="Check" className="w-3 h-3 text-green-400" />
+                                    <span className="text-green-400">USED</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
+                    ) : (
+                      // Rolling phase or single set (including PbtA which uses modifier shifts not extra sets)
+                      <div className="flex gap-3 items-center">
+                        {currentDice.map((die, index) => (
+                          <div
+                            key={index}
+                            className={`relative ${
+                              animationPhase === 'rolling' ? 'animate-spin' : ''
+                            }`}
+                          >
+                            <DynamicIcon
+                              name={isFate ? 'Dices' : 'Dice6'}
+                              className={`w-16 h-16 ${diceColor} drop-shadow-lg`}
+                            />
+                            {animationPhase !== 'rolling' && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-2xl font-bold text-white drop-shadow-md">
+                                  {isFate ? (die > 0 ? `+${die}` : die) : die}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 ) : isExplosive ? (
                   // Explosive dice system: Show individual rolls with explosion markers
                   <div className="flex flex-col items-center gap-2">
@@ -587,24 +682,83 @@ export function DiceVisualizer({
                       )}
                   </div>
                 ) : (
-                  // Single die systems: 1d20, 1d100, percentile
-                  <div
-                    className={`relative ${
-                      animationPhase === "rolling" ? "animate-spin" : ""
-                    }`}
-                  >
-                    <DynamicIcon
-                      name="Dices"
-                      className={`w-20 h-20 ${diceColor} drop-shadow-lg`}
-                    />
-                    {animationPhase === "result" && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold text-white drop-shadow-md">
-                          {currentDice[0]}
-                        </span>
+                  // Single die systems: 1d20, 1d100, percentile (support multi-roll advantage/disadvantage stacking)
+                  <>
+                    {rolls.length > 1 ? (
+                      <div className="flex flex-wrap gap-4 items-center justify-center">
+                        {rolls.map((roll, idx) => {
+                          const isUsed = animationPhase === "result" && roll === finalRoll;
+                          return (
+                            <div
+                              key={idx}
+                              className={`flex flex-col items-center gap-1 ${
+                                isUsed
+                                  ? "scale-110"
+                                  : animationPhase === "rolling"
+                                  ? "opacity-70"
+                                  : "opacity-50"
+                              } transition-all`}
+                            >
+                              <div
+                                className={`relative ${
+                                  animationPhase === "rolling" && idx === 0
+                                    ? "animate-spin"
+                                    : ""
+                                }`}
+                              >
+                                <DynamicIcon
+                                  name="Dices"
+                                  className={`w-16 h-16 ${
+                                    isUsed ? resultColor : diceColor
+                                  } drop-shadow-lg`}
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className={`text-2xl font-bold text-white drop-shadow-md ${
+                                    animationPhase === "rolling" && idx === 0
+                                      ? "animate-pulse"
+                                      : ""
+                                  }`}>
+                                    {animationPhase === "rolling" && idx === 0
+                                      ? currentNumber
+                                      : roll}
+                                  </span>
+                                </div>
+                              </div>
+                              {animationPhase === "result" && (
+                                <span
+                                  className={`text-xs font-bold ${
+                                    isUsed
+                                      ? "text-green-400"
+                                      : "text-gray-400 line-through"
+                                  }`}
+                                >
+                                  {roll}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div
+                        className={`relative ${
+                          animationPhase === "rolling" ? "animate-spin" : ""
+                        }`}
+                      >
+                        <DynamicIcon
+                          name="Dices"
+                          className={`w-20 h-20 ${diceColor} drop-shadow-lg`}
+                        />
+                        {animationPhase === "result" && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-2xl font-bold text-white drop-shadow-md">
+                              {currentDice[0]}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
             </>
@@ -745,6 +899,23 @@ export function DiceVisualizer({
         {/* Result Breakdown */}
         {showResult && (
           <div className="space-y-3 animate-slideUp">
+            {/* Roll breakdown for single-die multi-roll advantage/disadvantage */}
+            {!isYZE && rolls.length > 1 && (
+              <div className="text-center text-xs text-gray-300">
+                {hasAdvantage && <span className="font-semibold">Advantage Rolls: </span>}
+                {hasDisadvantage && <span className="font-semibold">Disadvantage Rolls: </span>}
+                {rolls.map((r, i) => (
+                  <span
+                    key={i}
+                    className={`mx-1 ${
+                      r === finalRoll ? "text-white font-bold underline" : "opacity-40 line-through"
+                    }`}
+                  >
+                    {r}
+                  </span>
+                ))}
+              </div>
+            )}
             {/* Success/Failure Message */}
             <div
               className={`text-center py-3 px-4 rounded-xl font-bold text-xl ${

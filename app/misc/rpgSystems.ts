@@ -1178,9 +1178,10 @@ export function checkSuccess(
 
     return { success, critical, partial, total };
   } else {
-    // Roll-over system: roll + stat >= DC
-    const effectiveRoll = Math.max(1, roll - penalty);
-    const total = effectiveRoll + statValue;
+    // Roll-over system: roll + modifier >= DC
+    const modifier = system.statToModifier(statValue);
+    const effectiveModifier = modifier - penalty;
+    const total = roll + effectiveModifier;
     const success = total >= dc;
     const critical =
       roll >= (system.success.criticalThreshold || system.dice.max) && success;

@@ -22,6 +22,12 @@ export interface DiceRollData {
   momentumUsed?: "reroll" | "guarantee";
   diceRolls?: number[][]; // Individual dice rolls for each attempt (for 3d6 system)
   rpgSystem?: "3d6" | "1d20" | "1d100" | "percentile" | "pbta" | "fate" | "yze";
+  // Advantage/Disadvantage stacking
+  advantageCount?: number;
+  disadvantageCount?: number;
+  netAdvantage?: number;
+  advantageSources?: string;
+  disadvantageSources?: string;
   // YZE-specific
   baseDice?: number[]; // Base dice from stat
   stressDice?: number[]; // Stress dice added by player
@@ -44,7 +50,20 @@ export default function DiceRollVisualization({ rollData, onComplete }: Props) {
   );
   const [displayRoll, setDisplayRoll] = useState(1);
   const [showingRollIndex, setShowingRollIndex] = useState(0);
-  const [displayDice, setDisplayDice] = useState<number[]>([1, 1, 1]);
+  // Initialize dice array based on system (Fate dice start at 0, others at 1)
+  const initialDice = (() => {
+    switch (rollData.rpgSystem) {
+      case "fate":
+        return [0, 0, 0, 0];
+      case "pbta":
+        return [1, 1];
+      case "3d6":
+        return [1, 1, 1];
+      default:
+        return [1];
+    }
+  })();
+  const [displayDice, setDisplayDice] = useState<number[]>(initialDice);
 
   // Determine dice system and configuration
   const rpgSystem = rollData.rpgSystem || "3d6";
@@ -52,11 +71,17 @@ export default function DiceRollVisualization({ rollData, onComplete }: Props) {
   const is1d20 = rpgSystem === "1d20";
   const is1d100 = rpgSystem === "1d100";
   const isPercentile = rpgSystem === "percentile";
+  // (Removed duplicate declarations)
   const isYZE = rpgSystem === "yze";
-  const diceCount = is3d6 ? 3 : 1;
-  const diceSides = is3d6 ? 6 : is1d20 ? 20 : 100;
-  const minRoll = is3d6 ? 3 : 1;
-  const maxRoll = is3d6 ? 18 : is1d20 ? 20 : 100;
+  const isPbta = rpgSystem === "pbta";
+  const isFate = rpgSystem === "fate";
+  const diceCount = is3d6 ? 3 : isPbta ? 2 : isFate ? 4 : 1;
+  const diceSides = is3d6 ? 6 : isPbta ? 6 : is1d20 ? 20 : (is1d100 || isPercentile) ? 100 : isFate ? 3 : 100;
+  // min/max not used for UI currently; keep for potential future logic
+  const minRoll = is3d6 ? 3 : isPbta ? 2 : isFate ? -4 : 1;
+  const maxRoll = is3d6 ? 18 : isPbta ? 12 : isFate ? 4 : is1d20 ? 20 : 100;
+
+  const [completedSets, setCompletedSets] = useState<number[][]>([]);
 
   useEffect(() => {
     // Animate the dice rolling
@@ -68,17 +93,21 @@ export default function DiceRollVisualization({ rollData, onComplete }: Props) {
     const interval = setInterval(() => {
       iteration++;
       // Random number animation
-      if (is3d6) {
-        // Animate 3 dice individually
-        const randomDice = [
-          Math.floor(Math.random() * diceSides) + 1,
-          Math.floor(Math.random() * diceSides) + 1,
-          Math.floor(Math.random() * diceSides) + 1,
-        ];
-        setDisplayDice(randomDice);
-        setDisplayRoll(randomDice.reduce((a, b) => a + b, 0));
+      if (is3d6 || isPbta || isFate) {
+        // Animate multi-die systems
+        const randomDice = Array.from({ length: diceCount }).map(() => {
+          if (isFate) {
+            // Fudge dice: -1, 0, +1
+            return Math.floor(Math.random() * 3) - 1;
+          }
+            // Standard d6
+          return Math.floor(Math.random() * diceSides) + 1;
+        });
+        setDisplayDice(randomDice as number[]);
+        const total = randomDice.reduce((a, b) => a + b, 0);
+        setDisplayRoll(total);
       } else {
-        // Animate single die
+        // Animate single-die systems
         const randomRoll = Math.floor(Math.random() * diceSides) + 1;
         setDisplayRoll(randomRoll);
       }
@@ -100,9 +129,17 @@ export default function DiceRollVisualization({ rollData, onComplete }: Props) {
 
         setTimeout(() => {
           if (showingRollIndex < rollData.rolls.length - 1) {
-            // If there are more rolls (advantage/disadvantage/reroll), show next
+            // Accumulate finished set (multi-die systems only)
+            if ((is3d6 || isPbta || isFate) && rollData.diceRolls && rollData.diceRolls[showingRollIndex]) {
+              setCompletedSets((prev) => [...prev, rollData.diceRolls![showingRollIndex]]);
+            }
+            // Proceed to next attempt
             setShowingRollIndex(showingRollIndex + 1);
           } else {
+            // Finalize last set accumulation for multi-die systems
+            if ((is3d6 || isPbta || isFate) && rollData.diceRolls && rollData.diceRolls[showingRollIndex]) {
+              setCompletedSets((prev) => [...prev, rollData.diceRolls![showingRollIndex]]);
+            }
             // All rolls shown, move to result phase
             setPhase("result");
             setTimeout(() => {
@@ -119,6 +156,14 @@ export default function DiceRollVisualization({ rollData, onComplete }: Props) {
 
   const getRollTypeLabel = () => {
     if (rollData.momentumUsed === "reroll") return "Reroll";
+    if (rollData.netAdvantage !== undefined && rollData.netAdvantage !== 0) {
+      const absNet = Math.abs(rollData.netAdvantage);
+      if (rollData.netAdvantage > 0) {
+        return absNet > 1 ? `Advantage x${absNet}` : "Advantage";
+      } else {
+        return absNet > 1 ? `Disadvantage x${absNet}` : "Disadvantage";
+      }
+    }
     if (rollData.type === "advantage") return "Advantage";
     if (rollData.type === "disadvantage") return "Disadvantage";
     if (rollData.type === "reroll") return "Momentum Reroll";
@@ -173,80 +218,361 @@ export default function DiceRollVisualization({ rollData, onComplete }: Props) {
 
         {/* Dice Visual */}
         <div className="flex justify-center mb-6">
-          {is3d6 ? (
-            // 3d6 System: Show 3 dice
-            <div className="flex gap-4 items-center">
-              {displayDice.map((die, idx) => (
-                <div key={idx} className="relative">
-                  <div
-                    className={`transition-all duration-300 ${
-                      phase === "rolling" ? "animate-spin-slow" : ""
-                    }`}
-                  >
-                    <DynamicIcon
-                      name="Dice6"
-                      className={`w-20 h-20 ${getDiceColor()} transition-colors duration-500`}
-                    />
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span
-                      className={`text-3xl font-black text-white drop-shadow-lg transition-all duration-300 ${
-                        phase === "rolling"
-                          ? "scale-110 opacity-70"
-                          : "scale-125"
-                      }`}
-                    >
-                      {phase === "complete"
-                        ? (rollData.diceRolls &&
-                            rollData.diceRolls[rollData.rolls.length - 1]?.[
-                              idx
-                            ]) ||
-                          die
-                        : die}
-                    </span>
-                  </div>
+          {is3d6 && !isYZE ? (
+            // 3d6 System: Show all rolled sets of 3 dice
+            <div className="flex flex-col gap-4 items-center">
+              {/* Show advantage/disadvantage info */}
+              {rollData.netAdvantage !== undefined && rollData.netAdvantage !== 0 && (
+                <div className="text-center mb-2">
+                  <p className={`text-sm font-bold ${rollData.netAdvantage > 0 ? "text-green-400" : "text-red-400"}`}>
+                    {rollData.netAdvantage > 0
+                      ? `Rolling ${rollData.diceRolls?.length || 1} set${(rollData.diceRolls?.length || 1) > 1 ? "s" : ""}; keeping best total`
+                      : `Rolling ${rollData.diceRolls?.length || 1} set${(rollData.diceRolls?.length || 1) > 1 ? "s" : ""}; keeping worst total`}
+                  </p>
+                  {(rollData.advantageSources || rollData.disadvantageSources) && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {rollData.netAdvantage > 0 ? rollData.advantageSources : rollData.disadvantageSources}
+                    </p>
+                  )}
                 </div>
-              ))}
-              {/* Plus signs between dice */}
-              {phase !== "rolling" && (
-                <>
-                  <span
-                    className="text-2xl text-gray-400 absolute"
-                    style={{ left: "28%" }}
-                  >
-                    +
-                  </span>
-                  <span
-                    className="text-2xl text-gray-400 absolute"
-                    style={{ left: "62%" }}
-                  >
-                    +
-                  </span>
-                </>
+              )}
+              {rollData.diceRolls && rollData.diceRolls.length > 1 ? (
+                <div className="flex flex-wrap gap-4 justify-center">
+                  {/* Completed sets */}
+                  {completedSets.map((diceSet, setIdx) => {
+                    const setTotal = diceSet.reduce((a, b) => a + b, 0);
+                    const isUsed = phase !== "rolling" && setTotal === rollData.finalRoll;
+                    return (
+                      <div key={`done-${setIdx}`} className={`flex flex-col gap-2 ${isUsed ? "" : phase === "rolling" ? "opacity-70" : "opacity-40"}`}>
+                        <div className="flex gap-2 items-center">
+                          {diceSet.map((die, idx) => (
+                            <div key={idx} className="relative">
+                              <DynamicIcon
+                                name="Dice6"
+                                className={`w-16 h-16 ${isUsed ? getDiceColor() : "text-gray-500"} transition-colors duration-500`}
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className={`text-2xl font-black ${isUsed ? "text-white" : "text-gray-600"} drop-shadow-lg`}>{die}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-center">
+                          <span className={`text-sm font-bold ${isUsed ? "text-white" : "text-gray-500"}`}>= {setTotal}</span>
+                          {isUsed && (
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <DynamicIcon name="Check" className="w-3 h-3 text-green-400" />
+                              <span className="text-xs text-green-400 font-bold">USED</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Current rolling set */}
+                  {phase === "rolling" && showingRollIndex < rollData.rolls.length && (
+                    <div className="flex flex-col gap-2 animate-pulse">
+                      <div className="flex gap-2 items-center">
+                        {displayDice.map((die, idx) => (
+                          <div key={idx} className="relative">
+                            <DynamicIcon name="Dice6" className={`w-16 h-16 text-blue-500 transition-colors duration-500`} />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-2xl font-black text-white drop-shadow-lg">{die}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-center text-xs text-blue-400 font-bold">Rolling...</div>
+                    </div>
+                  )}
+                  {/* Placeholder upcoming sets */}
+                  {phase === "rolling" && rollData.diceRolls && (
+                    Array.from({ length: Math.max(0, rollData.diceRolls.length - completedSets.length - 1) }).map((_, idx) => (
+                      <div key={`placeholder-${idx}`} className="flex flex-col gap-2 opacity-30">
+                        <div className="flex gap-2 items-center">
+                          {Array.from({ length: 3 }).map((_, dIdx) => (
+                            <div key={dIdx} className="relative">
+                              <DynamicIcon name="Dice6" className="w-16 h-16 text-gray-600" />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-2xl font-black text-gray-500">?</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                // Single set
+                <div className="flex gap-4 items-center">
+                  {displayDice.map((die, idx) => (
+                    <div key={idx} className="relative">
+                      <div className={`transition-all duration-300 ${phase === "rolling" ? "animate-spin-slow" : ""}`}>
+                        <DynamicIcon name="Dice6" className={`w-20 h-20 ${getDiceColor()} transition-colors duration-500`} />
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className={`text-3xl font-black text-white drop-shadow-lg transition-all duration-300 ${phase === "rolling" ? "scale-110 opacity-70" : "scale-125"}`}>{die}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          ) : (
-            // 1d20 System: Show single die
-            <div className="relative">
-              <div
-                className={`transition-all duration-300 ${
-                  phase === "rolling" ? "animate-spin-slow" : ""
-                }`}
-              >
-                <DynamicIcon
-                  name="Dices"
-                  className={`w-32 h-32 ${getDiceColor()} transition-colors duration-500`}
-                />
-              </div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span
-                  className={`text-5xl font-black text-white drop-shadow-lg transition-all duration-300 ${
-                    phase === "rolling" ? "scale-110 opacity-70" : "scale-125"
-                  }`}
-                >
-                  {phase === "complete" ? rollData.finalRoll : displayRoll}
-                </span>
-              </div>
+          ) : !isYZE && isPbta ? (
+            // PbtA System (2d6 + modifier): show sets of 2 dice when stacked
+            <div className="flex flex-col gap-4 items-center">
+              {rollData.netAdvantage !== undefined && rollData.netAdvantage !== 0 && (
+                <div className="text-center mb-2">
+                  <p className={`text-sm font-bold ${rollData.netAdvantage > 0 ? "text-green-400" : "text-red-400"}`}>
+                    {rollData.netAdvantage > 0
+                      ? `Rolling ${rollData.diceRolls?.length || 1} set${(rollData.diceRolls?.length || 1) > 1 ? "s" : ""}; keeping best total`
+                      : `Rolling ${rollData.diceRolls?.length || 1} set${(rollData.diceRolls?.length || 1) > 1 ? "s" : ""}; keeping worst total`}
+                  </p>
+                  {(rollData.advantageSources || rollData.disadvantageSources) && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {rollData.netAdvantage > 0 ? rollData.advantageSources : rollData.disadvantageSources}
+                    </p>
+                  )}
+                </div>
+              )}
+              {rollData.diceRolls && rollData.diceRolls.length > 1 ? (
+                <div className="flex flex-wrap gap-4 justify-center">
+                  {completedSets.map((diceSet, setIdx) => {
+                    const setTotal = diceSet.reduce((a, b) => a + b, 0);
+                    const isUsed = phase !== "rolling" && setTotal === rollData.finalRoll;
+                    return (
+                      <div key={`pbta-done-${setIdx}`} className={`flex flex-col gap-2 ${isUsed ? "" : phase === "rolling" ? "opacity-70" : "opacity-40"}`}>
+                        <div className="flex gap-2 items-center">
+                          {diceSet.map((die, idx) => (
+                            <div key={idx} className="relative">
+                              <DynamicIcon name="Dice6" className={`w-16 h-16 ${isUsed ? getDiceColor() : "text-gray-500"} transition-colors duration-500`} />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className={`text-2xl font-black ${isUsed ? "text-white" : "text-gray-600"} drop-shadow-lg`}>{die}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-center">
+                          <span className={`text-sm font-bold ${isUsed ? "text-white" : "text-gray-500"}`}>= {setTotal}</span>
+                          {isUsed && (
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <DynamicIcon name="Check" className="w-3 h-3 text-green-400" />
+                              <span className="text-xs text-green-400 font-bold">USED</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {phase === "rolling" && showingRollIndex < rollData.rolls.length && (
+                    <div className="flex flex-col gap-2 animate-pulse">
+                      <div className="flex gap-2 items-center">
+                        {displayDice.slice(0,2).map((die, idx) => (
+                          <div key={idx} className="relative">
+                            <DynamicIcon name="Dice6" className="w-16 h-16 text-blue-500" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-2xl font-black text-white drop-shadow-lg">{die}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-center text-xs text-blue-400 font-bold">Rolling...</div>
+                    </div>
+                  )}
+                  {phase === "rolling" && rollData.diceRolls && (
+                    Array.from({ length: Math.max(0, rollData.diceRolls.length - completedSets.length - 1) }).map((_, idx) => (
+                      <div key={`pbta-placeholder-${idx}`} className="flex flex-col gap-2 opacity-30">
+                        <div className="flex gap-2 items-center">
+                          {Array.from({ length: 2 }).map((_, dIdx) => (
+                            <div key={dIdx} className="relative">
+                              <DynamicIcon name="Dice6" className="w-16 h-16 text-gray-600" />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-2xl font-black text-gray-500">?</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="flex gap-4 items-center">
+                  {displayDice.slice(0,2).map((die, idx) => (
+                    <div key={idx} className="relative">
+                      <div className={`transition-all duration-300 ${phase === "rolling" ? "animate-spin-slow" : ""}`}>
+                        <DynamicIcon name="Dice6" className={`w-20 h-20 ${getDiceColor()} transition-colors duration-500`} />
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className={`text-3xl font-black text-white drop-shadow-lg transition-all duration-300 ${phase === "rolling" ? "scale-110 opacity-70" : "scale-125"}`}>{die}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : !isYZE && isFate ? (
+            // Fate System (4dF): show sets of 4 fudge dice when stacked (-1/0/+1)
+            <div className="flex flex-col gap-4 items-center">
+              {rollData.netAdvantage !== undefined && rollData.netAdvantage !== 0 && (
+                <div className="text-center mb-2">
+                  <p className={`text-sm font-bold ${rollData.netAdvantage > 0 ? "text-green-400" : "text-red-400"}`}>
+                    {rollData.netAdvantage > 0
+                      ? `Rolling ${rollData.diceRolls?.length || 1} set${(rollData.diceRolls?.length || 1) > 1 ? "s" : ""}; keeping best total`
+                      : `Rolling ${rollData.diceRolls?.length || 1} set${(rollData.diceRolls?.length || 1) > 1 ? "s" : ""}; keeping worst total`}
+                  </p>
+                  {(rollData.advantageSources || rollData.disadvantageSources) && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {rollData.netAdvantage > 0 ? rollData.advantageSources : rollData.disadvantageSources}
+                    </p>
+                  )}
+                </div>
+              )}
+              {rollData.diceRolls && rollData.diceRolls.length > 1 ? (
+                <div className="flex flex-wrap gap-4 justify-center">
+                  {completedSets.map((diceSet, setIdx) => {
+                    const setTotal = diceSet.reduce((a, b) => a + b, 0);
+                    const isUsed = phase !== "rolling" && setTotal === rollData.finalRoll;
+                    return (
+                      <div key={`fate-done-${setIdx}`} className={`flex flex-col gap-2 ${isUsed ? "" : phase === "rolling" ? "opacity-70" : "opacity-40"}`}>
+                        <div className="flex gap-2 items-center">
+                          {diceSet.map((die, idx) => {
+                            const dieColor = die === 1 ? "text-green-400" : die === -1 ? "text-red-400" : "text-gray-400";
+                            return (
+                              <div key={idx} className="relative">
+                                <DynamicIcon name="Dice6" className={`w-14 h-14 ${isUsed ? dieColor : "text-gray-600"} transition-colors duration-500`} />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className={`text-xl font-black ${isUsed ? "text-white" : "text-gray-500"} drop-shadow-lg`}>{die > 0 ? `+${die}` : die}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="text-center">
+                          <span className={`text-sm font-bold ${isUsed ? "text-white" : "text-gray-500"}`}>= {setTotal}</span>
+                          {isUsed && (
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <DynamicIcon name="Check" className="w-3 h-3 text-green-400" />
+                              <span className="text-xs text-green-400 font-bold">USED</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {phase === "rolling" && showingRollIndex < rollData.rolls.length && (
+                    <div className="flex flex-col gap-2 animate-pulse">
+                      <div className="flex gap-2 items-center">
+                        {displayDice.slice(0,4).map((die, idx) => {
+                          const dieColor = die === 1 ? "text-green-400" : die === -1 ? "text-red-400" : "text-gray-400";
+                          return (
+                            <div key={idx} className="relative">
+                              <DynamicIcon name="Dice6" className={`w-14 h-14 ${dieColor}`} />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-xl font-black text-white drop-shadow-lg">{die > 0 ? `+${die}` : die}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="text-center text-xs text-blue-400 font-bold">Rolling...</div>
+                    </div>
+                  )}
+                  {phase === "rolling" && rollData.diceRolls && (
+                    Array.from({ length: Math.max(0, rollData.diceRolls.length - completedSets.length - 1) }).map((_, idx) => (
+                      <div key={`fate-placeholder-${idx}`} className="flex flex-col gap-2 opacity-30">
+                        <div className="flex gap-2 items-center">
+                          {Array.from({ length: 4 }).map((_, dIdx) => (
+                            <div key={dIdx} className="relative">
+                              <DynamicIcon name="Dice6" className="w-14 h-14 text-gray-600" />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-xl font-black text-gray-500">?</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="flex gap-2 items-center">
+                  {displayDice.slice(0,4).map((die, idx) => {
+                    const dieColor = die === 1 ? "text-green-400" : die === -1 ? "text-red-400" : "text-gray-400";
+                    return (
+                      <div key={idx} className="relative">
+                        <div className={`transition-all duration-300 ${phase === "rolling" ? "animate-spin-slow" : ""}`}>
+                          <DynamicIcon name="Dice6" className={`w-16 h-16 ${dieColor} transition-colors duration-500`} />
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className={`text-2xl font-black text-white drop-shadow-lg transition-all duration-300 ${phase === "rolling" ? "scale-110 opacity-70" : "scale-125"}`}>{die > 0 ? `+${die}` : die}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : !isYZE && (is1d20 || is1d100 || isPercentile) ? (
+            // 1d20 System: Show single die with advantage/disadvantage
+            <div className="flex flex-col gap-4 items-center">
+              {/* Show advantage/disadvantage info */}
+              {rollData.netAdvantage !== undefined && rollData.netAdvantage !== 0 && (
+                <div className="text-center mb-2">
+                  <p className={`text-sm font-bold ${rollData.netAdvantage > 0 ? "text-green-400" : "text-red-400"}`}>
+                    {(() => {
+                      const baseText = `Rolling ${Math.abs(rollData.netAdvantage) + 1} dice, taking`;
+                      // Roll-under systems (percentile) reverse advantage semantics
+                      const isRollUnder = isPercentile; // 1d100 currently roll-over; percentile roll-under
+                      if (rollData.netAdvantage > 0) {
+                        return isRollUnder ? `${baseText} lowest` : `${baseText} highest`;
+                      } else {
+                        return isRollUnder ? `${baseText} highest` : `${baseText} lowest`;
+                      }
+                    })()}
+                  </p>
+                  {(rollData.advantageSources || rollData.disadvantageSources) && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {rollData.netAdvantage > 0 ? rollData.advantageSources : rollData.disadvantageSources}
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              {rollData.rolls && rollData.rolls.length > 1 ? (
+                <div className="flex flex-wrap gap-4 justify-center">
+                  {rollData.rolls.map((roll, rollIdx) => {
+                    const isUsed = phase !== "rolling" && roll === rollData.finalRoll;
+                    const isCurrent = phase === "rolling" && rollIdx === showingRollIndex;
+                    return (
+                      <div key={rollIdx} className={`flex flex-col items-center gap-2 ${isUsed ? "" : isCurrent ? "animate-pulse" : phase === "rolling" ? "opacity-70" : "opacity-40"}`}>
+                        <div className="relative">
+                          <DynamicIcon name="Dices" className={`w-20 h-20 ${isUsed ? getDiceColor() : isCurrent ? "text-blue-500" : "text-gray-500"} transition-colors duration-500`} />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className={`text-3xl font-black ${isUsed ? "text-white" : isCurrent ? "text-blue-100" : "text-gray-600"} drop-shadow-lg`}>{isCurrent ? displayRoll : roll}</span>
+                          </div>
+                        </div>
+                        {isUsed && (
+                          <div className="flex items-center gap-1">
+                            <DynamicIcon name="Check" className="w-3 h-3 text-green-400" />
+                            <span className="text-xs text-green-400 font-bold">USED</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className={`transition-all duration-300 ${phase === "rolling" ? "animate-spin-slow" : ""}`}>
+                    <DynamicIcon name="Dices" className={`w-32 h-32 ${getDiceColor()} transition-colors duration-500`} />
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className={`text-5xl font-black text-white drop-shadow-lg transition-all duration-300 ${phase === "rolling" ? "scale-110 opacity-70" : "scale-125"}`}>{phase === "complete" ? rollData.finalRoll : displayRoll}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
