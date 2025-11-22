@@ -1139,7 +1139,8 @@ export function checkSuccess(
   } else if (system.hasExplodingDice) {
     // Explosive Dice: pure dice roll vs DC, no modifiers
     const success = roll >= dc;
-    const critical = roll >= (system.success.criticalThreshold || 20) && success;
+    const critical =
+      roll >= (system.success.criticalThreshold || 20) && success;
     return { success, critical, total: roll };
   } else if (system.rollUnder) {
     // Roll-under system: need to roll <= stat
