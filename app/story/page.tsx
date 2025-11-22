@@ -1626,7 +1626,7 @@ function StoryPageContent() {
       imageUrl: "",
       user: false,
       role: "assistant",
-      choices: [{ text: "StartStory" }],
+      choices: [{ text: "Start Story" }],
     });
 
     //Updatestoryindatabasewithpresetapplied
@@ -2199,6 +2199,10 @@ function StoryPageContent() {
       dieSize?: number; // For explosive system
     } = {};
 
+    // Track roll outcome for AI context
+    let rollTotal = 0; // Final total (roll + modifier)
+    let rollDC = 0; // DC used for check
+
     //Processitemusage
     if (choice.item_used) {
       // Try fuzzy matching first
@@ -2362,11 +2366,9 @@ function StoryPageContent() {
             ? ` (x${Math.abs(netAdvantage)} stacked)`
             : "";
         addNotification(
-          `${
-            isAdvantage ? "✨ Advantage" : "⚠️ Disadvantage"
-          }${stackText}: ${isAdvantage ? "+" : "-"}${Math.abs(
-            netAdvantage
-          )} modifier from ${sourcesList}`,
+          `${isAdvantage ? "✨ Advantage" : "⚠️ Disadvantage"}${stackText}: ${
+            isAdvantage ? "+" : "-"
+          }${Math.abs(netAdvantage)} modifier from ${sourcesList}`,
           isAdvantage ? "success" : "warning"
         );
         logger.action("PbtA modifier shift from advantage/disadvantage", {
@@ -2385,7 +2387,7 @@ function StoryPageContent() {
         // 3d6 special handling: add extra dice to a single pool and keep best/worst 3
         if (rpgSystem.id === "3d6") {
           const extraDiceCount = Math.abs(netAdvantage); // number of additional dice beyond base 3
-            // Roll extra individual dice
+          // Roll extra individual dice
           const pool: number[] = [...diceResult.rolls]; // base 3 dice from initial roll
           for (let i = 0; i < extraDiceCount; i++) {
             const die = Math.floor(Math.random() * 6) + 1;
@@ -2413,9 +2415,14 @@ function StoryPageContent() {
             finalTotal: dice_roll,
             sources: sourcesList,
           });
-          const stackText = extraDiceCount > 1 ? ` (+${extraDiceCount} dice)` : " (+1 die)";
+          const stackText =
+            extraDiceCount > 1 ? ` (+${extraDiceCount} dice)` : " (+1 die)";
           addNotification(
-            `${isAdvantage ? "✨ Advantage" : "⚠️ Disadvantage"}${stackText}: kept ${selectedDice.join(",")} from [${pool.join(",")}]`,
+            `${
+              isAdvantage ? "✨ Advantage" : "⚠️ Disadvantage"
+            }${stackText}: kept ${selectedDice.join(",")} from [${pool.join(
+              ","
+            )}]`,
             isAdvantage ? "success" : "warning"
           );
         } else {
@@ -2702,6 +2709,10 @@ function StoryPageContent() {
           isCritical = successResult.critical;
           total = successResult.successes || 0;
 
+          // Store for AI context
+          rollTotal = total;
+          rollDC = dc;
+
           // Check for panic (1s on stress dice)
           if (stressDiceCount > 0 && yzeData.stressDice) {
             const hasOnes = yzeData.stressDice.some((die) => die === 1);
@@ -2735,11 +2746,25 @@ function StoryPageContent() {
           isCritical = successResult.critical;
           total = successResult.total;
 
+          // Store for AI context
+          rollTotal = total;
+          rollDC = dc;
+
           // Store partial success for PbtA
           if (successResult.partial) {
             // PbtA partial success counts as "success" for progression but with complications
             dc_passed = true;
             skillCheckResult = "partial";
+          }
+
+          // Store Fate-specific outcomes (tie, style)
+          if (rpgSystem.id === "fate") {
+            if (successResult.tie) {
+              skillCheckResult = "tie";
+              dc_passed = true; // Ties count as partial success
+            } else if (successResult.style) {
+              skillCheckResult = "style";
+            }
           }
         }
 
@@ -2765,7 +2790,9 @@ function StoryPageContent() {
           ? rpgSystem.statToModifier(statValue)
           : statValue;
         const displayBonus =
-          rpgSystem.id === "pbta" ? baseDisplayBonus - pbtaPenalty : baseDisplayBonus; // pbtaPenalty negative increases modifier
+          rpgSystem.id === "pbta"
+            ? baseDisplayBonus - pbtaPenalty
+            : baseDisplayBonus; // pbtaPenalty negative increases modifier
 
         // Calculate net advantage/disadvantage for display
         const netAdvantage = advantageCount - disadvantageCount;
@@ -2798,7 +2825,14 @@ function StoryPageContent() {
         setDiceRoll(null);
 
         if (dc_passed) {
-          skillCheckResult = "success";
+          // Only set to "success" if not already set to partial/tie/style
+          if (
+            skillCheckResult !== "partial" &&
+            skillCheckResult !== "tie" &&
+            skillCheckResult !== "style"
+          ) {
+            skillCheckResult = "success";
+          }
           const disadvantageText = insufficientResourceDisadvantage
             ? " (disadvantage from insufficient resource)"
             : "";
@@ -3054,10 +3088,45 @@ function StoryPageContent() {
       }
 
       //Buildskillcheckline
-      const insufficientText = insufficientResource ? "??NOSKILLBONUS" : "";
-      choiceDetails.push(
-        `[${choice.skill_used}:${skillCheckResult}${insufficientText}]`
-      );
+      const insufficientText = insufficientResource ? " (no skill bonus)" : "";
+      let skillCheckLine = `[${choice.skill_used}: `;
+
+      // Add system-specific context for AI
+      if (rpgSystem.id === "pbta" && skillCheckResult === "partial") {
+        // PbtA: Partial success (7-9) - AI should add complications
+        skillCheckLine += `partial success (7-9)`;
+      } else if (rpgSystem.id === "fate") {
+        // Fate: Include tie/style outcomes and margin
+        const margin = rollTotal - rollDC;
+        if (skillCheckResult === "tie") {
+          skillCheckLine += `tie (margin 0)`;
+        } else if (skillCheckResult === "style") {
+          skillCheckLine += `success with style (+${margin})`;
+        } else if (skillCheckResult === "success") {
+          skillCheckLine += `success (margin +${margin})`;
+        } else {
+          skillCheckLine += skillCheckResult;
+        }
+      } else if (rpgSystem.id === "explosive") {
+        // Explosive: Include explosion count and die size
+        const dieSize = yzeData.dieSize || 20;
+        const explosions = yzeData.explosions || 0;
+        if (explosions > 0) {
+          skillCheckLine += `${skillCheckResult} (d${dieSize} exploded x${explosions})`;
+        } else {
+          skillCheckLine += `${skillCheckResult} (d${dieSize})`;
+        }
+      } else if (rpgSystem.id === "yze") {
+        // YZE: Include success count
+        const successes = yzeData.successes || 0;
+        skillCheckLine += `${skillCheckResult} (${successes} successes vs ${rollDC})`;
+      } else {
+        // Standard systems
+        skillCheckLine += skillCheckResult;
+      }
+
+      skillCheckLine += `${insufficientText}]`;
+      choiceDetails.push(skillCheckLine);
 
       // YZE: Add panic details if triggered
       if (
