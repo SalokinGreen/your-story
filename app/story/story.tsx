@@ -81,7 +81,7 @@ export default function Story({
                 <DynamicIcon name="ChevronLeft" className="w-4 h-4" />
               </button>
 
-              {viewingPartIndex !== null ? (
+              {viewingPartIndex !== null && viewingPartIndex !== undefined ? (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-500 dark:text-gray-400">
                     {viewingPartIndex + 1} / {storyData.scene.parts.length}
