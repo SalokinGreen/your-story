@@ -3276,7 +3276,7 @@ function StoryPageContent() {
         yzeData.panicTriggered &&
         yzeData.panicEffect
       ) {
-        choiceDetails.push(`[PANIC!${yzeData.panicEffect}]`);
+        choiceDetails.push(`[PANIC! ${yzeData.panicEffect}]`);
       }
     }
 

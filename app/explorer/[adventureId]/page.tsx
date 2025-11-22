@@ -920,7 +920,10 @@ export default function AdventureDetailPage() {
                                 key={index}
                                 className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800"
                               >
-                                <span className="text-3xl">{stat.symbol}</span>
+                                <DynamicIcon
+                                  name={stat.symbol}
+                                  className="w-6 h-6"
+                                />
                                 <div className="flex-1">
                                   <div className="font-bold text-gray-900 dark:text-white">
                                     {stat.name}
@@ -959,9 +962,10 @@ export default function AdventureDetailPage() {
                                 key={index}
                                 className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800"
                               >
-                                <span className="text-3xl">
-                                  {resource.symbol}
-                                </span>
+                                <DynamicIcon
+                                  name={resource.symbol}
+                                  className="w-6 h-6"
+                                />
                                 <div className="flex-1">
                                   <div className="font-bold text-gray-900 dark:text-white">
                                     {resource.name}
@@ -1006,7 +1010,10 @@ export default function AdventureDetailPage() {
                                 key={index}
                                 className="flex items-center gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800"
                               >
-                                <span className="text-3xl">{item.symbol}</span>
+                                <DynamicIcon
+                                  name={item.symbol}
+                                  className="w-6 h-6"
+                                />
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
                                     <div className="font-bold text-gray-900 dark:text-white">
@@ -1085,7 +1092,10 @@ export default function AdventureDetailPage() {
                             className="flex items-start gap-4 p-4 bg-linear-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg border border-purple-200 dark:border-purple-800"
                           >
                             <span className="text-3xl shrink-0">
-                              {achievement.symbol}
+                              <DynamicIcon
+                                name={achievement.symbol}
+                                className="w-6 h-6"
+                              />
                             </span>
                             <div className="flex-1">
                               <div className="font-bold text-lg text-gray-900 dark:text-white mb-1">
@@ -1245,7 +1255,10 @@ export default function AdventureDetailPage() {
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                       <span className="text-2xl">
-                                        {shopStat.symbol}
+                                        <DynamicIcon
+                                          name={shopStat.symbol}
+                                          className="w-6 h-6"
+                                        />
                                       </span>
                                       <div>
                                         <div className="font-bold text-gray-900 dark:text-white">
@@ -1279,7 +1292,10 @@ export default function AdventureDetailPage() {
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                       <span className="text-2xl">
-                                        {shopResource.symbol}
+                                        <DynamicIcon
+                                          name={shopResource.symbol}
+                                          className="w-6 h-6"
+                                        />
                                       </span>
                                       <div>
                                         <div className="font-bold text-gray-900 dark:text-white">
@@ -1313,9 +1329,10 @@ export default function AdventureDetailPage() {
                                 >
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                      <span className="text-2xl">
-                                        {shopItem.symbol}
-                                      </span>
+                                      <DynamicIcon
+                                        name={shopItem.symbol}
+                                        className="w-6 h-6"
+                                      />
                                       <div>
                                         <div className="font-bold text-gray-900 dark:text-white">
                                           {shopItem.name}
