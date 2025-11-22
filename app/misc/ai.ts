@@ -3,8 +3,10 @@ import {
   StoryData,
   Choice,
   UPGRADE_COSTS,
+  CommandResponse,
 } from "@/app/misc/structs";
 import { getRPGSystem, RPGSystem } from "@/app/misc/rpgSystems";
+import { formatResponsesForAI } from "@/app/misc/commandResponses";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -14,6 +16,7 @@ export type ChatMessage = {
 export interface BuildPromptInput {
   storyData: StoryData;
   userChoice?: string;
+  commandResponses?: CommandResponse[]; // AI feedback from last commands
 }
 
 // Cleans text by removing problematic characters and normalizing whitespace
@@ -38,8 +41,10 @@ function cleanString(text: string): string {
 
 export function buildMessages({
   storyData,
+  userChoice,
   useRawContext = false,
   maxTokens = 120000,
+  commandResponses,
 }: BuildPromptInput & {
   useRawContext?: boolean;
   maxTokens?: number;
@@ -318,6 +323,30 @@ Narrative Best Practices:
         useRawContext && part.raw && !part.user ? part.raw : part.content;
       context.push({ role: role, content: cleanString(content) });
     });
+  }
+
+  // Build new user message with command responses and/or user choice
+  // This ensures we create a proper user message rather than corrupting the last assistant message
+  let newUserMessage = '';
+
+  // Prepend command responses (if any)
+  if (commandResponses && commandResponses.length > 0) {
+    newUserMessage = formatResponsesForAI(commandResponses); // Already includes trailing \n\n
+  }
+
+  // Append user choice (if any)
+  if (userChoice) {
+    if (newUserMessage) {
+      // formatResponsesForAI already ends with \n\n, so just append directly
+      newUserMessage += cleanString(userChoice);
+    } else {
+      newUserMessage = cleanString(userChoice);
+    }
+  }
+
+  // Add as new user message if we have content
+  if (newUserMessage) {
+    context.push({ role: 'user', content: newUserMessage });
   }
 
   return context;

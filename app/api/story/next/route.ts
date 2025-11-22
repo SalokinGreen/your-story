@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { StoryData } from "@/app/misc/structs";
+import { StoryData, CommandResponse } from "@/app/misc/structs";
 import { buildMessages, coerceToScenePart, ChatMessage } from "@/app/misc/ai";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -18,6 +18,7 @@ interface RequestBody {
   model?: string; // Optional model selection
   useRawContext?: boolean; // Use raw AI output in context instead of parsed content
   openRouterKey?: string; // BYOK key from client
+  commandResponses?: CommandResponse[]; // AI feedback from last commands
 }
 
 interface AIChoice {
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
     model: requestedModel,
     useRawContext,
     openRouterKey,
+    commandResponses,
   } = body;
   if (!storyData) {
     return NextResponse.json(
@@ -240,6 +242,7 @@ export async function POST(req: NextRequest) {
     userChoice,
     useRawContext,
     maxTokens: modelConfig.maxTokens,
+    commandResponses,
   });
   // Filter out duplicate messages
   messages = messages.filter(

@@ -1,21 +1,34 @@
 # Dice Roll Visualization
 
+> **Note**: This document describes legacy dice visualization. See [rpg-systems.md](rpg-systems.md) for comprehensive RPG system documentation and [choice-system.md](choice-system.md) for choice flow details.
+
 Baldur's Gate 3-inspired dice roll animation that displays during skill checks to build player trust and immersion.
 
-## Overview
+## Current Implementation
 
-The dice visualization system provides visual feedback for all dice rolls in the game, showing:
+**Active Component**: [`app/components/DiceVisualizer.tsx`](../app/components/DiceVisualizer.tsx)
 
-- The actual dice animation with random number generation
-- Multiple rolls for advantage/disadvantage/reroll scenarios
-- Final roll selection and calculation
-- Success/failure outcome with visual feedback
+The current dice visualizer supports **all 8 RPG systems** with a 4-phase animation:
+1. **Rolling** (1.8s): Dice tumbling
+2. **Stopped** (0.8s): Show final values
+3. **Calculating** (1.2s): Fade non-kept dice
+4. **Result** (5s): Display success/failure
 
-## Components
+**Key Features**:
+- System-specific visuals (PbtA partial success, Fate ladder, YZE stress/panic, Explosive explosions)
+- Click or keyboard (Enter/Space/Escape) to skip
+- Advantage/disadvantage stacking with source tracking
+- Real-time calculation display
+
+See [rpg-systems.md](rpg-systems.md) for detailed mechanics of each system.
+
+---
+
+## Legacy Documentation
 
 ### DiceRollVisualization
 
-**Location**: `app/components/DiceRollVisualization.tsx`
+**Status**: ⚠️ **DEPRECATED** - Component file does not exist. Documentation preserved for reference only.
 
 A full-screen overlay component that animates dice rolls with BG3-style presentation.
 

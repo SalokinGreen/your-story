@@ -47,6 +47,14 @@ export interface Achievement {
   hidden?: boolean; // Hidden from player but visible to AI
   rewardDescription?: string;
 }
+
+export interface CommandResponse {
+  command: string; // The original command that was executed
+  success: boolean | 'partial'; // True if succeeded, false if failed, 'partial' if partially successful
+  message: string; // Human-readable description of what happened
+  timestamp: number; // When the command was executed
+}
+
 export interface StoryLore {
   title: string;
   content: string;

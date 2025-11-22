@@ -7,6 +7,7 @@ import {
   Choice,
   UPGRADE_COSTS,
   Preset,
+  CommandResponse,
 } from "../misc/structs";
 import {
   getRPGSystem,
@@ -40,6 +41,10 @@ import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { DiceVisualizer } from "../components/DiceVisualizer";
+import {
+  generateCommandResponses,
+  formatResponsesForAI,
+} from "../misc/commandResponses";
 import {
   findItemMatch,
   findResourceMatch,
@@ -1415,6 +1420,11 @@ function StoryPageContent() {
     useState<boolean>(false);
   const [yzePendingChoice, setYzePendingChoice] = useState<Choice | null>(null);
 
+  // Command responses for AI feedback loop
+  const [pendingCommandResponses, setPendingCommandResponses] = useState<
+    CommandResponse[]
+  >([]);
+
   // Fetch token balance on mount
   useEffect(() => {
     async function fetchBalance() {
@@ -1917,6 +1927,7 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("openRouterKey") || undefined
           : undefined,
+      commandResponses: pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined,
     };
 
     const payloadSize = JSON.stringify(payload).length;
@@ -2031,7 +2042,23 @@ function StoryPageContent() {
         }
 
         if (data.part.commands && data.part.commands.length > 0) {
-          processCommands(data.part.commands, storyData, addNotification);
+          // Generate command responses for AI feedback
+          const responses = generateCommandResponses(
+            data.part.commands,
+            storyData
+          );
+          setPendingCommandResponses(responses);
+
+          // Also show notifications for user
+          responses.forEach((r) => {
+            if (r.success === true) {
+              addNotification(r.message, "success");
+            } else if (r.success === 'partial') {
+              addNotification(r.message, "warning");
+            } else {
+              addNotification(r.message, "warning");
+            }
+          });
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
@@ -2067,6 +2094,9 @@ function StoryPageContent() {
         setCanUndo(true);
         setChoices({ choices: data.part.choices || [] });
         setLoading(false);
+
+        // Clear command responses after successful AI generation
+        setPendingCommandResponses([]);
 
         await saveProgress(storyData);
       })
@@ -3288,6 +3318,7 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("openRouterKey") || undefined
           : undefined,
+      commandResponses: pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined,
     };
 
     const payloadSize = JSON.stringify(payload).length;
@@ -3388,7 +3419,23 @@ function StoryPageContent() {
         });
 
         if (data.part.commands && data.part.commands.length > 0) {
-          processCommands(data.part.commands, storyData, addNotification);
+          // Generate command responses for AI feedback
+          const responses = generateCommandResponses(
+            data.part.commands,
+            storyData
+          );
+          setPendingCommandResponses(responses);
+
+          // Also show notifications for user (processCommands behavior preserved via generateCommandResponses)
+          responses.forEach((r) => {
+            if (r.success === true) {
+              addNotification(r.message, "success");
+            } else if (r.success === 'partial') {
+              addNotification(r.message, "warning");
+            } else {
+              addNotification(r.message, "warning");
+            }
+          });
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
@@ -3439,6 +3486,9 @@ function StoryPageContent() {
         setLoading(false);
         setCanRetry(true); //EnableretryaftersuccessfulAIresponse
         setCanUndo(true); //EnableundoaftersuccessfulAIresponse
+
+        // Clear command responses after successful AI generation
+        setPendingCommandResponses([]);
 
         //Saveprogresstodatabase
         await saveProgress(storyData);
@@ -3590,6 +3640,7 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("useRawContext") === "true"
           : false,
+      commandResponses: pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined,
     };
 
     await fetch("/api/story/next", {
@@ -3655,7 +3706,23 @@ function StoryPageContent() {
         });
 
         if (data.part.commands && data.part.commands.length > 0) {
-          processCommands(data.part.commands, storyData, addNotification);
+          // Generate command responses for AI feedback
+          const responses = generateCommandResponses(
+            data.part.commands,
+            storyData
+          );
+          setPendingCommandResponses(responses);
+
+          // Also show notifications for user
+          responses.forEach((r) => {
+            if (r.success === true) {
+              addNotification(r.message, "success");
+            } else if (r.success === 'partial') {
+              addNotification(r.message, "warning");
+            } else {
+              addNotification(r.message, "warning");
+            }
+          });
         }
 
         if (data.part.memoryEntries && data.part.memoryEntries.length > 0) {
@@ -3705,6 +3772,9 @@ function StoryPageContent() {
         setCanRetry(true);
         setCanUndo(true);
         addNotification("✓ Response regenerated", "success");
+
+        // Clear command responses after successful AI generation
+        setPendingCommandResponses([]);
 
         await saveProgress(storyData);
       })
@@ -3793,7 +3863,23 @@ function StoryPageContent() {
 
     // Process any commands from the re-parsed content
     if (reparsedPart.commands && reparsedPart.commands.length > 0) {
-      processCommands(reparsedPart.commands, storyData, addNotification);
+      // Generate command responses for AI feedback
+      const responses = generateCommandResponses(
+        reparsedPart.commands,
+        storyData
+      );
+      setPendingCommandResponses(responses);
+
+      // Also show notifications for user
+      responses.forEach((r) => {
+        if (r.success === true) {
+          addNotification(r.message, "success");
+        } else if (r.success === 'partial') {
+          addNotification(r.message, "warning");
+        } else {
+          addNotification(r.message, "warning");
+        }
+      });
     }
 
     // Process any memory entries from the re-parsed content

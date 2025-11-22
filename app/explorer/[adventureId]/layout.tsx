@@ -35,7 +35,10 @@ export async function generateMetadata({
   params: { adventureId: string };
 }): Promise<Metadata> {
   const baseUrl = getSiteUrl();
-  const adventureId = params.adventureId;
+  // Unrwap the params promise
+  const paramsPromise = Promise.resolve(params);
+  const resolvedParams = await paramsPromise;
+  const adventureId = resolvedParams.adventureId;
   const adventureUrl = `${baseUrl}/explorer/${adventureId}`;
 
   let adventure: AdventureResponse["adventure"] | undefined;

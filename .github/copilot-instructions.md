@@ -8,6 +8,10 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 
 - app/page.tsx: Landing page with auth form/user profile display.
 - app/story/page.tsx: Story shell. Loads StoryData from database or starter stories, manages story state, renders <Story />. Includes handleCustomInput for free-form text submission.
+  - **Dice System Integration**: Uses checkSuccess() to validate skill checks against system-specific DCs; tracks rollTotal and rollDC for AI context
+  - **Choice Details**: Constructs system-appropriate context strings (partial success, tie, explosions, success count) sent to AI in format `[SkillName: result (context)]`
+  - **Advantage/Disadvantage**: Tracks sources and net count from items, achievements, story state; applies advantage stacking rules per system
+  - **Item/Resource Validation**: Checks item existence, applies advantages, handles consumption/breaking per item type; calculates resource penalties when insufficient
 - app/story/story.tsx: Presentational story component. Receives full StoryData via spread props, renders scenes with choices. Includes custom input toggle, retry button, and momentum mode selection.
 - app/story/stats.tsx: Stats display component showing character stats, resources, inventory, achievements.
 - app/story/lore.tsx: Lore display component, filters by `on` state (only shows active lore).
@@ -23,6 +27,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Achievement**: Includes optional `ai_hint` field for precise AI triggering conditions separate from user-facing descriptions.
   - **InventoryItem**: Strict type union 'normal' | 'consumable' | 'story' | 'misc' with specific behaviors per type.
   - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `beats_trigger` (number[]), `beats_untrigger` (number[]) for dynamic visibility.
+- app/misc/rpgSystems.ts: RPG system configurations and mechanics. Exports 8 systems (3d6, 1d20, 1d100, percentile, pbta, fate, yze, explosive) with dice rolling, DC calculation, and success checking. Key exports: getRPGSystem(), rollDice(), checkSuccess(), calculateResourceRequirements(). Each system has unique mechanics (PbtA partial success, Fate ladder/style, YZE stress/panic, Explosive dice chains).
 - app/misc/starter_stories.ts: Example datasets for testing and development.
 
 ### Auth & Tokens
@@ -42,6 +47,12 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Robust parsing**: Handles responses with or without `<story>` tags via fallback extraction logic.
   - **Item types**: Provides AI with type-specific behavior descriptions (normal, consumable, story, misc).
   - **Resource System**: Dynamic DC-based resource requirements - Required: DC÷10 (min 5), Success recovery: DC÷20 (min 1), Failure penalty: DC÷10 (min 5). Insufficient resources apply -DC÷10 dice penalty.
+  - **RPG System Context**: Sends rich roll results to AI for narrative calibration:
+    - PbtA: `[Technique: partial success (7-9)]` signals AI to add complications/costs
+    - Fate: `[Diplomacy: tie (margin 0)]` or `[Combat: success with style (+5)]` for narrative impact
+    - Explosive: `[Acrobatics: success (d8 exploded x2)]` shows dramatic lucky moments
+    - YZE: `[Mechanics: success (3 successes vs 2)]` calibrates tension and panic context
+    - All systems include skill name, result (success/failure/partial/tie/style), and system-specific details
 - app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter). Includes getModelConfig() helper for dynamic model selection.
 - app/api/story/next/route.ts: POST endpoint supporting multiple AI providers (DeepSeek, OpenRouter); accepts optional `model` parameter; deducts tokens via service role; returns { part: ScenePart, meta: { model, modelName, provider, usage, tokenCost, balance } }.
 - app/api/tts/generate/route.ts: POST endpoint for Speechify text-to-speech generation; deducts 3 tokens per generation; returns audio blob with token metadata.
@@ -87,6 +98,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/components/NotificationContainer.tsx: Toast notifications display.
 - app/components/TTSControls.tsx: Text-to-speech controls with voice selection, volume, play/pause/stop, and auto-generation support.
 - app/components/CustomVoiceManager.tsx: Manage custom Speechify voice IDs for TTS.
+- app/components/DiceVisualizer.tsx: Main dice animation component with 4-phase system (rolling→stopped→calculating→result). Supports all 8 RPG systems with visual feedback for advantage/disadvantage, explosions, stress dice, partial success, and Fate ladder outcomes. Click or keyboard (Enter/Space/Escape) to skip animation.
 
 ### Config
 
