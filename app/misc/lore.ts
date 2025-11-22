@@ -109,11 +109,11 @@ export function processLoreTriggers(
       });
 
       if (!initialLoad) {
-        if (isActive) {
-          addNotification(`📜 Lore discovered: ${loreItem.title}`, "success");
-        } else {
-          addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
-        }
+        // if (isActive) {
+        //   addNotification(`📜 Lore discovered: ${loreItem.title}`, "success");
+        // } else {
+        //   addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
+        // }
       }
     }
   });
