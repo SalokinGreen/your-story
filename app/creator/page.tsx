@@ -291,7 +291,7 @@ function AdventureCreatorContent() {
         const response = await authenticatedFetch(
           `/api/adventures/${editAdventureId}`
         );
-        
+
         let adventure: Adventure | null = null;
         let isFromLocal = false;
 
@@ -314,7 +314,9 @@ function AdventureCreatorContent() {
               isFromLocal = true;
               setIsLocal(true);
             } else {
-              throw new Error("Adventure not found in database or local storage");
+              throw new Error(
+                "Adventure not found in database or local storage"
+              );
             }
           } catch (localErr) {
             throw new Error("Adventure not found");
@@ -1790,7 +1792,9 @@ function AdventureCreatorContent() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to upload adventure to database");
+        throw new Error(
+          error.error || "Failed to upload adventure to database"
+        );
       }
 
       const { adventure } = await response.json();
@@ -1807,7 +1811,7 @@ function AdventureCreatorContent() {
       }
 
       addNotification("Adventure saved to database successfully!", "success");
-      
+
       // Navigate to the database version
       router.push(`/creator?edit=${adventure.id}`);
     } catch (error) {
@@ -7873,10 +7877,16 @@ function AdventureCreatorContent() {
                 onClick={handleSave}
                 disabled={saving}
                 className="flex-1 sm:flex-none px-3 py-2 bg-linear-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
-                title={isLocal ? "Save changes locally" : "Publish to the community"}
+                title={
+                  isLocal ? "Save changes locally" : "Publish to the community"
+                }
               >
                 {saving ? (
-                  isLocal ? "Saving..." : "Publishing..."
+                  isLocal ? (
+                    "Saving..."
+                  ) : (
+                    "Publishing..."
+                  )
                 ) : (
                   <>
                     <DynamicIcon

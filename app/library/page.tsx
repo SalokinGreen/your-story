@@ -76,6 +76,13 @@ export default function LibraryPage() {
     useState<AdventureSortBy>("updated");
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
 
+  // Mass selection states
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedStories, setSelectedStories] = useState<Set<string>>(
+    new Set()
+  );
+  const [showMassMoveDropdown, setShowMassMoveDropdown] = useState(false);
+
   // Folder management states
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -111,6 +118,21 @@ export default function LibraryPage() {
       fetchLibraryData();
     }
   }, [user, view]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMassMoveDropdown) {
+        const target = event.target as HTMLElement;
+        if (!target.closest(".relative")) {
+          setShowMassMoveDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMassMoveDropdown]);
 
   const fetchLibraryData = async () => {
     if (!user) return;
@@ -442,6 +464,168 @@ export default function LibraryPage() {
         "failure"
       );
     }
+  };
+
+  // Mass operation handlers
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    setSelectedStories(new Set());
+  };
+
+  const toggleStorySelection = (storyId: string) => {
+    const newSelection = new Set(selectedStories);
+    if (newSelection.has(storyId)) {
+      newSelection.delete(storyId);
+    } else {
+      newSelection.add(storyId);
+    }
+    setSelectedStories(newSelection);
+  };
+
+  const selectAllStories = () => {
+    const allIds = new Set([
+      ...filteredStories.map((s) => s.id),
+      ...filteredLocalStories.map((s) => s.id),
+    ]);
+    setSelectedStories(allIds);
+  };
+
+  const deselectAllStories = () => {
+    setSelectedStories(new Set());
+  };
+
+  const handleMassDelete = () => {
+    if (selectedStories.size === 0) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Multiple Stories?",
+      message: `Are you sure you want to delete ${selectedStories.size} ${
+        selectedStories.size === 1 ? "story" : "stories"
+      }? This action cannot be undone.`,
+      icon: "Trash2",
+      confirmText: `Delete ${selectedStories.size} ${
+        selectedStories.size === 1 ? "Story" : "Stories"
+      }`,
+      confirmButtonClass: "bg-red-600 hover:bg-red-700",
+      onConfirm: async () => {
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        try {
+          const deletePromises = Array.from(selectedStories).map(
+            async (storyId) => {
+              const isLocal = storyId.startsWith("local_");
+              if (isLocal) {
+                await deleteLocalStory(storyId);
+              } else {
+                const response = await authenticatedFetch(
+                  `/api/stories/${storyId}`,
+                  {
+                    method: "DELETE",
+                  }
+                );
+                if (!response.ok) {
+                  throw new Error(`Failed to delete story ${storyId}`);
+                }
+              }
+            }
+          );
+
+          await Promise.all(deletePromises);
+
+          // Update state
+          setStories(stories.filter((s) => !selectedStories.has(s.id)));
+          setLocalStories(
+            localStories.filter((s) => !selectedStories.has(s.id))
+          );
+          setSelectedStories(new Set());
+          setSelectionMode(false);
+
+          addNotification(
+            `${selectedStories.size} ${
+              selectedStories.size === 1 ? "story" : "stories"
+            } deleted successfully`,
+            "success"
+          );
+        } catch (error: any) {
+          console.error("Error deleting stories:", error);
+          addNotification(
+            `Failed to delete some stories: ${error.message}`,
+            "failure"
+          );
+        }
+      },
+    });
+  };
+
+  const handleMassMove = (folderId: string | null) => {
+    if (selectedStories.size === 0) return;
+
+    const moveStories = async () => {
+      try {
+        const movePromises = Array.from(selectedStories).map(
+          async (storyId) => {
+            const isLocal = storyId.startsWith("local_");
+            if (isLocal) {
+              const { saveLocalStory, getLocalStory } = await import(
+                "@/app/misc/localStoryManager"
+              );
+              const localStory = await getLocalStory(storyId);
+              if (localStory) {
+                await saveLocalStory(storyId, localStory.storyData, folderId);
+              }
+            } else {
+              const response = await authenticatedFetch(
+                `/api/stories/${storyId}`,
+                {
+                  method: "PATCH",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ folderId }),
+                }
+              );
+              if (!response.ok) {
+                throw new Error(`Failed to move story ${storyId}`);
+              }
+            }
+          }
+        );
+
+        await Promise.all(movePromises);
+
+        // Update state
+        setStories(
+          stories.map((s) =>
+            selectedStories.has(s.id) ? { ...s, folder_id: folderId } : s
+          )
+        );
+        setLocalStories(
+          localStories.map((s) =>
+            selectedStories.has(s.id) ? { ...s, folder_id: folderId } : s
+          )
+        );
+        setSelectedStories(new Set());
+        setSelectionMode(false);
+
+        const folderName = folderId
+          ? folders.find((f) => f.id === folderId)?.name || "folder"
+          : "Uncategorized";
+        addNotification(
+          `${selectedStories.size} ${
+            selectedStories.size === 1 ? "story" : "stories"
+          } moved to ${folderName}`,
+          "success"
+        );
+      } catch (error: any) {
+        console.error("Error moving stories:", error);
+        addNotification(
+          `Failed to move some stories: ${error.message}`,
+          "failure"
+        );
+      }
+    };
+
+    moveStories();
   };
 
   // Filter and sort stories
@@ -819,6 +1003,107 @@ export default function LibraryPage() {
                 )}
               </div>
 
+              {/* Mass Operations Toolbar */}
+              {(filteredStories.length > 0 ||
+                filteredLocalStories.length > 0) && (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 mb-6 border border-gray-200 dark:border-gray-700">
+                  {!selectionMode ? (
+                    <button
+                      onClick={toggleSelectionMode}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <DynamicIcon name="CheckSquare" className="w-4 h-4" />
+                      Select Stories
+                    </button>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        {selectedStories.size} selected
+                      </span>
+                      <button
+                        onClick={selectAllStories}
+                        className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={deselectAllStories}
+                        className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        Deselect All
+                      </button>
+                      {selectedStories.size > 0 && (
+                        <>
+                          <div className="relative">
+                            <button
+                              onClick={() =>
+                                setShowMassMoveDropdown(!showMassMoveDropdown)
+                              }
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
+                            >
+                              <DynamicIcon
+                                name="FolderOpen"
+                                className="w-4 h-4"
+                              />
+                              Move to Folder
+                            </button>
+                            {showMassMoveDropdown && (
+                              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg shadow-xl p-2 min-w-[200px] z-50">
+                                <button
+                                  onClick={() => {
+                                    handleMassMove(null);
+                                    setShowMassMoveDropdown(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+                                >
+                                  <DynamicIcon
+                                    name="FileText"
+                                    className="w-4 h-4 inline mr-2"
+                                  />
+                                  Uncategorized
+                                </button>
+                                {folders.map((folder) => (
+                                  <button
+                                    key={folder.id}
+                                    onClick={() => {
+                                      handleMassMove(folder.id);
+                                      setShowMassMoveDropdown(false);
+                                    }}
+                                    className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+                                    style={{
+                                      borderLeft: `4px solid ${folder.color}`,
+                                    }}
+                                  >
+                                    <DynamicIcon
+                                      name={folder.icon}
+                                      className="w-4 h-4 inline mr-2"
+                                    />
+                                    {folder.name}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={handleMassDelete}
+                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
+                          >
+                            <DynamicIcon name="Trash2" className="w-4 h-4" />
+                            Delete Selected
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={toggleSelectionMode}
+                        className="ml-auto px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Stories List */}
               <div className="space-y-4">
                 {filteredStories.length === 0 &&
@@ -853,12 +1138,39 @@ export default function LibraryPage() {
                   filteredStories.map((story) => (
                     <div
                       key={story.id}
-                      className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
+                      onClick={() =>
+                        selectionMode
+                          ? toggleStorySelection(story.id)
+                          : router.push(`/story?storyId=${story.id}`)
+                      }
+                      className={`rounded-2xl shadow-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                        selectionMode
+                          ? selectedStories.has(story.id)
+                            ? "bg-purple-50 dark:bg-purple-900/20 border-purple-500 dark:border-purple-400 shadow-purple-200 dark:shadow-purple-900"
+                            : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-2xl"
+                          : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-2xl"
+                      } active:scale-[0.98]`}
                     >
                       <div className="p-6">
-                        <div className="flex flex-col items-start justify-between gap-2G">
-                          <div className="flex-1 min-w-0">
+                        <div className="flex flex-col items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0 w-full">
                             <div className="flex items-center gap-3 mb-2">
+                              {selectionMode && (
+                                <div
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                    selectedStories.has(story.id)
+                                      ? "bg-purple-600 border-purple-600"
+                                      : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500"
+                                  }`}
+                                >
+                                  {selectedStories.has(story.id) && (
+                                    <DynamicIcon
+                                      name="Check"
+                                      className="w-3 h-3 text-white"
+                                    />
+                                  )}
+                                </div>
+                              )}
                               <h3 className="text-xl font-bold text-gray-900 dark:text-white truncate">
                                 {story.story_name}
                               </h3>
@@ -914,40 +1226,40 @@ export default function LibraryPage() {
                               )}
                             </div>
                           </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setMovingStory(story.id)}
-                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center"
-                              title="Move to folder"
+                          {!selectionMode && (
+                            <div
+                              className="flex gap-2"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <DynamicIcon name="Folder" className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() =>
-                                router.push(`/story?storyId=${story.id}`)
-                              }
-                              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
-                            >
-                              Continue
-                            </button>
-                            <button
-                              onClick={() => handleDeleteStory(story.id)}
-                              disabled={deleting === story.id}
-                              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                            >
-                              {deleting === story.id ? (
+                              <button
+                                onClick={() => setMovingStory(story.id)}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center"
+                                title="Move to folder"
+                              >
                                 <DynamicIcon
-                                  name="Loader2"
-                                  className="w-5 h-5 animate-spin"
-                                />
-                              ) : (
-                                <DynamicIcon
-                                  name="Trash2"
+                                  name="Folder"
                                   className="w-5 h-5"
                                 />
-                              )}
-                            </button>
-                          </div>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStory(story.id)}
+                                disabled={deleting === story.id}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                              >
+                                {deleting === story.id ? (
+                                  <DynamicIcon
+                                    name="Loader2"
+                                    className="w-5 h-5 animate-spin"
+                                  />
+                                ) : (
+                                  <DynamicIcon
+                                    name="Trash2"
+                                    className="w-5 h-5"
+                                  />
+                                )}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -958,12 +1270,39 @@ export default function LibraryPage() {
                 {filteredLocalStories.map((story) => (
                   <div
                     key={story.id}
-                    className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
+                    onClick={() =>
+                      selectionMode
+                        ? toggleStorySelection(story.id)
+                        : router.push(`/story?storyId=${story.id}`)
+                    }
+                    className={`rounded-2xl shadow-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                      selectionMode
+                        ? selectedStories.has(story.id)
+                          ? "bg-purple-50 dark:bg-purple-900/20 border-purple-500 dark:border-purple-400 shadow-purple-200 dark:shadow-purple-900"
+                          : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-2xl"
+                        : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-2xl"
+                    } active:scale-[0.98]`}
                   >
                     <div className="p-6">
                       <div className="flex flex-col items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 w-full">
                           <div className="flex items-center gap-3 mb-2">
+                            {selectionMode && (
+                              <div
+                                className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                  selectedStories.has(story.id)
+                                    ? "bg-purple-600 border-purple-600"
+                                    : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500"
+                                }`}
+                              >
+                                {selectedStories.has(story.id) && (
+                                  <DynamicIcon
+                                    name="Check"
+                                    className="w-3 h-3 text-white"
+                                  />
+                                )}
+                              </div>
+                            )}
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white truncate">
                               {story.title}
                             </h3>
@@ -985,37 +1324,37 @@ export default function LibraryPage() {
                             {story.preview}
                           </p>
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setMovingStory(story.id)}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center"
-                            title="Move to folder"
+                        {!selectionMode && (
+                          <div
+                            className="flex gap-2"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <DynamicIcon name="Folder" className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              router.push(`/story?storyId=${story.id}`)
-                            }
-                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
-                          >
-                            Continue
-                          </button>
-                          <button
-                            onClick={() => handleDeleteStory(story.id, true)}
-                            disabled={deleting === story.id}
-                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                          >
-                            {deleting === story.id ? (
-                              <DynamicIcon
-                                name="Loader2"
-                                className="w-5 h-5 animate-spin"
-                              />
-                            ) : (
-                              <DynamicIcon name="Trash2" className="w-5 h-5" />
-                            )}
-                          </button>
-                        </div>
+                            <button
+                              onClick={() => setMovingStory(story.id)}
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center"
+                              title="Move to folder"
+                            >
+                              <DynamicIcon name="Folder" className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStory(story.id, true)}
+                              disabled={deleting === story.id}
+                              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                            >
+                              {deleting === story.id ? (
+                                <DynamicIcon
+                                  name="Loader2"
+                                  className="w-5 h-5 animate-spin"
+                                />
+                              ) : (
+                                <DynamicIcon
+                                  name="Trash2"
+                                  className="w-5 h-5"
+                                />
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1120,7 +1459,8 @@ export default function LibraryPage() {
                   Adventure
                 </button>
               </div>
-              {filteredAdventures.length === 0 && localAdventures.length === 0 ? (
+              {filteredAdventures.length === 0 &&
+              localAdventures.length === 0 ? (
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-700">
                   <div className="flex justify-center mb-4">
                     <DynamicIcon
