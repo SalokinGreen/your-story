@@ -156,7 +156,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const modelConfig = getModelConfig(selectedModel);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-200px)] bg-white dark:bg-blue-950 rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
       <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 space-y-2">
         <div className="flex justify-between items-center">
@@ -199,7 +199,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           <>
             {/* Stats and Options */}
             <div className="flex flex-wrap gap-2 items-center text-xs sm:text-sm">
-              <div className="px-2 sm:px-3 py-1 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+              <div className="px-2 sm:px-3 py-1 bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
                 <span className="text-gray-600 dark:text-gray-400">
                   Messages:
                 </span>{" "}
@@ -207,7 +207,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                   {messages.length}
                 </span>
               </div>
-              <div className="px-2 sm:px-3 py-1 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+              <div className="px-2 sm:px-3 py-1 bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
                 <span className="text-gray-600 dark:text-gray-400">
                   Tokens:
                 </span>{" "}
@@ -215,7 +215,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                   {estimatedTokens.toLocaleString()}
                 </span>
               </div>
-              <div className="px-2 sm:px-3 py-1 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+              <div className="px-2 sm:px-3 py-1 bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
                 <span className="text-gray-600 dark:text-gray-400">
                   Context:
                 </span>{" "}
@@ -267,7 +267,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             </div>
 
             {/* Token Breakdown */}
-            <details className="text-xs bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+            <details className="text-xs bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
               <summary className="cursor-pointer px-2 sm:px-3 py-2 font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded">
                 <DynamicIcon name="PieChart" className="w-3 h-3 inline mr-1" />
                 Token Breakdown
@@ -323,7 +323,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                 msg.role
               )} rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mx-2 sm:mx-4`}
             >
-              <div className="flex justify-between items-center p-2 sm:p-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="flex justify-between items-center p-2 sm:p-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-blue-950">
                 <div className="flex items-center gap-1 sm:gap-2 min-w-0">
                   <DynamicIcon
                     name={

@@ -21,7 +21,7 @@ export default function UserProfile() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 w-full">
+    <div className="flex flex-col items-center gap-4 p-6 bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 w-full">
       <div className="flex flex-col gap-2 text-center">
         <div className="w-12 h-12 mx-auto bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-md">
           <span className="text-xl font-bold text-white">

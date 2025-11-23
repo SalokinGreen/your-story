@@ -147,7 +147,7 @@ export default function EncryptionMigration({
 
       {showDialog && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 md:p-8 max-w-2xl w-full shadow-2xl my-4">
+          <div className="bg-white dark:bg-blue-950 rounded-2xl p-4 sm:p-6 md:p-8 max-w-2xl w-full shadow-2xl my-4">
             <div className="text-center mb-4 sm:mb-6">
               <div className="flex justify-center mb-3 sm:mb-4">
                 <DynamicIcon

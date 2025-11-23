@@ -69,7 +69,7 @@ export default function Story({
 
   return (
     <div className="w-full">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col gap-6">
           {/* Navigation arrows */}
           {storyData.scene.parts.length > 1 && (
@@ -343,7 +343,7 @@ export default function Story({
                     ? "bg-yellow-500 text-white shadow-md"
                     : canUseReroll
                     ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-yellow-400 hover:text-white"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                    : "bg-gray-100 dark:bg-blue-950 text-gray-400 dark:text-gray-600 cursor-not-allowed"
                 }`}
               >
                 <DynamicIcon name="Dices" className="w-4 h-4" /> Reroll (1
@@ -361,7 +361,7 @@ export default function Story({
                     ? "bg-green-500 text-white shadow-md"
                     : canUseGuarantee
                     ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-green-500 hover:text-white"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                    : "bg-gray-100 dark:bg-blue-950 text-gray-400 dark:text-gray-600 cursor-not-allowed"
                 }`}
               >
                 <DynamicIcon name="Check" className="w-4 h-4" /> Guarantee (2

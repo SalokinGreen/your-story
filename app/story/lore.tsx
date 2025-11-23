@@ -35,7 +35,7 @@ export default function LorePage(storyData: StoryData) {
   return (
     <div className="w-full space-y-6">
       {/* Header Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -87,7 +87,7 @@ export default function LorePage(storyData: StoryData) {
       {/* Main Content - Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Lore List */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
             Discovered Lore
           </h3>
@@ -195,7 +195,7 @@ export default function LorePage(storyData: StoryData) {
         </div>
 
         {/* Lore Detail */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
             Lore Details
           </h3>

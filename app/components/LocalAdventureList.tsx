@@ -58,13 +58,13 @@ export default function LocalAdventureList() {
 
   if (loading) {
     return (
-      <div className="animate-pulse h-20 bg-gray-100 dark:bg-gray-800 rounded-lg"></div>
+      <div className="animate-pulse h-20 bg-gray-100 dark:bg-blue-950 rounded-lg"></div>
     );
   }
 
   if (adventures.length === 0) {
     return (
-      <div className="text-center py-8 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+      <div className="text-center py-8 bg-gray-50 dark:bg-blue-950/50 rounded-xl border border-gray-200 dark:border-gray-700">
         <p className="text-gray-500 dark:text-gray-400">
           No locally saved adventures found.
         </p>
@@ -81,7 +81,7 @@ export default function LocalAdventureList() {
         {adventures.map((adv) => (
           <div
             key={adv.id}
-            className="group relative bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-400 shadow-sm hover:shadow-md transition-all"
+            className="group relative bg-white dark:bg-blue-950 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-400 shadow-sm hover:shadow-md transition-all"
           >
             <div className="flex justify-between items-start">
               <div

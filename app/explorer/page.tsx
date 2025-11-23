@@ -130,14 +130,14 @@ export default function ExplorerPage() {
               {user && (
                 <button
                   onClick={() => router.push("/library")}
-                  className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
+                  className="px-4 py-2 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
                 >
                   <DynamicIcon name="Library" className="w-4 h-4" /> Library
                 </button>
               )}
               <button
                 onClick={() => router.push("/")}
-                className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
+                className="px-4 py-2 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
               >
                 <DynamicIcon name="ArrowLeft" className="w-4 h-4" /> Home
               </button>
@@ -155,7 +155,7 @@ export default function ExplorerPage() {
               <DynamicIcon name="Star" className="w-6 h-6 text-yellow-500" />{" "}
               Featured Adventures
             </h2>
-            <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+            <div className="relative bg-white dark:bg-blue-950 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
               <div className="relative h-96 sm:h-80 md:h-96">
                 {featuredAdventures.map((adventure, index) => (
                   <div
@@ -313,7 +313,7 @@ export default function ExplorerPage() {
         </div>
 
         {/* Search and Filters */}
-        <div className="mb-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+        <div className="mb-8 bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
           <div className="flex flex-col gap-4">
             {/* Search Bar */}
             <div className="flex flex-col sm:flex-row gap-3">
@@ -443,14 +443,14 @@ export default function ExplorerPage() {
             All Adventures ({adventures.length})
           </h2>
           {loading ? (
-            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+            <div className="text-center py-12 bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent mx-auto"></div>
               <p className="text-gray-600 dark:text-gray-400 text-lg mt-4">
                 Loading adventures...
               </p>
             </div>
           ) : adventures.length === 0 ? (
-            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+            <div className="text-center py-12 bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
               <p className="text-gray-600 dark:text-gray-400 text-lg">
                 No adventures found matching your filters
               </p>
@@ -460,7 +460,7 @@ export default function ExplorerPage() {
               {adventures.map((adventure) => (
                 <div
                   key={adventure.id}
-                  className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all hover:scale-105 cursor-pointer"
+                  className="bg-white dark:bg-blue-950 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all hover:scale-105 cursor-pointer"
                   onClick={() => router.push(`/explorer/${adventure.id}`)}
                 >
                   {/* Thumbnail Image or Placeholder */}

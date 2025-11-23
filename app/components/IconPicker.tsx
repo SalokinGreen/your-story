@@ -170,7 +170,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+        className="flex items-center gap-2 w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
       >
         <div className="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded">
           <DynamicIcon
@@ -185,7 +185,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-full min-w-[300px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[400px] flex flex-col">
+        <div className="absolute z-50 mt-1 w-full min-w-[300px] bg-white dark:bg-blue-950 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[400px] flex flex-col">
           <div className="p-2 border-b border-gray-200 dark:border-gray-700 space-y-2">
             <input
               type="text"

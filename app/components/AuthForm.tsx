@@ -41,7 +41,7 @@ export default function AuthForm() {
     <div className="w-full max-w-md">
       <form
         onSubmit={handleSubmit}
-        className="flex flex-col gap-5 bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700"
+        className="flex flex-col gap-5 bg-white dark:bg-blue-950 p-6 sm:p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700"
       >
         <div className="text-center">
           <h2 className="text-2xl sm:text-3xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">

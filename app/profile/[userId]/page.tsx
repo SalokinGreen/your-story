@@ -192,7 +192,7 @@ export default function ProfilePage() {
   if (!profileUser) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
-        <div className="text-center bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
+        <div className="text-center bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
           <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-900 dark:text-white">
             User Not Found
           </h1>
@@ -213,7 +213,7 @@ export default function ProfilePage() {
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() => router.back()}
-            className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
+            className="px-4 py-2 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
           >
             ← Back
           </button>
@@ -226,7 +226,7 @@ export default function ProfilePage() {
 
         <div className="space-y-6">
           {/* Header with Avatar and Profile Info */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
             <div className="flex items-start gap-4 mb-4">
               {/* Avatar */}
               <div className="shrink-0">
@@ -300,7 +300,7 @@ export default function ProfilePage() {
           <div className="flex justify-center">
             <button
               onClick={handleRefresh}
-              className="px-6 py-3 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 font-semibold transition-all rounded-lg shadow-md hover:shadow-lg text-gray-900 dark:text-white flex items-center gap-2"
+              className="px-6 py-3 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 font-semibold transition-all rounded-lg shadow-md hover:shadow-lg text-gray-900 dark:text-white flex items-center gap-2"
             >
               <DynamicIcon name="RefreshCw" className="w-5 h-5" /> Refresh
               Balance
@@ -316,7 +316,7 @@ export default function ProfilePage() {
           )}
 
           {/* Adventures Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-purple-50 dark:bg-purple-900/30">
               <h2 className="text-xl font-bold text-purple-600 dark:text-purple-400 flex items-center gap-2">
                 <DynamicIcon name="Gamepad2" className="w-5 h-5" /> Adventures (

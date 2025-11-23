@@ -409,7 +409,7 @@ export default function AdventureDetailPage() {
   if (!adventure) {
     return (
       <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center p-4 pt-20">
-        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 text-center">
+        <div className="max-w-md w-full bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 text-center">
           <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
             Adventure Not Found
           </h1>
@@ -434,14 +434,14 @@ export default function AdventureDetailPage() {
         <div className="mb-6">
           <button
             onClick={() => router.push("/explorer")}
-            className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
+            className="px-4 py-2 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md"
           >
             ← Back to Explorer
           </button>
         </div>
 
         {/* Hero Banner */}
-        <div className="flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden mb-8 border border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col bg-white dark:bg-blue-950 rounded-2xl shadow-xl overflow-hidden mb-8 border border-gray-200 dark:border-gray-700">
           {/* Banner Image or Gradient */}
           {adventure.bannerUrl ? (
             <div
@@ -783,7 +783,7 @@ export default function AdventureDetailPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-1">
             {/* Description */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
               <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
                 <span className="text-2xl">📖</span>
                 About This Adventure
@@ -794,7 +794,7 @@ export default function AdventureDetailPage() {
             </div>
 
             {/* Story Preview */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
               <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
                 <span className="text-2xl">🎬</span>
                 Story Preview
@@ -812,7 +812,7 @@ export default function AdventureDetailPage() {
             </div>
 
             {/* Stats Preview */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
               {/* Tabs */}
               <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-700 pb-4">
                 <button
@@ -1375,7 +1375,7 @@ export default function AdventureDetailPage() {
 
             {/* Character Presets */}
             {adventure.presets && adventure.presets.length > 0 && (
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+              <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
                 <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
                   🎭 Character Presets
                 </h2>
@@ -1454,7 +1454,7 @@ export default function AdventureDetailPage() {
           {/* Sidebar */}
           <div className="space-y-1">
             {/* Tags */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
                 🏷️ Tags
               </h3>
@@ -1471,7 +1471,7 @@ export default function AdventureDetailPage() {
             </div>
 
             {/* Details */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
                 <DynamicIcon
                   name="Info"
@@ -1520,7 +1520,7 @@ export default function AdventureDetailPage() {
             </div>
 
             {/* Share */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
                 🔗 Share
               </h3>
@@ -1556,7 +1556,7 @@ export default function AdventureDetailPage() {
               className={`px-6 py-3 font-semibold rounded-lg transition-all ${
                 activeTab === "overview"
                   ? "bg-purple-600 text-white shadow-lg"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
+                  : "bg-white dark:bg-blue-950 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
               }`}
             >
               💬 Comments
@@ -1566,7 +1566,7 @@ export default function AdventureDetailPage() {
               className={`px-6 py-3 font-semibold rounded-lg transition-all ${
                 activeTab === "lore"
                   ? "bg-purple-600 text-white shadow-lg"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
+                  : "bg-white dark:bg-blue-950 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
               }`}
             >
               📚 Lore ({adventure?.storyTemplate?.lore?.length || 0})
@@ -1577,7 +1577,7 @@ export default function AdventureDetailPage() {
           {activeTab === "overview" && <Comments adventureId={adventureId} />}
 
           {activeTab === "lore" && adventure?.storyTemplate?.lore && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <span className="text-2xl">📚</span>

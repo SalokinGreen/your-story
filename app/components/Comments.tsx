@@ -277,7 +277,7 @@ export default function Comments({
       {user ? (
         <form
           onSubmit={handleSubmit}
-          className="bg-white dark:bg-gray-800 rounded-xl border-2 border-gray-300 dark:border-gray-600 p-6 shadow-lg"
+          className="bg-white dark:bg-blue-950 rounded-xl border-2 border-gray-300 dark:border-gray-600 p-6 shadow-lg"
         >
           <div className="mb-4">
             <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
@@ -350,7 +350,7 @@ export default function Comments({
           </button>
         </form>
       ) : (
-        <div className="bg-gray-100 dark:bg-gray-800 rounded-xl border-2 border-gray-300 dark:border-gray-600 p-6 text-center">
+        <div className="bg-gray-100 dark:bg-blue-950 rounded-xl border-2 border-gray-300 dark:border-gray-600 p-6 text-center">
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             Sign in to leave a comment and rate this adventure
           </p>
@@ -370,7 +370,7 @@ export default function Comments({
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400 mx-auto"></div>
           </div>
         ) : comments.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center">
+          <div className="text-center py-12 bg-gray-50 dark:bg-blue-950 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center">
             <DynamicIcon
               name="MessageCircle"
               className="w-16 h-16 text-gray-400 mb-4"
@@ -386,7 +386,7 @@ export default function Comments({
           comments.map((comment) => (
             <div
               key={comment.id}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-md hover:shadow-lg transition-shadow"
+              className="bg-white dark:bg-blue-950 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-md hover:shadow-lg transition-shadow"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">

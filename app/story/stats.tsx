@@ -30,7 +30,7 @@ export default function StatsPage(storyData: StoryData) {
 
   return (
     <div className="w-full">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
         {/* Player Info Section - Always Visible */}
         <div className="p-6 sm:p-8 border-b border-gray-200 dark:border-gray-700">
           <div className="flex flex-col gap-4">

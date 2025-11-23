@@ -176,7 +176,7 @@ export default function CreatorAIChat({
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="bg-gray-100 dark:bg-gray-800 border-none text-xs rounded-md px-2 py-1 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer max-w-[150px] truncate"
+              className="bg-gray-100 dark:bg-blue-950 border-none text-xs rounded-md px-2 py-1 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer max-w-[150px] truncate"
             >
               {Object.values(AI_MODELS).map((m) => (
                 <option key={m.model} value={m.model}>
@@ -225,7 +225,7 @@ export default function CreatorAIChat({
                     onClick={() =>
                       setInput("Create a legendary sword with fire abilities")
                     }
-                    className="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-500 transition-colors text-left shadow-xs"
+                    className="px-4 py-2 rounded-lg bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-500 transition-colors text-left shadow-xs"
                   >
                     "Create a legendary sword..."
                   </button>
@@ -233,7 +233,7 @@ export default function CreatorAIChat({
                     onClick={() =>
                       setInput("Write a plot beat about a dragon attack")
                     }
-                    className="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-500 transition-colors text-left shadow-xs"
+                    className="px-4 py-2 rounded-lg bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-500 transition-colors text-left shadow-xs"
                   >
                     "Write a plot beat about..."
                   </button>
@@ -250,7 +250,7 @@ export default function CreatorAIChat({
           ))}
           {loading && (
             <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="rounded-2xl rounded-tl-none bg-white dark:bg-gray-800 px-5 py-3 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-2">
+              <div className="rounded-2xl rounded-tl-none bg-white dark:bg-blue-950 px-5 py-3 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-2">
                 <div className="flex gap-1">
                   <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                   <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
@@ -267,7 +267,7 @@ export default function CreatorAIChat({
 
         {/* Input */}
         <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 sm:p-6">
-          <div className="relative flex items-end gap-2 bg-gray-50 dark:bg-gray-800 p-2 rounded-xl border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-500 transition-all shadow-inner">
+          <div className="relative flex items-end gap-2 bg-gray-50 dark:bg-blue-950 p-2 rounded-xl border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-500 transition-all shadow-inner">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -332,7 +332,7 @@ function MessageItem({
         className={`max-w-[90%] sm:max-w-[85%] rounded-2xl px-5 py-4 shadow-sm ${
           isUser
             ? "rounded-tr-sm bg-linear-to-br from-blue-600 to-purple-600 text-white"
-            : "rounded-tl-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700"
+            : "rounded-tl-sm bg-white dark:bg-blue-950 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700"
         }`}
       >
         <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
@@ -549,7 +549,7 @@ function ChangeSummary({
       {changes.map((change, i) => (
         <div
           key={i}
-          className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 overflow-hidden transition-all hover:border-purple-300 dark:hover:border-purple-700"
+          className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-blue-950 overflow-hidden transition-all hover:border-purple-300 dark:hover:border-purple-700"
         >
           <div
             className={`flex items-center gap-3 p-3 ${

@@ -50,7 +50,7 @@ export default function UserOptions() {
   if (!user) return null;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
+    <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
       <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
         <DynamicIcon name="Settings" className="w-6 h-6" /> User Options
       </h2>

@@ -47,13 +47,13 @@ export default function LocalStoryList() {
 
   if (loading) {
     return (
-      <div className="animate-pulse h-20 bg-gray-100 dark:bg-gray-800 rounded-lg"></div>
+      <div className="animate-pulse h-20 bg-gray-100 dark:bg-blue-950 rounded-lg"></div>
     );
   }
 
   if (stories.length === 0) {
     return (
-      <div className="text-center py-8 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+      <div className="text-center py-8 bg-gray-50 dark:bg-blue-950/50 rounded-xl border border-gray-200 dark:border-gray-700">
         <p className="text-gray-500 dark:text-gray-400">
           No locally saved stories found.
         </p>
@@ -71,7 +71,7 @@ export default function LocalStoryList() {
           <div
             key={story.id}
             onClick={() => router.push(`/story?storyId=${story.id}`)}
-            className="group relative bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-400 shadow-sm hover:shadow-md transition-all cursor-pointer"
+            className="group relative bg-white dark:bg-blue-950 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-400 shadow-sm hover:shadow-md transition-all cursor-pointer"
           >
             <div className="flex justify-between items-start">
               <div className="flex-1 min-w-0">

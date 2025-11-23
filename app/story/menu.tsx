@@ -345,7 +345,7 @@ function AIModelSelector({
         <select
           value={currentPreset}
           onChange={(e) => handlePresetChange(e.target.value)}
-          className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-3 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
           {Object.entries(MODEL_PRESETS).map(([key, presetConfig]) => (
             <option key={key} value={key}>
@@ -472,7 +472,7 @@ function AIModelSelector({
                             );
                           }
                         }}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
@@ -513,7 +513,7 @@ function AIModelSelector({
                             );
                           }
                         }}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
@@ -554,7 +554,7 @@ function AIModelSelector({
                             );
                           }
                         }}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
@@ -609,7 +609,7 @@ function AIModelSelector({
                   value={openRouterKey}
                   onChange={(e) => setOpenRouterKey(e.target.value)}
                   placeholder="sk-or-..."
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono"
+                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono"
                 />
               </div>
               <div>
@@ -621,7 +621,7 @@ function AIModelSelector({
                   value={speechifyKey}
                   onChange={(e) => setSpeechifyKey(e.target.value)}
                   placeholder="speechify-..."
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono"
+                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono"
                 />
               </div>
             </div>
@@ -651,7 +651,7 @@ function AIModelSelector({
                               type="text"
                               value={newModelId}
                               onChange={(e) => setNewModelId(e.target.value)}
-                              className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                              className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                             />
                           </div>
                           <div>
@@ -662,7 +662,7 @@ function AIModelSelector({
                               type="text"
                               value={newModelName}
                               onChange={(e) => setNewModelName(e.target.value)}
-                              className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                              className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                             />
                           </div>
                           <div className="grid grid-cols-2 gap-2">
@@ -678,7 +678,7 @@ function AIModelSelector({
                                     parseInt(e.target.value) || 4096
                                   )
                                 }
-                                className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                                className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                               />
                             </div>
                             <div>
@@ -693,7 +693,7 @@ function AIModelSelector({
                                     parseInt(e.target.value) || 1000
                                   )
                                 }
-                                className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                                className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                               />
                             </div>
                           </div>
@@ -711,7 +711,7 @@ function AIModelSelector({
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
-                                className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                                className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                               />
                             </div>
                             <div>
@@ -727,7 +727,7 @@ function AIModelSelector({
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
-                                className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                                className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                               />
                             </div>
                           </div>
@@ -799,7 +799,7 @@ function AIModelSelector({
                       value={newModelId}
                       onChange={(e) => setNewModelId(e.target.value)}
                       placeholder="anthropic/claude-3-opus"
-                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                      className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       The API model identifier (e.g., anthropic/claude-3-opus)
@@ -814,7 +814,7 @@ function AIModelSelector({
                       value={newModelName}
                       onChange={(e) => setNewModelName(e.target.value)}
                       placeholder="Claude 3 Opus"
-                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                      className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Human-readable name shown in the model selector
@@ -832,7 +832,7 @@ function AIModelSelector({
                           setNewContextSize(parseInt(e.target.value) || 4096)
                         }
                         placeholder="4096"
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Max input tokens
@@ -849,7 +849,7 @@ function AIModelSelector({
                           setNewMaxOutput(parseInt(e.target.value) || 1000)
                         }
                         placeholder="1000"
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Max output tokens
@@ -869,7 +869,7 @@ function AIModelSelector({
                           setNewInputPrice(parseFloat(e.target.value) || 0)
                         }
                         placeholder="0.00"
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         $/M input tokens
@@ -887,7 +887,7 @@ function AIModelSelector({
                           setNewOutputPrice(parseFloat(e.target.value) || 0)
                         }
                         placeholder="0.00"
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         $/M output tokens
@@ -1466,7 +1466,7 @@ function StatsResourcesEditor({
                       setEditStat({ ...editStat, name: e.target.value })
                     }
                     placeholder="Stat name"
-                    className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <div className="relative z-50">
                     <IconPicker
@@ -1486,7 +1486,7 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="Value"
-                    className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                 </div>
                 <textarea
@@ -1495,7 +1495,7 @@ function StatsResourcesEditor({
                     setEditStat({ ...editStat, description: e.target.value })
                   }
                   placeholder="Description"
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white mb-3"
+                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white mb-3"
                   rows={2}
                 />
                 <div className="flex gap-2">
@@ -1612,7 +1612,7 @@ function StatsResourcesEditor({
                       setEditResource({ ...editResource, name: e.target.value })
                     }
                     placeholder="Resource name"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <div className="relative z-50">
                     <IconPicker
@@ -1633,7 +1633,7 @@ function StatsResourcesEditor({
                         })
                       }
                       placeholder="Current"
-                      className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                      className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     />
                     <input
                       type="number"
@@ -1645,7 +1645,7 @@ function StatsResourcesEditor({
                         })
                       }
                       placeholder="Max"
-                      className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                      className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     />
                   </div>
                   <textarea
@@ -1657,7 +1657,7 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="Description"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     rows={3}
                   />
                   <div className="flex gap-2">
@@ -1771,7 +1771,7 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="Title"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <div className="relative z-50">
                     <IconPicker
@@ -1791,7 +1791,7 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="Points"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <textarea
                     value={editAchievement.description || ""}
@@ -1802,7 +1802,7 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="Description (shown to players)"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     rows={3}
                   />
                   <input
@@ -1815,7 +1815,7 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="AI Hint (optional precise trigger conditions)"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <label className="flex items-center gap-2 text-gray-900 dark:text-white">
                     <input
@@ -2090,7 +2090,7 @@ function QuestEditor({
                       setEditQuest({ ...editQuest!, title: e.target.value })
                     }
                     placeholder="Quest Title"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <input
                     type="text"
@@ -2102,7 +2102,7 @@ function QuestEditor({
                       })
                     }
                     placeholder="Short Description"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <textarea
                     value={editQuest?.description || ""}
@@ -2113,7 +2113,7 @@ function QuestEditor({
                       })
                     }
                     placeholder="Full Description"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     rows={4}
                   />
                   <input
@@ -2126,7 +2126,7 @@ function QuestEditor({
                       })
                     }
                     placeholder="Points"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <div className="flex gap-4">
                     <label className="flex items-center gap-2 text-gray-900 dark:text-white">
@@ -2406,7 +2406,7 @@ function InventoryEditor({
                     })
                   }
                   placeholder="Item name"
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                 />
                 <div className="relative z-50">
                   <IconPicker
@@ -2430,7 +2430,7 @@ function InventoryEditor({
                       })
                     }
                     placeholder="Quantity"
-                    className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <input
                     type="text"
@@ -2446,7 +2446,7 @@ function InventoryEditor({
                       })
                     }
                     placeholder="Type"
-                    className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                 </div>
                 <textarea
@@ -2458,7 +2458,7 @@ function InventoryEditor({
                     })
                   }
                   placeholder="Description"
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   rows={3}
                 />
                 <div className="flex gap-2">
@@ -2729,7 +2729,7 @@ function LoreEditor({
                     setEditLore({ ...editLore, title: e.target.value })
                   }
                   placeholder="Lore title"
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white font-semibold"
+                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white font-semibold"
                 />
                 <textarea
                   value={editLore.content || ""}
@@ -2737,7 +2737,7 @@ function LoreEditor({
                     setEditLore({ ...editLore, content: e.target.value })
                   }
                   placeholder="Lore content (supports Markdown)"
-                  className="w-full h-32 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
+                  className="w-full h-32 px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
                   <div className="sm:col-span-2">
@@ -2754,7 +2754,7 @@ function LoreEditor({
                         })
                       }
                       placeholder="https://..."
-                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     />
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Shown in lore list and detail if provided (ideal
@@ -2876,7 +2876,7 @@ function LoreEditor({
                         <input
                           type="text"
                           placeholder="e.g., 'Found the Ancient Map'"
-                          className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                          className="flex-1 px-3 py-2 text-sm bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               const input = e.currentTarget;
@@ -2941,7 +2941,7 @@ function LoreEditor({
                         <input
                           type="text"
                           placeholder="e.g., 'Destroyed the Map'"
-                          className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                          className="flex-1 px-3 py-2 text-sm bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               const input = e.currentTarget;
@@ -3477,7 +3477,7 @@ function RelationshipsEditor({
                     })
                   }
                   placeholder="Character/Faction/Organization Name"
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white font-semibold"
+                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white font-semibold"
                 />
                 <div>
                   <label className="flex text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 items-center justify-between">
@@ -3524,7 +3524,7 @@ function RelationshipsEditor({
                     })
                   }
                   placeholder="Describe the relationship..."
-                  className="w-full h-24 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
+                  className="w-full h-24 px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
                 />
                 <div className="flex gap-2">
                   <button
@@ -3780,7 +3780,7 @@ function StoryMetaEditor({
                       })
                     }
                     placeholder="Title"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                   />
                   <textarea
                     value={editPlotBeat.content || ""}
@@ -3792,7 +3792,7 @@ function StoryMetaEditor({
                     }
                     placeholder="Content"
                     rows={3}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
+                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
                   />
                   <div>
                     <input
@@ -3808,7 +3808,7 @@ function StoryMetaEditor({
                       }
                       placeholder="Points (default: 25)"
                       min="0"
-                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
                       <DynamicIcon name="Coins" className="w-3 h-3" /> Custom
@@ -4212,7 +4212,7 @@ export default function MenuPage({
   return (
     <div className="w-full space-y-6">
       {/* Story Info Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
           <DynamicIcon name="Settings" className="w-8 h-8" /> Story Menu
         </h2>
@@ -4222,7 +4222,7 @@ export default function MenuPage({
       </div>
 
       {/* Actions Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <DynamicIcon name="Gamepad2" className="w-6 h-6" /> Actions
         </h3>
@@ -4429,7 +4429,7 @@ export default function MenuPage({
       </div>
 
       {/* Story Progress Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <DynamicIcon name="BarChart2" className="w-6 h-6" /> Story Progress
         </h3>
@@ -4515,7 +4515,7 @@ export default function MenuPage({
       </div>
 
       {/* Player Notes Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <DynamicIcon name="FileText" className="w-6 h-6" /> Player Notes
@@ -4570,7 +4570,7 @@ export default function MenuPage({
       </div>
 
       {/* Replay & Restart Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <DynamicIcon name="RefreshCw" className="w-6 h-6" /> Replay & Restart
         </h3>
@@ -4790,7 +4790,7 @@ export default function MenuPage({
       </div>
 
       {/* Story Info Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <DynamicIcon name="Info" className="w-6 h-6" /> Story Information
         </h3>
@@ -4843,7 +4843,7 @@ export default function MenuPage({
       {showSettings && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           {/* Added min-h to stabilize modal height across tab switches */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-6xl w-full border border-gray-200 dark:border-gray-700 h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-2xl max-w-6xl w-full border border-gray-200 dark:border-gray-700 h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -4870,7 +4870,7 @@ export default function MenuPage({
             </div>
 
             {/* Tabs - Made sticky with background to prevent content overlap */}
-            <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 flex gap-3 px-6 py-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto overflow-y-hidden scrollbar-thin">
+            <div className="sticky top-0 z-10 bg-white dark:bg-blue-950 flex gap-3 px-6 py-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto overflow-y-hidden scrollbar-thin">
               {[
                 { id: "basic", label: "Basic", icon: "FileText" },
                 { id: "stats", label: "Stats & Resources", icon: "BarChart2" },

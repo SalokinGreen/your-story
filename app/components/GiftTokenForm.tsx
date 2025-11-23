@@ -70,7 +70,7 @@ export default function GiftTokenForm({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
       <h3 className="text-lg sm:text-xl font-bold mb-6 flex items-center gap-2 text-gray-900 dark:text-white">
         <DynamicIcon name="Gift" className="w-6 h-6 text-pink-500" />
         Gift Credits

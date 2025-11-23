@@ -10,7 +10,7 @@ export default function QuestsPage(storyData: StoryData) {
   if (!storyData.quests || storyData.quests.length === 0) {
     return (
       <div className="w-full">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
             <DynamicIcon name="Scroll" className="w-8 h-8 text-purple-600" />{" "}
             Quests
@@ -45,7 +45,7 @@ export default function QuestsPage(storyData: StoryData) {
 
   return (
     <div className="w-full">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
           <DynamicIcon name="Scroll" className="w-8 h-8 text-purple-600" />{" "}
           Quests

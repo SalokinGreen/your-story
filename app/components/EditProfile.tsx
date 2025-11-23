@@ -151,7 +151,7 @@ export default function EditProfile({
     return (
       <button
         onClick={() => setIsEditing(true)}
-        className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+        className="px-3 py-1 text-sm bg-gray-200 dark:bg-blue-950 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
       >
         <DynamicIcon name="Edit" className="w-4 h-4" /> Edit Profile
       </button>

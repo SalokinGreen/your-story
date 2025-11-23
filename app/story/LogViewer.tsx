@@ -49,7 +49,7 @@ export default function LogViewer() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-200px)] bg-white dark:bg-blue-950 rounded-lg shadow-lg overflow-hidden">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900">
         <h3 className="font-bold text-lg text-gray-900 dark:text-white">
           Session Log
@@ -86,7 +86,7 @@ export default function LogViewer() {
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-xs bg-white dark:bg-gray-800">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-xs bg-white dark:bg-blue-950">
         {logs.length === 0 && (
           <div className="text-center text-gray-400 py-8">
             No logs recorded in this session.

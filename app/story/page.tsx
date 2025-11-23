@@ -4243,7 +4243,7 @@ function StoryPageContent() {
       <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
         <div className="max-w-4xl mx-auto">
           {/*GameOverHeader*/}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6 text-center">
+          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6 text-center">
             <h1 className="text-5xl font-bold mb-4 flex items-center justify-center gap-4">
               <DynamicIcon name="Skull" className="w-12 h-12" />
               Game Over{""}
@@ -4258,7 +4258,7 @@ function StoryPageContent() {
           </div>
 
           {/*StatsSummary*/}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6">
+          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6">
             <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
               <DynamicIcon name="BarChart2" className="w-8 h-8" />
               Final Statistics
@@ -4337,7 +4337,7 @@ function StoryPageContent() {
 
           {/*RecentAchievements*/}
           {achievedCount > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6">
+            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6">
               <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
                 <DynamicIcon name="Trophy" className="w-8 h-8" />
                 Achievements Earned
@@ -4374,7 +4374,7 @@ function StoryPageContent() {
           )}
 
           {/*ActionButtons*/}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
             <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white text-center">
               What'sNext?
             </h3>
@@ -4639,7 +4639,7 @@ function StoryPageContent() {
       <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
         <div className="max-w-4xl mx-auto">
           {/*Header*/}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 mb-6">
+          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 mb-6">
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
               {storyData.story_name}
             </h1>
@@ -4649,7 +4649,7 @@ function StoryPageContent() {
           </div>
 
           {/*PresetSelection*/}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
             <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white flex items-center gap-2">
               <DynamicIcon name="Users" className="w-8 h-8" />
               Select Your Character
@@ -4721,7 +4721,7 @@ function StoryPageContent() {
           <div className="mt-6">
             <button
               onClick={() => router.push("/library")}
-              className="px-6 py-3 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
+              className="px-6 py-3 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
             >
               <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
               Back to Library
@@ -4736,7 +4736,7 @@ function StoryPageContent() {
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8 pt-24">
       <main className="flex gap-6 w-full max-w-4xl mx-auto flex-col">
         {/*StoryHeader*/}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
           <div className="flex justify-between items-center">
             <h1 className="text-3xl sm:text-4xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               {storyData.story_name}
@@ -4750,7 +4750,7 @@ function StoryPageContent() {
           </div>
         </div>
         {/*Buttonsfornavigationandpages*/}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
           <div className="flex flex-row flex-wrap items-center justify-center sm:justify-start gap-3">
             <button
               onClick={() => setCurrentState(StoryState.STORY)}

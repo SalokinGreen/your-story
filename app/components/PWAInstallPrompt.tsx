@@ -62,7 +62,7 @@ export default function PWAInstallPrompt() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-50 animate-slide-up">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border-2 border-purple-500 p-4">
+      <div className="bg-white dark:bg-blue-950 rounded-xl shadow-2xl border-2 border-purple-500 p-4">
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center">
             <DynamicIcon name="Download" className="w-6 h-6 text-white" />

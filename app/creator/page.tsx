@@ -2651,7 +2651,7 @@ function AdventureCreatorContent() {
                     className={`relative p-5 rounded-xl border-2 transition-all ${
                       isSelected
                         ? "bg-purple-100 dark:bg-purple-900/30 border-purple-500 dark:border-purple-400 ring-4 ring-purple-300 dark:ring-purple-700"
-                        : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                        : "bg-white dark:bg-blue-950 border-gray-300 dark:border-gray-600"
                     }`}
                   >
                     <button
@@ -2951,7 +2951,7 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
                 Add New Stat
               </h3>
@@ -3050,7 +3050,7 @@ function AdventureCreatorContent() {
                             onChange={(e) =>
                               setEditStat({ ...editStat, name: e.target.value })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div>
@@ -3082,7 +3082,7 @@ function AdventureCreatorContent() {
                                 value: parseInt(e.target.value) || 0,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -3098,7 +3098,7 @@ function AdventureCreatorContent() {
                                 description: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                       </div>
@@ -3213,7 +3213,7 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
                 Add New Resource
               </h3>
@@ -3334,7 +3334,7 @@ function AdventureCreatorContent() {
                                 name: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div>
@@ -3365,7 +3365,7 @@ function AdventureCreatorContent() {
                                 value: parseInt(e.target.value) || 0,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div>
@@ -3382,7 +3382,7 @@ function AdventureCreatorContent() {
                                 maxValue: parseInt(e.target.value) || 1,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -3398,7 +3398,7 @@ function AdventureCreatorContent() {
                                 description: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                       </div>
@@ -3518,7 +3518,7 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
                 Add Starting Item
               </h3>
@@ -3643,7 +3643,7 @@ function AdventureCreatorContent() {
                                 name: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div>
@@ -3674,7 +3674,7 @@ function AdventureCreatorContent() {
                                 quantity: parseInt(e.target.value) || 1,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div>
@@ -3689,7 +3689,7 @@ function AdventureCreatorContent() {
                                 type: e.target.value as any,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           >
                             <option value="weapon">Weapon</option>
                             <option value="armor">Armor</option>
@@ -3710,7 +3710,7 @@ function AdventureCreatorContent() {
                                 description: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                       </div>
@@ -3829,7 +3829,7 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
                 Add Lore Entry
               </h3>
@@ -5349,7 +5349,7 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
                 Add Relationship
               </h3>
@@ -5720,7 +5720,7 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
                 Add Achievement
               </h3>
@@ -5884,7 +5884,7 @@ function AdventureCreatorContent() {
                                 title: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div>
@@ -5915,7 +5915,7 @@ function AdventureCreatorContent() {
                                 points: parseInt(e.target.value) || 10,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -5934,7 +5934,7 @@ function AdventureCreatorContent() {
                                 description: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -5954,7 +5954,7 @@ function AdventureCreatorContent() {
                               })
                             }
                             placeholder="Precise trigger conditions for AI"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -6019,7 +6019,7 @@ function AdventureCreatorContent() {
                       <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
                         <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
-                      <div className="p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <div className="p-2 bg-white dark:bg-blue-950 rounded-lg border border-gray-200 dark:border-gray-700">
                         <DynamicIcon
                           name={achievement.symbol || "Trophy"}
                           className="w-8 h-8 text-amber-600 dark:text-amber-400"
@@ -6106,7 +6106,7 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
                 Add Plot Beat
               </h3>
@@ -6381,7 +6381,7 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
               <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
                 Add Quest
               </h3>
@@ -6564,7 +6564,7 @@ function AdventureCreatorContent() {
                                 title: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -6580,7 +6580,7 @@ function AdventureCreatorContent() {
                                 shortDescription: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -6596,7 +6596,7 @@ function AdventureCreatorContent() {
                               })
                             }
                             rows={3}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm resize-none"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm resize-none"
                           />
                         </div>
                         <div>
@@ -6613,7 +6613,7 @@ function AdventureCreatorContent() {
                                 points: parseInt(e.target.value) || 10,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
                           />
                         </div>
                         <div className="flex items-center gap-4">
@@ -6853,7 +6853,7 @@ function AdventureCreatorContent() {
             </div>
 
             {/* Master Toggle */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
@@ -6883,7 +6883,7 @@ function AdventureCreatorContent() {
             {upgradeSettings.enabled && (
               <>
                 {/* Stat Upgrades */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                       📊 Stat Upgrades
@@ -6952,7 +6952,7 @@ function AdventureCreatorContent() {
                 </div>
 
                 {/* Resource Upgrades */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                       ⚡ Resource Upgrades
@@ -7021,7 +7021,7 @@ function AdventureCreatorContent() {
                 </div>
 
                 {/* Add Item */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                       🎒 Add Custom Items
@@ -7067,7 +7067,7 @@ function AdventureCreatorContent() {
                 </div>
 
                 {/* Stat Shop */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                       <DynamicIcon name="Store" className="w-5 h-5" /> Stat Shop
@@ -7224,7 +7224,7 @@ function AdventureCreatorContent() {
                 </div>
 
                 {/* Resource Shop */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                       <DynamicIcon name="ShoppingCart" className="w-5 h-5" />{" "}
@@ -7418,7 +7418,7 @@ function AdventureCreatorContent() {
                 </div>
 
                 {/* Item Shop */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                       <DynamicIcon name="Store" className="w-5 h-5" /> Item Shop
@@ -7626,7 +7626,7 @@ function AdventureCreatorContent() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
               <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
                 Summary
               </h3>
@@ -7725,7 +7725,7 @@ function AdventureCreatorContent() {
             </div>
 
             {intro && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+              <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
                 <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
                   Opening Scene
                 </h3>
@@ -7796,7 +7796,7 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Progress Steps */}
-        <div className="mb-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 overflow-x-auto">
+        <div className="mb-8 bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 overflow-x-auto">
           <div className="flex gap-2 min-w-max">
             {steps.map((step, index) => (
               <button
@@ -7818,7 +7818,7 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Content */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 mb-8">
+        <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 mb-8">
           <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
             {steps.find((s) => s.id === currentStep)?.label}
           </h2>
@@ -7826,7 +7826,7 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Navigation */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 mb-8">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 mb-8">
           <button
             onClick={() => {
               const prevIndex = Math.max(0, currentStepIndex - 1);

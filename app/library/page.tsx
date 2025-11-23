@@ -783,7 +783,7 @@ export default function LibraryPage() {
             className={`px-6 py-3 font-semibold rounded-lg transition-all shadow-md ${
               view === "stories"
                 ? "bg-purple-600 text-white"
-                : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
+                : "bg-white dark:bg-blue-950 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
             }`}
           >
             <DynamicIcon name="Book" className="w-5 h-5 inline-block mr-2" />
@@ -799,7 +799,7 @@ export default function LibraryPage() {
             className={`px-6 py-3 font-semibold rounded-lg transition-all shadow-md ${
               view === "adventures"
                 ? "bg-purple-600 text-white"
-                : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
+                : "bg-white dark:bg-blue-950 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
             }`}
           >
             <DynamicIcon
@@ -824,7 +824,7 @@ export default function LibraryPage() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Folders Sidebar */}
             <div className="lg:col-span-1">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 sticky top-4">
+              <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 sticky top-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
                     <DynamicIcon name="Folder" className="w-5 h-5" /> Folders
@@ -919,7 +919,7 @@ export default function LibraryPage() {
               />
 
               {/* Stories Filters */}
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-6 border border-gray-200 dark:border-gray-700">
+              <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 mb-6 border border-gray-200 dark:border-gray-700">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Search */}
                   <div>
@@ -1006,7 +1006,7 @@ export default function LibraryPage() {
               {/* Mass Operations Toolbar */}
               {(filteredStories.length > 0 ||
                 filteredLocalStories.length > 0) && (
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 mb-6 border border-gray-200 dark:border-gray-700">
+                <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 mb-6 border border-gray-200 dark:border-gray-700">
                   {!selectionMode ? (
                     <button
                       onClick={toggleSelectionMode}
@@ -1048,7 +1048,7 @@ export default function LibraryPage() {
                               Move to Folder
                             </button>
                             {showMassMoveDropdown && (
-                              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg shadow-xl p-2 min-w-[200px] z-50">
+                              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 rounded-lg shadow-xl p-2 min-w-[200px] z-50">
                                 <button
                                   onClick={() => {
                                     handleMassMove(null);
@@ -1108,7 +1108,7 @@ export default function LibraryPage() {
               <div className="space-y-4">
                 {filteredStories.length === 0 &&
                 filteredLocalStories.length === 0 ? (
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-700">
+                  <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-700">
                     <div className="flex justify-center mb-4">
                       <DynamicIcon
                         name="BookOpen"
@@ -1147,8 +1147,8 @@ export default function LibraryPage() {
                         selectionMode
                           ? selectedStories.has(story.id)
                             ? "bg-purple-50 dark:bg-purple-900/20 border-purple-500 dark:border-purple-400 shadow-purple-200 dark:shadow-purple-900"
-                            : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-2xl"
-                          : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-2xl"
+                            : "bg-white dark:bg-blue-950 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-2xl"
+                          : "bg-white dark:bg-blue-950 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-2xl"
                       } active:scale-[0.98]`}
                     >
                       <div className="p-6">
@@ -1279,8 +1279,8 @@ export default function LibraryPage() {
                       selectionMode
                         ? selectedStories.has(story.id)
                           ? "bg-purple-50 dark:bg-purple-900/20 border-purple-500 dark:border-purple-400 shadow-purple-200 dark:shadow-purple-900"
-                          : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-2xl"
-                        : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-2xl"
+                          : "bg-white dark:bg-blue-950 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-2xl"
+                        : "bg-white dark:bg-blue-950 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-2xl"
                     } active:scale-[0.98]`}
                   >
                     <div className="p-6">
@@ -1365,7 +1365,7 @@ export default function LibraryPage() {
         ) : (
           <div>
             {/* Adventures Filters */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-6 border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 mb-6 border border-gray-200 dark:border-gray-700">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Search */}
                 <div>
@@ -1461,7 +1461,7 @@ export default function LibraryPage() {
               </div>
               {filteredAdventures.length === 0 &&
               localAdventures.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-700">
+                <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-700">
                   <div className="flex justify-center mb-4">
                     <DynamicIcon
                       name="Gamepad2"
@@ -1492,7 +1492,7 @@ export default function LibraryPage() {
                   {filteredAdventures.map((adventure) => (
                     <div
                       key={adventure.id}
-                      className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
+                      className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
                     >
                       {/* Thumbnail */}
                       {adventure.thumbnailUrl ? (
@@ -1600,7 +1600,7 @@ export default function LibraryPage() {
                   {localAdventures.map((adventure) => (
                     <div
                       key={adventure.id}
-                      className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
+                      className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
                     >
                       {/* Thumbnail */}
                       {adventure.adventureData.thumbnailUrl ? (
@@ -1707,7 +1707,7 @@ export default function LibraryPage() {
       {/* Folder Management Dialogs */}
       {showNewFolderDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+          <div className="bg-white dark:bg-blue-950 rounded-lg p-6 max-w-md w-full">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Create New Folder
             </h2>
@@ -1771,7 +1771,7 @@ export default function LibraryPage() {
 
       {editingFolder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+          <div className="bg-white dark:bg-blue-950 rounded-lg p-6 max-w-md w-full">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Edit Folder
             </h2>
@@ -1850,7 +1850,7 @@ export default function LibraryPage() {
 
       {movingStory && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+          <div className="bg-white dark:bg-blue-950 rounded-lg p-6 max-w-md w-full">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Move to Folder
             </h2>

@@ -55,7 +55,7 @@ export default function SiteHeader() {
   const isActive = (path: string) => pathname === path;
 
   return (
-    <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 border-b-2 border-gray-200 dark:border-gray-700 shadow-md">
+    <header className="sticky top-0 z-50 bg-white dark:bg-blue-950 border-b-2 border-gray-200 dark:border-gray-700 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo/Brand */}

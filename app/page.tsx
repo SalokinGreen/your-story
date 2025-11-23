@@ -28,7 +28,7 @@ function InfoTabs() {
     <div className="w-full max-w-5xl mb-12">
       {/* Tab Navigation */}
       <div className="flex justify-center mb-8 px-2">
-        <div className="inline-flex flex-wrap justify-center bg-white dark:bg-gray-800 rounded-xl shadow-lg p-1 border border-gray-200 dark:border-gray-700 gap-1">
+        <div className="inline-flex flex-wrap justify-center bg-white dark:bg-blue-950 rounded-xl shadow-lg p-1 border border-gray-200 dark:border-gray-700 gap-1">
           <button
             onClick={() => setActiveTab("models")}
             className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
@@ -80,7 +80,7 @@ function InfoTabs() {
               {Object.entries(AI_MODELS).map(([key, model]) => (
                 <div
                   key={key}
-                  className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:scale-105 transition-transform"
+                  className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:scale-105 transition-transform"
                 >
                   <div className="bg-linear-to-r from-purple-600 to-blue-600 p-4 text-white">
                     <h3 className="text-2xl font-bold mb-1">{model.name}</h3>
@@ -181,7 +181,7 @@ function InfoTabs() {
             </p>
 
             {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+            <div className="hidden md:block overflow-x-auto bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
               <table className="w-full text-left">
                 <thead className="bg-linear-to-r from-blue-600 to-purple-600 text-white">
                   <tr>
@@ -251,7 +251,7 @@ function InfoTabs() {
               {packages.map((pkg, index) => (
                 <div
                   key={pkg.name}
-                  className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-2 ${
+                  className={`bg-white dark:bg-blue-950 rounded-xl shadow-lg p-6 border-2 ${
                     index === 2
                       ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
                       : "border-gray-200 dark:border-gray-700"
@@ -369,7 +369,7 @@ function InfoTabs() {
 
               <div className="p-8 sm:p-12">
                 <div className="grid md:grid-cols-2 gap-6 mb-8">
-                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                  <div className="bg-white dark:bg-blue-950 rounded-xl p-6 shadow-lg">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="text-3xl">
                         <DynamicIcon name="Bot" className="w-8 h-8" />
@@ -414,7 +414,7 @@ function InfoTabs() {
                     </ul>
                   </div>
 
-                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                  <div className="bg-white dark:bg-blue-950 rounded-xl p-6 shadow-lg">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="text-3xl">
                         <DynamicIcon name="Mic" className="w-8 h-8" />
@@ -587,7 +587,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-wrap justify-center gap-4 mb-8">
-            <div className="px-6 py-3 bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center gap-2">
+            <div className="px-6 py-3 bg-white dark:bg-blue-950 rounded-lg shadow-md flex items-center gap-2">
               <div className="text-blue-600 dark:text-blue-400">
                 <DynamicIcon name="BookOpen" className="w-6 h-6" />
               </div>
@@ -595,7 +595,7 @@ export default function Home() {
                 Author curated
               </div>
             </div>
-            <div className="px-6 py-3 bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center gap-2">
+            <div className="px-6 py-3 bg-white dark:bg-blue-950 rounded-lg shadow-md flex items-center gap-2">
               <div className="text-purple-600 dark:text-purple-400">
                 <DynamicIcon name="Zap" className="w-6 h-6" />
               </div>
@@ -603,7 +603,7 @@ export default function Home() {
                 AI-Powered
               </div>
             </div>
-            <div className="px-6 py-3 bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center gap-2">
+            <div className="px-6 py-3 bg-white dark:bg-blue-950 rounded-lg shadow-md flex items-center gap-2">
               <div className="text-pink-600 dark:text-pink-400">
                 <DynamicIcon name="Gamepad2" className="w-6 h-6" />
               </div>
@@ -617,7 +617,7 @@ export default function Home() {
         {/* Auth Section */}
         {!loading && (
           <div className="w-full max-w-md mb-12">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
               {user ? <UserProfile /> : <AuthForm />}
             </div>
           </div>
@@ -645,7 +645,7 @@ export default function Home() {
                 .map((_, i) => (
                   <div
                     key={i}
-                    className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse"
+                    className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse"
                   >
                     <div className="h-48 bg-gray-300 dark:bg-gray-700"></div>
                     <div className="p-6 space-y-3">
@@ -664,7 +664,7 @@ export default function Home() {
                 <div
                   key={adventure.id}
                   onClick={() => router.push(`/explorer/${adventure.id}`)}
-                  className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer hover:scale-105 transition-transform"
+                  className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer hover:scale-105 transition-transform"
                 >
                   {/* Thumbnail with fallback to gradient */}
                   {adventure.thumbnailUrl ? (
@@ -790,7 +790,7 @@ export default function Home() {
                 {road_map.map((milestone, index) => (
                   <div key={index} className="w-full shrink-0 px-4">
                     <div
-                      className={`mx-auto max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl border-2 overflow-hidden transition-all ${
+                      className={`mx-auto max-w-2xl bg-white dark:bg-blue-950 rounded-2xl shadow-xl border-2 overflow-hidden transition-all ${
                         milestone.status === "done"
                           ? "border-green-500 dark:border-green-400"
                           : milestone.status === "wip"

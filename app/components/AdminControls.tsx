@@ -163,7 +163,7 @@ export default function AdminControls({
 
       <div className="space-y-6">
         {/* Mint Credits Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-red-200 dark:border-red-800">
+        <div className="bg-white dark:bg-blue-950 rounded-lg p-5 border border-red-200 dark:border-red-800">
           <form onSubmit={handleMint} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <label
@@ -203,7 +203,7 @@ export default function AdminControls({
         <div className="border-t-2 border-red-300 dark:border-red-700"></div>
 
         {/* Remove Credits Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-red-200 dark:border-red-800">
+        <div className="bg-white dark:bg-blue-950 rounded-lg p-5 border border-red-200 dark:border-red-800">
           <form onSubmit={handleRemove} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <label
@@ -242,7 +242,7 @@ export default function AdminControls({
         </div>
 
         {/* Change Role Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-red-200 dark:border-red-800">
+        <div className="bg-white dark:bg-blue-950 rounded-lg p-5 border border-red-200 dark:border-red-800">
           <form onSubmit={handleRoleChange} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <label
