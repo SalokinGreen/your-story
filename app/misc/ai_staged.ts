@@ -1,0 +1,381 @@
+import { StoryData, Choice, CommandResponse } from "@/app/misc/structs";
+import { getRPGSystem } from "@/app/misc/rpgSystems";
+import { formatResponsesForAI } from "@/app/misc/commandResponses";
+
+export type ChatMessage = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  tool_calls?: any[];
+  tool_call_id?: string;
+};
+
+// Cleans text by removing problematic characters and normalizing whitespace
+function cleanString(text: string): string {
+  return text
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g, " ")
+    .replace(/ {2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/^[ \t]+/gm, "")
+    .trim();
+}
+
+// Build info message - shared across all stages
+export function buildInfoMessage(storyData: StoryData): string {
+  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+
+  // Build stats section
+  const statsSection = storyData.stats.length
+    ? `Stats:\n${storyData.stats
+        .map(
+          (s) =>
+            `- ${s.name}: ${s.value}${
+              s.description ? ` (${s.description})` : ""
+            }`
+        )
+        .join("\n")}`
+    : "";
+
+  // Build resources section
+  const resourcesSection = storyData.resources.length
+    ? `Resources:\n${storyData.resources
+        .map(
+          (r) =>
+            `- ${r.name}: ${r.value}/${r.maxValue}${
+              r.description ? ` (${r.description})` : ""
+            }`
+        )
+        .join("\n")}`
+    : "";
+
+  // Build inventory section
+  const inventorySection = storyData.inventory.length
+    ? `Inventory:\n${storyData.inventory
+        .map((i) => {
+          const typeLabel = i.type ? ` [${i.type}]` : "";
+          const desc = i.description ? ` - ${i.description}` : "";
+          return `- ${i.name}${typeLabel} x${i.quantity}${desc}`;
+        })
+        .join("\n")}`
+    : "Inventory: Empty";
+
+  // Build achievements section - show LOCKED achievements with ai_hint
+  const lockedAchievements = storyData.achievements.filter(
+    (a) => !a.dateAchieved
+  );
+  const achievementsSection = lockedAchievements.length
+    ? `Locked Achievements (trigger when conditions met):\n${lockedAchievements
+        .map((a) => `- ${a.title}: ${a.ai_hint || a.description}`)
+        .join("\n")}`
+    : "";
+
+  // Build lore section - only send lore where on !== false
+  const activeLore = storyData.lore.filter((l) => l.on !== false);
+  const loreSection = activeLore.length
+    ? `Lore:\n${activeLore
+        .map((l) => `- ${l.title}: ${cleanString(l.content)}`)
+        .join("\n")}`
+    : "";
+
+  // Build memory section
+  const memorySection = storyData.memory.length
+    ? `Memory (story developments so far):\n${storyData.memory
+        .map((m) => `- ${m}`)
+        .join("\n")}`
+    : "";
+
+  // Build plot beats section
+  const unfulfilledBeats = storyData.plot_beats.filter((b) => !b.fulfilled);
+  const plotBeatsSection = unfulfilledBeats.length
+    ? `Unfulfilled Plot Beats (important story goals to work toward):\n${unfulfilledBeats
+        .map((b) => `- ${b.title}: ${cleanString(b.content)}`)
+        .join("\n")}`
+    : "";
+
+  // Build relationships section if any exist
+  const relationshipsSection =
+    storyData.relationships && storyData.relationships.length > 0
+      ? `Relationships:\n${storyData.relationships
+          .map(
+            (r) =>
+              `- ${r.name}: ${r.value} (${r.description || "No description"})`
+          )
+          .join("\n")}`
+      : "";
+
+  // Build quests section if any exist
+  const activeQuests = storyData.quests?.filter((q) => q.active) || [];
+  const questsSection = activeQuests.length
+    ? `Active Quests:\n${activeQuests
+        .map((q) => `- ${q.title}: ${q.description}`)
+        .join("\n")}`
+    : "";
+
+  // Combine all sections
+  const sections = [
+    `Story: ${cleanString(storyData.story_name || "Untitled Story")}`,
+    `Premise: ${cleanString(storyData.premise || "")}`,
+    `Player: ${cleanString(storyData.player_name || "Hero")}${
+      storyData.player_summary
+        ? ` - ${cleanString(storyData.player_summary)}`
+        : ""
+    }`,
+    rpgSystem.id !== "3d6"
+      ? `RPG System: ${rpgSystem.name} - ${rpgSystem.description}`
+      : "",
+    statsSection,
+    resourcesSection,
+    inventorySection,
+    achievementsSection,
+    loreSection,
+    memorySection,
+    plotBeatsSection,
+    relationshipsSection,
+    questsSection,
+    storyData.author_notes
+      ? `Author Notes: ${cleanString(storyData.author_notes)}`
+      : "",
+    storyData.player_notes
+      ? `Player Notes: ${cleanString(storyData.player_notes)}`
+      : "",
+    storyData.momentum !== undefined
+      ? `Momentum: ${storyData.momentum}/${
+          storyData.maxMomentum || 3
+        } (spend for rerolls/guaranteed success)`
+      : "",
+    storyData.points !== undefined
+      ? `Progression Points: ${storyData.points} (spend on upgrades)`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  return cleanString(sections);
+}
+
+// Stage 1: Story narration only
+export function buildStoryPrompt({
+  storyData,
+  userChoice,
+  commandResponses,
+}: {
+  storyData: StoryData;
+  userChoice?: string;
+  commandResponses?: CommandResponse[];
+}): { messages: ChatMessage[] } {
+  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+
+  const systemPrompt = `You are a creative narrative engine for an interactive text-based adventure game.
+Your role is to write ONLY the story prose - no game mechanics, no choices, no commands.
+
+Writing Guidelines:
+- Write in the style of interactive fiction - immersive, vivid, present-tense
+- Address the player as "you" (second person)
+- Show don't tell - use sensory details and specific descriptions
+- Match the tone and genre established in the story premise
+- Build tension and consequences from previous actions
+- Create dramatic moments that flow naturally from the current situation
+- DO NOT include choices, game mechanics, or commands - ONLY write narrative prose
+- DO NOT worry about triggering achievements or updating game state - focus purely on storytelling
+
+${
+  commandResponses && commandResponses.length > 0
+    ? `\nCommand Feedback from previous actions:\n${formatResponsesForAI(
+        commandResponses
+      )}\n`
+    : ""
+}`;
+
+  const infoMessage = buildInfoMessage(storyData);
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: cleanString(systemPrompt) },
+    { role: "user", content: cleanString(infoMessage) },
+  ];
+
+  // Add conversation history with full context
+  for (const part of storyData.scene.parts) {
+    if (part.user) {
+      messages.push({
+        role: "user",
+        content: cleanString(part.content),
+      });
+    } else {
+      const assistantContent = part.raw || part.content;
+      const message: ChatMessage = {
+        role: "assistant",
+        content: cleanString(assistantContent),
+      };
+
+      if (part.toolCalls && part.toolCalls.length > 0) {
+        message.tool_calls = part.toolCalls;
+      }
+
+      messages.push(message);
+
+      if (part.toolResponses && part.toolResponses.length > 0) {
+        for (const response of part.toolResponses) {
+          messages.push({
+            role: "tool",
+            content: cleanString(
+              `${
+                response.success ? "✓" : response.success === false ? "✗" : "⚠"
+              } ${response.message}`
+            ),
+            tool_call_id: response.toolCallId,
+          });
+        }
+      }
+    }
+  }
+
+  // Add user choice if present
+  if (userChoice) {
+    messages.push({
+      role: "user",
+      content: cleanString(`Player chose: ${userChoice}`),
+    });
+  }
+
+  return { messages };
+}
+
+// Stage 2a: Tool calls / game state changes
+export function buildToolPrompt({
+  storyData,
+  storyContent,
+  commandResponses,
+}: {
+  storyData: StoryData;
+  storyContent: string; // The story text just generated
+  commandResponses?: CommandResponse[];
+}): { messages: ChatMessage[] } {
+  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+
+  const systemPrompt = `You are a game mechanics analyzer for an interactive text-based adventure game.
+Your role is to determine what game state changes should happen based on the narrative that was just written.
+
+You have access to various tools (functions) to modify game state. Use them to:
+- Add/remove items from inventory
+- Change stats and resources
+- Track quests and achievements
+- Manage relationships
+- Add memory entries for important story developments
+- Update lore and plot beats
+
+⚠️ EXACT NAME MATCHING REQUIREMENT:
+When referencing skills, resources, items, achievements, quests, or relationships, you MUST use the EXACT names as they appear in the game state.
+- Copy exact spelling, capitalization, and punctuation
+- Do NOT paraphrase, abbreviate, or modify names
+- The system uses exact string matching and will fail if names don't match perfectly
+
+Guidelines:
+- Only use tools for clear, explicit changes in the story
+- Don't unlock achievements unless their trigger conditions are explicitly met
+- Track resource and stat changes that result from story events
+- Use add_memory for important story developments with specific details
+- Add quest objectives as they're discovered or mentioned
+- Add lore entries for world-building information revealed in the story
+- Use game_over tool if the story clearly ends (death, complete victory, etc.)
+
+Memory Guidelines:
+- Add NEW memory entries that don't already exist in the Memory section
+- Make entries DETAILED and SPECIFIC with names, locations, consequences, emotional context
+- Track important story developments, character actions, world changes
+- BAD: "Met a merchant" GOOD: "Met Aldric, a suspicious merchant in Darkwater who tried to sell cursed artifacts and fled when confronted"
+
+${
+  commandResponses && commandResponses.length > 0
+    ? `\nPrevious Command Feedback:\n${formatResponsesForAI(
+        commandResponses
+      )}\n`
+    : ""
+}`;
+
+  const infoMessage = buildInfoMessage(storyData);
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: cleanString(systemPrompt) },
+    { role: "user", content: cleanString(infoMessage) },
+    {
+      role: "user",
+      content: cleanString(
+        `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen?`
+      ),
+    },
+  ];
+
+  return { messages };
+}
+
+// Stage 2b: Choices generation
+export function buildChoicesPrompt({
+  storyData,
+  storyContent,
+}: {
+  storyData: StoryData;
+  storyContent: string; // The story text just generated
+}): { messages: ChatMessage[] } {
+  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+
+  const systemPrompt = `You are a choice designer for an interactive text-based adventure game.
+Your role is to create meaningful player choices based on the narrative that was just written.
+
+OUTPUT FORMAT:
+Return a plain list of choices, one per line, starting with a dash:
+\`\`\`
+- Choice 1
+- Choice 2
+- Choice 3
+\`\`\`
+
+Choice Syntax:
+${rpgSystem.aiInstructions.choiceSyntax}
+
+⚠️ EXACT NAME MATCHING REQUIREMENT:
+When referencing skills, resources, or items in choices, you MUST use the EXACT names as they appear in the game state below.
+- Copy exact spelling, capitalization, and punctuation from Stats, Resources, and Inventory
+- Do NOT paraphrase, abbreviate, or modify names
+
+Resource System:
+- When a choice uses a resource (use_resource), that resource is AUTOMATICALLY at risk if the skill check fails
+- Choose resources that thematically fit the action
+- Resource requirements are DYNAMIC based on DC:
+  * Required amount: DC ÷ ${rpgSystem.resources.requiredDivisor} (minimum ${rpgSystem.resources.minRequired})
+  * On failure: loses DC ÷ ${rpgSystem.resources.lossDivisor} points (minimum ${rpgSystem.resources.minLoss})
+  * On success: RECOVERS DC ÷ ${rpgSystem.resources.recoverDivisor} points (minimum ${rpgSystem.resources.minRecover})
+
+Item Types:
+- normal: Advantage on use, breaks on failure (tools, weapons, armor)
+- consumable: Advantage on use, consumed immediately (potions, scrolls, ammunition)
+- story: Advantage on use, never breaks/consumed (quest items, artifacts, keys)
+- misc: Prevents disadvantage only, never breaks/consumed (rope, torches, rations)
+
+Choice Design Guidelines:
+- Offer 6-8 meaningful choices that reflect different approaches or priorities
+- Each choice should have clear stakes and potential consequences
+- Use skill checks for challenging actions (combat, persuasion, acrobatics, etc.)
+- Use items for tactical advantages when appropriate
+- Use resources for risky or exhausting actions
+- Balance risk vs reward - higher DCs should offer better outcomes
+- Include at least one "safe" option and one "risky but rewarding" option
+- Make choices reflect the player's agency and the current story situation
+- Avoid dead-end choices that just lead to "Continue..."
+`;
+
+  const infoMessage = buildInfoMessage(storyData);
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: cleanString(systemPrompt) },
+    { role: "user", content: cleanString(infoMessage) },
+    {
+      role: "user",
+      content: cleanString(
+        `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?`
+      ),
+    },
+  ];
+
+  return { messages };
+}

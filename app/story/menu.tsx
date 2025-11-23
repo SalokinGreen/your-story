@@ -58,6 +58,34 @@ function AIModelSelector({
     return true;
   });
 
+  const [stagedModeEnabled, setStagedModeEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("aiStagedMode") === "true"; // Default false
+    }
+    return false;
+  });
+
+  // Staged mode model configuration
+  const [showModelConfig, setShowModelConfig] = useState(false);
+  const [storyModel, setStoryModel] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("aiModelStory") || "";
+    }
+    return "";
+  });
+  const [toolsModel, setToolsModel] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("aiModelTools") || "";
+    }
+    return "";
+  });
+  const [choicesModel, setChoicesModel] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("aiModelChoices") || "";
+    }
+    return "";
+  });
+
   // Custom Models State (array of models)
   const [customModels, setCustomModels] = useState<CustomModel[]>([]);
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
@@ -101,6 +129,25 @@ function AIModelSelector({
         .finally(() => setIsLoadingSettings(false));
     }
   }, [user, hasLoadedSettings]);
+
+  // Persist stage model selections to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aiModelStory", storyModel);
+    }
+  }, [storyModel]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aiModelTools", toolsModel);
+    }
+  }, [toolsModel]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aiModelChoices", choicesModel);
+    }
+  }, [choicesModel]);
 
   const handleAddModel = () => {
     if (!newModelId || !newModelName) {
@@ -418,6 +465,171 @@ function AIModelSelector({
                 />
               </button>
             </div>
+
+            {/* Staged Generation Mode Toggle */}
+            <div className="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    Staged Generation Mode
+                  </span>
+                  <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs font-semibold rounded">
+                    ~2x cost
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Generate story, tools, and choices separately for better
+                  quality
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const newValue = !stagedModeEnabled;
+                  setStagedModeEnabled(newValue);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("aiStagedMode", String(newValue));
+                  }
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  stagedModeEnabled ? "bg-orange-600" : "bg-gray-400"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    stagedModeEnabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Staged Mode Model Configuration */}
+            {stagedModeEnabled && (
+              <div className="space-y-3 border-t border-gray-200 dark:border-gray-600 pt-3">
+                <button
+                  onClick={() => setShowModelConfig(!showModelConfig)}
+                  className="flex items-center justify-between w-full text-left"
+                >
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Configure Stage Models
+                  </h4>
+                  <DynamicIcon
+                    name={showModelConfig ? "ChevronUp" : "ChevronDown"}
+                    className="w-4 h-4 text-gray-500"
+                  />
+                </button>
+
+                {showModelConfig && (
+                  <div className="space-y-4 pl-2">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Choose different models for each generation stage. Empty
+                      = use main model.
+                    </p>
+
+                    {/* Story Model Selector */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                        Story Narration Model
+                      </label>
+                      <select
+                        value={storyModel}
+                        onChange={(e) => setStoryModel(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      >
+                        <option value="">Use Main Model</option>
+                        {Object.entries(AI_MODELS).map(([key, config]) => (
+                          <option key={key} value={key}>
+                            {config.name} - {config.original_model} (
+                            {config.cost} coin
+                            {config.cost > 1 ? "s" : ""},{" "}
+                            {(config.maxTokens / 1000).toFixed(0)}K)
+                          </option>
+                        ))}
+                        {isSubscriber &&
+                          byokEnabled &&
+                          customModels.length > 0 && (
+                            <optgroup label="Custom Models (BYOK)">
+                              {customModels.map((model) => (
+                                <option key={model.id} value={model.id}>
+                                  {model.name} - {model.modelId} (FREE,{" "}
+                                  {(model.contextSize / 1000).toFixed(0)}K)
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                      </select>
+                    </div>
+
+                    {/* Tools Model Selector */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                        Tools & Game State Model
+                      </label>
+                      <select
+                        value={toolsModel}
+                        onChange={(e) => setToolsModel(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      >
+                        <option value="">Use Main Model</option>
+                        {Object.entries(AI_MODELS).map(([key, config]) => (
+                          <option key={key} value={key}>
+                            {config.name} - {config.original_model} (
+                            {config.cost} coin
+                            {config.cost > 1 ? "s" : ""},{" "}
+                            {(config.maxTokens / 1000).toFixed(0)}K)
+                          </option>
+                        ))}
+                        {isSubscriber &&
+                          byokEnabled &&
+                          customModels.length > 0 && (
+                            <optgroup label="Custom Models (BYOK)">
+                              {customModels.map((model) => (
+                                <option key={model.id} value={model.id}>
+                                  {model.name} - {model.modelId} (FREE,{" "}
+                                  {(model.contextSize / 1000).toFixed(0)}K)
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                      </select>
+                    </div>
+
+                    {/* Choices Model Selector */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                        Player Choices Model
+                      </label>
+                      <select
+                        value={choicesModel}
+                        onChange={(e) => setChoicesModel(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      >
+                        <option value="">Use Main Model</option>
+                        {Object.entries(AI_MODELS).map(([key, config]) => (
+                          <option key={key} value={key}>
+                            {config.name} - {config.original_model} (
+                            {config.cost} coin
+                            {config.cost > 1 ? "s" : ""},{" "}
+                            {(config.maxTokens / 1000).toFixed(0)}K)
+                          </option>
+                        ))}
+                        {isSubscriber &&
+                          byokEnabled &&
+                          customModels.length > 0 && (
+                            <optgroup label="Custom Models (BYOK)">
+                              {customModels.map((model) => (
+                                <option key={model.id} value={model.id}>
+                                  {model.name} - {model.modelId} (FREE,{" "}
+                                  {(model.contextSize / 1000).toFixed(0)}K)
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* API Keys */}
             <div className="space-y-3">

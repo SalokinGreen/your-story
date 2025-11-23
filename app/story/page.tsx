@@ -1950,9 +1950,11 @@ function StoryPageContent() {
         : "deep-seek/deepseek-chat";
     const modelConfig = getModelConfig(modelKey);
 
-    // Dynamic memory cap: 1/4 of context window (approx 4 chars per token)
+    // Dynamic memory cap: Reserve maxOutputTokens, then use 25% of remaining for memory
     const CHARS_PER_TOKEN = 4;
-    const memory_cap = modelConfig.maxTokens * 0.25 * CHARS_PER_TOKEN;
+    const availableInputTokens =
+      modelConfig.maxTokens - modelConfig.maxOutputTokens;
+    const memory_cap = availableInputTokens * 0.25 * CHARS_PER_TOKEN;
 
     //Removeduplicateentriesfrommemory
     let addedItems = new Set<string>();
@@ -2021,8 +2023,11 @@ function StoryPageContent() {
         : "deep-seek/deepseek-chat";
     const modelConfig = getModelConfig(modelKey);
 
-    //Estimateneededcharacters(tokens*4).Sendabitmoretobesafe.
-    const neededChars = modelConfig.maxTokens * 5;
+    // Reserve maxOutputTokens, then split remaining: 75% history, 25% memory (4 chars per token)
+    const CHARS_PER_TOKEN = 4;
+    const availableInputTokens =
+      modelConfig.maxTokens - modelConfig.maxOutputTokens;
+    const neededChars = availableInputTokens * 0.75 * CHARS_PER_TOKEN;
 
     let currentChars = 0;
     const partsToSend = [];
@@ -2045,6 +2050,16 @@ function StoryPageContent() {
       currentChars += content.length;
       if (currentChars > neededChars) break;
     }
+
+    console.log(
+      `Context usage: ${
+        partsToSend.length
+      } parts, ${currentChars.toLocaleString()} chars (${Math.round(
+        currentChars / CHARS_PER_TOKEN
+      ).toLocaleString()} tokens) of ${Math.round(
+        neededChars / CHARS_PER_TOKEN
+      ).toLocaleString()} available (75% of ${availableInputTokens.toLocaleString()} input tokens, output: ${modelConfig.maxOutputTokens.toLocaleString()})`
+    );
 
     const minimalStoryData: any = {
       story_name: storyData.story_name,
@@ -2089,6 +2104,18 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("aiModel") || undefined
           : undefined,
+      modelStory:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModelStory") || undefined
+          : undefined,
+      modelTools:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModelTools") || undefined
+          : undefined,
+      modelChoices:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModelChoices") || undefined
+          : undefined,
       useRawContext:
         typeof window !== "undefined"
           ? localStorage.getItem("useRawContext") === "true"
@@ -2111,9 +2138,20 @@ function StoryPageContent() {
     console.log(
       `Custom input payload size: ${(payloadSize / 1024).toFixed(2)} KB`
     );
+
+    // Check if staged mode is enabled
+    const stagedMode =
+      typeof window !== "undefined"
+        ? localStorage.getItem("aiStagedMode") === "true"
+        : false;
+    const apiEndpoint = stagedMode
+      ? "/api/story/next-staged"
+      : "/api/story/next";
+
     logger.ai_request("Sending custom input to AI", {
       model: payload.model,
       payloadSize,
+      stagedMode,
     });
 
     if (payloadSize > 4 * 1024 * 1024) {
@@ -2123,7 +2161,7 @@ function StoryPageContent() {
       return;
     }
 
-    await fetch("/api/story/next", {
+    await fetch(apiEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -3398,8 +3436,11 @@ function StoryPageContent() {
         : "deep-seek/deepseek-chat";
     const modelConfig = getModelConfig(modelKey);
 
-    //Estimateneededcharacters(tokens*4).Sendabitmoretobesafe.
-    const neededChars = modelConfig.maxTokens * 5;
+    // Reserve maxOutputTokens, then split remaining: 75% history, 25% memory (4 chars per token)
+    const CHARS_PER_TOKEN = 4;
+    const availableInputTokens =
+      modelConfig.maxTokens - modelConfig.maxOutputTokens;
+    const neededChars = availableInputTokens * 0.75 * CHARS_PER_TOKEN;
 
     let currentChars = 0;
     const partsToSend = [];
@@ -3421,6 +3462,16 @@ function StoryPageContent() {
       currentChars += content.length;
       if (currentChars > neededChars) break;
     }
+
+    console.log(
+      `Context usage (handleChoice): ${
+        partsToSend.length
+      } parts, ${currentChars.toLocaleString()} chars (${Math.round(
+        currentChars / CHARS_PER_TOKEN
+      ).toLocaleString()} tokens) of ${Math.round(
+        neededChars / CHARS_PER_TOKEN
+      ).toLocaleString()} available (75% of ${availableInputTokens.toLocaleString()} input tokens, output: ${modelConfig.maxOutputTokens.toLocaleString()})`
+    );
 
     //Buildminimalstorydataobject
     const minimalStoryData: any = {
@@ -3470,6 +3521,18 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("aiModel") || undefined
           : undefined,
+      modelStory:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModelStory") || undefined
+          : undefined,
+      modelTools:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModelTools") || undefined
+          : undefined,
+      modelChoices:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModelChoices") || undefined
+          : undefined,
       useRawContext:
         typeof window !== "undefined"
           ? localStorage.getItem("useRawContext") === "true"
@@ -3490,9 +3553,20 @@ function StoryPageContent() {
 
     const payloadSize = JSON.stringify(payload).length;
     console.log(`Payload size: ${(payloadSize / 1024).toFixed(2)} KB`);
+
+    // Check if staged mode is enabled
+    const stagedMode =
+      typeof window !== "undefined"
+        ? localStorage.getItem("aiStagedMode") === "true"
+        : false;
+    const apiEndpoint = stagedMode
+      ? "/api/story/next-staged"
+      : "/api/story/next";
+
     logger.ai_request("Sending choice to AI", {
       model: payload.model,
       payloadSize,
+      stagedMode,
     });
 
     if (payloadSize > 4 * 1024 * 1024) {
@@ -3502,7 +3576,7 @@ function StoryPageContent() {
       return;
     }
 
-    await fetch("/api/story/next", {
+    await fetch(apiEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -3705,8 +3779,11 @@ function StoryPageContent() {
         : "deep-seek/deepseek-chat";
     const modelConfig = getModelConfig(modelKey);
 
-    //Estimateneededcharacters(tokens*4).Sendabitmoretobesafe.
-    const neededChars = modelConfig.maxTokens * 5;
+    // Reserve maxOutputTokens, then split remaining: 75% history, 25% memory (4 chars per token)
+    const CHARS_PER_TOKEN = 4;
+    const availableInputTokens =
+      modelConfig.maxTokens - modelConfig.maxOutputTokens;
+    const neededChars = availableInputTokens * 0.75 * CHARS_PER_TOKEN;
 
     let currentChars = 0;
     const partsToSend = [];
@@ -3728,6 +3805,16 @@ function StoryPageContent() {
       currentChars += content.length;
       if (currentChars > neededChars) break;
     }
+
+    console.log(
+      `Context usage (handleRetry): ${
+        partsToSend.length
+      } parts, ${currentChars.toLocaleString()} chars (${Math.round(
+        currentChars / CHARS_PER_TOKEN
+      ).toLocaleString()} tokens) of ${Math.round(
+        neededChars / CHARS_PER_TOKEN
+      ).toLocaleString()} available (75% of ${availableInputTokens.toLocaleString()} input tokens, output: ${modelConfig.maxOutputTokens.toLocaleString()})`
+    );
 
     const minimalStoryData: any = {
       story_name: storyData.story_name,
@@ -3769,6 +3856,18 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("aiModel") || undefined
           : undefined,
+      modelStory:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModelStory") || undefined
+          : undefined,
+      modelTools:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModelTools") || undefined
+          : undefined,
+      modelChoices:
+        typeof window !== "undefined"
+          ? localStorage.getItem("aiModelChoices") || undefined
+          : undefined,
       useRawContext:
         typeof window !== "undefined"
           ? localStorage.getItem("useRawContext") === "true"
@@ -3787,7 +3886,16 @@ function StoryPageContent() {
           : true,
     };
 
-    await fetch("/api/story/next", {
+    // Check if staged mode is enabled
+    const stagedMode =
+      typeof window !== "undefined"
+        ? localStorage.getItem("aiStagedMode") === "true"
+        : false;
+    const apiEndpoint = stagedMode
+      ? "/api/story/next-staged"
+      : "/api/story/next";
+
+    await fetch(apiEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
