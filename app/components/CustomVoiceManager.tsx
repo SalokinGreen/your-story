@@ -70,7 +70,7 @@ export default function CustomVoiceManager({
             value={newVoiceInput}
             onChange={(e) => setNewVoiceInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addCustomVoice()}
-            className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
           <button
             onClick={addCustomVoice}
@@ -84,7 +84,7 @@ export default function CustomVoiceManager({
             {customVoices.map((voiceId) => (
               <div
                 key={voiceId}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
               >
                 <span className="font-mono text-sm text-gray-900 dark:text-white">
                   {voiceId}

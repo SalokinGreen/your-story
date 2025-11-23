@@ -213,7 +213,7 @@ export default function EncryptionMigration({
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                   <button
                     onClick={() => setShowDialog(false)}
-                    className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold text-sm sm:text-base rounded-lg transition-colors"
+                    className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold text-sm sm:text-base rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
@@ -236,7 +236,7 @@ export default function EncryptionMigration({
                     <span>Encrypting stories...</span>
                     <span>{Math.round(progress)}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+                  <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-4 overflow-hidden">
                     <div
                       className="bg-emerald-600 h-full transition-all duration-300 ease-out"
                       style={{ width: `${progress}%` }}

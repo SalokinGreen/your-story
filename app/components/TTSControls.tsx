@@ -319,7 +319,7 @@ export default function TTSControls({
               disabled={disabled}
               className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-all ${
                 disabled
-                  ? "bg-gray-100 dark:bg-gray-700 text-gray-400 border-gray-300 dark:border-gray-600 cursor-not-allowed"
+                  ? "bg-gray-100 dark:bg-gray-900 text-gray-400 border-gray-300 dark:border-gray-600 cursor-not-allowed"
                   : "bg-white dark:bg-blue-950 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500"
               }`}
               title="Select voice"
@@ -361,7 +361,7 @@ export default function TTSControls({
               disabled={disabled}
               className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-all ${
                 disabled
-                  ? "bg-gray-100 dark:bg-gray-700 text-gray-400 border-gray-300 dark:border-gray-600 cursor-not-allowed"
+                  ? "bg-gray-100 dark:bg-gray-900 text-gray-400 border-gray-300 dark:border-gray-600 cursor-not-allowed"
                   : "bg-white dark:bg-blue-950 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500"
               }`}
               title="Volume"
@@ -393,7 +393,7 @@ export default function TTSControls({
                   step="0.05"
                   value={volume}
                   onChange={(e) => setVolume(parseFloat(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-900"
                 />
                 <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
                   <button
@@ -421,7 +421,7 @@ export default function TTSControls({
           disabled={disabled || isLoading || !text.trim()}
           className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
             disabled || isLoading || !text.trim()
-              ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+              ? "bg-gray-200 dark:bg-gray-900 text-gray-400 dark:text-gray-500 cursor-not-allowed"
               : "bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg"
           }`}
           title={

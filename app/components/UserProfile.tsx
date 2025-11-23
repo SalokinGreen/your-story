@@ -56,7 +56,7 @@ export default function UserProfile() {
         </button> */}
         <button
           onClick={signOut}
-          className="w-full px-6 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-semibold transition-colors border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center gap-2"
+          className="w-full px-6 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-900 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-semibold transition-colors border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center gap-2"
         >
           <DynamicIcon name="LogOut" className="w-5 h-5" /> Sign Out
         </button>

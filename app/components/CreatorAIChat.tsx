@@ -570,7 +570,7 @@ function ChangeSummary({
                 <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
                   {change.label}
                 </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">
                   {change.type}
                 </span>
               </div>

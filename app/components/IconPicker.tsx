@@ -172,7 +172,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
       >
-        <div className="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded">
+        <div className="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded">
           <DynamicIcon
             name={value}
             className="w-4 h-4 text-gray-900 dark:text-white"
@@ -202,7 +202,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                 className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
                   selectedCategory === "All"
                     ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                    : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    : "bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
                 }`}
               >
                 All
@@ -214,7 +214,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                   className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
                     selectedCategory === cat
                       ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                      : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+                      : "bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
                   }`}
                 >
                   {cat}

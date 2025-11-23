@@ -4757,7 +4757,7 @@ function StoryPageContent() {
               className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
                 currentState === StoryState.STORY
                   ? "bg-linear-to-r from-gray-700 to-gray-900 text-white ring-2 ring-gray-400 shadow-lg"
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
+                  : "bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
               }`}
             >
               <DynamicIcon name="BookOpen" className="w-5 h-5" />

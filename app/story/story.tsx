@@ -157,7 +157,7 @@ export default function Story({
                 <textarea
                   value={editedText}
                   onChange={(e) => setEditedText(e.target.value)}
-                  className="w-full h-96 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono resize-none"
+                  className="w-full h-96 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono resize-none"
                   placeholder="Edit the raw AI output here..."
                 />
                 <div className="flex items-center justify-between">
@@ -171,7 +171,7 @@ export default function Story({
                         setEditMode(false);
                         setEditedText("");
                       }}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-all"
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-all"
                     >
                       Cancel
                     </button>
@@ -239,7 +239,7 @@ export default function Story({
                     className={`flex flex-row items-start cursor-pointer rounded-lg transition-all p-4 border-2 ${
                       input[choice.text]
                         ? "border-purple-500 bg-purple-100 dark:bg-purple-900/40 shadow-md"
-                        : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-md"
+                        : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/30 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-md"
                     }`}
                     onClick={() => handleSelect(index)}
                   >
@@ -342,7 +342,7 @@ export default function Story({
                   momentumMode === "reroll"
                     ? "bg-yellow-500 text-white shadow-md"
                     : canUseReroll
-                    ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-yellow-400 hover:text-white"
+                    ? "bg-gray-200 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-yellow-400 hover:text-white"
                     : "bg-gray-100 dark:bg-blue-950 text-gray-400 dark:text-gray-600 cursor-not-allowed"
                 }`}
               >
@@ -360,7 +360,7 @@ export default function Story({
                   momentumMode === "guarantee"
                     ? "bg-green-500 text-white shadow-md"
                     : canUseGuarantee
-                    ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-green-500 hover:text-white"
+                    ? "bg-gray-200 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-green-500 hover:text-white"
                     : "bg-gray-100 dark:bg-blue-950 text-gray-400 dark:text-gray-600 cursor-not-allowed"
                 }`}
               >
@@ -413,7 +413,7 @@ export default function Story({
               className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors border flex items-center gap-2 ${
                 freeInputEnabled
                   ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700 "
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-purple-200 dark:hover:bg-purple-600/40"
+                  : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-purple-200 dark:hover:bg-purple-600/40"
               }`}
             >
               {freeInputEnabled ? (
@@ -446,7 +446,7 @@ export default function Story({
                 onChange={(e) => setCustomInput(e.target.value)}
                 placeholder="Write your own action, dialog, or narration..."
                 rows={3}
-                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
               />
               <div className="flex items-center justify-between">
                 <p className="text-xs text-gray-500 dark:text-gray-400">

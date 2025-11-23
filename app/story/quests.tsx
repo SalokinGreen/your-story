@@ -15,7 +15,7 @@ export default function QuestsPage(storyData: StoryData) {
             <DynamicIcon name="Scroll" className="w-8 h-8 text-purple-600" />{" "}
             Quests
           </h2>
-          <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-700/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
+          <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-900/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
             <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
               No quests have been created yet
             </p>
@@ -87,7 +87,7 @@ export default function QuestsPage(storyData: StoryData) {
                         </p>
                         {expandedQuestId === quest.id &&
                           quest.description !== quest.shortDescription && (
-                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 italic mt-2 p-3 bg-white dark:bg-gray-700 rounded border border-blue-200 dark:border-blue-800">
+                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 italic mt-2 p-3 bg-white dark:bg-gray-900 rounded border border-blue-200 dark:border-blue-800">
                               {quest.description}
                             </p>
                           )}
@@ -106,7 +106,7 @@ export default function QuestsPage(storyData: StoryData) {
                       )}
                       <button
                         onClick={() => toggleQuestActive(quest.id)}
-                        className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
+                        className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
                       >
                         <span className="flex items-center gap-1">
                           <DynamicIcon name="EyeOff" className="w-4 h-4" /> Hide
@@ -163,7 +163,7 @@ export default function QuestsPage(storyData: StoryData) {
                         </p>
                         {expandedQuestId === quest.id &&
                           quest.description !== quest.shortDescription && (
-                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 italic mt-2 p-3 bg-white dark:bg-gray-700 rounded border border-green-200 dark:border-green-800">
+                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 italic mt-2 p-3 bg-white dark:bg-gray-900 rounded border border-green-200 dark:border-green-800">
                               {quest.description}
                             </p>
                           )}
@@ -182,7 +182,7 @@ export default function QuestsPage(storyData: StoryData) {
                       )}
                       <button
                         onClick={() => toggleQuestActive(quest.id)}
-                        className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
+                        className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
                       >
                         <span className="flex items-center gap-1">
                           <DynamicIcon name="EyeOff" className="w-4 h-4" /> Hide
@@ -218,7 +218,7 @@ export default function QuestsPage(storyData: StoryData) {
                       quest.id ||
                       `quest-inactive-${quest.title}-${Math.random()}`
                     }
-                    className="flex flex-col gap-3 p-4 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30 opacity-70 transition-all"
+                    className="flex flex-col gap-3 p-4 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/30 opacity-70 transition-all"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -230,7 +230,7 @@ export default function QuestsPage(storyData: StoryData) {
                           >
                             {quest.title}
                           </h4>
-                          <span className="px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-full text-xs font-bold shrink-0">
+                          <span className="px-2 py-0.5 bg-gray-200 dark:bg-gray-900 text-gray-800 dark:text-gray-200 rounded-full text-xs font-bold shrink-0">
                             {quest.points} pts
                           </span>
                           {quest.fulfilled && (
@@ -245,7 +245,7 @@ export default function QuestsPage(storyData: StoryData) {
                         </p>
                         {expandedQuestId === quest.id &&
                           quest.description !== quest.shortDescription && (
-                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 italic mt-2 p-3 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 italic mt-2 p-3 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-600">
                               {quest.description}
                             </p>
                           )}
@@ -255,7 +255,7 @@ export default function QuestsPage(storyData: StoryData) {
                       {quest.description !== quest.shortDescription && (
                         <button
                           onClick={() => toggleExpanded(quest.id)}
-                          className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
+                          className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
                         >
                           {expandedQuestId === quest.id
                             ? "Show Less"

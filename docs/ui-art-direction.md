@@ -213,7 +213,7 @@ border-2 border-black dark:border-white
 ### Fallback Avatars
 
 ```
-bg-gray-300 dark:bg-gray-700
+bg-gray-300 dark:bg-gray-900
 flex items-center justify-center
 text-2xl sm:text-3xl font-bold
 text-gray-600 dark:text-gray-400

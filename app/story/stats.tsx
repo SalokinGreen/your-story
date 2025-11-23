@@ -106,7 +106,7 @@ export default function StatsPage(storyData: StoryData) {
               className={`px-3 sm:px-4 py-2 font-semibold rounded-t-lg transition-colors whitespace-nowrap flex items-center gap-2 text-sm sm:text-base ${
                 activeTab === tab.id
                   ? `bg-${tab.color}-600 text-white`
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
               }`}
             >
               <DynamicIcon name={tab.icon} className="w-4 h-4" />
@@ -207,7 +207,7 @@ export default function StatsPage(storyData: StoryData) {
                       )}
                     </div>
                     {/* Progress bar */}
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                    <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-2.5">
                       <div
                         className="bg-linear-to-r from-yellow-400 to-yellow-500 h-2.5 rounded-full transition-all duration-300 shadow-sm"
                         style={{
@@ -250,7 +250,7 @@ export default function StatsPage(storyData: StoryData) {
                         {resource.description}
                       </p>
                       {/* Progress bar */}
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                      <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-2.5">
                         <div
                           className={`h-2.5 rounded-full transition-all duration-300 shadow-sm ${
                             resource.value / resource.maxValue > 0.5
@@ -322,7 +322,7 @@ export default function StatsPage(storyData: StoryData) {
                   ))}
                 </div>
               ) : (
-                <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-700/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
+                <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-900/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
                   <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
                     Your inventory is empty
                   </p>
@@ -373,7 +373,7 @@ export default function StatsPage(storyData: StoryData) {
                         className={`flex flex-row items-center gap-3 p-4 rounded-lg border-2 transition-all ${
                           achievement.dateAchieved
                             ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 dark:border-yellow-600 shadow-md"
-                            : "bg-gray-50 dark:bg-gray-700/30 border-gray-300 dark:border-gray-600 opacity-60"
+                            : "bg-gray-50 dark:bg-gray-900/30 border-gray-300 dark:border-gray-600 opacity-60"
                         }`}
                       >
                         <div className="shrink-0">
@@ -409,7 +409,7 @@ export default function StatsPage(storyData: StoryData) {
                     ))}
                 </div>
               ) : (
-                <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-700/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
+                <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-900/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
                   <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
                     No achievements yet
                   </p>
@@ -475,7 +475,7 @@ export default function StatsPage(storyData: StoryData) {
                       ))}
                   </div>
                 ) : (
-                  <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-700/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
+                  <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-900/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
                     <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
                       No active quests
                     </p>
@@ -527,7 +527,7 @@ export default function StatsPage(storyData: StoryData) {
                           {rel.description}
                         </p>
                         {/* Relationship bar */}
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mt-3 relative">
+                        <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-2.5 mt-3 relative">
                           <div
                             className={`h-2.5 rounded-full transition-all duration-300 shadow-sm ${
                               rel.value >= 0

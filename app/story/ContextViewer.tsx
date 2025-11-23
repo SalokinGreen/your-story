@@ -167,7 +167,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           <div className="flex gap-1 sm:gap-2">
             <button
               onClick={() => setShowInfo(!showInfo)}
-              className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 flex items-center gap-1"
+              className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-600 flex items-center gap-1"
               title="Toggle info"
             >
               <DynamicIcon
@@ -349,7 +349,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                 </div>
                 <button
                   onClick={() => copyToClipboard(msg.content)}
-                  className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded flex items-center gap-1 shrink-0"
+                  className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 rounded flex items-center gap-1 shrink-0"
                   title="Copy to clipboard"
                 >
                   <DynamicIcon name="Copy" className="w-3 h-3" />

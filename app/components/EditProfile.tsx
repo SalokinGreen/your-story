@@ -219,7 +219,7 @@ export default function EditProfile({
             type="button"
             onClick={handleCancel}
             disabled={loading || uploading}
-            className="flex-1 px-4 py-2 bg-gray-300 dark:bg-gray-700 font-semibold hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+            className="flex-1 px-4 py-2 bg-gray-300 dark:bg-gray-900 font-semibold hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
           >
             Cancel
           </button>

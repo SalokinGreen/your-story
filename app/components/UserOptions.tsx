@@ -56,7 +56,7 @@ export default function UserOptions() {
       </h2>
 
       <div className="space-y-4">
-        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+        <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-600">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-gray-900 dark:text-white">

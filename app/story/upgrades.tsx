@@ -234,7 +234,7 @@ export default function UpgradesPage({
                     className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all border-2 ${
                       selectedStat === stat.name
                         ? "bg-blue-100 dark:bg-blue-900/40 border-blue-500"
-                        : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-blue-300"
+                        : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-600 hover:border-blue-300"
                     }`}
                     onClick={() => setSelectedStat(stat.name)}
                   >
@@ -306,7 +306,7 @@ export default function UpgradesPage({
                       className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all border-2 ${
                         selectedResource === resource.name
                           ? "bg-green-100 dark:bg-green-900/40 border-green-500"
-                          : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-green-300"
+                          : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-600 hover:border-green-300"
                       }`}
                       onClick={() => setSelectedResource(resource.name)}
                     >
@@ -380,7 +380,7 @@ export default function UpgradesPage({
                     value={newItemName}
                     onChange={(e) => setNewItemName(e.target.value)}
                     placeholder="e.g., Magic Sword, Health Potion"
-                    className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400"
+                    className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400"
                     maxLength={50}
                   />
                 </div>
@@ -393,7 +393,7 @@ export default function UpgradesPage({
                     value={newItemDescription}
                     onChange={(e) => setNewItemDescription(e.target.value)}
                     placeholder="Describe the item..."
-                    className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 resize-none"
+                    className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 resize-none"
                     rows={2}
                     maxLength={200}
                   />
@@ -414,7 +414,7 @@ export default function UpgradesPage({
                           | "misc"
                       )
                     }
-                    className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400"
+                    className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400"
                   >
                     <option value="normal">
                       Normal (Advantage, breaks on fail)
@@ -470,8 +470,8 @@ export default function UpgradesPage({
                         key={index}
                         className={`flex items-center justify-between p-4 rounded-lg border-2 ${
                           alreadyOwned
-                            ? "bg-gray-100 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 opacity-60"
-                            : "bg-white dark:bg-gray-700 border-cyan-300 dark:border-cyan-700"
+                            ? "bg-gray-100 dark:bg-gray-900/50 border-gray-300 dark:border-gray-600 opacity-60"
+                            : "bg-white dark:bg-gray-900 border-cyan-300 dark:border-cyan-700"
                         }`}
                       >
                         <div className="flex items-center gap-3 flex-1">
@@ -541,8 +541,8 @@ export default function UpgradesPage({
                         key={index}
                         className={`flex items-center justify-between p-4 rounded-lg border-2 ${
                           alreadyOwned
-                            ? "bg-gray-100 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 opacity-60"
-                            : "bg-white dark:bg-gray-700 border-teal-300 dark:border-teal-700"
+                            ? "bg-gray-100 dark:bg-gray-900/50 border-gray-300 dark:border-gray-600 opacity-60"
+                            : "bg-white dark:bg-gray-900 border-teal-300 dark:border-teal-700"
                         }`}
                       >
                         <div className="flex items-center gap-3 flex-1">
@@ -607,7 +607,7 @@ export default function UpgradesPage({
                   {upgradeSettings.itemShop.map((shopItem, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-4 rounded-lg border-2 bg-white dark:bg-gray-700 border-amber-300 dark:border-amber-700"
+                      className="flex items-center justify-between p-4 rounded-lg border-2 bg-white dark:bg-gray-900 border-amber-300 dark:border-amber-700"
                     >
                       <div className="flex items-center gap-3 flex-1">
                         <DynamicIcon

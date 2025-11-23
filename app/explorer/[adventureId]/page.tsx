@@ -799,7 +799,7 @@ export default function AdventureDetailPage() {
                 <span className="text-2xl">🎬</span>
                 Story Preview
               </h2>
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-6 border-l-4 border-purple-500">
+              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 border-l-4 border-purple-500">
                 <p className="text-gray-800 dark:text-gray-200 italic">
                   "{adventure.storyTemplate?.intro || "The adventure begins..."}
                   "
@@ -820,7 +820,7 @@ export default function AdventureDetailPage() {
                   className={`px-4 py-2 font-semibold rounded-lg transition-all ${
                     contentTab === "stats"
                       ? "bg-purple-600 text-white shadow-md"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                   }`}
                 >
                   📊 Stats
@@ -830,7 +830,7 @@ export default function AdventureDetailPage() {
                   className={`px-4 py-2 font-semibold rounded-lg transition-all ${
                     contentTab === "achievements"
                       ? "bg-purple-600 text-white shadow-md"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                   }`}
                 >
                   🏆 Achievements
@@ -840,7 +840,7 @@ export default function AdventureDetailPage() {
                   className={`px-4 py-2 font-semibold rounded-lg transition-all ${
                     contentTab === "upgrades"
                       ? "bg-purple-600 text-white shadow-md"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                   }`}
                 >
                   ⚡ Upgrades
@@ -861,7 +861,7 @@ export default function AdventureDetailPage() {
                         className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                           selectedPresetId === "custom"
                             ? "bg-purple-600 text-white shadow-md"
-                            : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600"
+                            : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600"
                         }`}
                       >
                         ✨ Default
@@ -875,7 +875,7 @@ export default function AdventureDetailPage() {
                             className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                               selectedPresetId === preset.id
                                 ? "bg-purple-600 text-white shadow-md"
-                                : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600"
+                                : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600"
                             }`}
                           >
                             {preset.icon} {preset.name}
@@ -932,7 +932,7 @@ export default function AdventureDetailPage() {
                                     {stat.description}
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div className="flex-1 bg-gray-200 dark:bg-gray-900 rounded-full h-2">
                                       <div
                                         className="bg-blue-600 h-2 rounded-full transition-all"
                                         style={{ width: `${stat.value}%` }}
@@ -974,7 +974,7 @@ export default function AdventureDetailPage() {
                                     {resource.description}
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div className="flex-1 bg-gray-200 dark:bg-gray-900 rounded-full h-2">
                                       <div
                                         className="bg-green-600 h-2 rounded-full transition-all"
                                         style={{
@@ -1587,12 +1587,12 @@ export default function AdventureDetailPage() {
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                   {/* Secret Toggle */}
-                  <label className="flex items-center gap-2 cursor-pointer px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                  <label className="flex items-center gap-2 cursor-pointer px-3 py-2 bg-gray-100 dark:bg-gray-900 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
                     <input
                       type="checkbox"
                       checked={showSecretLore}
                       onChange={(e) => setShowSecretLore(e.target.checked)}
-                      className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                      className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-900 dark:border-gray-600"
                     />
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                       <DynamicIcon
@@ -1634,7 +1634,7 @@ export default function AdventureDetailPage() {
                         className={`p-5 rounded-xl border-2 transition-all hover:shadow-lg ${
                           lore.secrtet
                             ? "bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700"
-                            : "bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600"
+                            : "bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-600"
                         }`}
                       >
                         <div className="flex items-start justify-between mb-3">

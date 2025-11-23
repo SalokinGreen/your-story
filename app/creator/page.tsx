@@ -2019,7 +2019,7 @@ function AdventureCreatorContent() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., The Dragon's Quest"
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
                 maxLength={100}
               />
             </div>
@@ -2033,7 +2033,7 @@ function AdventureCreatorContent() {
                 value={shortDescription}
                 onChange={(e) => setShortDescription(e.target.value)}
                 placeholder="A brief one-line summary"
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
                 maxLength={150}
               />
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
@@ -2050,7 +2050,7 @@ function AdventureCreatorContent() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Write a compelling description of your adventure..."
                 rows={5}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
                 maxLength={1000}
               />
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
@@ -2070,7 +2070,7 @@ function AdventureCreatorContent() {
                     className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
                       difficulty === diff
                         ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                        : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                     }`}
                   >
                     {diff}
@@ -2098,7 +2098,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
                     rpgSystem === "3d6"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                   }`}
                 >
                   <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
@@ -2112,7 +2112,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
                     rpgSystem === "1d20"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                   }`}
                 >
                   <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
@@ -2126,7 +2126,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
                     rpgSystem === "1d100"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                   }`}
                 >
                   <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
@@ -2140,7 +2140,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
                     rpgSystem === "percentile"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                   }`}
                 >
                   <DynamicIcon
@@ -2157,7 +2157,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
                     rpgSystem === "pbta"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                   }`}
                 >
                   <DynamicIcon name="Zap" className="w-5 h-5 inline mr-2" />
@@ -2171,7 +2171,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
                     rpgSystem === "fate"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                   }`}
                 >
                   <DynamicIcon name="Scale" className="w-5 h-5 inline mr-2" />
@@ -2185,7 +2185,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
                     rpgSystem === "yze"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                   }`}
                 >
                   <DynamicIcon name="Skull" className="w-5 h-5 inline mr-2" />
@@ -2199,7 +2199,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
                     rpgSystem === "explosive"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                   }`}
                 >
                   <DynamicIcon name="Flame" className="w-5 h-5 inline mr-2" />
@@ -2228,7 +2228,7 @@ function AdventureCreatorContent() {
                     className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all capitalize ${
                       visibility === vis
                         ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                        : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                     }`}
                   >
                     {vis === "public" ? (
@@ -2270,7 +2270,7 @@ function AdventureCreatorContent() {
                     onChange={(e) => setNsfw(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
                 </div>
                 <div>
                   <span className="block text-sm font-bold text-gray-900 dark:text-white">
@@ -2297,7 +2297,7 @@ function AdventureCreatorContent() {
                     e.key === "Enter" && (e.preventDefault(), addTag())
                   }
                   placeholder="Add a tag..."
-                  className="flex-1 px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 transition-colors"
+                  className="flex-1 px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 transition-colors"
                 />
                 <button
                   onClick={addTag}
@@ -2319,7 +2319,7 @@ function AdventureCreatorContent() {
                       <button
                         key={tag}
                         onClick={() => setTags([...tags, tag])}
-                        className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                        className="px-3 py-1 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
                       >
                         + {tag}
                       </button>
@@ -2497,7 +2497,7 @@ function AdventureCreatorContent() {
 
             {/* Preset Form */}
             {showPresetForm && (
-              <div className="bg-gray-50 dark:bg-gray-700/50 border-2 border-gray-300 dark:border-gray-600 rounded-lg p-6 mb-6">
+              <div className="bg-gray-50 dark:bg-gray-900/50 border-2 border-gray-300 dark:border-gray-600 rounded-lg p-6 mb-6">
                 <h5 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
                   {editingPresetId ? "Edit Preset" : "Create New Preset"}
                 </h5>
@@ -2512,7 +2512,7 @@ function AdventureCreatorContent() {
                       value={newPresetName}
                       onChange={(e) => setNewPresetName(e.target.value)}
                       placeholder="e.g., Battle Mage"
-                      className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 transition-colors"
+                      className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 transition-colors"
                     />
                   </div>
 
@@ -2525,7 +2525,7 @@ function AdventureCreatorContent() {
                       onChange={(e) => setNewPresetDescription(e.target.value)}
                       placeholder="Describe this character archetype..."
                       rows={2}
-                      className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 transition-colors resize-none"
+                      className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 transition-colors resize-none"
                     />
                   </div>
 
@@ -2805,7 +2805,7 @@ function AdventureCreatorContent() {
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 placeholder="e.g., Aria"
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
               />
             </div>
 
@@ -2818,7 +2818,7 @@ function AdventureCreatorContent() {
                 onChange={(e) => setPlayerSummary(e.target.value)}
                 placeholder="A brief description of who the player character is..."
                 rows={3}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
               />
             </div>
 
@@ -2831,7 +2831,7 @@ function AdventureCreatorContent() {
                 onChange={(e) => setPremise(e.target.value)}
                 placeholder="A one-paragraph summary of the story's main conflict or goal..."
                 rows={4}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
               />
             </div>
 
@@ -2844,7 +2844,7 @@ function AdventureCreatorContent() {
                 onChange={(e) => setIntro(e.target.value)}
                 placeholder="The opening text that players will see when they start the adventure..."
                 rows={6}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
               />
             </div>
 
@@ -2857,7 +2857,7 @@ function AdventureCreatorContent() {
                 onChange={(e) => setAuthorNotes(e.target.value)}
                 placeholder="Notes for yourself about the story direction, themes, etc..."
                 rows={4}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
               />
             </div>
 
@@ -2885,7 +2885,7 @@ function AdventureCreatorContent() {
                   min="0"
                   value={points}
                   onChange={(e) => setPoints(parseInt(e.target.value) || 0)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
                 />
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                   Points players start with
@@ -2906,7 +2906,7 @@ function AdventureCreatorContent() {
                       Math.min(parseInt(e.target.value) || 0, maxMomentum)
                     )
                   }
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
                 />
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                   Current momentum value
@@ -2924,7 +2924,7 @@ function AdventureCreatorContent() {
                   onChange={(e) =>
                     setMaxMomentum(Math.max(1, parseInt(e.target.value) || 5))
                   }
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
                 />
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                   Maximum momentum capacity
@@ -2967,7 +2967,7 @@ function AdventureCreatorContent() {
                       setNewStat({ ...newStat, name: e.target.value })
                     }
                     placeholder="e.g., Strength"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -2996,7 +2996,7 @@ function AdventureCreatorContent() {
                         value: parseInt(e.target.value) || 0,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -3010,7 +3010,7 @@ function AdventureCreatorContent() {
                       setNewStat({ ...newStat, description: e.target.value })
                     }
                     placeholder="e.g., Physical power and combat prowess"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -3229,7 +3229,7 @@ function AdventureCreatorContent() {
                       setNewResource({ ...newResource, name: e.target.value })
                     }
                     placeholder="e.g., Health"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -3257,7 +3257,7 @@ function AdventureCreatorContent() {
                         value: parseInt(e.target.value) || 0,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -3274,7 +3274,7 @@ function AdventureCreatorContent() {
                         maxValue: parseInt(e.target.value) || 100,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -3291,7 +3291,7 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Your life force"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -3534,7 +3534,7 @@ function AdventureCreatorContent() {
                       setNewItem({ ...newItem, name: e.target.value })
                     }
                     placeholder="e.g., Rusty Sword"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -3562,7 +3562,7 @@ function AdventureCreatorContent() {
                         quantity: parseInt(e.target.value) || 1,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -3581,7 +3581,7 @@ function AdventureCreatorContent() {
                           | "misc",
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   >
                     <option value="normal">Normal Item</option>
                     <option value="consumable">Consumable</option>
@@ -3600,7 +3600,7 @@ function AdventureCreatorContent() {
                       setNewItem({ ...newItem, description: e.target.value })
                     }
                     placeholder="e.g., A worn but reliable blade"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -3845,7 +3845,7 @@ function AdventureCreatorContent() {
                       setNewLore({ ...newLore, title: e.target.value })
                     }
                     placeholder="e.g., The Ancient Prophecy"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -3859,7 +3859,7 @@ function AdventureCreatorContent() {
                     }
                     placeholder="Write the lore entry content..."
                     rows={5}
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
                   />
                 </div>
                 <div className="flex items-center gap-4">
@@ -4029,7 +4029,7 @@ function AdventureCreatorContent() {
                         (e.preventDefault(), addLoreOnTrigger())
                       }
                       placeholder="e.g., 'Ancient Map'"
-                      className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                     />
                     <button
                       onClick={addLoreOnTrigger}
@@ -4081,7 +4081,7 @@ function AdventureCreatorContent() {
                         (e.preventDefault(), addLoreOffTrigger())
                       }
                       placeholder="e.g., 'Destroyed the Map'"
-                      className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                     />
                     <button
                       onClick={addLoreOffTrigger}
@@ -4121,7 +4121,7 @@ function AdventureCreatorContent() {
                     onClick={() =>
                       setNewLoreAdvancedExpanded(!newLoreAdvancedExpanded)
                     }
-                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                   >
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                       <DynamicIcon name="Settings" className="w-4 h-4" />{" "}
@@ -4149,7 +4149,7 @@ function AdventureCreatorContent() {
                             />{" "}
                             Lores that turn this ON
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                             {lore.length === 0 ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                 No other lore entries yet.
@@ -4195,7 +4195,7 @@ function AdventureCreatorContent() {
                             />{" "}
                             Lores that turn this OFF
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                             {lore.length === 0 ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                 No other lore entries yet.
@@ -4251,7 +4251,7 @@ function AdventureCreatorContent() {
                                 (e.preventDefault(), addLoreKey())
                               }
                               placeholder="e.g., 'Dragon Defeated' or 'Ancient Ruins'"
-                              className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                             />
                             <button
                               onClick={addLoreKey}
@@ -4296,7 +4296,7 @@ function AdventureCreatorContent() {
                             />{" "}
                             Beats that turn this lore ON
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                             {plotBeats.length === 0 ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                 No plot beats yet. Add them in the Plot Beats
@@ -4343,7 +4343,7 @@ function AdventureCreatorContent() {
                             />{" "}
                             Beats that turn this lore OFF
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                             {plotBeats.length === 0 ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                 No plot beats yet. Add them in the Plot Beats
@@ -4410,7 +4410,7 @@ function AdventureCreatorContent() {
                       setLorePage(1);
                     }}
                     placeholder="Search lore..."
-                    className="pl-8 pr-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                    className="pl-8 pr-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                   />
                   <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">
                     <DynamicIcon name="Search" className="w-4 h-4" />
@@ -4481,7 +4481,7 @@ function AdventureCreatorContent() {
                                       title: e.target.value,
                                     })
                                   }
-                                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                 />
                               </div>
                               <div>
@@ -4497,7 +4497,7 @@ function AdventureCreatorContent() {
                                     })
                                   }
                                   rows={5}
-                                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
                                 />
                               </div>
                               <div className="flex items-center gap-4">
@@ -4696,7 +4696,7 @@ function AdventureCreatorContent() {
                                       addEditLoreOnTrigger())
                                     }
                                     placeholder="e.g., 'Ancient Map'"
-                                    className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                   />
                                   <button
                                     onClick={addEditLoreOnTrigger}
@@ -4756,7 +4756,7 @@ function AdventureCreatorContent() {
                                       addEditLoreOffTrigger())
                                     }
                                     placeholder="e.g., 'Destroyed the Map'"
-                                    className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                   />
                                   <button
                                     onClick={addEditLoreOffTrigger}
@@ -4804,7 +4804,7 @@ function AdventureCreatorContent() {
                                       !editLoreAdvancedExpanded
                                     )
                                   }
-                                  className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                  className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                                 >
                                   <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                                     <DynamicIcon
@@ -4837,7 +4837,7 @@ function AdventureCreatorContent() {
                                           />{" "}
                                           Lores that turn this ON
                                         </label>
-                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                                           {lore.filter((_, i) => i !== index)
                                             .length === 0 ? (
                                             <p className="text-xs text-gray-500 dark:text-gray-400 italic">
@@ -4894,7 +4894,7 @@ function AdventureCreatorContent() {
                                           />{" "}
                                           Lores that turn this OFF
                                         </label>
-                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                                           {lore.filter((_, i) => i !== index)
                                             .length === 0 ? (
                                             <p className="text-xs text-gray-500 dark:text-gray-400 italic">
@@ -4967,7 +4967,7 @@ function AdventureCreatorContent() {
                                               addEditLoreKey())
                                             }
                                             placeholder="e.g., 'Dragon Defeated'"
-                                            className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                            className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                           />
                                           <button
                                             onClick={addEditLoreKey}
@@ -5015,7 +5015,7 @@ function AdventureCreatorContent() {
                                           />{" "}
                                           Beats that turn this lore ON
                                         </label>
-                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                                           {plotBeats.length === 0 ? (
                                             <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                               No plot beats yet. Add them in the
@@ -5069,7 +5069,7 @@ function AdventureCreatorContent() {
                                           />{" "}
                                           Beats that turn this lore OFF
                                         </label>
-                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                                           {plotBeats.length === 0 ? (
                                             <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                               No plot beats yet. Add them in the
@@ -5305,7 +5305,7 @@ function AdventureCreatorContent() {
                               setLorePage((p) => Math.max(1, p - 1))
                             }
                             disabled={lorePage === 1}
-                            className="px-3 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded disabled:opacity-50 text-sm"
+                            className="px-3 py-1 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 rounded disabled:opacity-50 text-sm"
                           >
                             Previous
                           </button>
@@ -5317,7 +5317,7 @@ function AdventureCreatorContent() {
                               setLorePage((p) => Math.min(totalPages, p + 1))
                             }
                             disabled={lorePage === totalPages}
-                            className="px-3 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded disabled:opacity-50 text-sm"
+                            className="px-3 py-1 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 rounded disabled:opacity-50 text-sm"
                           >
                             Next
                           </button>
@@ -5368,7 +5368,7 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., King's Guard, The Shadow Syndicate"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -5391,7 +5391,7 @@ function AdventureCreatorContent() {
                         value: parseInt(e.target.value),
                       })
                     }
-                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 bg-gray-200 dark:bg-gray-900 rounded-lg appearance-none cursor-pointer"
                     style={{
                       background: `linear-gradient(to right, 
                         #ef4444 0%, 
@@ -5421,7 +5421,7 @@ function AdventureCreatorContent() {
                     }
                     placeholder="Describe the current state of this relationship..."
                     rows={3}
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
                   />
                 </div>
               </div>
@@ -5448,7 +5448,7 @@ function AdventureCreatorContent() {
                       setRelationshipPage(1);
                     }}
                     placeholder="Search relationships..."
-                    className="pl-8 pr-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-pink-500"
+                    className="pl-8 pr-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-pink-500"
                   />
                   <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">
                     <DynamicIcon name="Search" className="w-4 h-4" />
@@ -5526,7 +5526,7 @@ function AdventureCreatorContent() {
                                         name: e.target.value,
                                       })
                                     }
-                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                   />
                                 </div>
                                 <div>
@@ -5552,7 +5552,7 @@ function AdventureCreatorContent() {
                                         value: parseInt(e.target.value),
                                       })
                                     }
-                                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                    className="w-full h-2 bg-gray-200 dark:bg-gray-900 rounded-lg appearance-none cursor-pointer"
                                     style={{
                                       background: `linear-gradient(to right, 
                                       #ef4444 0%, 
@@ -5581,7 +5581,7 @@ function AdventureCreatorContent() {
                                       })
                                     }
                                     rows={3}
-                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
                                   />
                                 </div>
                                 <div className="flex gap-2">
@@ -5739,7 +5739,7 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Dragon Slayer"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -5767,7 +5767,7 @@ function AdventureCreatorContent() {
                         points: parseInt(e.target.value) || 10,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -5787,7 +5787,7 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Defeat your first dragon"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -5807,7 +5807,7 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Trigger when player defeats the red dragon in the mountain lair"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     <DynamicIcon
@@ -6122,7 +6122,7 @@ function AdventureCreatorContent() {
                       setNewPlotBeat({ ...newPlotBeat, title: e.target.value })
                     }
                     placeholder="e.g., The Ancient Prophecy"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -6139,7 +6139,7 @@ function AdventureCreatorContent() {
                     }
                     placeholder="e.g., The player discovers the truth about the ancient prophecy"
                     rows={3}
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
                   />
                 </div>
                 <div>
@@ -6159,7 +6159,7 @@ function AdventureCreatorContent() {
                     }
                     placeholder="Default: 25"
                     min="0"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Leave empty to use default (25 points)
@@ -6223,7 +6223,7 @@ function AdventureCreatorContent() {
                                 title: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                           />
                         </div>
                         <div>
@@ -6239,7 +6239,7 @@ function AdventureCreatorContent() {
                               })
                             }
                             rows={3}
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
                           />
                         </div>
                         <div>
@@ -6259,7 +6259,7 @@ function AdventureCreatorContent() {
                             }
                             placeholder="Default: 25"
                             min="0"
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                           />
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             Leave empty to use default (25 points)
@@ -6400,7 +6400,7 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Find the Lost Artifact"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -6417,7 +6417,7 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Recover the ancient relic from the temple"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -6434,7 +6434,7 @@ function AdventureCreatorContent() {
                     }
                     placeholder="Detailed quest description with context and objectives..."
                     rows={3}
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
                   />
                 </div>
                 <div>
@@ -6451,7 +6451,7 @@ function AdventureCreatorContent() {
                         points: parseInt(e.target.value) || 10,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div className="flex items-center gap-4">
@@ -6875,7 +6875,7 @@ function AdventureCreatorContent() {
                     }
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-4 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                  <div className="w-14 h-7 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-4 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
                 </label>
               </div>
             </div>
@@ -6900,7 +6900,7 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
 
@@ -6923,7 +6923,7 @@ function AdventureCreatorContent() {
                             })
                           }
                           min="1"
-                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                         />
                       </div>
                       <div>
@@ -6944,7 +6944,7 @@ function AdventureCreatorContent() {
                           }
                           min="1"
                           max="10"
-                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                         />
                       </div>
                     </div>
@@ -6969,7 +6969,7 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:peer-focus:ring-green-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
+                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:peer-focus:ring-green-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
                     </label>
                   </div>
 
@@ -6992,7 +6992,7 @@ function AdventureCreatorContent() {
                             })
                           }
                           min="1"
-                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                         />
                       </div>
                       <div>
@@ -7013,7 +7013,7 @@ function AdventureCreatorContent() {
                           }
                           min="1"
                           max="50"
-                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                         />
                       </div>
                     </div>
@@ -7038,7 +7038,7 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
                     </label>
                   </div>
 
@@ -7060,7 +7060,7 @@ function AdventureCreatorContent() {
                           })
                         }
                         min="1"
-                        className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                       />
                     </div>
                   )}
@@ -7084,7 +7084,7 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-300 dark:peer-focus:ring-cyan-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-cyan-600"></div>
+                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-300 dark:peer-focus:ring-cyan-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-cyan-600"></div>
                     </label>
                   </div>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
@@ -7131,7 +7131,7 @@ function AdventureCreatorContent() {
                                 });
                               }}
                               placeholder="Name"
-                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                             />
                             <IconPicker
                               value={stat.symbol}
@@ -7157,7 +7157,7 @@ function AdventureCreatorContent() {
                               });
                             }}
                             placeholder="Description"
-                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                           />
                           <div className="grid grid-cols-2 gap-2">
                             <div>
@@ -7177,7 +7177,7 @@ function AdventureCreatorContent() {
                                     statShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                 min="1"
                               />
                             </div>
@@ -7198,7 +7198,7 @@ function AdventureCreatorContent() {
                                     statShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                 min="1"
                               />
                             </div>
@@ -7242,7 +7242,7 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 dark:peer-focus:ring-teal-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-teal-600"></div>
+                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 dark:peer-focus:ring-teal-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-teal-600"></div>
                     </label>
                   </div>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
@@ -7295,7 +7295,7 @@ function AdventureCreatorContent() {
                                 });
                               }}
                               placeholder="Name"
-                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                             />
                             <IconPicker
                               value={resource.symbol}
@@ -7323,7 +7323,7 @@ function AdventureCreatorContent() {
                               });
                             }}
                             placeholder="Description"
-                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                           />
                           <div className="grid grid-cols-3 gap-2">
                             <div>
@@ -7345,7 +7345,7 @@ function AdventureCreatorContent() {
                                     resourceShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                 min="0"
                               />
                             </div>
@@ -7368,7 +7368,7 @@ function AdventureCreatorContent() {
                                     resourceShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                 min="1"
                               />
                             </div>
@@ -7391,7 +7391,7 @@ function AdventureCreatorContent() {
                                     resourceShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                 min="1"
                               />
                             </div>
@@ -7435,7 +7435,7 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 dark:peer-focus:ring-amber-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-amber-600"></div>
+                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 dark:peer-focus:ring-amber-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-amber-600"></div>
                     </label>
                   </div>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
@@ -7483,7 +7483,7 @@ function AdventureCreatorContent() {
                                 });
                               }}
                               placeholder="Name"
-                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                             />
                             <IconPicker
                               value={item.symbol}
@@ -7509,7 +7509,7 @@ function AdventureCreatorContent() {
                               });
                             }}
                             placeholder="Description"
-                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                           />
                           <div className="grid grid-cols-3 gap-2">
                             <div>
@@ -7526,7 +7526,7 @@ function AdventureCreatorContent() {
                                     itemShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                               >
                                 <option value="normal">Normal</option>
                                 <option value="consumable">Consumable</option>
@@ -7551,7 +7551,7 @@ function AdventureCreatorContent() {
                                     itemShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                 min="1"
                               />
                             </div>
@@ -7572,7 +7572,7 @@ function AdventureCreatorContent() {
                                     itemShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                 min="1"
                               />
                             </div>
@@ -7729,7 +7729,7 @@ function AdventureCreatorContent() {
                 <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
                   Opening Scene
                 </h3>
-                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-6 border-l-4 border-purple-500">
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 border-l-4 border-purple-500">
                   <p className="text-gray-800 dark:text-gray-200 italic">
                     "{intro}"
                   </p>
@@ -7807,7 +7807,7 @@ function AdventureCreatorContent() {
                     ? "bg-purple-600 text-white"
                     : index < currentStepIndex
                     ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                    : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300"
                 }`}
               >
                 <DynamicIcon name={step.icon} className="w-5 h-5" />
@@ -7833,7 +7833,7 @@ function AdventureCreatorContent() {
               setCurrentStep(steps[prevIndex].id);
             }}
             disabled={currentStepIndex === 0}
-            className="px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
+            className="px-3 py-2 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
           >
             ← Previous
           </button>
@@ -7847,7 +7847,7 @@ function AdventureCreatorContent() {
               <button
                 onClick={handleSaveLocally}
                 disabled={saving}
-                className="flex-1 sm:flex-none px-3 py-2 bg-white dark:bg-gray-700 border-2 border-gray-600 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
+                className="flex-1 sm:flex-none px-3 py-2 bg-white dark:bg-gray-900 border-2 border-gray-600 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
                 title="Save to your device without publishing"
               >
                 <DynamicIcon name="Save" className="w-4 h-4 inline mr-2" />

@@ -297,7 +297,7 @@ function AIModelSelector({
   };
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
+    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden">
       <label className="p-4 pb-3 text-sm font-semibold text-gray-700 dark:text-gray-300 flex justify-between items-center">
         <span className="flex items-center gap-2">
           <DynamicIcon name="Bot" className="w-4 h-4" /> AI Model Selection
@@ -638,7 +638,7 @@ function AIModelSelector({
                   {customModels.map((model) => (
                     <div
                       key={model.id}
-                      className="p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600"
+                      className="p-2 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-600"
                     >
                       {editingModelId === model.id ? (
                         // Edit Mode
@@ -961,7 +961,7 @@ function BasicSettings({
           type="text"
           value={form.story_name}
           onChange={(e) => onChange({ ...form, story_name: e.target.value })}
-          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
       <div>
@@ -972,7 +972,7 @@ function BasicSettings({
           type="text"
           value={form.player_name}
           onChange={(e) => onChange({ ...form, player_name: e.target.value })}
-          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
       <div>
@@ -984,7 +984,7 @@ function BasicSettings({
           onChange={(e) =>
             onChange({ ...form, player_summary: e.target.value })
           }
-          className="w-full h-32 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+          className="w-full h-32 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
         />
       </div>
       <div>
@@ -994,7 +994,7 @@ function BasicSettings({
         <textarea
           value={form.premise}
           onChange={(e) => onChange({ ...form, premise: e.target.value })}
-          className="w-full h-24 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+          className="w-full h-24 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
         />
       </div>
       <div>
@@ -1007,7 +1007,7 @@ function BasicSettings({
           onChange={(e) =>
             onChange({ ...form, max_chapters: parseInt(e.target.value) || 0 })
           }
-          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1022,7 +1022,7 @@ function BasicSettings({
             onChange={(e) =>
               onChange({ ...form, points: parseInt(e.target.value) || 0 })
             }
-            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
         <div>
@@ -1036,7 +1036,7 @@ function BasicSettings({
             onChange={(e) =>
               onChange({ ...form, momentum: parseInt(e.target.value) || 0 })
             }
-            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
         <div>
@@ -1050,7 +1050,7 @@ function BasicSettings({
             onChange={(e) =>
               onChange({ ...form, maxMomentum: parseInt(e.target.value) || 1 })
             }
-            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
       </div>
@@ -1523,7 +1523,7 @@ function StatsResourcesEditor({
                 onDragStart={() => handleStatDragStart(index)}
                 onDragOver={(e) => handleStatDragOver(e, index)}
                 onDragEnd={handleStatDragEnd}
-                className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move"
+                className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move"
                 style={{ opacity: draggedStatIndex === index ? 0.5 : 1 }}
               >
                 <div className="flex items-start gap-3">
@@ -1683,7 +1683,7 @@ function StatsResourcesEditor({
                 onDragStart={() => handleResourceDragStart(index)}
                 onDragOver={(e) => handleResourceDragOver(e, index)}
                 onDragEnd={handleResourceDragEnd}
-                className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
+                className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move flex items-center gap-3 ${
                   draggedResourceIndex === index ? "opacity-50" : ""
                 }`}
               >
@@ -1874,7 +1874,7 @@ function StatsResourcesEditor({
                 onDragStart={() => handleAchievementDragStart(index)}
                 onDragOver={(e) => handleAchievementDragOver(e, index)}
                 onDragEnd={handleAchievementDragEnd}
-                className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
+                className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move flex items-center gap-3 ${
                   draggedAchievementIndex === index ? "opacity-50" : ""
                 }`}
               >
@@ -2181,7 +2181,7 @@ function QuestEditor({
                 onDragStart={() => handleQuestDragStart(index)}
                 onDragOver={(e) => handleQuestDragOver(e, index)}
                 onDragEnd={handleQuestDragEnd}
-                className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
+                className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move flex items-center gap-3 ${
                   draggedQuestIndex === index ? "opacity-50" : ""
                 }`}
               >
@@ -2484,7 +2484,7 @@ function InventoryEditor({
               onDragStart={() => handleInventoryDragStart(index)}
               onDragOver={(e) => handleInventoryDragOver(e, index)}
               onDragEnd={handleInventoryDragEnd}
-              className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
+              className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move flex items-center gap-3 ${
                 draggedInventoryIndex === index ? "opacity-50" : ""
               }`}
             >
@@ -2997,7 +2997,7 @@ function LoreEditor({
                     onClick={() =>
                       setEditLoreAdvancedExpanded(!editLoreAdvancedExpanded)
                     }
-                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                   >
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                       <DynamicIcon
@@ -3027,7 +3027,7 @@ function LoreEditor({
                             />
                             Lores that turn this ON
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                             {localLore.filter((_, i) => i !== index).length ===
                             0 ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400 italic">
@@ -3076,7 +3076,7 @@ function LoreEditor({
                             />
                             Lores that turn this OFF
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                             {localLore.filter((_, i) => i !== index).length ===
                             0 ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400 italic">
@@ -3129,7 +3129,7 @@ function LoreEditor({
                             />
                             Beats that turn this lore ON
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                             {plotBeats.length === 0 ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                 No plot beats yet.
@@ -3175,7 +3175,7 @@ function LoreEditor({
                             />
                             Beats that turn this lore OFF
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700">
+                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
                             {plotBeats.length === 0 ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                 No plot beats yet.
@@ -3241,7 +3241,7 @@ function LoreEditor({
               onDragStart={() => handleLoreDragStart(index)}
               onDragOver={(e) => handleLoreDragOver(e, index)}
               onDragEnd={handleLoreDragEnd}
-              className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move flex items-center gap-3 ${
+              className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move flex items-center gap-3 ${
                 draggedLoreIndex === index ? "opacity-50" : ""
               }`}
             >
@@ -3499,7 +3499,7 @@ function RelationshipsEditor({
                         value: parseInt(e.target.value),
                       })
                     }
-                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 bg-gray-200 dark:bg-gray-900 rounded-lg appearance-none cursor-pointer"
                     style={{
                       background: `linear-gradient(to right, 
                         #ef4444 0%, 
@@ -3595,7 +3595,7 @@ function RelationshipsEditor({
           )
         )}
         {localRelationships.length === 0 && (
-          <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-700/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
+          <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-900/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
             <p className="text-sm text-gray-500 dark:text-gray-400">
               No relationships yet. Add relationships to track your standing
               with characters, factions, and organizations.
@@ -3757,7 +3757,7 @@ function StoryMetaEditor({
               onDragStart={() => handlePlotBeatDragStart(index)}
               onDragOver={(e) => handlePlotBeatDragOver(e, index)}
               onDragEnd={handlePlotBeatDragEnd}
-              className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-opacity ${
+              className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg transition-opacity ${
                 editingPlotBeatIndex === index ? "" : "cursor-move"
               } ${
                 draggedPlotBeatIndex === index ? "opacity-50" : "opacity-100"
@@ -3923,7 +3923,7 @@ function StoryMetaEditor({
             onUpdate({ author_notes: e.target.value });
           }}
           placeholder="Add notes for the adventure creator or AI storyteller (these notes guide the narrative direction)..."
-          className="w-full h-32 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+          className="w-full h-32 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
         />
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           <DynamicIcon name="Lightbulb" className="w-3 h-3 inline mr-1" /> These
@@ -3944,7 +3944,7 @@ function StoryMetaEditor({
               placeholder="Add new memory entry..."
               value={newMemoryEntry}
               onChange={(e) => setNewMemoryEntry(e.target.value)}
-              className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+              className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
             />
             <button
               onClick={() => {
@@ -3964,7 +3964,7 @@ function StoryMetaEditor({
             {localMemory.map((entry, index) => (
               <div
                 key={index}
-                className="p-3 bg-gray-50 dark:bg-gray-700 rounded text-sm text-gray-700 dark:text-gray-300 flex justify-between items-center"
+                className="p-3 bg-gray-50 dark:bg-gray-900 rounded text-sm text-gray-700 dark:text-gray-300 flex justify-between items-center"
               >
                 <span className="pr-2 flex-1">{entry}</span>
                 <button
@@ -4470,7 +4470,7 @@ export default function MenuPage({
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+        <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-3 overflow-hidden">
           <div
             className="bg-linear-to-r from-purple-500 to-pink-500 h-3 transition-all duration-500"
             style={{ width: `${stats.progress}%` }}
@@ -4534,7 +4534,7 @@ export default function MenuPage({
               value={playerNotes}
               onChange={(e) => setPlayerNotes(e.target.value)}
               placeholder="Write your notes, strategies, or thoughts about the story..."
-              className="w-full h-40 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+              className="w-full h-40 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
             />
             <div className="flex gap-2 justify-end">
               <button
@@ -4542,7 +4542,7 @@ export default function MenuPage({
                   setPlayerNotes(storyData.player_notes || "");
                   setEditingNotes(false);
                 }}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
               >
                 Cancel
               </button>
@@ -4887,7 +4887,7 @@ export default function MenuPage({
                   className={`shrink-0 h-14 px-6 text-base font-semibold rounded-xl transition-colors whitespace-nowrap flex items-center gap-3 overflow-visible ${
                     activeTab === tab.id
                       ? "bg-purple-600 text-white shadow-md"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                   }`}
                 >
                   <DynamicIcon name={tab.icon} className="w-5 h-5 shrink-0" />
@@ -4982,7 +4982,7 @@ export default function MenuPage({
                     <AIModelSelector addNotification={addNotification} />
 
                     {/* Raw Context Toggle */}
-                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
                       <input
                         type="checkbox"
                         checked={
@@ -5017,7 +5017,7 @@ export default function MenuPage({
                       </div>
                     </label>
 
-                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
                       <input
                         type="checkbox"
                         checked={
@@ -5050,7 +5050,7 @@ export default function MenuPage({
                       </div>
                     </label>
 
-                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
                       <input
                         type="checkbox"
                         checked={
@@ -5084,7 +5084,7 @@ export default function MenuPage({
                       </div>
                     </label>
 
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
                       <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                         <DynamicIcon
                           name="Volume2"
@@ -5125,7 +5125,7 @@ export default function MenuPage({
                             )}%`;
                           }
                         }}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-900"
                       />
                       <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
                         <span>
@@ -5187,7 +5187,7 @@ export default function MenuPage({
                   });
                   setShowSettings(false);
                 }}
-                className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
+                className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
               >
                 Cancel
               </button>

@@ -647,11 +647,11 @@ export default function Home() {
                     key={i}
                     className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse"
                   >
-                    <div className="h-48 bg-gray-300 dark:bg-gray-700"></div>
+                    <div className="h-48 bg-gray-300 dark:bg-gray-900"></div>
                     <div className="p-6 space-y-3">
-                      <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-3/4"></div>
-                      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded"></div>
-                      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-5/6"></div>
+                      <div className="h-6 bg-gray-300 dark:bg-gray-900 rounded w-3/4"></div>
+                      <div className="h-4 bg-gray-300 dark:bg-gray-900 rounded"></div>
+                      <div className="h-4 bg-gray-300 dark:bg-gray-900 rounded w-5/6"></div>
                     </div>
                   </div>
                 ))
@@ -847,7 +847,7 @@ export default function Home() {
                                   ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
                                   : milestone.status === "wip"
                                   ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                  : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300"
                               }`}
                             >
                               {milestone.status === "done"
@@ -885,7 +885,7 @@ export default function Home() {
                 disabled={roadmapIndex === 0}
                 className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all shadow-md ${
                   roadmapIndex === 0
-                    ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed"
+                    ? "bg-gray-300 dark:bg-gray-900 text-gray-500 dark:text-gray-500 cursor-not-allowed"
                     : "bg-purple-600 hover:bg-purple-700 text-white hover:shadow-lg"
                 }`}
               >
@@ -929,7 +929,7 @@ export default function Home() {
                 disabled={roadmapIndex === road_map.length - 1}
                 className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all shadow-md ${
                   roadmapIndex === road_map.length - 1
-                    ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed"
+                    ? "bg-gray-300 dark:bg-gray-900 text-gray-500 dark:text-gray-500 cursor-not-allowed"
                     : "bg-purple-600 hover:bg-purple-700 text-white hover:shadow-lg"
                 }`}
               >

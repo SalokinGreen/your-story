@@ -265,7 +265,7 @@ export default function Comments({
           onChange={(e) =>
             setSortBy(e.target.value as "newest" | "oldest" | "likes")
           }
-          className="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold"
+          className="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm font-semibold"
         >
           <option value="newest">Newest First</option>
           <option value="oldest">Oldest First</option>
@@ -288,7 +288,7 @@ export default function Comments({
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="Share your thoughts about this adventure..."
               rows={4}
-              className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
+              className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
               maxLength={500}
             />
             <div className="flex items-center justify-between mt-2">
@@ -449,7 +449,7 @@ export default function Comments({
                   className={`flex items-center gap-2 px-3 py-1 rounded-lg font-semibold text-sm transition-colors ${
                     comment.likedBy?.includes(user?.id || "")
                       ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                   }`}
                 >
                   {comment.likedBy?.includes(user?.id || "") ? (
