@@ -295,13 +295,32 @@ ${
   const messages: ChatMessage[] = [
     { role: "system", content: cleanString(systemPrompt) },
     { role: "user", content: cleanString(infoMessage) },
-    {
-      role: "user",
-      content: cleanString(
-        `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.`
-      ),
-    },
   ];
+
+  // Add last 10 scene parts for context
+  const recentParts = storyData.scene.parts.slice(-10);
+  for (const part of recentParts) {
+    if (part.user) {
+      messages.push({
+        role: "user",
+        content: cleanString(part.content),
+      });
+    } else {
+      const assistantContent = part.raw || part.content;
+      messages.push({
+        role: "assistant",
+        content: cleanString(assistantContent),
+      });
+    }
+  }
+
+  // Add the new story content
+  messages.push({
+    role: "user",
+    content: cleanString(
+      `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.`
+    ),
+  });
 
   // If we have existing tool calls, add them to history and prompt for more
   if (existingToolCalls && existingToolCalls.length > 0) {
@@ -382,11 +401,27 @@ Resource System:
 - When a choice uses a resource (use_resource), that resource is AUTOMATICALLY at risk if the skill check fails
 - Choose resources that thematically fit the action: use Stamina for running/escaping, Health for combat/dangerous situations, Mana for spellcasting, etc.
 - Resource requirements are DYNAMIC based on DC:
-  * Required amount: DC ÷ ${rpgSystem.resources.requiredDivisor} (rounded down, minimum ${rpgSystem.resources.minRequired})
-  * If player has insufficient resource: dice roll receives -DC÷${rpgSystem.resources.penaltyDivisor} penalty (minimum -${rpgSystem.resources.minPenalty})
-  * On success: RECOVERS DC ÷ ${rpgSystem.resources.recoverDivisor} points (minimum ${rpgSystem.resources.minRecover}), capped at max value
-  * On failure: loses DC ÷ ${rpgSystem.resources.lossDivisor} points (minimum ${rpgSystem.resources.minLoss})
-- Example: DC ${rpgSystem.dc.medium * 2} requires ${Math.floor((rpgSystem.dc.medium * 2) / rpgSystem.resources.requiredDivisor)} resource points. Insufficient resources = -${Math.floor((rpgSystem.dc.medium * 2) / rpgSystem.resources.penaltyDivisor)} to dice roll. Success recovers ${Math.floor((rpgSystem.dc.medium * 2) / rpgSystem.resources.recoverDivisor)} points, failure loses ${Math.floor((rpgSystem.dc.medium * 2) / rpgSystem.resources.lossDivisor)} points.
+  * Required amount: DC ÷ ${
+    rpgSystem.resources.requiredDivisor
+  } (rounded down, minimum ${rpgSystem.resources.minRequired})
+  * If player has insufficient resource: dice roll receives -DC÷${
+    rpgSystem.resources.penaltyDivisor
+  } penalty (minimum -${rpgSystem.resources.minPenalty})
+  * On success: RECOVERS DC ÷ ${
+    rpgSystem.resources.recoverDivisor
+  } points (minimum ${rpgSystem.resources.minRecover}), capped at max value
+  * On failure: loses DC ÷ ${rpgSystem.resources.lossDivisor} points (minimum ${
+    rpgSystem.resources.minLoss
+  })
+- Example: DC ${rpgSystem.dc.medium * 2} requires ${Math.floor(
+    (rpgSystem.dc.medium * 2) / rpgSystem.resources.requiredDivisor
+  )} resource points. Insufficient resources = -${Math.floor(
+    (rpgSystem.dc.medium * 2) / rpgSystem.resources.penaltyDivisor
+  )} to dice roll. Success recovers ${Math.floor(
+    (rpgSystem.dc.medium * 2) / rpgSystem.resources.recoverDivisor
+  )} points, failure loses ${Math.floor(
+    (rpgSystem.dc.medium * 2) / rpgSystem.resources.lossDivisor
+  )} points.
 - This creates meaningful risk/reward - higher DC actions demand more resources but reward success with recovery.
 
 Item Types:
@@ -420,13 +455,32 @@ Choice Design Guidelines:
   const messages: ChatMessage[] = [
     { role: "system", content: cleanString(systemPrompt) },
     { role: "user", content: cleanString(infoMessage) },
-    {
-      role: "user",
-      content: cleanString(
-        `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?`
-      ),
-    },
   ];
+
+  // Add last 8 scene parts for context
+  const recentParts = storyData.scene.parts.slice(-8);
+  for (const part of recentParts) {
+    if (part.user) {
+      messages.push({
+        role: "user",
+        content: cleanString(part.content),
+      });
+    } else {
+      const assistantContent = part.raw || part.content;
+      messages.push({
+        role: "assistant",
+        content: cleanString(assistantContent),
+      });
+    }
+  }
+
+  // Add the new story content
+  messages.push({
+    role: "user",
+    content: cleanString(
+      `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?`
+    ),
+  });
 
   return { messages };
 }
