@@ -257,6 +257,82 @@ export const AI_MODELS = {
   },
 } as const;
 
+export interface ModelPreset {
+  id: string;
+  name: string;
+  description: string;
+  storyModel: string; // Key from AI_MODELS
+  toolsModel: string; // Key from AI_MODELS
+  choicesModel: string; // Key from AI_MODELS
+  estimatedCost: number; // Sum of the three model costs
+}
+
+export const MODEL_PRESETS: Record<string, ModelPreset> = {
+  main: {
+    id: "main",
+    name: "Main",
+    description: "Creative narration, powerful tools, fast choices",
+    storyModel: "Deepseek Chat",
+    toolsModel: "Grok Code Fast 1",
+    choicesModel: "Gemini 2.5 Flash Lite",
+    estimatedCost: 12, // 1 + 10 + 1
+  },
+  budget: {
+    id: "budget",
+    name: "Budget (Cost-Effective)",
+    description: "Optimized for low token usage while maintaining quality",
+    storyModel: "Gemini 2.5 Flash Lite",
+    toolsModel: "Gemini 2.5 Flash Lite",
+    choicesModel: "Gemini 2.5 Flash Lite",
+    estimatedCost: 3, // 1 + 1 + 1
+  },
+  creative: {
+    id: "creative",
+    name: "Creative (High Quality)",
+    description: "Best creative writing with powerful tool execution",
+    storyModel: "Deepseek Reasoner",
+    toolsModel: "Grok Code Fast 1",
+    choicesModel: "Gemini 2.5 Flash",
+    estimatedCost: 21, // 10 + 10 + 1
+  },
+  balanced: {
+    id: "balanced",
+    name: "Balanced (Quality + Cost)",
+    description: "Good balance between quality and token cost",
+    storyModel: "Deepseek Chat",
+    toolsModel: "Qwen 2.5 72B Instruct",
+    choicesModel: "Gemini 2.5 Flash Lite",
+    estimatedCost: 3, // 1 + 1 + 1
+  },
+  speed: {
+    id: "speed",
+    name: "Speed (Fast Responses)",
+    description: "Optimized for quick generation times",
+    storyModel: "Grok 4 Fast",
+    toolsModel: "Grok Code Fast 1",
+    choicesModel: "Gemini 2.5 Flash Lite",
+    estimatedCost: 12, // 10 + 1 + 1
+  },
+  novelai: {
+    id: "novelai",
+    name: "NovelAI (Prose Focused)",
+    description: "Focused on rich prose and storytelling",
+    storyModel: "NovelAI GLM Opus",
+    toolsModel: "Grok Code Fast 1",
+    choicesModel: "NovelAI GLM Opus",
+    estimatedCost: 1, // 0 + 1 + 1
+  },
+  custom: {
+    id: "custom",
+    name: "Custom",
+    description: "Choose your own models for each stage",
+    storyModel: "Deepseek Chat", // Defaults
+    toolsModel: "Grok Code Fast 1",
+    choicesModel: "Gemini 2.5 Flash Lite",
+    estimatedCost: 12,
+  },
+};
+
 export interface AIModelConfig {
   name: string;
   original_model: string;

@@ -79,7 +79,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         logger.info(`Notification: ${message}`);
       }
       // Don't log success notifications to avoid clutter
-      
+
       setQueue((prev) => [...prev, { message, type, duration }]);
     },
     []

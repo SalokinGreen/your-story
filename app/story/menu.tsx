@@ -17,7 +17,7 @@ import { useNotification } from "../misc/NotificationContext";
 import { supabase } from "../misc/supabase";
 import { compressImage } from "../misc/imageCompression";
 import CustomVoiceManager from "../components/CustomVoiceManager";
-import { AI_MODELS } from "../misc/ai_prices";
+import { AI_MODELS, MODEL_PRESETS } from "../misc/ai_prices";
 import ConfirmDialog from "../components/ConfirmDialog";
 import {
   getUserSettings,
@@ -38,11 +38,11 @@ function AIModelSelector({
   ) => void;
 }) {
   const { user } = useAuth();
-  const [currentModelKey, setCurrentModelKey] = useState(() => {
+  const [currentPreset, setCurrentPreset] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("aiModel") || "Prometheus";
+      return localStorage.getItem("aiPreset") || "main";
     }
-    return "Prometheus";
+    return "main";
   });
 
   // BYOK State
@@ -58,14 +58,7 @@ function AIModelSelector({
     return true;
   });
 
-  const [stagedModeEnabled, setStagedModeEnabled] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("aiStagedMode") === "true"; // Default false
-    }
-    return false;
-  });
-
-  // Staged mode model configuration
+  // Model configuration for custom preset
   const [showModelConfig, setShowModelConfig] = useState(false);
   const [storyModel, setStoryModel] = useState(() => {
     if (typeof window !== "undefined") {
@@ -281,25 +274,25 @@ function AIModelSelector({
     };
   });
 
-  const currentModel =
-    availableModels[currentModelKey] || AI_MODELS["Deepseek Chat"];
-  AI_MODELS["Deepseek Chat"];
+  // Get current preset configuration
+  const preset = MODEL_PRESETS[currentPreset];
+  const effectiveStoryModel =
+    currentPreset === "custom" && storyModel ? storyModel : preset.storyModel;
+  const effectiveToolsModel =
+    currentPreset === "custom" && toolsModel ? toolsModel : preset.toolsModel;
+  const effectiveChoicesModel =
+    currentPreset === "custom" && choicesModel
+      ? choicesModel
+      : preset.choicesModel;
 
-  const handleModelChange = (newModelKey: string) => {
+  const handlePresetChange = (newPreset: string) => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("aiModel", newModelKey);
-      setCurrentModelKey(newModelKey);
-
-      const selectedModel = availableModels[newModelKey];
-      if (selectedModel) {
-        const isByok = customModels.some((m) => m.id === newModelKey);
-        addNotification(
-          `Model changed to ${selectedModel.name}${
-            isByok ? " (BYOK - FREE)" : ""
-          }`,
-          "success"
-        );
-      }
+      localStorage.setItem("aiPreset", newPreset);
+      setCurrentPreset(newPreset);
+      addNotification(
+        `Preset changed to ${MODEL_PRESETS[newPreset].name}`,
+        "success"
+      );
     }
   };
 
@@ -318,74 +311,47 @@ function AIModelSelector({
       </label>
 
       <div className="px-4 pb-4">
-        {/* Current Model Banner */}
-        <div
-          className={`bg-linear-to-r ${
-            isSubscriber &&
-            byokEnabled &&
-            (openRouterKey || currentModelKey === "custom")
-              ? "from-green-600 to-teal-600"
-              : "from-purple-600 to-blue-600"
-          } rounded-lg p-4 text-white mb-4`}
-        >
+        {/* Current Preset Banner */}
+        <div className="bg-linear-to-r from-purple-600 to-blue-600 rounded-lg p-4 text-white mb-4">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <div className="text-xl font-bold">{currentModel.name}</div>
+              <div className="text-xl font-bold">{preset.name}</div>
               <div className="text-sm text-purple-100">
-                {currentModel.original_model}
+                {preset.description}
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold">
-                {isSubscriber &&
-                byokEnabled &&
-                (openRouterKey || currentModelKey === "custom")
-                  ? "FREE"
-                  : currentModel.cost}
-              </div>
-              <div className="text-xs text-purple-100">
-                {isSubscriber &&
-                byokEnabled &&
-                (openRouterKey || currentModelKey === "custom")
-                  ? "(BYOK)"
-                  : "coins/gen"}
-              </div>
+              <div className="text-2xl font-bold">~{preset.estimatedCost}</div>
+              <div className="text-xs text-purple-100">coins/gen</div>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex flex-col gap-1 text-xs mt-2">
             <div>
-              <span className="text-purple-100">Context:</span>{" "}
-              <span className="font-semibold">
-                {(currentModel.maxTokens / 1000).toFixed(0)}K tokens
-              </span>
+              <span className="text-purple-200">Story:</span>{" "}
+              {effectiveStoryModel}
+            </div>
+            <div>
+              <span className="text-purple-200">Tools:</span>{" "}
+              {effectiveToolsModel}
+            </div>
+            <div>
+              <span className="text-purple-200">Choices:</span>{" "}
+              {effectiveChoicesModel}
             </div>
           </div>
         </div>
 
-        {/* Model Selection Dropdown */}
+        {/* Preset Selection Dropdown */}
         <select
-          value={currentModelKey}
-          onChange={(e) => handleModelChange(e.target.value)}
+          value={currentPreset}
+          onChange={(e) => handlePresetChange(e.target.value)}
           className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
-          {Object.entries(AI_MODELS).map(([key, config]) => (
+          {Object.entries(MODEL_PRESETS).map(([key, presetConfig]) => (
             <option key={key} value={key}>
-              {config.name} - {config.original_model} (
-              {(config as any).cost || 1} coin
-              {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
-              {(config.maxTokens / 1000).toFixed(0)}K context)
+              {presetConfig.name} - ~{presetConfig.estimatedCost} coins
             </option>
           ))}
-          {isSubscriber && byokEnabled && customModels.length > 0 && (
-            <optgroup label="Custom Models (BYOK)">
-              {customModels.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name} - {model.modelId} (FREE,{" "}
-                  {(model.contextSize / 1000).toFixed(0)}K context)
-                </option>
-              ))}
-            </optgroup>
-          )}
         </select>
 
         {/* Advanced Settings / BYOK Section */}
@@ -468,50 +434,15 @@ function AIModelSelector({
               </button>
             </div>
 
-            {/* Staged Generation Mode Toggle */}
-            <div className="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    Staged Generation Mode
-                  </span>
-                  <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs font-semibold rounded">
-                    variable cost
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  3 separate generations (story, tools, choices) - cost based on selected models
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  const newValue = !stagedModeEnabled;
-                  setStagedModeEnabled(newValue);
-                  if (typeof window !== "undefined") {
-                    localStorage.setItem("aiStagedMode", String(newValue));
-                  }
-                }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  stagedModeEnabled ? "bg-orange-600" : "bg-gray-400"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    stagedModeEnabled ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Staged Mode Model Configuration */}
-            {stagedModeEnabled && (
+            {/* Custom Preset Model Configuration */}
+            {currentPreset === "custom" && (
               <div className="space-y-3 border-t border-gray-200 dark:border-gray-600 pt-3">
                 <button
                   onClick={() => setShowModelConfig(!showModelConfig)}
                   className="flex items-center justify-between w-full text-left"
                 >
                   <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Configure Stage Models
+                    Configure Custom Models
                   </h4>
                   <DynamicIcon
                     name={showModelConfig ? "ChevronUp" : "ChevronDown"}
@@ -522,8 +453,7 @@ function AIModelSelector({
                 {showModelConfig && (
                   <div className="space-y-4 pl-2">
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Choose different models for each generation stage. Empty =
-                      use main model.
+                      Choose models for each generation stage
                     </p>
 
                     {/* Story Model Selector */}
@@ -532,11 +462,18 @@ function AIModelSelector({
                         Story Narration Model
                       </label>
                       <select
-                        value={storyModel}
-                        onChange={(e) => setStoryModel(e.target.value)}
+                        value={storyModel || preset.storyModel}
+                        onChange={(e) => {
+                          setStoryModel(e.target.value);
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem(
+                              "aiModelStory",
+                              e.target.value
+                            );
+                          }
+                        }}
                         className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
-                        <option value="">Use Main Model</option>
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
                             {config.name} - {config.original_model} (
@@ -566,11 +503,18 @@ function AIModelSelector({
                         Tools & Game State Model
                       </label>
                       <select
-                        value={toolsModel}
-                        onChange={(e) => setToolsModel(e.target.value)}
+                        value={toolsModel || preset.toolsModel}
+                        onChange={(e) => {
+                          setToolsModel(e.target.value);
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem(
+                              "aiModelTools",
+                              e.target.value
+                            );
+                          }
+                        }}
                         className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
-                        <option value="">Use Main Model</option>
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
                             {config.name} - {config.original_model} (
@@ -600,11 +544,18 @@ function AIModelSelector({
                         Player Choices Model
                       </label>
                       <select
-                        value={choicesModel}
-                        onChange={(e) => setChoicesModel(e.target.value)}
+                        value={choicesModel || preset.choicesModel}
+                        onChange={(e) => {
+                          setChoicesModel(e.target.value);
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem(
+                              "aiModelChoices",
+                              e.target.value
+                            );
+                          }
+                        }}
                         className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
-                        <option value="">Use Main Model</option>
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
                             {config.name} - {config.original_model} (
@@ -629,55 +580,6 @@ function AIModelSelector({
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Cost Estimate for Staged Mode */}
-            {stagedModeEnabled && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
-                    Estimated Cost per Generation:
-                  </span>
-                  <span className="text-sm font-bold text-blue-900 dark:text-blue-300">
-                    {(() => {
-                      // Get effective models (fallback to main if not set)
-                      const effectiveStoryModel = storyModel || currentModelKey;
-                      const effectiveToolsModel = toolsModel || currentModelKey;
-                      const effectiveChoicesModel =
-                        choicesModel || currentModelKey;
-
-                      // Get costs (1 for custom models, actual cost for predefined)
-                      const storyCost =
-                        effectiveStoryModel.startsWith("custom-")
-                          ? 0
-                          : ((AI_MODELS as any)[effectiveStoryModel]?.cost ||
-                            1);
-                      const toolsCost =
-                        effectiveToolsModel.startsWith("custom-")
-                          ? 0
-                          : ((AI_MODELS as any)[effectiveToolsModel]?.cost ||
-                            1);
-                      const choicesCost =
-                        effectiveChoicesModel.startsWith("custom-")
-                          ? 0
-                          : ((AI_MODELS as any)[effectiveChoicesModel]?.cost ||
-                            1);
-
-                      const totalCost = storyCost + toolsCost + choicesCost;
-
-                      // Show BYOK status if all models are custom
-                      if (totalCost === 0) {
-                        return "FREE (BYOK)";
-                      }
-
-                      return `~${totalCost} coin${totalCost !== 1 ? "s" : ""} + tool bonus`;
-                    })()}
-                  </span>
-                </div>
-                <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
-                  Base cost from 3 stages + 1 coin per 2 tool calls
-                </p>
               </div>
             )}
 

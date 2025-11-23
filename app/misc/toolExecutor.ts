@@ -209,7 +209,9 @@ export function executeTools(
 
         if (!descResponse || !descResponse.success) {
           // Value was updated but description failed - return partial success
-          const partialMsg = `${valueResponse.message} (description update failed: ${
+          const partialMsg = `${
+            valueResponse.message
+          } (description update failed: ${
             descResponse?.message || "unknown error"
           })`;
           logger.warn(`Tool call partial success: ${partialMsg}`, {

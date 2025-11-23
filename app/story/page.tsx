@@ -15,6 +15,7 @@ import {
   checkSuccess,
   calculateResourceRequirements,
 } from "../misc/rpgSystems";
+import { MODEL_PRESETS } from "../misc/ai_prices";
 import Story from "./story";
 import StatsPage from "./stats";
 import LorePage from "./lore";
@@ -29,6 +30,38 @@ import { useNotification } from "../misc/NotificationContext";
 import { useAuth } from "../misc/AuthContext";
 import { supabase } from "../misc/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
+
+// Helper function to get models from preset
+function getModelsFromPreset() {
+  if (typeof window === "undefined") {
+    const preset = MODEL_PRESETS["main"];
+    return {
+      storyModel: preset.storyModel,
+      toolsModel: preset.toolsModel,
+      choicesModel: preset.choicesModel,
+    };
+  }
+
+  const currentPreset = localStorage.getItem("aiPreset") || "main";
+  const preset = MODEL_PRESETS[currentPreset];
+
+  // For custom preset, check if user has overridden any models
+  if (currentPreset === "custom") {
+    return {
+      storyModel: localStorage.getItem("aiModelStory") || preset.storyModel,
+      toolsModel: localStorage.getItem("aiModelTools") || preset.toolsModel,
+      choicesModel:
+        localStorage.getItem("aiModelChoices") || preset.choicesModel,
+    };
+  }
+
+  // For non-custom presets, use the preset's models directly
+  return {
+    storyModel: preset.storyModel,
+    toolsModel: preset.toolsModel,
+    choicesModel: preset.choicesModel,
+  };
+}
 import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { authenticatedFetch } from "../misc/getAuthToken";
@@ -2097,25 +2130,14 @@ function StoryPageContent() {
       },
     };
 
+    const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
+
     const payload = {
       storyData: minimalStoryData,
-      userChoice: null, //Nospecificchoice,justcustomtext
-      model:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModel") || undefined
-          : undefined,
-      modelStory:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModelStory") || undefined
-          : undefined,
-      modelTools:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModelTools") || undefined
-          : undefined,
-      modelChoices:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModelChoices") || undefined
-          : undefined,
+      userChoice: null, // No specific choice, just custom text
+      modelStory: storyModel,
+      modelTools: toolsModel,
+      modelChoices: choicesModel,
       useRawContext:
         typeof window !== "undefined"
           ? localStorage.getItem("useRawContext") === "true"
@@ -2139,19 +2161,13 @@ function StoryPageContent() {
       `Custom input payload size: ${(payloadSize / 1024).toFixed(2)} KB`
     );
 
-    // Check if staged mode is enabled
-    const stagedMode =
-      typeof window !== "undefined"
-        ? localStorage.getItem("aiStagedMode") === "true"
-        : false;
-    const apiEndpoint = stagedMode
-      ? "/api/story/next-staged"
-      : "/api/story/next";
+    const apiEndpoint = "/api/story/next-staged";
 
     logger.ai_request("Sending custom input to AI", {
-      model: payload.model,
+      modelStory: storyModel,
+      modelTools: toolsModel,
+      modelChoices: choicesModel,
       payloadSize,
-      stagedMode,
     });
 
     if (payloadSize > 4 * 1024 * 1024) {
@@ -3514,25 +3530,14 @@ function StoryPageContent() {
       },
     };
 
+    const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
+
     const payload = {
       storyData: minimalStoryData,
-      userChoice: null, //Nospecificchoice,justcustomtext
-      model:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModel") || undefined
-          : undefined,
-      modelStory:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModelStory") || undefined
-          : undefined,
-      modelTools:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModelTools") || undefined
-          : undefined,
-      modelChoices:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModelChoices") || undefined
-          : undefined,
+      userChoice: null, // No specific choice, just custom text
+      modelStory: storyModel,
+      modelTools: toolsModel,
+      modelChoices: choicesModel,
       useRawContext:
         typeof window !== "undefined"
           ? localStorage.getItem("useRawContext") === "true"
@@ -3554,19 +3559,13 @@ function StoryPageContent() {
     const payloadSize = JSON.stringify(payload).length;
     console.log(`Payload size: ${(payloadSize / 1024).toFixed(2)} KB`);
 
-    // Check if staged mode is enabled
-    const stagedMode =
-      typeof window !== "undefined"
-        ? localStorage.getItem("aiStagedMode") === "true"
-        : false;
-    const apiEndpoint = stagedMode
-      ? "/api/story/next-staged"
-      : "/api/story/next";
+    const apiEndpoint = "/api/story/next-staged";
 
     logger.ai_request("Sending choice to AI", {
-      model: payload.model,
+      modelStory: storyModel,
+      modelTools: toolsModel,
+      modelChoices: choicesModel,
       payloadSize,
-      stagedMode,
     });
 
     if (payloadSize > 4 * 1024 * 1024) {
@@ -3850,24 +3849,13 @@ function StoryPageContent() {
       scene: { parts: partsToSend },
     };
 
+    const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
+
     const payload = {
       storyData: minimalStoryData,
-      model:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModel") || undefined
-          : undefined,
-      modelStory:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModelStory") || undefined
-          : undefined,
-      modelTools:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModelTools") || undefined
-          : undefined,
-      modelChoices:
-        typeof window !== "undefined"
-          ? localStorage.getItem("aiModelChoices") || undefined
-          : undefined,
+      modelStory: storyModel,
+      modelTools: toolsModel,
+      modelChoices: choicesModel,
       useRawContext:
         typeof window !== "undefined"
           ? localStorage.getItem("useRawContext") === "true"
@@ -3886,14 +3874,7 @@ function StoryPageContent() {
           : true,
     };
 
-    // Check if staged mode is enabled
-    const stagedMode =
-      typeof window !== "undefined"
-        ? localStorage.getItem("aiStagedMode") === "true"
-        : false;
-    const apiEndpoint = stagedMode
-      ? "/api/story/next-staged"
-      : "/api/story/next";
+    const apiEndpoint = "/api/story/next-staged";
 
     await fetch(apiEndpoint, {
       method: "POST",
