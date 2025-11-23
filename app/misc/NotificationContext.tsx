@@ -8,6 +8,7 @@ import {
   useEffect,
   ReactNode,
 } from "react";
+import { logger } from "@/app/misc/logger";
 
 export type NotificationType = "success" | "failure" | "info" | "warning";
 
@@ -69,6 +70,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const addNotification = useCallback(
     (message: string, type: NotificationType, duration = 4000) => {
+      // Log errors and warnings to session storage
+      if (type === "failure") {
+        logger.error(`Notification: ${message}`);
+      } else if (type === "warning") {
+        logger.warn(`Notification: ${message}`);
+      } else if (type === "info") {
+        logger.info(`Notification: ${message}`);
+      }
+      // Don't log success notifications to avoid clutter
+      
       setQueue((prev) => [...prev, { message, type, duration }]);
     },
     []

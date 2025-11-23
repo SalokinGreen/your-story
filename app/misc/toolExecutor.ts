@@ -8,6 +8,7 @@
 import { StoryData, CommandResponse } from "@/app/misc/structs";
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
+import { logger } from "@/app/misc/logger";
 
 export interface ToolCall {
   id?: string;
@@ -26,6 +27,13 @@ export function executeTools(
   toolCalls: ToolCall[],
   storyData: StoryData
 ): CommandResponse[] {
+  logger.action(
+    `Executing ${toolCalls.length} tool call${
+      toolCalls.length !== 1 ? "s" : ""
+    }`,
+    { toolNames: toolCalls.map((tc) => tc.function.name) }
+  );
+
   const responses: CommandResponse[] = [];
 
   // Helper to serialize arguments (string or object) in a compact form for failure diagnostics
@@ -43,6 +51,14 @@ export function executeTools(
   }
 
   for (const toolCall of toolCalls) {
+    const toolName = toolCall.function.name;
+    const toolId = toolCall.id || "unknown";
+
+    logger.action(`Processing tool call: ${toolName}`, {
+      toolCallId: toolId,
+      argsPreview: serializeArgs(toolCall.function.arguments),
+    });
+
     try {
       // Parse arguments if they're a string (some APIs send JSON strings)
       let args: Record<string, any>;
@@ -50,14 +66,19 @@ export function executeTools(
         try {
           args = JSON.parse(toolCall.function.arguments);
         } catch (e) {
+          const errorMsg = `Invalid tool arguments: ${
+            e instanceof Error ? e.message : "Parse error"
+          } (tool ${toolCall.function.name} rawArgs=${serializeArgs(
+            toolCall.function.arguments
+          )})`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
           responses.push({
             command: toolCall.function.name,
             success: false,
-            message: `Invalid tool arguments: ${
-              e instanceof Error ? e.message : "Parse error"
-            } (tool ${toolCall.function.name} rawArgs=${serializeArgs(
-              toolCall.function.arguments
-            )})`,
+            message: errorMsg,
             timestamp: Date.now(),
             toolCallId: toolCall.id,
           });
@@ -70,12 +91,17 @@ export function executeTools(
       // Validate tool exists
       const toolSchema = TOOL_MAP.get(toolCall.function.name);
       if (!toolSchema) {
+        const errorMsg = `Unknown tool: ${
+          toolCall.function.name
+        } (called with args=${serializeArgs(args)})`;
+        logger.error(`Tool call failed: ${errorMsg}`, {
+          toolCallId: toolId,
+          toolName,
+        });
         responses.push({
           command: toolCall.function.name,
           success: false,
-          message: `Unknown tool: ${
-            toolCall.function.name
-          } (called with args=${serializeArgs(args)})`,
+          message: errorMsg,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -87,12 +113,18 @@ export function executeTools(
       const missingParams = required.filter((param) => !(param in args));
 
       if (missingParams.length > 0) {
+        const errorMsg = `Missing required parameters: ${missingParams.join(
+          ", "
+        )} (tool ${toolCall.function.name} args=${serializeArgs(args)})`;
+        logger.error(`Tool call failed: ${errorMsg}`, {
+          toolCallId: toolId,
+          toolName,
+          missingParams,
+        });
         responses.push({
           command: toolCall.function.name,
           success: false,
-          message: `Missing required parameters: ${missingParams.join(
-            ", "
-          )} (tool ${toolCall.function.name} args=${serializeArgs(args)})`,
+          message: errorMsg,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -101,15 +133,24 @@ export function executeTools(
 
       // Special handling for add_memory (direct array manipulation)
       if (toolCall.function.name === "add_memory") {
+        logger.action("Special handling: add_memory", {
+          toolCallId: toolId,
+          entry: args.entry.substring(0, 100),
+        });
         if (!storyData.memory) storyData.memory = [];
         const entry = args.entry;
         storyData.memory.push(entry);
+        const successMsg = `Added memory: "${entry.substring(0, 50)}${
+          entry.length > 50 ? "..." : ""
+        }"`;
+        logger.action(`Tool call succeeded: ${successMsg}`, {
+          toolCallId: toolId,
+          toolName,
+        });
         responses.push({
           command: toolCall.function.name,
           success: true,
-          message: `Added memory: "${entry.substring(0, 50)}${
-            entry.length > 50 ? "..." : ""
-          }"`,
+          message: successMsg,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -122,19 +163,37 @@ export function executeTools(
         toolCall.function.name === "modify_relationship" &&
         args.description
       ) {
+        logger.action(
+          "Special handling: modify_relationship with description",
+          {
+            toolCallId: toolId,
+            relationshipName: args.name,
+            valueDelta: args.valueDelta,
+          }
+        );
+
         // First: modify the value
         const valueCommand = `/modify_relationship: ${args.name} | ${args.valueDelta}`;
+        logger.action(`Executing command: ${valueCommand}`, {
+          toolCallId: toolId,
+        });
         const valueResponse = executeCommandWithResponse(
           valueCommand,
           storyData
         );
 
         if (!valueResponse || !valueResponse.success) {
+          const errorMsg =
+            valueResponse?.message || `Failed to modify relationship value`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+            command: valueCommand,
+          });
           responses.push({
             command: toolCall.function.name,
             success: false,
-            message:
-              valueResponse?.message || `Failed to modify relationship value`,
+            message: errorMsg,
             timestamp: Date.now(),
             toolCallId: toolCall.id,
           });
@@ -143,16 +202,24 @@ export function executeTools(
 
         // Second: update the description
         const descCommand = `/update_relationship_description: ${args.name} | ${args.description}`;
+        logger.action(`Executing command: ${descCommand}`, {
+          toolCallId: toolId,
+        });
         const descResponse = executeCommandWithResponse(descCommand, storyData);
 
         if (!descResponse || !descResponse.success) {
           // Value was updated but description failed - return partial success
+          const partialMsg = `${valueResponse.message} (description update failed: ${
+            descResponse?.message || "unknown error"
+          })`;
+          logger.warn(`Tool call partial success: ${partialMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
           responses.push({
             command: toolCall.function.name,
             success: true,
-            message: `${valueResponse.message} (description update failed: ${
-              descResponse?.message || "unknown error"
-            })`,
+            message: partialMsg,
             timestamp: Date.now(),
             toolCallId: toolCall.id,
           });
@@ -160,10 +227,15 @@ export function executeTools(
         }
 
         // Both succeeded - combine messages
+        const successMsg = `${valueResponse.message} and updated description`;
+        logger.action(`Tool call succeeded: ${successMsg}`, {
+          toolCallId: toolId,
+          toolName,
+        });
         responses.push({
           command: toolCall.function.name,
           success: true,
-          message: `${valueResponse.message} and updated description`,
+          message: successMsg,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -173,45 +245,90 @@ export function executeTools(
       // Convert tool call to XML command format and execute
       const command = convertToolToCommand(toolCall.function.name, args);
       if (command === null) {
+        const errorMsg = `Tool cannot be converted to command (tool ${
+          toolCall.function.name
+        } args=${serializeArgs(args)})`;
+        logger.error(`Tool call failed: ${errorMsg}`, {
+          toolCallId: toolId,
+          toolName,
+        });
         responses.push({
           command: toolCall.function.name,
           success: false,
-          message: `Tool cannot be converted to command (tool ${
-            toolCall.function.name
-          } args=${serializeArgs(args)})`,
+          message: errorMsg,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
         continue;
       }
 
+      logger.action(`Converted to command: ${command}`, { toolCallId: toolId });
       const response = executeCommandWithResponse(command, storyData);
       if (response) {
         response.toolCallId = toolCall.id; // Link response to tool call
+        logger.action(
+          `Tool call ${response.success ? "succeeded" : "failed"}: ${
+            response.message
+          }`,
+          {
+            toolCallId: toolId,
+            toolName,
+            success: response.success,
+          }
+        );
         responses.push(response);
       } else {
+        const errorMsg = `Command execution returned null (tool ${
+          toolCall.function.name
+        } args=${serializeArgs(args)} command=${command})`;
+        logger.error(`Tool call failed: ${errorMsg}`, {
+          toolCallId: toolId,
+          toolName,
+          command,
+        });
         responses.push({
           command: toolCall.function.name,
           success: false,
-          message: `Command execution returned null (tool ${
-            toolCall.function.name
-          } args=${serializeArgs(args)} command=${command})`,
+          message: errorMsg,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
       }
     } catch (error: any) {
+      const errorMsg = `Execution error: ${error.message} (tool ${
+        toolCall.function.name
+      } args=${serializeArgs(toolCall.function.arguments)})`;
+      logger.error(`Tool call exception: ${errorMsg}`, {
+        toolCallId: toolId,
+        toolName,
+        error: error.message,
+        stack: error.stack,
+      });
       responses.push({
         command: toolCall.function.name,
         success: false,
-        message: `Execution error: ${error.message} (tool ${
-          toolCall.function.name
-        } args=${serializeArgs(toolCall.function.arguments)})`,
+        message: errorMsg,
         timestamp: Date.now(),
         toolCallId: toolCall.id,
       });
     }
   }
+
+  const successCount = responses.filter((r) => r.success).length;
+  const failureCount = responses.length - successCount;
+  logger.action(
+    `Tool execution complete: ${successCount} succeeded, ${failureCount} failed`,
+    {
+      totalCalls: toolCalls.length,
+      successCount,
+      failureCount,
+      responses: responses.map((r) => ({
+        tool: r.command,
+        success: r.success,
+        message: r.message.substring(0, 100),
+      })),
+    }
+  );
 
   return responses;
 }

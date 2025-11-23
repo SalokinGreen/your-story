@@ -370,7 +370,8 @@ function AIModelSelector({
         >
           {Object.entries(AI_MODELS).map(([key, config]) => (
             <option key={key} value={key}>
-              {config.name} - {config.original_model} ({(config as any).cost || 1} coin
+              {config.name} - {config.original_model} (
+              {(config as any).cost || 1} coin
               {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
               {(config.maxTokens / 1000).toFixed(0)}K context)
             </option>
@@ -475,12 +476,11 @@ function AIModelSelector({
                     Staged Generation Mode
                   </span>
                   <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs font-semibold rounded">
-                    ~2x cost
+                    variable cost
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Generate story, tools, and choices separately for better
-                  quality
+                  3 separate generations (story, tools, choices) - cost based on selected models
                 </p>
               </div>
               <button
@@ -629,6 +629,55 @@ function AIModelSelector({
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Cost Estimate for Staged Mode */}
+            {stagedModeEnabled && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
+                    Estimated Cost per Generation:
+                  </span>
+                  <span className="text-sm font-bold text-blue-900 dark:text-blue-300">
+                    {(() => {
+                      // Get effective models (fallback to main if not set)
+                      const effectiveStoryModel = storyModel || currentModelKey;
+                      const effectiveToolsModel = toolsModel || currentModelKey;
+                      const effectiveChoicesModel =
+                        choicesModel || currentModelKey;
+
+                      // Get costs (1 for custom models, actual cost for predefined)
+                      const storyCost =
+                        effectiveStoryModel.startsWith("custom-")
+                          ? 0
+                          : ((AI_MODELS as any)[effectiveStoryModel]?.cost ||
+                            1);
+                      const toolsCost =
+                        effectiveToolsModel.startsWith("custom-")
+                          ? 0
+                          : ((AI_MODELS as any)[effectiveToolsModel]?.cost ||
+                            1);
+                      const choicesCost =
+                        effectiveChoicesModel.startsWith("custom-")
+                          ? 0
+                          : ((AI_MODELS as any)[effectiveChoicesModel]?.cost ||
+                            1);
+
+                      const totalCost = storyCost + toolsCost + choicesCost;
+
+                      // Show BYOK status if all models are custom
+                      if (totalCost === 0) {
+                        return "FREE (BYOK)";
+                      }
+
+                      return `~${totalCost} coin${totalCost !== 1 ? "s" : ""} + tool bonus`;
+                    })()}
+                  </span>
+                </div>
+                <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                  Base cost from 3 stages + 1 coin per 2 tool calls
+                </p>
               </div>
             )}
 

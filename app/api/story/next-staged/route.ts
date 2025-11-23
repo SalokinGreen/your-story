@@ -232,7 +232,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Check token balance (staged mode costs ~2x) IF not using BYOK
+  // Check token balance (staged mode costs vary based on model selection) IF not using BYOK
   if (shouldUseTokens) {
     const balance = await getUserTokenBalance(userId, supabaseAdmin);
     const estimatedCost =
