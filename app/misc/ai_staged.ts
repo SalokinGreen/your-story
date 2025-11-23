@@ -380,17 +380,26 @@ When referencing skills, resources, or items in choices, you MUST use the EXACT 
 
 Resource System:
 - When a choice uses a resource (use_resource), that resource is AUTOMATICALLY at risk if the skill check fails
-- Choose resources that thematically fit the action
+- Choose resources that thematically fit the action: use Stamina for running/escaping, Health for combat/dangerous situations, Mana for spellcasting, etc.
 - Resource requirements are DYNAMIC based on DC:
-  * Required amount: DC ÷ ${rpgSystem.resources.requiredDivisor} (minimum ${rpgSystem.resources.minRequired})
+  * Required amount: DC ÷ ${rpgSystem.resources.requiredDivisor} (rounded down, minimum ${rpgSystem.resources.minRequired})
+  * If player has insufficient resource: dice roll receives -DC÷${rpgSystem.resources.penaltyDivisor} penalty (minimum -${rpgSystem.resources.minPenalty})
+  * On success: RECOVERS DC ÷ ${rpgSystem.resources.recoverDivisor} points (minimum ${rpgSystem.resources.minRecover}), capped at max value
   * On failure: loses DC ÷ ${rpgSystem.resources.lossDivisor} points (minimum ${rpgSystem.resources.minLoss})
-  * On success: RECOVERS DC ÷ ${rpgSystem.resources.recoverDivisor} points (minimum ${rpgSystem.resources.minRecover})
+- Example: DC ${rpgSystem.dc.medium * 2} requires ${Math.floor((rpgSystem.dc.medium * 2) / rpgSystem.resources.requiredDivisor)} resource points. Insufficient resources = -${Math.floor((rpgSystem.dc.medium * 2) / rpgSystem.resources.penaltyDivisor)} to dice roll. Success recovers ${Math.floor((rpgSystem.dc.medium * 2) / rpgSystem.resources.recoverDivisor)} points, failure loses ${Math.floor((rpgSystem.dc.medium * 2) / rpgSystem.resources.lossDivisor)} points.
+- This creates meaningful risk/reward - higher DC actions demand more resources but reward success with recovery.
 
 Item Types:
 - normal: Advantage on use, breaks on failure (tools, weapons, armor)
 - consumable: Advantage on use, consumed immediately (potions, scrolls, ammunition)
 - story: Advantage on use, never breaks/consumed (quest items, artifacts, keys)
 - misc: Prevents disadvantage only, never breaks/consumed (rope, torches, rations)
+
+RPG System:
+${rpgSystem.aiInstructions.diceSystem}
+${rpgSystem.aiInstructions.dcGuidance}
+${rpgSystem.aiInstructions.challengeGuidance}
+${rpgSystem.aiInstructions.dcGuidelines}
 
 Choice Design Guidelines:
 - Offer 6-8 meaningful choices that reflect different approaches or priorities
@@ -402,6 +411,8 @@ Choice Design Guidelines:
 - Include at least one "safe" option and one "risky but rewarding" option
 - Make choices reflect the player's agency and the current story situation
 - Avoid dead-end choices that just lead to "Continue..."
+- Balance challenge with narrative flow: not every choice needs a skill check
+- Use skill checks for dramatic moments, high-stakes decisions, and character-defining actions
 `;
 
   const infoMessage = buildInfoMessage(storyData);

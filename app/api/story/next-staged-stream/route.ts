@@ -386,6 +386,7 @@ export async function POST(req: NextRequest) {
               storyData,
               storyContent,
             });
+            console.log(choicesPrompt);
 
             const choicesApiKey = getApiKey(
               choicesModelConfig.provider as "deepseek" | "openrouter",

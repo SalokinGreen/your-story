@@ -167,7 +167,7 @@ export const SYSTEM_3D6: RPGSystem = {
     choiceSyntax:
       "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none>\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 25); use_resource: Stamina; use_item: none>",
     dcGuidelines:
-      "⚠️ DC GUIDELINES:\n- Use DCs that scale with the adventure's stat range.\n- 8-15: Easy challenge (most characters can succeed)\n- 20: Medium challenge (requires decent stats)\n- 25: Hard challenge (high stats or items needed)\n- 30-35: Very Hard challenge (only the most prepared succeed)",
+      "⚠️ DC GUIDELINES:\n- Use DCs that scale with the adventure's stat range.\n- 3-15: Easy challenge (most characters can succeed)\n- 20: Medium challenge (requires decent stats)\n- 25: Hard challenge (high stats or items needed)\n- 30-35: Very Hard challenge (only the most prepared succeed)",
   },
 };
 
