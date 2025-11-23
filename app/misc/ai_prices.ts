@@ -314,8 +314,8 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     name: "Broke (Cost-Effective)",
     description: "Best if you owe money or are hiding from the IRS",
     storyModel: "Mistral Nemo",
-    toolsModel: "Gemini 2.5 Flash Lite",
-    choicesModel: "Mistral Nemo",
+    toolsModel: "Grok Code Fast 1",
+    choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 3, // 1 + 1 + 1
   },
   creative: {
