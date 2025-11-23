@@ -7,14 +7,14 @@ import { DynamicIcon } from "./DynamicIcon";
 
 interface AdminControlsProps {
   userId: string;
-  userEmail: string;
+  userName: string;
   currentRole?: string;
   onSuccess?: () => void;
 }
 
 export default function AdminControls({
   userId,
-  userEmail,
+  userName,
   currentRole,
   onSuccess,
 }: AdminControlsProps) {
@@ -63,7 +63,7 @@ export default function AdminControls({
 
       const creditMintLabel = amount === 1 ? "credit" : "credits";
       addNotification(
-        `Minted ${amount} ${creditMintLabel} for ${userEmail}`,
+        `Minted ${amount} ${creditMintLabel} for ${userName}`,
         "success"
       );
       setAmount(10);
@@ -100,7 +100,7 @@ export default function AdminControls({
       if (!res.ok) throw new Error(data.error || "Failed to remove credits");
       const creditRemoveLabel = removeAmount === 1 ? "credit" : "credits";
       addNotification(
-        `Removed ${removeAmount} ${creditRemoveLabel} for ${userEmail}`,
+        `Removed ${removeAmount} ${creditRemoveLabel} for ${userName}`,
         "success"
       );
       onSuccess?.();
@@ -144,7 +144,7 @@ export default function AdminControls({
         return;
       }
 
-      addNotification(`Changed role to ${role} for ${userEmail}`, "success");
+      addNotification(`Changed role to ${role} for ${userName}`, "success");
       onSuccess?.();
     } catch (error) {
       console.error("Error changing role:", error);

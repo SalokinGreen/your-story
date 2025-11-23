@@ -17,7 +17,6 @@ import { DynamicIcon } from "@/app/components/DynamicIcon";
 
 interface ProfileUser {
   id: string;
-  email: string;
   created_at: string;
   display_name?: string;
   role?: string;
@@ -85,7 +84,6 @@ export default function ProfilePage() {
       const userData = await userResponse.json();
       setProfileUser({
         id: userData.id,
-        email: userData.email,
         created_at: userData.created_at,
         display_name: userData.user_metadata?.display_name || null,
         role:
@@ -241,9 +239,7 @@ export default function ProfilePage() {
                 ) : (
                   <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center border-2 border-white dark:border-gray-700 shadow-lg">
                     <span className="text-2xl sm:text-3xl font-bold text-white">
-                      {(
-                        profileUser.display_name?.[0] || profileUser.email[0]
-                      ).toUpperCase()}
+                      {(profileUser.display_name?.[0] || "A").toUpperCase()}
                     </span>
                   </div>
                 )}
@@ -314,7 +310,7 @@ export default function ProfilePage() {
           {!isOwnProfile && currentUser && (
             <GiftTokenForm
               recipientId={profileUser.id}
-              recipientEmail={profileUser.email}
+              recipientName={profileUser.display_name || "this user"}
               onSuccess={handleRefresh}
             />
           )}
@@ -408,7 +404,7 @@ export default function ProfilePage() {
           {userIsAdmin && (
             <AdminControls
               userId={profileUser.id}
-              userEmail={profileUser.email}
+              userName={profileUser.display_name || "this user"}
               currentRole={profileUser.role}
               onSuccess={handleRefresh}
             />

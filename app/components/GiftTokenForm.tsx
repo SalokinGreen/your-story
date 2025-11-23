@@ -7,13 +7,13 @@ import { DynamicIcon } from "./DynamicIcon";
 
 interface GiftTokenFormProps {
   recipientId: string;
-  recipientEmail: string;
+  recipientName: string;
   onSuccess?: () => void;
 }
 
 export default function GiftTokenForm({
   recipientId,
-  recipientEmail,
+  recipientName,
   onSuccess,
 }: GiftTokenFormProps) {
   const { addNotification } = useNotification();
@@ -56,7 +56,7 @@ export default function GiftTokenForm({
 
       const creditLabel = amount === 1 ? "credit" : "credits";
       addNotification(
-        `Gifted ${amount} ${creditLabel} to ${recipientEmail}`,
+        `Gifted ${amount} ${creditLabel} to ${recipientName}`,
         "success"
       );
       setAmount(1);
@@ -110,7 +110,7 @@ export default function GiftTokenForm({
         <p className="text-xs text-gray-600 dark:text-gray-400">
           Sending to:{" "}
           <span className="font-semibold text-gray-900 dark:text-white">
-            {recipientEmail}
+            {recipientName}
           </span>
         </p>
       </form>
