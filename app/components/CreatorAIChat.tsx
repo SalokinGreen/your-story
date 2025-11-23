@@ -195,7 +195,7 @@ export default function CreatorAIChat({
             )}
             <button
               onClick={onClose}
-              className="rounded-full p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              className="rounded-full p-2 text-gray-400 hover:bg-gray-800 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
             >
               <DynamicIcon name="X" className="w-6 h-6" />
             </button>

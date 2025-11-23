@@ -74,7 +74,7 @@ export default function SiteHeader() {
               className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
                 isActive("/library")
                   ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
               }`}
             >
               <DynamicIcon name="Library" className="w-4 h-4" /> Library
@@ -84,7 +84,7 @@ export default function SiteHeader() {
               className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
                 isActive("/explorer")
                   ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
               }`}
             >
               <DynamicIcon name="Map" className="w-4 h-4" /> Explorer
@@ -94,7 +94,7 @@ export default function SiteHeader() {
               className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
                 isActive("/creator")
                   ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
               }`}
             >
               <DynamicIcon name="Sparkles" className="w-4 h-4" /> Creator
@@ -104,7 +104,7 @@ export default function SiteHeader() {
           {/* Profile */}
           <button
             onClick={() => router.push(`/profile/${user.id}`)}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
           >
             <span className="text-sm font-semibold text-gray-900 dark:text-white">
               {displayName}
@@ -132,7 +132,7 @@ export default function SiteHeader() {
                 menu.classList.toggle("hidden");
               }
             }}
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="md:hidden p-2 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
           >
             <DynamicIcon
               name="Menu"
@@ -152,7 +152,7 @@ export default function SiteHeader() {
               className={`px-4 py-2 rounded-lg font-semibold text-left transition-all flex items-center gap-2 ${
                 isActive("/library")
                   ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
               }`}
             >
               <DynamicIcon name="Library" className="w-4 h-4" /> Library
@@ -165,7 +165,7 @@ export default function SiteHeader() {
               className={`px-4 py-2 rounded-lg font-semibold text-left transition-all flex items-center gap-2 ${
                 isActive("/explorer")
                   ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
               }`}
             >
               <DynamicIcon name="Map" className="w-4 h-4" /> Explorer
@@ -178,7 +178,7 @@ export default function SiteHeader() {
               className={`px-4 py-2 rounded-lg font-semibold text-left transition-all flex items-center gap-2 ${
                 isActive("/creator")
                   ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
               }`}
             >
               <DynamicIcon name="Sparkles" className="w-4 h-4" /> Creator

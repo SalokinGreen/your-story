@@ -344,7 +344,7 @@ export default function TTSControls({
                     className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors ${
                       voice.id === selectedVoice
                         ? "bg-blue-100 dark:bg-blue-900/50 text-blue-900 dark:text-blue-200"
-                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
                     }`}
                   >
                     <DynamicIcon name={voice.icon as any} className="w-4 h-4" />

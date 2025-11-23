@@ -34,7 +34,7 @@ function InfoTabs() {
             className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
               activeTab === "models"
                 ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
             }`}
           >
             <DynamicIcon name="Bot" className="w-4 h-4 sm:w-5 sm:h-5" /> AI
@@ -45,7 +45,7 @@ function InfoTabs() {
             className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
               activeTab === "coins"
                 ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
             }`}
           >
             <DynamicIcon name="Coins" className="w-4 h-4 sm:w-5 sm:h-5" /> Coins
@@ -56,7 +56,7 @@ function InfoTabs() {
             className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
               activeTab === "byok"
                 ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
             }`}
           >
             <DynamicIcon name="Key" className="w-4 h-4 sm:w-5 sm:h-5" /> BYOK

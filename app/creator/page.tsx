@@ -4121,7 +4121,7 @@ function AdventureCreatorContent() {
                     onClick={() =>
                       setNewLoreAdvancedExpanded(!newLoreAdvancedExpanded)
                     }
-                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
                   >
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                       <DynamicIcon name="Settings" className="w-4 h-4" />{" "}
@@ -4158,7 +4158,7 @@ function AdventureCreatorContent() {
                               lore.map((loreEntry, loreIndex) => (
                                 <label
                                   key={loreIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -4204,7 +4204,7 @@ function AdventureCreatorContent() {
                               lore.map((loreEntry, loreIndex) => (
                                 <label
                                   key={loreIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -4306,7 +4306,7 @@ function AdventureCreatorContent() {
                               plotBeats.map((beat, beatIndex) => (
                                 <label
                                   key={beatIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -4353,7 +4353,7 @@ function AdventureCreatorContent() {
                               plotBeats.map((beat, beatIndex) => (
                                 <label
                                   key={beatIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -4804,7 +4804,7 @@ function AdventureCreatorContent() {
                                       !editLoreAdvancedExpanded
                                     )
                                   }
-                                  className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                  className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
                                 >
                                   <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                                     <DynamicIcon
@@ -4849,7 +4849,7 @@ function AdventureCreatorContent() {
                                               .map((loreEntry, loreIndex) => (
                                                 <label
                                                   key={loreIndex}
-                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
                                                 >
                                                   <input
                                                     type="checkbox"
@@ -4906,7 +4906,7 @@ function AdventureCreatorContent() {
                                               .map((loreEntry, loreIndex) => (
                                                 <label
                                                   key={loreIndex}
-                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
                                                 >
                                                   <input
                                                     type="checkbox"
@@ -5025,7 +5025,7 @@ function AdventureCreatorContent() {
                                             plotBeats.map((beat, beatIndex) => (
                                               <label
                                                 key={beatIndex}
-                                                className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                                className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
                                               >
                                                 <input
                                                   type="checkbox"
@@ -5079,7 +5079,7 @@ function AdventureCreatorContent() {
                                             plotBeats.map((beat, beatIndex) => (
                                               <label
                                                 key={beatIndex}
-                                                className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                                className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
                                               >
                                                 <input
                                                   type="checkbox"

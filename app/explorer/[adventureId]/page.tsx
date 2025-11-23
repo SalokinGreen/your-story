@@ -1556,7 +1556,7 @@ export default function AdventureDetailPage() {
               className={`px-6 py-3 font-semibold rounded-lg transition-all ${
                 activeTab === "overview"
                   ? "bg-purple-600 text-white shadow-lg"
-                  : "bg-white dark:bg-blue-950 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
+                  : "bg-white dark:bg-blue-950 text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
               }`}
             >
               💬 Comments
@@ -1566,7 +1566,7 @@ export default function AdventureDetailPage() {
               className={`px-6 py-3 font-semibold rounded-lg transition-all ${
                 activeTab === "lore"
                   ? "bg-purple-600 text-white shadow-lg"
-                  : "bg-white dark:bg-blue-950 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
+                  : "bg-white dark:bg-blue-950 text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
               }`}
             >
               📚 Lore ({adventure?.storyTemplate?.lore?.length || 0})

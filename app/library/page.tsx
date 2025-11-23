@@ -843,7 +843,7 @@ export default function LibraryPage() {
                   className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors flex items-center gap-2 ${
                     selectedFolder === null
                       ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold"
-                      : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                      : "hover:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   <DynamicIcon name="Book" className="w-4 h-4" />
@@ -856,7 +856,7 @@ export default function LibraryPage() {
                   className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors flex items-center gap-2 ${
                     selectedFolder === "uncategorized"
                       ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold"
-                      : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                      : "hover:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   <DynamicIcon name="FileText" className="w-4 h-4" />
@@ -874,7 +874,7 @@ export default function LibraryPage() {
                       className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors flex items-center gap-2 ${
                         selectedFolder === folder.id
                           ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold"
-                          : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                          : "hover:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                       }`}
                       style={{ borderLeft: `4px solid ${folder.color}` }}
                     >
@@ -1054,7 +1054,7 @@ export default function LibraryPage() {
                                     handleMassMove(null);
                                     setShowMassMoveDropdown(false);
                                   }}
-                                  className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+                                  className="w-full text-left px-3 py-2 hover:bg-gray-800 dark:hover:bg-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
                                 >
                                   <DynamicIcon
                                     name="FileText"
@@ -1069,7 +1069,7 @@ export default function LibraryPage() {
                                       handleMassMove(folder.id);
                                       setShowMassMoveDropdown(false);
                                     }}
-                                    className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+                                    className="w-full text-left px-3 py-2 hover:bg-gray-800 dark:hover:bg-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
                                     style={{
                                       borderLeft: `4px solid ${folder.color}`,
                                     }}
