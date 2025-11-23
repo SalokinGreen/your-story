@@ -1120,7 +1120,7 @@ export default function LibraryPage() {
                   Adventure
                 </button>
               </div>
-              {filteredAdventures.length === 0 ? (
+              {filteredAdventures.length === 0 && localAdventures.length === 0 ? (
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-700">
                   <div className="flex justify-center mb-4">
                     <DynamicIcon
@@ -1129,16 +1129,16 @@ export default function LibraryPage() {
                     />
                   </div>
                   <h3 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
-                    {adventures.length === 0
+                    {adventures.length === 0 && localAdventures.length === 0
                       ? "No Adventures Yet"
                       : "No Adventures Match Filters"}
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400 mb-6">
-                    {adventures.length === 0
+                    {adventures.length === 0 && localAdventures.length === 0
                       ? "Create your first adventure and share it with the community!"
                       : "Try adjusting your search or filters to find more adventures."}
                   </p>
-                  {adventures.length === 0 && (
+                  {adventures.length === 0 && localAdventures.length === 0 && (
                     <button
                       onClick={() => router.push("/creator")}
                       className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
