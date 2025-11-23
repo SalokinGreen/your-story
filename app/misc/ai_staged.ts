@@ -202,31 +202,12 @@ ${
         content: cleanString(part.content),
       });
     } else {
+      // For story generation, we only need the narrative content, not tool calls/responses
       const assistantContent = part.raw || part.content;
-      const message: ChatMessage = {
+      messages.push({
         role: "assistant",
         content: cleanString(assistantContent),
-      };
-
-      if (part.toolCalls && part.toolCalls.length > 0) {
-        message.tool_calls = part.toolCalls;
-      }
-
-      messages.push(message);
-
-      if (part.toolResponses && part.toolResponses.length > 0) {
-        for (const response of part.toolResponses) {
-          messages.push({
-            role: "tool",
-            content: cleanString(
-              `${
-                response.success ? "✓" : response.success === false ? "✗" : "⚠"
-              } ${response.message}`
-            ),
-            tool_call_id: response.toolCallId,
-          });
-        }
-      }
+      });
     }
   }
 

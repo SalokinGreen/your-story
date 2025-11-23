@@ -15,6 +15,7 @@ import {
 import { getModelConfig } from "@/app/misc/ai_prices";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
 import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
+import { getUserSettings } from "@/app/misc/user_settings";
 
 export const runtime = "nodejs";
 
@@ -188,6 +189,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Check user settings for BYOK
+  const userSettings = await getUserSettings(userId, supabaseAdmin);
+  const isSubscriber = userSettings?.is_subscriber || false;
+  const byokEnabled = userSettings?.byok_enabled || false;
+
+  // Only use BYOK if subscriber, BYOK is enabled in settings, and key is provided
+  let shouldUseTokens = true;
+  if (isSubscriber && byokEnabled && openRouterKey) {
+    shouldUseTokens = false;
+    console.log(`User ${userId} using BYOK for staged generation`);
+  }
+
   // Get model configurations for each stage
   const defaultModelKey =
     modelKey || process.env.DEFAULT_AI_MODEL || "Deepseek Chat";
@@ -219,23 +232,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Check token balance (staged mode costs ~2x)
-  const balance = await getUserTokenBalance(userId, supabaseAdmin);
-  const estimatedCost =
-    storyModelConfig.cost + toolsModelConfig.cost + choicesModelConfig.cost;
+  // Check token balance (staged mode costs ~2x) IF not using BYOK
+  if (shouldUseTokens) {
+    const balance = await getUserTokenBalance(userId, supabaseAdmin);
+    const estimatedCost =
+      storyModelConfig.cost + toolsModelConfig.cost + choicesModelConfig.cost;
 
-  const hasTokens = await hasEnoughTokens(userId, estimatedCost, supabaseAdmin);
-  if (!hasTokens) {
-    return NextResponse.json(
-      {
-        error: `Insufficient tokens. Need ${estimatedCost}, have ${
-          balance?.tradable || 0
-        } tradable.`,
-        balance,
-        code: "INSUFFICIENT_TOKENS",
-      },
-      { status: 402 }
-    );
+    const hasTokens = await hasEnoughTokens(userId, estimatedCost, supabaseAdmin);
+    if (!hasTokens) {
+      return NextResponse.json(
+        {
+          error: `Insufficient tokens. Need ${estimatedCost}, have ${
+            balance?.tradable || 0
+          } tradable.`,
+          balance,
+          code: "INSUFFICIENT_TOKENS",
+        },
+        { status: 402 }
+      );
+    }
   }
 
   try {
@@ -490,21 +505,27 @@ export async function POST(req: NextRequest) {
     const toolCallBonus = Math.floor(allToolCalls.length / 2);
     const tokenCost = Math.max(1, Math.ceil(totalCostUSD / 0.01) + toolCallBonus);
 
-    // Deduct tokens
-    const deductResult = await deductTokens(userId, tokenCost, supabaseAdmin);
+    // Deduct tokens only if not using BYOK
+    let remainingBalance;
+    if (shouldUseTokens) {
+      const deductResult = await deductTokens(userId, tokenCost, supabaseAdmin);
 
-    if (!deductResult.success) {
-      return NextResponse.json(
-        {
-          error: deductResult.error || "Failed to deduct tokens",
-          code: "TOKEN_DEDUCTION_FAILED",
-        },
-        { status: 500 }
-      );
+      if (!deductResult.success) {
+        return NextResponse.json(
+          {
+            error: deductResult.error || "Failed to deduct tokens",
+            code: "TOKEN_DEDUCTION_FAILED",
+          },
+          { status: 500 }
+        );
+      }
+
+      // Get updated balance
+      remainingBalance = await getUserTokenBalance(userId, supabaseAdmin);
+    } else {
+      // BYOK: no token deduction, return null balance
+      remainingBalance = null;
     }
-
-    // Get updated balance
-    const remainingBalance = await getUserTokenBalance(userId, supabaseAdmin);
 
     // Return in same format as regular /next route
     return NextResponse.json({
