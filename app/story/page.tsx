@@ -120,11 +120,7 @@ async function streamStoryGeneration(
               callbacks.onStory(data.content, data.usage);
               break;
             case "tools":
-              callbacks.onTools(
-                data.toolCalls,
-                data.toolResponses,
-                data.usage
-              );
+              callbacks.onTools(data.toolCalls, data.toolResponses, data.usage);
               break;
             case "choices":
               callbacks.onChoices(data.choices, data.usage);
@@ -2275,120 +2271,112 @@ function StoryPageContent() {
       choices: [],
     };
 
-    await streamStoryGeneration(
-      apiEndpoint,
-      payload,
-      session.access_token,
-      {
-        onStory: (content: string, usage: any) => {
-          // Story narration arrives first - show immediately!
-          partialPart.content = content;
-          storyData.scene.parts.push(partialPart);
+    await streamStoryGeneration(apiEndpoint, payload, session.access_token, {
+      onStory: (content: string, usage: any) => {
+        // Story narration arrives first - show immediately!
+        partialPart.content = content;
+        storyData.scene.parts.push(partialPart);
 
-          setStoryText(content);
+        setStoryText(content);
+        setStoryData({ ...storyData });
+        setLoading(false); // Let player read while tools/choices generate
+        setLoadingStage("tools"); // Now analyzing game state
+
+        logger.ai_response("Story narration received (custom input)", {
+          length: content.length,
+          usage,
+        });
+      },
+      onTools: (
+        toolCalls: any[],
+        toolResponses: CommandResponse[],
+        usage: any
+      ) => {
+        // Tools arrive - update the last part in scene
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            toolCalls,
+            toolResponses,
+          };
+        }
+
+        // Process tool responses (update stats, inventory, etc.)
+        const lastPart = processSceneParts(
+          [storyData.scene.parts[lastPartIndex]],
+          storyData,
+          addNotification
+        );
+        if (lastPart) {
           setStoryData({ ...storyData });
-          setLoading(false); // Let player read while tools/choices generate
-          setLoadingStage("tools"); // Now analyzing game state
+        }
 
-          logger.ai_response("Story narration received (custom input)", {
-            length: content.length,
-            usage,
-          });
-        },
-        onTools: (
-          toolCalls: any[],
-          toolResponses: CommandResponse[],
-          usage: any
-        ) => {
-          // Tools arrive - update the last part in scene
-          const lastPartIndex = storyData.scene.parts.length - 1;
-          if (lastPartIndex >= 0) {
-            storyData.scene.parts[lastPartIndex] = {
-              ...storyData.scene.parts[lastPartIndex],
-              toolCalls,
-              toolResponses,
-            };
-          }
+        setLoadingStage("choices"); // Now generating choices
 
-          // Process tool responses (update stats, inventory, etc.)
-          const lastPart = processSceneParts(
-            [storyData.scene.parts[lastPartIndex]],
-            storyData,
-            addNotification
-          );
-          if (lastPart) {
-            setStoryData({ ...storyData });
-          }
+        logger.ai_response("Tool calls received (custom input)", {
+          toolCallsCount: toolCalls?.length || 0,
+          toolResponsesCount: toolResponses?.length || 0,
+          usage,
+        });
+      },
+      onChoices: (newChoices: Choices, usage: any) => {
+        // Choices arrive - update the last part in scene
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            choices: newChoices.choices,
+          };
+        }
+        setChoices(newChoices);
+        setStoryData({ ...storyData });
+        setLoadingStage(null); // All done
 
-          setLoadingStage("choices"); // Now generating choices
+        logger.ai_response("Choices received (custom input)", {
+          choicesCount: newChoices.choices.length,
+          usage,
+        });
+      },
+      onComplete: (meta: any) => {
+        // All done - update token balance
+        if (meta?.remainingBalance?.total !== undefined) {
+          setTokenBalance(meta.remainingBalance.total);
+        }
 
-          logger.ai_response("Tool calls received (custom input)", {
-            toolCallsCount: toolCalls?.length || 0,
-            toolResponsesCount: toolResponses?.length || 0,
-            usage,
-          });
-        },
-        onChoices: (newChoices: Choices, usage: any) => {
-          // Choices arrive - update the last part in scene
-          const lastPartIndex = storyData.scene.parts.length - 1;
-          if (lastPartIndex >= 0) {
-            storyData.scene.parts[lastPartIndex] = {
-              ...storyData.scene.parts[lastPartIndex],
-              choices: newChoices.choices,
-            };
-          }
-          setChoices(newChoices);
-          setStoryData({ ...storyData });
-          setLoadingStage(null); // All done
-
-          logger.ai_response("Choices received (custom input)", {
-            choicesCount: newChoices.choices.length,
-            usage,
-          });
-        },
-        onComplete: (meta: any) => {
-          // All done - update token balance
-          if (meta?.remainingBalance?.total !== undefined) {
-            setTokenBalance(meta.remainingBalance.total);
-          }
-
-          if (meta?.tokensDeducted) {
+        if (meta?.tokensDeducted) {
+          addNotification(`✨ Used ${meta.tokensDeducted} tokens`, "success");
+          if (meta.remainingBalance) {
             addNotification(
-              `✨ Used ${meta.tokensDeducted} tokens`,
-              "success"
+              `Balance: ${meta.remainingBalance.total} tokens remaining (${meta.remainingBalance.tradable} tradable)`,
+              "info"
             );
-            if (meta.remainingBalance) {
-              addNotification(
-                `Balance: ${meta.remainingBalance.total} tokens remaining (${meta.remainingBalance.tradable} tradable)`,
-                "info"
-              );
-            }
           }
+        }
 
-          setCanRetry(true);
-          setCanUndo(true);
-          setLoadingStage(null); // Ensure cleared on complete
+        setCanRetry(true);
+        setCanUndo(true);
+        setLoadingStage(null); // Ensure cleared on complete
 
-          // Clear command responses after successful AI generation
-          setPendingCommandResponses([]);
+        // Clear command responses after successful AI generation
+        setPendingCommandResponses([]);
 
-          // Save progress to database
-          saveProgress(storyData);
+        // Save progress to database
+        saveProgress(storyData);
 
-          logger.ai_response("Generation complete (custom input)", {
-            tokensDeducted: meta?.tokensDeducted,
-            totalCost: meta?.totalCost,
-          });
-        },
-        onError: (message: string) => {
-          addNotification(`Error: ${message}`, "failure");
-          setLoading(false);
-          setLoadingStage(null);
+        logger.ai_response("Generation complete (custom input)", {
+          tokensDeducted: meta?.tokensDeducted,
+          totalCost: meta?.totalCost,
+        });
+      },
+      onError: (message: string) => {
+        addNotification(`Error: ${message}`, "failure");
+        setLoading(false);
+        setLoadingStage(null);
 
-          logger.error("Streaming error (custom input)", { message });
-        },
-      }
-    );
+        logger.error("Streaming error (custom input)", { message });
+      },
+    });
   }
 
   async function handleChoice() {
@@ -3672,126 +3660,121 @@ function StoryPageContent() {
       choices: [],
     };
 
-    await streamStoryGeneration(
-      apiEndpoint,
-      payload,
-      session.access_token,
-      {
-        onStory: (content: string, usage: any) => {
-          // Story narration arrives first - show immediately!
-          partialPart.content = content;
-          storyData.scene.parts.push(partialPart);
+    await streamStoryGeneration(apiEndpoint, payload, session.access_token, {
+      onStory: (content: string, usage: any) => {
+        // Story narration arrives first - show immediately!
+        partialPart.content = content;
+        storyData.scene.parts.push(partialPart);
 
-          setStoryText(content);
+        setStoryText(content);
+        setStoryData({ ...storyData });
+        setLoading(false); // Let player read while tools/choices generate
+        setLoadingStage("tools"); // Now analyzing game state
+
+        logger.ai_response("Story narration received", {
+          length: content.length,
+          usage,
+        });
+      },
+      onTools: (
+        toolCalls: any[],
+        toolResponses: CommandResponse[],
+        usage: any
+      ) => {
+        // Tools arrive - update the last part in scene
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            toolCalls,
+            toolResponses,
+          };
+        }
+
+        // Process tool responses (update stats, inventory, etc.)
+        const lastPart = processSceneParts(
+          [storyData.scene.parts[lastPartIndex]],
+          storyData,
+          addNotification
+        );
+        if (lastPart) {
           setStoryData({ ...storyData });
-          setLoading(false); // Let player read while tools/choices generate
-          setLoadingStage("tools"); // Now analyzing game state
+        }
 
-          logger.ai_response("Story narration received", {
-            length: content.length,
-            usage,
-          });
-        },
-        onTools: (
-          toolCalls: any[],
-          toolResponses: CommandResponse[],
-          usage: any
-        ) => {
-          // Tools arrive - update the last part in scene
-          const lastPartIndex = storyData.scene.parts.length - 1;
-          if (lastPartIndex >= 0) {
-            storyData.scene.parts[lastPartIndex] = {
-              ...storyData.scene.parts[lastPartIndex],
-              toolCalls,
-              toolResponses,
-            };
+        setLoadingStage("choices"); // Now generating choices
+
+        logger.ai_response("Tool calls received", {
+          toolCallsCount: toolCalls?.length || 0,
+          toolResponsesCount: toolResponses?.length || 0,
+          usage,
+        });
+      },
+      onChoices: (newChoices: Choices, usage: any) => {
+        // Choices arrive - update the last part in scene
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            choices: newChoices.choices,
+          };
+        }
+        setChoices(newChoices);
+        setStoryData({ ...storyData });
+        setLoadingStage(null); // All done
+
+        logger.ai_response("Choices received", {
+          choicesCount: newChoices.choices.length,
+          usage,
+        });
+      },
+      onComplete: (meta: any) => {
+        // All done - update token balance
+        if (meta?.remainingBalance?.total !== undefined) {
+          setTokenBalance(meta.remainingBalance.total);
+        }
+
+        // Check for chapter completion
+        if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
+          const currentChapter = storyData.chapters.length;
+          if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
+            storyData.earnedPointsFromChapters.push(currentChapter);
+            storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
+            addNotification(
+              `✨ Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+              "success"
+            );
           }
+        }
 
-          // Process tool responses (update stats, inventory, etc.)
-          const lastPart = processSceneParts(
-            [storyData.scene.parts[lastPartIndex]],
-            storyData,
-            addNotification
-          );
-          if (lastPart) {
-            setStoryData({ ...storyData });
-          }
+        setCanRetry(true);
+        setCanUndo(true);
+        setLoadingStage(null); // Ensure cleared on complete
 
-          setLoadingStage("choices"); // Now generating choices
+        // Clear command responses after successful AI generation
+        setPendingCommandResponses([]);
 
-          logger.ai_response("Tool calls received", {
-            toolCallsCount: toolCalls?.length || 0,
-            toolResponsesCount: toolResponses?.length || 0,
-            usage,
-          });
-        },
-        onChoices: (newChoices: Choices, usage: any) => {
-          // Choices arrive - update the last part in scene
-          const lastPartIndex = storyData.scene.parts.length - 1;
-          if (lastPartIndex >= 0) {
-            storyData.scene.parts[lastPartIndex] = {
-              ...storyData.scene.parts[lastPartIndex],
-              choices: newChoices.choices,
-            };
-          }
-          setChoices(newChoices);
-          setStoryData({ ...storyData });
-          setLoadingStage(null); // All done
+        // Save progress to database
+        saveProgress(storyData);
 
-          logger.ai_response("Choices received", {
-            choicesCount: newChoices.choices.length,
-            usage,
-          });
-        },
-        onComplete: (meta: any) => {
-          // All done - update token balance
-          if (meta?.remainingBalance?.total !== undefined) {
-            setTokenBalance(meta.remainingBalance.total);
-          }
+        logger.ai_response("Generation complete (choice)", {
+          tokensDeducted: meta?.tokensDeducted,
+          totalCost: meta?.totalCost,
+        });
+      },
+      onError: (message: string) => {
+        addNotification(`Error: ${message}`, "failure");
+        setLoading(false);
+        setLoadingStage(null);
+        setCanRetry(true);
+        setChoices({
+          choices:
+            storyData.scene.parts[storyData.scene.parts.length - 1]?.choices ||
+            [],
+        });
 
-          // Check for chapter completion
-          if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
-            const currentChapter = storyData.chapters.length;
-            if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
-              storyData.earnedPointsFromChapters.push(currentChapter);
-              storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
-              addNotification(
-                `✨ Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
-                "success"
-              );
-            }
-          }
-
-          setCanRetry(true);
-          setCanUndo(true);
-          setLoadingStage(null); // Ensure cleared on complete
-
-          // Clear command responses after successful AI generation
-          setPendingCommandResponses([]);
-
-          // Save progress to database
-          saveProgress(storyData);
-
-          logger.ai_response("Generation complete (choice)", {
-            tokensDeducted: meta?.tokensDeducted,
-            totalCost: meta?.totalCost,
-          });
-        },
-        onError: (message: string) => {
-          addNotification(`Error: ${message}`, "failure");
-          setLoading(false);
-          setLoadingStage(null);
-          setCanRetry(true);
-          setChoices({
-            choices:
-              storyData.scene.parts[storyData.scene.parts.length - 1]?.choices ||
-              [],
-          });
-
-          logger.error("Streaming error (choice)", { message });
-        },
-      }
-    );
+        logger.error("Streaming error (choice)", { message });
+      },
+    });
   }
 
   function handleSelect(index: number): void {
@@ -3971,126 +3954,121 @@ function StoryPageContent() {
       choices: [],
     };
 
-    await streamStoryGeneration(
-      apiEndpoint,
-      payload,
-      session.access_token,
-      {
-        onStory: (content: string, usage: any) => {
-          // Story narration arrives first - show immediately!
-          partialPart.content = content;
-          storyData.scene.parts.push(partialPart);
+    await streamStoryGeneration(apiEndpoint, payload, session.access_token, {
+      onStory: (content: string, usage: any) => {
+        // Story narration arrives first - show immediately!
+        partialPart.content = content;
+        storyData.scene.parts.push(partialPart);
 
-          setStoryText(content);
+        setStoryText(content);
+        setStoryData({ ...storyData });
+        setLoading(false); // Let player read while tools/choices generate
+        setLoadingStage("tools"); // Now analyzing game state
+
+        logger.ai_response("Story narration received (retry)", {
+          length: content.length,
+          usage,
+        });
+      },
+      onTools: (
+        toolCalls: any[],
+        toolResponses: CommandResponse[],
+        usage: any
+      ) => {
+        // Tools arrive - update the last part in scene
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            toolCalls,
+            toolResponses,
+          };
+        }
+
+        // Process tool responses (update stats, inventory, etc.)
+        const lastPart = processSceneParts(
+          [storyData.scene.parts[lastPartIndex]],
+          storyData,
+          addNotification
+        );
+        if (lastPart) {
           setStoryData({ ...storyData });
-          setLoading(false); // Let player read while tools/choices generate
-          setLoadingStage("tools"); // Now analyzing game state
+        }
 
-          logger.ai_response("Story narration received (retry)", {
-            length: content.length,
-            usage,
-          });
-        },
-        onTools: (
-          toolCalls: any[],
-          toolResponses: CommandResponse[],
-          usage: any
-        ) => {
-          // Tools arrive - update the last part in scene
-          const lastPartIndex = storyData.scene.parts.length - 1;
-          if (lastPartIndex >= 0) {
-            storyData.scene.parts[lastPartIndex] = {
-              ...storyData.scene.parts[lastPartIndex],
-              toolCalls,
-              toolResponses,
-            };
+        setLoadingStage("choices"); // Now generating choices
+
+        logger.ai_response("Tool calls received (retry)", {
+          toolCallsCount: toolCalls?.length || 0,
+          toolResponsesCount: toolResponses?.length || 0,
+          usage,
+        });
+      },
+      onChoices: (newChoices: Choices, usage: any) => {
+        // Choices arrive - update the last part in scene
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            choices: newChoices.choices,
+          };
+        }
+        setChoices(newChoices);
+        setStoryData({ ...storyData });
+        setLoadingStage(null); // All done
+
+        logger.ai_response("Choices received (retry)", {
+          choicesCount: newChoices.choices.length,
+          usage,
+        });
+      },
+      onComplete: (meta: any) => {
+        // All done - update token balance
+        if (meta?.remainingBalance?.total !== undefined) {
+          setTokenBalance(meta.remainingBalance.total);
+        }
+
+        // Check for chapter completion
+        if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
+          const currentChapter = storyData.chapters.length;
+          if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
+            storyData.earnedPointsFromChapters.push(currentChapter);
+            storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
+            addNotification(
+              `🎉 Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+              "success"
+            );
           }
+        }
 
-          // Process tool responses (update stats, inventory, etc.)
-          const lastPart = processSceneParts(
-            [storyData.scene.parts[lastPartIndex]],
-            storyData,
-            addNotification
-          );
-          if (lastPart) {
-            setStoryData({ ...storyData });
-          }
+        // Process lore triggers based on new content
+        processLoreTriggers(storyData, addNotification);
 
-          setLoadingStage("choices"); // Now generating choices
+        setCanRetry(true);
+        setCanUndo(true);
+        setLoadingStage(null); // Ensure cleared on complete
 
-          logger.ai_response("Tool calls received (retry)", {
-            toolCallsCount: toolCalls?.length || 0,
-            toolResponsesCount: toolResponses?.length || 0,
-            usage,
-          });
-        },
-        onChoices: (newChoices: Choices, usage: any) => {
-          // Choices arrive - update the last part in scene
-          const lastPartIndex = storyData.scene.parts.length - 1;
-          if (lastPartIndex >= 0) {
-            storyData.scene.parts[lastPartIndex] = {
-              ...storyData.scene.parts[lastPartIndex],
-              choices: newChoices.choices,
-            };
-          }
-          setChoices(newChoices);
-          setStoryData({ ...storyData });
-          setLoadingStage(null); // All done
+        // Clear command responses after successful AI generation
+        setPendingCommandResponses([]);
 
-          logger.ai_response("Choices received (retry)", {
-            choicesCount: newChoices.choices.length,
-            usage,
-          });
-        },
-        onComplete: (meta: any) => {
-          // All done - update token balance
-          if (meta?.remainingBalance?.total !== undefined) {
-            setTokenBalance(meta.remainingBalance.total);
-          }
+        // Save progress to database
+        saveProgress(storyData);
 
-          // Check for chapter completion
-          if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
-            const currentChapter = storyData.chapters.length;
-            if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
-              storyData.earnedPointsFromChapters.push(currentChapter);
-              storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
-              addNotification(
-                `🎉 Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
-                "success"
-              );
-            }
-          }
+        addNotification("✓ Response regenerated", "success");
 
-          // Process lore triggers based on new content
-          processLoreTriggers(storyData, addNotification);
+        logger.ai_response("Generation complete (retry)", {
+          tokensDeducted: meta?.tokensDeducted,
+          totalCost: meta?.totalCost,
+        });
+      },
+      onError: (message: string) => {
+        addNotification(`Error: ${message}`, "failure");
+        setLoading(false);
+        setLoadingStage(null);
+        setCanRetry(true);
 
-          setCanRetry(true);
-          setCanUndo(true);
-          setLoadingStage(null); // Ensure cleared on complete
-
-          // Clear command responses after successful AI generation
-          setPendingCommandResponses([]);
-
-          // Save progress to database
-          saveProgress(storyData);
-
-          addNotification("✓ Response regenerated", "success");
-
-          logger.ai_response("Generation complete (retry)", {
-            tokensDeducted: meta?.tokensDeducted,
-            totalCost: meta?.totalCost,
-          });
-        },
-        onError: (message: string) => {
-          addNotification(`Error: ${message}`, "failure");
-          setLoading(false);
-          setLoadingStage(null);
-          setCanRetry(true);
-
-          logger.error("Streaming error (retry)", { message });
-        },
-      }
-    );
+        logger.error("Streaming error (retry)", { message });
+      },
+    });
   }
 
   async function handleUndo() {
@@ -4140,7 +4118,7 @@ function StoryPageContent() {
     await saveProgress(storyData);
   }
 
-  async function handleEdit(rawText: string, partIndex: number) {
+  async function handleEdit(editedText: string, partIndex: number) {
     if (!storyData || loading) return;
 
     if (partIndex < 0 || partIndex >= storyData.scene.parts.length) {
@@ -4156,73 +4134,35 @@ function StoryPageContent() {
       return;
     }
 
-    logger.action("User editing story part", { partIndex, rawText });
+    logger.action("User editing story part", {
+      partIndex,
+      originalLength: partToEdit.content.length,
+      editedLength: editedText.length,
+    });
 
-    // Parse the edited text as if it was fresh AI output
-    const reparsedPart = outputToScenePart(rawText);
+    // Update only the content field, preserve all other data
+    storyData.scene.parts[partIndex] = {
+      ...partToEdit,
+      content: editedText,
+      // Explicitly preserve these fields:
+      // - choices: AI-generated choices remain unchanged
+      // - toolCalls: AI tool usage history preserved
+      // - toolResponses: Command execution results preserved
+      // - imageUrl: Story images preserved
+      // - user: false (still AI response)
+      // - role: "assistant" (still AI role)
+    };
 
-    // Preserve original metadata
-    reparsedPart.user = false;
-    reparsedPart.role = "assistant";
-
-    // Replace the old part with the newly parsed one
-    storyData.scene.parts[partIndex] = reparsedPart;
-
-    // Process any commands from the re-parsed content
-    if (reparsedPart.commands && reparsedPart.commands.length > 0) {
-      // Generate command responses for AI feedback
-      const responses = generateCommandResponses(
-        reparsedPart.commands,
-        storyData
-      );
-      console.log("Command responses from edited part:", responses);
-      setPendingCommandResponses(responses);
-
-      // Also show notifications for user
-      responses.forEach((r) => {
-        if (r.success === true) {
-          addNotification(r.message, "success");
-        } else if (r.success === "partial") {
-          addNotification(r.message, "warning");
-        } else {
-          addNotification(r.message, "warning");
-        }
-      });
-    }
-
-    // Process any memory entries from the re-parsed content
-    if (reparsedPart.memoryEntries && reparsedPart.memoryEntries.length > 0) {
-      const existingMemoryLower = storyData.memory.map((m) =>
-        m.toLowerCase().trim()
-      );
-      const newMemories = reparsedPart.memoryEntries.filter(
-        (entry: string) =>
-          !existingMemoryLower.includes(entry.toLowerCase().trim())
-      );
-      if (newMemories.length > 0) {
-        storyData.memory.push(...newMemories);
-      }
-    }
-
-    // Process lore triggers
-    processLoreTriggers(storyData, addNotification);
-
-    // Update UI if this is the last/current part
+    // Update UI if this is the current/last part
     if (partIndex === storyData.scene.parts.length - 1) {
-      setStoryText(reparsedPart.content);
-      setChoices({ choices: reparsedPart.choices || [] });
-      const inputs =
-        reparsedPart.choices?.reduce(
-          (acc, choice) => ({ ...acc, [choice.text]: false }),
-          {} as Record<string, boolean>
-        ) || {};
-      setInput(inputs);
+      setStoryText(editedText);
+      // Choices remain unchanged - don't update them
     }
 
     setStoryData({ ...storyData });
-    addNotification("Story part edited and re-parsed", "success");
+    addNotification("Story narration edited successfully", "success");
 
-    // Save progress
+    // Save progress to database
     await saveProgress(storyData);
   }
 

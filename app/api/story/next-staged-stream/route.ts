@@ -198,11 +198,7 @@ export async function POST(req: NextRequest) {
         const userSettings = await getUserSettings(userId, supabase);
         const byokEnabled = userSettings?.byok_enabled || false;
         const isSubscriber = userSettings?.is_subscriber || false;
-        const shouldUseTokens = !(
-          isSubscriber &&
-          byokEnabled &&
-          openRouterKey
-        );
+        const shouldUseTokens = !(isSubscriber && byokEnabled && openRouterKey);
 
         logger.info("[Stream] Token check", {
           shouldUseTokens,
@@ -221,7 +217,9 @@ export async function POST(req: NextRequest) {
           if (!hasTokens) {
             const balance = await getUserTokenBalance(userId, supabaseAdmin);
             throw new Error(
-              `Insufficient tokens. You have ${balance?.total || 0} tokens (${balance?.tradable || 0} tradable, ${balance?.locked || 0} locked).`
+              `Insufficient tokens. You have ${balance?.total || 0} tokens (${
+                balance?.tradable || 0
+              } tradable, ${balance?.locked || 0} locked).`
             );
           }
         }
@@ -252,8 +250,7 @@ export async function POST(req: NextRequest) {
           undefined // No tools for story generation
         );
 
-        const storyContent =
-          storyResponse.choices[0]?.message?.content || "";
+        const storyContent = storyResponse.choices[0]?.message?.content || "";
         const storyUsage = storyResponse.usage || {
           prompt_tokens: 0,
           completion_tokens: 0,
@@ -457,7 +454,10 @@ export async function POST(req: NextRequest) {
 
             // Parse use_skill: Skill (DC #) or use_skill: Skill or use_skill: none
             const skillMatch = metadata.match(/use_skill:\s*([^;]+?)(?:;|$)/i);
-            if (skillMatch && !skillMatch[1].trim().toLowerCase().includes("none")) {
+            if (
+              skillMatch &&
+              !skillMatch[1].trim().toLowerCase().includes("none")
+            ) {
               const skillPart = skillMatch[1].trim();
               const dcMatch = skillPart.match(/\(DC\s*(\d+)\)/i);
               if (dcMatch) {
@@ -469,14 +469,22 @@ export async function POST(req: NextRequest) {
             }
 
             // Parse use_resource: Resource or use_resource: none
-            const resourceMatch = metadata.match(/use_resource:\s*([^;]+?)(?:;|$)/i);
-            if (resourceMatch && !resourceMatch[1].trim().toLowerCase().includes("none")) {
+            const resourceMatch = metadata.match(
+              /use_resource:\s*([^;]+?)(?:;|$)/i
+            );
+            if (
+              resourceMatch &&
+              !resourceMatch[1].trim().toLowerCase().includes("none")
+            ) {
               resourceUsed = resourceMatch[1].trim();
             }
 
             // Parse use_item: Item or use_item: none
             const itemMatch = metadata.match(/use_item:\s*(.+?)(?:;|$)/i);
-            if (itemMatch && !itemMatch[1].trim().toLowerCase().includes("none")) {
+            if (
+              itemMatch &&
+              !itemMatch[1].trim().toLowerCase().includes("none")
+            ) {
               itemUsed = itemMatch[1].trim();
             }
           }
@@ -520,8 +528,7 @@ export async function POST(req: NextRequest) {
         };
 
         const storyInputCost =
-          (storyUsage.prompt_tokens / 1_000_000) *
-          storyModelConfig.inputPrice;
+          (storyUsage.prompt_tokens / 1_000_000) * storyModelConfig.inputPrice;
         const storyOutputCost =
           (storyUsage.completion_tokens / 1_000_000) *
           storyModelConfig.outputPrice;
@@ -567,9 +574,7 @@ export async function POST(req: NextRequest) {
           );
 
           if (!deductResult.success) {
-            throw new Error(
-              deductResult.error || "Failed to deduct tokens"
-            );
+            throw new Error(deductResult.error || "Failed to deduct tokens");
           }
 
           const balance = await getUserTokenBalance(userId, supabaseAdmin);

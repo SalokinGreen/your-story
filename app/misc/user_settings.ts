@@ -61,7 +61,10 @@ export async function getUserSettings(
       }
       return newData as UserSettings;
     } catch (serviceError) {
-      console.error("Error using service role for settings creation:", serviceError);
+      console.error(
+        "Error using service role for settings creation:",
+        serviceError
+      );
       return null;
     }
   }
