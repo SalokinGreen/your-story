@@ -10,22 +10,22 @@ export function processLoreTriggers(
   ) => void,
   initialLoad: boolean = false
 ) {
-  // Combine all content for history scan
-  const fullContent = [
-    storyData.intro,
-    ...storyData.scene.parts.map((p) => p.content),
-  ]
+  // Only check last 5 scene parts for lore triggers to reduce token costs
+  const recentParts = storyData.scene.parts.slice(-5);
+  const recentContent = [...recentParts.map((p) => p.content)]
     .join("\n")
     .toLowerCase();
+
+  const currentPartIndex = storyData.scene.parts.length;
 
   const fulfilledBeatIndices = storyData.plot_beats
     .map((beat, index) => (beat.fulfilled ? index : -1))
     .filter((index) => index !== -1);
 
-  // Helper to check triggers
+  // Helper to check triggers (only in recent content)
   const checkTriggers = (triggers?: string[]) => {
     if (!triggers || triggers.length === 0) return false;
-    return triggers.some((t) => fullContent.includes(t.toLowerCase()));
+    return triggers.some((t) => recentContent.includes(t.toLowerCase()));
   };
 
   const checkBeats = (beats?: number[]) => {
@@ -103,6 +103,12 @@ export function processLoreTriggers(
     // Update state
     if (loreItem.on !== isActive) {
       loreItem.on = isActive;
+
+      // Track when lore was triggered for auto-expiry
+      if (isActive && !loreItem.alwaysOn) {
+        loreItem.lastTriggeredIndex = currentPartIndex;
+      }
+
       logger.state_change(`Lore '${loreItem.title}' changed state`, {
         active: isActive,
         triggers: { shouldTurnOn, shouldTurnOff, hasAnyOnTriggersDefined },
@@ -115,6 +121,9 @@ export function processLoreTriggers(
         //   addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
         // }
       }
+    } else if (isActive && !loreItem.alwaysOn && shouldTurnOn) {
+      // Refresh lastTriggeredIndex if lore is re-triggered
+      loreItem.lastTriggeredIndex = currentPartIndex;
     }
   });
 }

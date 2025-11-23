@@ -70,8 +70,14 @@ export function buildInfoMessage(storyData: StoryData): string {
         .join("\n")}`
     : "";
 
-  // Build lore section - only send lore where on !== false
-  const activeLore = storyData.lore.filter((l) => l.on !== false);
+  // Build lore section - only send always-on lore or recently triggered lore (last 10 parts)
+  const currentPartIndex = storyData.scene.parts.length;
+  const activeLore = storyData.lore.filter((l) => {
+    if (l.on === false || l.enabled === false) return false; // Explicitly disabled
+    if (l.alwaysOn) return true; // Always include always-on lore
+    if (!l.lastTriggeredIndex) return l.on === true; // Fallback for old lore without tracking
+    return currentPartIndex - l.lastTriggeredIndex <= 15; // Only recent triggers (last 10 parts)
+  });
   const loreSection = activeLore.length
     ? `Lore:\n${activeLore
         .map((l) => `- ${l.title}: ${cleanString(l.content)}`)

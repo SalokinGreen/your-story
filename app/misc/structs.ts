@@ -73,6 +73,7 @@ export interface StoryLore {
   on?: boolean;
   beats_trigger?: number[];
   beats_untrigger?: number[];
+  lastTriggeredIndex?: number; // Track when lore was last triggered for auto-expiry
 }
 export interface Chapter {
   title: string;

@@ -567,8 +567,15 @@ export function storyDataToString(storyData: StoryData): string {
     }
   }
 
-  // Lore - only include entries that are turned ON
-  const activeLore = storyData.lore.filter((lore) => lore.on !== false);
+  // Lore - only include always-on lore or recently triggered lore (last 10 parts)
+  const currentPartIndex = storyData.scene.parts.length;
+  const activeLore = storyData.lore.filter((lore) => {
+    if (lore.on === false || lore.enabled === false) return false; // Explicitly disabled
+    if (lore.alwaysOn) return true; // Always include always-on lore
+    if (!lore.lastTriggeredIndex)
+      return lore.on === true || lore.on === undefined; // Fallback for old lore without tracking
+    return currentPartIndex - lore.lastTriggeredIndex <= 10; // Only recent triggers (last 10 parts)
+  });
   if (activeLore.length > 0) {
     result += `\n## Lore Entries:\n`;
     activeLore.forEach((lore, index) => {
