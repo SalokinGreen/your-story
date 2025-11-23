@@ -9,10 +9,13 @@ The application uses a stateless API approach where the entire relevant story co
 ## Generation Modes
 
 ### Standard Generation (`/api/story/next`)
+
 Single-stage generation where the AI produces story text, choices, and commands in one call. Faster and more cost-effective.
 
 ### Staged Generation (`/api/story/next-staged`)
+
 Three-stage generation for higher quality output:
+
 1. **Stage 1**: Story narration (plain text)
 2. **Stage 2a**: Tool calls for game state updates (native OpenAI tool calling)
 3. **Stage 2b**: Player choices (plain text list)
@@ -22,6 +25,7 @@ Each stage can use a different AI model, allowing optimization for quality, spee
 ## Supported Providers
 
 1. **DeepSeek** (Default)
+
    - Model: `deepseek-chat`
    - Optimized for creative writing and following complex instructions.
    - Cost-effective.
@@ -34,14 +38,18 @@ Each stage can use a different AI model, allowing optimization for quality, spee
 ## Prompt Engineering
 
 ### Standard Mode (`ai.ts`)
+
 The system uses a comprehensive system prompt that instructs the AI to:
+
 - Act as a narrative engine.
 - Output strict XML-like tags.
 - Manage game mechanics (skills, resources, items).
 - Track plot beats and quests.
 
 ### Staged Mode (`ai_staged.ts`)
+
 Uses specialized prompts for each stage:
+
 - **Story Prompt**: Focuses purely on narrative quality without XML wrappers
 - **Tool Prompt**: Uses native OpenAI tool calling for precise game state updates
 - **Choices Prompt**: Generates contextually appropriate player choices with metadata
@@ -49,6 +57,7 @@ Uses specialized prompts for each stage:
 ### Context Construction
 
 For each request, the following context is built:
+
 1. **System Prompt**: Core instructions and output format.
 2. **Story Data**: Current state of the player, stats, inventory, and plot.
 3. **Recent History**: Last ~6 scene parts, allocated as 75% of available context (after reserving output tokens), with 25% reserved for memory.
@@ -56,6 +65,7 @@ For each request, the following context is built:
 ### Context Allocation
 
 Staged mode calculates available context as:
+
 - `availableInputTokens = maxTokens - maxOutputTokens`
 - History: 75% of available tokens
 - Memory: 25% of available tokens
@@ -92,11 +102,13 @@ The narrative prose goes here...
 Each stage has a different format:
 
 **Stage 1 (Story)**: Plain text narrative without XML wrappers
+
 ```
 The shadows deepen as you approach the ancient door...
 ```
 
 **Stage 2a (Tools)**: Native OpenAI tool calling format
+
 ```json
 {
   "tool_calls": [
@@ -111,6 +123,7 @@ The shadows deepen as you approach the ancient door...
 ```
 
 **Stage 2b (Choices)**: Plain text list
+
 ```
 - Sneak past the guards <use_skill: Stealth (DC 60)>
 - Negotiate with the captain <use_skill: Persuasion (DC 45)>
@@ -120,6 +133,7 @@ The shadows deepen as you approach the ancient door...
 ## Parsing Logic
 
 The `outputToScenePart` function in `app/misc/ai.ts` parses the raw AI response:
+
 1. **Story**: Extracted from `<story>` tags (or inferred if tags are missing).
 2. **Choices**: Parsed from `<choices>` block, including metadata like `<use_skill: ...>`.
 3. **Commands**: Extracted from `<commands>` block to update game state.
@@ -142,11 +156,12 @@ This is parsed into a structured `Choice` object used by the UI to display skill
 - **Staged Generation**: ~2x tokens (3 separate API calls).
 - **TTS Generation**: 3 Tokens per audio generation.
 - **Tracking**: Tokens are deducted from the user's balance in the database.
-- **Logic**: The system burns the *newest* (locked) tokens first, preserving older *tradable* tokens for the user.
+- **Logic**: The system burns the _newest_ (locked) tokens first, preserving older _tradable_ tokens for the user.
 
 ## API Integration
 
 ### Standard Generation (`/api/story/next`)
+
 1. Verifies user authentication and token balance.
 2. Constructs the prompt using `buildMessages`.
 3. Calls the appropriate AI provider (DeepSeek or OpenRouter).
@@ -155,6 +170,7 @@ This is parsed into a structured `Choice` object used by the UI to display skill
 6. Returns the parsed `ScenePart` to the client.
 
 ### Staged Generation (`/api/story/next-staged`)
+
 1. Verifies authentication and token balance.
 2. **Stage 1**: Calls `buildStoryPrompt` and generates narrative.
 3. **Stage 2**: Parallel execution:
@@ -168,6 +184,7 @@ This is parsed into a structured `Choice` object used by the UI to display skill
 ### Multi-Model Support
 
 Both endpoints accept model parameters:
+
 - **Standard**: `model` parameter (single model for entire generation)
 - **Staged**: `modelStory`, `modelTools`, `modelChoices` (one per stage)
 
@@ -175,4 +192,4 @@ Empty parameters default to the main model (`DEFAULT_AI_MODEL` env var or user's
 
 ### Raw Context Mode
 
-The API supports a `useRawContext` parameter. If true, the AI's *raw* output from previous turns is used in the context history instead of the parsed content. This can help the AI maintain better coherence if the parsing strips out important hidden reasoning or formatting.
+The API supports a `useRawContext` parameter. If true, the AI's _raw_ output from previous turns is used in the context history instead of the parsed content. This can help the AI maintain better coherence if the parsing strips out important hidden reasoning or formatting.

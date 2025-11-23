@@ -183,6 +183,24 @@ export const AI_MODELS = {
       "A small-sized model from Mistral, offering a balance between performance and cost, suitable for story generation..",
     bannerUrl: undefined,
   },
+  "Grok Code Fast 1": {
+    name: "Grok Code Fast 1",
+    original_model: "Grok Code Fast 1",
+    model: "x-ai/grok-code-fast-1",
+    maxTokens: 250000,
+    maxOutputTokens: 4000,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    cost: 10,
+    inputPrice: 2.0,
+    outputPrice: 10.0,
+    finetunes: [],
+    strengths: ["tool calling", "logic", "reasoning"],
+    weaknesses: ["creativity", "prose"],
+    description:
+      "A logic and reasoning-focused model that excels at understanding and generating structured content. Ideal for scenarios requiring precise logic and tool usage.",
+    bannerUrl: undefined,
+  },
 } as const;
 
 export interface AIModelConfig {
@@ -211,8 +229,10 @@ export function getModelConfig(modelKey: string): AIModelConfig {
   if (modelKey in AI_MODELS) {
     return AI_MODELS[modelKey as AIModelKey] as unknown as AIModelConfig;
   }
-  
+
   // Fallback to Deepseek Chat if key not found
-  console.warn(`Model key "${modelKey}" not found, falling back to Deepseek Chat`);
+  console.warn(
+    `Model key "${modelKey}" not found, falling back to Deepseek Chat`
+  );
   return AI_MODELS["Deepseek Chat"] as unknown as AIModelConfig;
 }

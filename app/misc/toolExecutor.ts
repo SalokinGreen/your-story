@@ -116,6 +116,60 @@ export function executeTools(
         continue;
       }
 
+      // Special handling for modify_relationship with description
+      // Need to execute two commands: modify value, then update description
+      if (
+        toolCall.function.name === "modify_relationship" &&
+        args.description
+      ) {
+        // First: modify the value
+        const valueCommand = `/modify_relationship: ${args.name} | ${args.valueDelta}`;
+        const valueResponse = executeCommandWithResponse(
+          valueCommand,
+          storyData
+        );
+
+        if (!valueResponse || !valueResponse.success) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message:
+              valueResponse?.message || `Failed to modify relationship value`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Second: update the description
+        const descCommand = `/update_relationship_description: ${args.name} | ${args.description}`;
+        const descResponse = executeCommandWithResponse(descCommand, storyData);
+
+        if (!descResponse || !descResponse.success) {
+          // Value was updated but description failed - return partial success
+          responses.push({
+            command: toolCall.function.name,
+            success: true,
+            message: `${valueResponse.message} (description update failed: ${
+              descResponse?.message || "unknown error"
+            })`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Both succeeded - combine messages
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: `${valueResponse.message} and updated description`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
       // Convert tool call to XML command format and execute
       const command = convertToolToCommand(toolCall.function.name, args);
       if (command === null) {
@@ -252,9 +306,7 @@ function convertToolToCommand(
 
     // Stat Management
     case "adjust_stat":
-      return `/modify_stat: ${args.name} ${args.valueDelta >= 0 ? "+" : ""}${
-        args.valueDelta
-      }`;
+      return `/modify_stat: ${args.name} | ${args.valueDelta}`;
 
     case "set_stat":
       return `/set_stat: ${args.name} ${args.value}`;
@@ -313,20 +365,14 @@ function convertToolToCommand(
       return `/add_relationship: ${args.name} | ${args.value} | ${args.description}`;
 
     case "modify_relationship":
-      if (args.description) {
-        return `/modify_relationship: ${args.name} | ${
-          args.valueDelta >= 0 ? "+" : ""
-        }${args.valueDelta} | ${args.description}`;
-      }
-      return `/modify_relationship: ${args.name} | ${
-        args.valueDelta >= 0 ? "+" : ""
-      }${args.valueDelta}`;
+      // Description handled separately in executeTools if provided
+      return `/modify_relationship: ${args.name} | ${args.valueDelta}`;
 
     case "delete_relationship":
       return `/delete_relationship: ${args.name}`;
 
     case "edit_relationship":
-      return `/edit_relationship: ${args.name} | ${args.description}`;
+      return `/update_relationship_description: ${args.name} | ${args.description}`;
 
     // Memory - handled directly in executeTools, not via command
     case "add_memory":

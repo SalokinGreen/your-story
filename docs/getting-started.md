@@ -148,16 +148,16 @@ npm install @tailwindcss/postcss --save-dev
 If imports fail in tests, ensure `vitest.config.ts` includes:
 
 ```typescript
-import { defineConfig } from 'vitest/config';
-import path from 'path';
+import { defineConfig } from "vitest/config";
+import path from "path";
 
 export default defineConfig({
   test: {
-    environment: 'node',
+    environment: "node",
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './'),
+      "@": path.resolve(__dirname, "./"),
     },
   },
 });

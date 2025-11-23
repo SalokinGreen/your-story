@@ -238,7 +238,11 @@ export async function POST(req: NextRequest) {
     const estimatedCost =
       storyModelConfig.cost + toolsModelConfig.cost + choicesModelConfig.cost;
 
-    const hasTokens = await hasEnoughTokens(userId, estimatedCost, supabaseAdmin);
+    const hasTokens = await hasEnoughTokens(
+      userId,
+      estimatedCost,
+      supabaseAdmin
+    );
     if (!hasTokens) {
       return NextResponse.json(
         {
@@ -287,7 +291,9 @@ export async function POST(req: NextRequest) {
     console.log(`[Staged] Stage 1 complete: ${storyUsage.total_tokens} tokens`);
 
     // STAGE 2: Generate tool calls and choices in parallel
-    console.log("[Staged] Stage 2: Generating tools and choices in parallel...");
+    console.log(
+      "[Staged] Stage 2: Generating tools and choices in parallel..."
+    );
 
     const [stage2aResult, choicesResponse] = await Promise.all([
       // Stage 2a: Tool calls loop
@@ -307,8 +313,10 @@ export async function POST(req: NextRequest) {
             storyData,
             storyContent,
             commandResponses,
-            existingToolCalls: allToolCalls.length > 0 ? allToolCalls : undefined,
-            existingToolResponses: allToolResponses.length > 0 ? allToolResponses : undefined,
+            existingToolCalls:
+              allToolCalls.length > 0 ? allToolCalls : undefined,
+            existingToolResponses:
+              allToolResponses.length > 0 ? allToolResponses : undefined,
           });
 
           const toolResponse = await callAI(
@@ -320,7 +328,8 @@ export async function POST(req: NextRequest) {
             TOOL_SCHEMAS
           );
 
-          const newToolCalls = toolResponse.choices[0]?.message?.tool_calls || [];
+          const newToolCalls =
+            toolResponse.choices[0]?.message?.tool_calls || [];
           const currentToolUsage = toolResponse.usage || {
             prompt_tokens: 0,
             completion_tokens: 0,
@@ -329,31 +338,40 @@ export async function POST(req: NextRequest) {
 
           // Accumulate usage
           totalToolUsage.prompt_tokens += currentToolUsage.prompt_tokens;
-          totalToolUsage.completion_tokens += currentToolUsage.completion_tokens;
+          totalToolUsage.completion_tokens +=
+            currentToolUsage.completion_tokens;
           totalToolUsage.total_tokens += currentToolUsage.total_tokens;
 
           toolLoopCount++;
 
           // If no new tool calls, we're done
           if (newToolCalls.length === 0) {
-            console.log(`[Staged] Tool loop complete after ${toolLoopCount} iterations (no more tools needed)`);
+            console.log(
+              `[Staged] Tool loop complete after ${toolLoopCount} iterations (no more tools needed)`
+            );
             break;
           }
 
-          console.log(`[Staged] Tool loop iteration ${toolLoopCount}: ${newToolCalls.length} tool calls`);
+          console.log(
+            `[Staged] Tool loop iteration ${toolLoopCount}: ${newToolCalls.length} tool calls`
+          );
 
           // Execute new tools
           const newResponses = await executeTools(newToolCalls, storyData);
-          
+
           allToolCalls = [...allToolCalls, ...newToolCalls];
           allToolResponses = [...allToolResponses, ...newResponses];
         }
 
         if (toolLoopCount >= maxToolLoops) {
-          console.log(`[Staged] Tool loop reached maximum iterations (${maxToolLoops})`);
+          console.log(
+            `[Staged] Tool loop reached maximum iterations (${maxToolLoops})`
+          );
         }
 
-        console.log(`[Staged] Stage 2a complete: ${allToolCalls.length} total tool calls, ${totalToolUsage.total_tokens} tokens`);
+        console.log(
+          `[Staged] Stage 2a complete: ${allToolCalls.length} total tool calls, ${totalToolUsage.total_tokens} tokens`
+        );
 
         return {
           toolCalls: allToolCalls,
@@ -379,7 +397,9 @@ export async function POST(req: NextRequest) {
         );
 
         console.log(
-          `[Staged] Stage 2b complete: ${response.usage?.total_tokens || 0} tokens`
+          `[Staged] Stage 2b complete: ${
+            response.usage?.total_tokens || 0
+          } tokens`
         );
 
         return response;
@@ -486,7 +506,8 @@ export async function POST(req: NextRequest) {
     const toolsInputCost =
       (totalToolUsage.prompt_tokens / 1_000_000) * toolsModelConfig.inputPrice;
     const toolsOutputCost =
-      (totalToolUsage.completion_tokens / 1_000_000) * toolsModelConfig.outputPrice;
+      (totalToolUsage.completion_tokens / 1_000_000) *
+      toolsModelConfig.outputPrice;
     const choicesInputCost =
       (choicesUsage.prompt_tokens / 1_000_000) * choicesModelConfig.inputPrice;
     const choicesOutputCost =
@@ -500,10 +521,13 @@ export async function POST(req: NextRequest) {
       toolsOutputCost +
       choicesInputCost +
       choicesOutputCost;
-    
+
     // Add additional cost based on tool call count: 1 coin per 2 tool calls
     const toolCallBonus = Math.floor(allToolCalls.length / 2);
-    const tokenCost = Math.max(1, Math.ceil(totalCostUSD / 0.01) + toolCallBonus);
+    const tokenCost = Math.max(
+      1,
+      Math.ceil(totalCostUSD / 0.01) + toolCallBonus
+    );
 
     // Deduct tokens only if not using BYOK
     let remainingBalance;

@@ -370,8 +370,8 @@ function AIModelSelector({
         >
           {Object.entries(AI_MODELS).map(([key, config]) => (
             <option key={key} value={key}>
-              {config.name} - {config.original_model} ({config.cost} coin
-              {config.cost > 1 ? "s" : ""},{" "}
+              {config.name} - {config.original_model} ({(config as any).cost || 1} coin
+              {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
               {(config.maxTokens / 1000).toFixed(0)}K context)
             </option>
           ))}
@@ -574,8 +574,8 @@ function AIModelSelector({
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
                             {config.name} - {config.original_model} (
-                            {config.cost} coin
-                            {config.cost > 1 ? "s" : ""},{" "}
+                            {(config as any).cost || 1} coin
+                            {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
                             {(config.maxTokens / 1000).toFixed(0)}K)
                           </option>
                         ))}
@@ -608,8 +608,8 @@ function AIModelSelector({
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
                             {config.name} - {config.original_model} (
-                            {config.cost} coin
-                            {config.cost > 1 ? "s" : ""},{" "}
+                            {(config as any).cost || 1} coin
+                            {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
                             {(config.maxTokens / 1000).toFixed(0)}K)
                           </option>
                         ))}
