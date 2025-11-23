@@ -313,7 +313,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     id: "broke",
     name: "Broke (Cost-Effective)",
     description: "Best if you owe money or are hiding from the IRS",
-    storyModel: "Mistral Nemo",
+    storyModel: "Mistral Medium 3.1",
     toolsModel: "Grok Code Fast 1",
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 3, // 1 + 1 + 1
