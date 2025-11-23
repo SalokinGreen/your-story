@@ -192,7 +192,7 @@ export default function StatsPage(storyData: StoryData) {
                       Spend to reroll (1⚡) or guarantee success (2⚡).
                     </p>
                     {/* Momentum dots display */}
-                    <div className="flex gap-1.5 mb-2">
+                    <div className="flex gap-1.5 mb-2 overflow-hidden">
                       {Array.from({ length: storyData.maxMomentum }).map(
                         (_, i) => (
                           <div

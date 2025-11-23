@@ -872,13 +872,17 @@ export default function AdventureDetailPage() {
                           <button
                             key={preset.id}
                             onClick={() => setSelectedPresetId(preset.id)}
-                            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                            className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
                               selectedPresetId === preset.id
                                 ? "bg-purple-600 text-white shadow-md"
                                 : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600"
                             }`}
                           >
-                            {preset.icon} {preset.name}
+                            <DynamicIcon
+                              name={preset.icon}
+                              className="w-4 h-4"
+                            />
+                            {preset.name}
                           </button>
                         ))}
                     </div>
@@ -1417,7 +1421,7 @@ export default function AdventureDetailPage() {
                         className="border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/30 rounded-xl p-4 hover:shadow-lg transition-shadow"
                       >
                         <div className="flex items-start gap-3 mb-3">
-                          <span className="text-3xl">{preset.icon}</span>
+                          <DynamicIcon name={preset.icon} className="w-8 h-8" />
                           <div className="flex-1">
                             <h3 className="font-bold text-lg text-gray-900 dark:text-white">
                               {preset.name}

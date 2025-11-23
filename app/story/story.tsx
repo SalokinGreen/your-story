@@ -67,16 +67,34 @@ export default function Story({
   const canUseReroll = storyData.momentum >= 1 && hasSkillCheck;
   const canUseGuarantee = storyData.momentum >= 2 && hasSkillCheck;
 
+  // Filter to only AI story parts with content and deduplicate consecutive identical content
+  const storyParts = storyData.scene.parts.filter(
+    (part) => !part.user && part.content.trim().length > 0
+  );
+
+  // Remove consecutive duplicates (same content)
+  const uniqueStoryParts = storyParts.filter((part, index, arr) => {
+    if (index === 0) return true;
+    return part.content !== arr[index - 1].content;
+  });
+
+  const currentStoryIndex =
+    viewingPartIndex !== null && viewingPartIndex !== undefined
+      ? uniqueStoryParts.findIndex(
+          (part) => storyData.scene.parts.indexOf(part) === viewingPartIndex
+        )
+      : uniqueStoryParts.length - 1;
+
   return (
     <div className="w-full">
       <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col gap-6">
           {/* Navigation arrows */}
-          {storyData.scene.parts.length > 1 && (
+          {uniqueStoryParts.length > 1 && (
             <div className="flex items-center justify-center gap-2">
               <button
                 onClick={onNavigateLeft}
-                disabled={viewingPartIndex === 0}
+                disabled={currentStoryIndex <= 0}
                 className="p-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
                 title="Previous message"
               >
@@ -86,7 +104,7 @@ export default function Story({
               {viewingPartIndex !== null && viewingPartIndex !== undefined ? (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {viewingPartIndex + 1} / {storyData.scene.parts.length}
+                    {currentStoryIndex + 1} / {uniqueStoryParts.length}
                   </span>
                   <button
                     onClick={onResetToCurrentPart}
@@ -97,7 +115,7 @@ export default function Story({
                 </div>
               ) : (
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {storyData.scene.parts.length}
+                  {uniqueStoryParts.length}
                 </span>
               )}
 
@@ -105,7 +123,7 @@ export default function Story({
                 onClick={onNavigateRight}
                 disabled={
                   viewingPartIndex === null ||
-                  viewingPartIndex === storyData.scene.parts.length - 1
+                  currentStoryIndex >= uniqueStoryParts.length - 1
                 }
                 className="p-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
                 title="Next message"

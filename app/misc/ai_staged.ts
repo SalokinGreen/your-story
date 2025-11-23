@@ -402,6 +402,7 @@ ${rpgSystem.aiInstructions.choiceSyntax}
 When referencing skills, resources, or items in choices, you MUST use the EXACT names as they appear in the game state below.
 - Copy exact spelling, capitalization, and punctuation from Stats, Resources, and Inventory
 - Do NOT paraphrase, abbreviate, or modify names
+- Only use stats and resources that the player owns
 
 Resource System:
 - When a choice uses a resource (use_resource), that resource is AUTOMATICALLY at risk if the skill check fails
@@ -445,7 +446,7 @@ ${rpgSystem.aiInstructions.dcGuidelines}
 Choice Design Guidelines:
 - Offer 6-8 meaningful choices that reflect different approaches or priorities
 - Each choice should have clear stakes and potential consequences
-- Use skill checks for challenging actions (combat, persuasion, acrobatics, etc.)
+- Use skill checks for challenging actions
 - Use items for tactical advantages when appropriate
 - Use resources for risky or exhausting actions
 - Balance risk vs reward - higher DCs should offer better outcomes
@@ -453,8 +454,7 @@ Choice Design Guidelines:
 - Make choices reflect the player's agency and the current story situation
 - Avoid dead-end choices that just lead to "Continue..."
 - Balance challenge with narrative flow: not every choice needs a skill check
-- Use skill checks for dramatic moments, high-stakes decisions, and character-defining actions
-`;
+- Use skill checks for dramatic moments, high-stakes decisions, and character-defining actions`;
 
   const infoMessage = buildInfoMessage(storyData);
 

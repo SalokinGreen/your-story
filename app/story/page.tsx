@@ -1698,30 +1698,80 @@ function StoryPageContent() {
     return lastPartWithContent || parts[parts.length - 1];
   }
 
-  // Navigation handlers
+  // Navigation handlers - only navigate through AI story parts with content
   function handleNavigateLeft() {
     if (!storyData) return;
-    const currentIndex = viewingPartIndex ?? storyData.scene.parts.length - 1;
-    if (currentIndex > 0) {
-      const newIndex = currentIndex - 1;
+
+    // Filter to only AI story parts with actual content and deduplicate consecutive identical content
+    const storyParts = storyData.scene.parts.filter(
+      (part) => !part.user && part.content.trim().length > 0
+    );
+
+    // Remove consecutive duplicates (same content)
+    const uniqueStoryParts = storyParts.filter((part, index, arr) => {
+      if (index === 0) return true;
+      return part.content !== arr[index - 1].content;
+    });
+
+    if (uniqueStoryParts.length === 0) return;
+
+    // If viewing current (null), we're at the last unique story part
+    let currentStoryIndex;
+    if (viewingPartIndex === null || viewingPartIndex === undefined) {
+      currentStoryIndex = uniqueStoryParts.length - 1;
+    } else {
+      const currentPart = storyData.scene.parts[viewingPartIndex];
+      currentStoryIndex = uniqueStoryParts.indexOf(currentPart);
+    }
+
+    if (currentStoryIndex > 0) {
+      const prevStoryPart = uniqueStoryParts[currentStoryIndex - 1];
+      const newIndex = storyData.scene.parts.indexOf(prevStoryPart);
       setViewingPartIndex(newIndex);
-      const part = storyData.scene.parts[newIndex];
-      setStoryText(part.content);
-      setChoices({ choices: part.choices || [] });
+      setStoryText(prevStoryPart.content);
+      setChoices({ choices: prevStoryPart.choices || [] });
     }
   }
 
   function handleNavigateRight() {
     if (!storyData) return;
-    const currentIndex = viewingPartIndex ?? storyData.scene.parts.length - 1;
-    if (currentIndex < storyData.scene.parts.length - 1) {
-      const newIndex = currentIndex + 1;
-      setViewingPartIndex(newIndex);
-      const part = storyData.scene.parts[newIndex];
-      setStoryText(part.content);
-      setChoices({ choices: part.choices || [] });
+
+    // Filter to only AI story parts with actual content and deduplicate consecutive identical content
+    const storyParts = storyData.scene.parts.filter(
+      (part) => !part.user && part.content.trim().length > 0
+    );
+
+    // Remove consecutive duplicates (same content)
+    const uniqueStoryParts = storyParts.filter((part, index, arr) => {
+      if (index === 0) return true;
+      return part.content !== arr[index - 1].content;
+    });
+
+    if (uniqueStoryParts.length === 0) return;
+
+    // If viewing current (null), we're already at the end
+    if (viewingPartIndex === null || viewingPartIndex === undefined) {
+      return;
+    }
+
+    const currentPart = storyData.scene.parts[viewingPartIndex];
+    const currentStoryIndex = uniqueStoryParts.indexOf(currentPart);
+
+    if (currentStoryIndex < uniqueStoryParts.length - 1) {
+      const nextStoryPart = uniqueStoryParts[currentStoryIndex + 1];
+      const newIndex = storyData.scene.parts.indexOf(nextStoryPart);
+
+      // Check if this is the last story part - if so, set to null to show "current"
+      if (currentStoryIndex + 1 === uniqueStoryParts.length - 1) {
+        setViewingPartIndex(null);
+      } else {
+        setViewingPartIndex(newIndex);
+      }
+
+      setStoryText(nextStoryPart.content);
+      setChoices({ choices: nextStoryPart.choices || [] });
     } else {
-      // At the end, return to current
+      // Moving to the end, return to current
       setViewingPartIndex(null);
       const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
       setStoryText(lastPart.content);
@@ -2812,7 +2862,8 @@ function StoryPageContent() {
     if (choice.skill_used) {
       // Try fuzzy matching first
       const matchResult = findStatMatch(choice.skill_used, storyData.stats);
-      const statValue = matchResult?.item.value || 0;
+      // If skill not found, treat as if player has 1 stat point in it
+      const statValue = matchResult?.item.value ?? 1;
 
       // For YZE: Roll dice NOW using stat value
       // For Explosive: Roll dice NOW using stat value to determine die size
