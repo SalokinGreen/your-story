@@ -1331,6 +1331,14 @@ export default function LibraryPage() {
                           </button>
                           <button
                             onClick={() =>
+                              router.push(`/creator?edit=${adventure.id}`)
+                            }
+                            className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() =>
                               handleDeleteAdventure(adventure.id, true)
                             }
                             disabled={deleting === adventure.id}

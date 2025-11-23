@@ -36,6 +36,7 @@ import { IconPicker } from "@/app/components/IconPicker";
 import {
   saveLocalAdventure,
   getLocalAdventure,
+  deleteLocalAdventure,
 } from "@/app/misc/localAdventureManager";
 type CreatorStep =
   | "basic"
@@ -73,6 +74,7 @@ function AdventureCreatorContent() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [isLocal, setIsLocal] = useState(false); // Track if adventure is stored locally
   const [selectedPreset, setSelectedPreset] = useState<string>("custom");
   const [presets, setPresets] = useState<Preset[]>([DEFAULT_PRESET]);
   const [showPresetForm, setShowPresetForm] = useState(false);
@@ -285,18 +287,44 @@ function AdventureCreatorContent() {
     const loadAdventure = async () => {
       setLoading(true);
       try {
+        // First, try loading from database
         const response = await authenticatedFetch(
           `/api/adventures/${editAdventureId}`
         );
-        if (!response.ok) throw new Error("Failed to load adventure");
+        
+        let adventure: Adventure | null = null;
+        let isFromLocal = false;
 
-        const { adventure } = await response.json();
+        if (response.ok) {
+          const data = await response.json();
+          adventure = data.adventure;
 
-        // Verify user is the author
-        if (adventure.authorId !== user?.id) {
-          addNotification("You can only edit your own adventures", "failure");
-          router.push("/explorer");
-          return;
+          // Verify user is the author
+          if (adventure!.authorId !== user?.id) {
+            addNotification("You can only edit your own adventures", "failure");
+            router.push("/explorer");
+            return;
+          }
+        } else if (response.status === 404) {
+          // Not in database, try loading from IndexedDB
+          try {
+            const localAdv = await getLocalAdventure(editAdventureId);
+            if (localAdv) {
+              adventure = localAdv.adventureData as Adventure;
+              isFromLocal = true;
+              setIsLocal(true);
+            } else {
+              throw new Error("Adventure not found in database or local storage");
+            }
+          } catch (localErr) {
+            throw new Error("Adventure not found");
+          }
+        } else {
+          throw new Error("Failed to load adventure");
+        }
+
+        if (!adventure) {
+          throw new Error("Adventure data is empty");
         }
 
         // Load basic info
@@ -407,16 +435,26 @@ function AdventureCreatorContent() {
               "success"
             );
           } else {
-            addNotification("Adventure loaded for editing", "success");
+            addNotification(
+              isFromLocal
+                ? "Local adventure loaded for editing"
+                : "Adventure loaded for editing",
+              "success"
+            );
           }
         } catch (err) {
           console.error("Failed to restore draft overlay", err);
-          addNotification("Adventure loaded for editing", "success");
+          addNotification(
+            isFromLocal
+              ? "Local adventure loaded for editing"
+              : "Adventure loaded for editing",
+            "success"
+          );
         }
       } catch (error) {
         console.error("Error loading adventure:", error);
         addNotification("Failed to load adventure", "failure");
-        router.push("/explorer");
+        router.push("/library");
       } finally {
         setLoading(false);
         setInitialLoadComplete(true);
@@ -1611,7 +1649,8 @@ function AdventureCreatorContent() {
       setShortDescription("");
       setDescription("");
       setDifficulty("Medium");
-      setVisibility("public");
+      setRpgSystem("3d6");
+      setVisibility("private");
       setNsfw(false);
       setTags([]);
       setThumbnailUrl("");
@@ -1630,11 +1669,16 @@ function AdventureCreatorContent() {
       setInventory([]);
       setPlotBeats([]);
       setLore([]);
+      setRelationships([]);
       setAchievements([]);
+      setQuests([]);
+      setSelectedPreset("custom");
+      setPresets([DEFAULT_PRESET]);
+      setUpgradeSettings(DEFAULT_UPGRADE_SETTINGS);
       setCurrentStep("basic");
       addNotification("Draft cleared", "success");
     } else {
-      // For editing, clear the draft and reload from server
+      // For editing, clear the draft and reload from server/IndexedDB
       if (draftKey && typeof window !== "undefined") {
         window.localStorage.removeItem(draftKey);
       }
@@ -1643,6 +1687,137 @@ function AdventureCreatorContent() {
       if (typeof window !== "undefined") {
         window.location.reload();
       }
+    }
+  };
+
+  const handleSaveToDatabase = async () => {
+    // Validation
+    if (!title.trim()) {
+      addNotification("Please enter a title", "warning");
+      setCurrentStep("basic");
+      return;
+    }
+    if (!premise.trim() || !intro.trim()) {
+      addNotification("Please fill in the story setup", "warning");
+      setCurrentStep("premise");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      // Build the story data
+      const storyData: Partial<StoryData> = {
+        story_name: title,
+        premise,
+        player_name: playerName || "Hero",
+        player_summary: playerSummary || "An adventurer",
+        intro: intro,
+        plot_beats: plotBeats,
+        memory: [],
+        max_chapters: maxChapters,
+        currentChapter: 0,
+        chapters: [],
+        scene: { parts: [] },
+        stats,
+        resources,
+        inventory,
+        achievements,
+        lore,
+        relationships,
+        quests,
+        earnedPointsFromQuests: [],
+        momentum,
+        maxMomentum,
+        points,
+        earnedPointsFromBeats: [],
+        earnedPointsFromChapters: [],
+        author_notes: authorNotes,
+        selected_preset: selectedPreset,
+        presets: presets,
+        upgradeSettings: upgradeSettings,
+        rpgSystem: rpgSystem,
+      };
+
+      // Get auth token
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Not authenticated");
+      }
+
+      const payload = {
+        title,
+        shortDescription,
+        description,
+        thumbnailUrl: thumbnailUrl || undefined,
+        bannerUrl: bannerUrl || undefined,
+        authorId: user!.id,
+        tags,
+        difficulty: difficulty.toLowerCase(),
+        visibility: visibility.toLowerCase(),
+        nsfw,
+        estimatedDuration: "1-2 hours",
+        isPublished: true,
+        isFeatured: false,
+        storyTemplate: storyData,
+        selectedPreset: selectedPreset,
+        presets: presets,
+      };
+
+      // Check payload size
+      const payloadSize = JSON.stringify(payload).length;
+      console.log(
+        `Adventure payload size: ${(payloadSize / 1024).toFixed(2)} KB`
+      );
+
+      if (payloadSize > 4 * 1024 * 1024) {
+        addNotification(
+          "Adventure data is very large (>4MB). Consider reducing lore entries or plot beats.",
+          "warning"
+        );
+      }
+
+      const response = await fetch("/api/adventures", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to upload adventure to database");
+      }
+
+      const { adventure } = await response.json();
+
+      // Success! Remove from IndexedDB and clear local state
+      if (editAdventureId) {
+        await deleteLocalAdventure(editAdventureId);
+      }
+      setIsLocal(false);
+
+      // Clear draft from localStorage
+      if (draftKey && typeof window !== "undefined") {
+        window.localStorage.removeItem(draftKey);
+      }
+
+      addNotification("Adventure saved to database successfully!", "success");
+      
+      // Navigate to the database version
+      router.push(`/creator?edit=${adventure.id}`);
+    } catch (error) {
+      console.error("Error uploading adventure:", error);
+      addNotification(
+        error instanceof Error ? error.message : "Failed to upload adventure",
+        "failure"
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1694,6 +1869,49 @@ function AdventureCreatorContent() {
       rpgSystem: rpgSystem,
     };
 
+    // If editing a local adventure, save to IndexedDB instead of database
+    if (isLocal) {
+      try {
+        const adventureData: Partial<Adventure> = {
+          title,
+          shortDescription,
+          description,
+          thumbnailUrl: thumbnailUrl || undefined,
+          bannerUrl: bannerUrl || undefined,
+          authorId: user!.id,
+          tags,
+          difficulty: difficulty.toLowerCase() as any,
+          visibility: visibility.toLowerCase() as any,
+          nsfw,
+          estimatedDuration: "1-2 hours",
+          isPublished: false, // Local adventures are unpublished drafts
+          isFeatured: false,
+          storyTemplate: storyData,
+          selectedPreset: selectedPreset,
+          presets: presets,
+        };
+
+        await saveLocalAdventure(editAdventureId!, adventureData);
+
+        // Clear draft from localStorage since we just saved
+        if (draftKey && typeof window !== "undefined") {
+          window.localStorage.removeItem(draftKey);
+        }
+
+        addNotification("Adventure saved locally", "success");
+        setSaving(false);
+        return;
+      } catch (error) {
+        console.error("Error saving locally:", error);
+        addNotification(
+          error instanceof Error ? error.message : "Failed to save locally",
+          "failure"
+        );
+        setSaving(false);
+        return;
+      }
+    }
+
     //Save to database
     try {
       // Get auth token
@@ -1714,8 +1932,8 @@ function AdventureCreatorContent() {
         title,
         shortDescription,
         description,
-        thumbnailUrl: thumbnailUrl || null,
-        bannerUrl: bannerUrl || null,
+        thumbnailUrl: thumbnailUrl || undefined,
+        bannerUrl: bannerUrl || undefined,
         authorId: user!.id,
         tags,
         difficulty: difficulty.toLowerCase(),
@@ -7631,21 +7849,41 @@ function AdventureCreatorContent() {
                 <DynamicIcon name="Save" className="w-4 h-4 inline mr-2" />
                 Save Locally
               </button>
+              {isLocal && (
+                <button
+                  onClick={handleSaveToDatabase}
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-3 py-2 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
+                  title="Upload local adventure to database"
+                >
+                  {saving ? (
+                    "Uploading..."
+                  ) : (
+                    <>
+                      <DynamicIcon
+                        name="Upload"
+                        className="w-4 h-4 inline mr-2"
+                      />
+                      Save to Database
+                    </>
+                  )}
+                </button>
+              )}
               <button
                 onClick={handleSave}
                 disabled={saving}
                 className="flex-1 sm:flex-none px-3 py-2 bg-linear-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
-                title="Publish to the community"
+                title={isLocal ? "Save changes locally" : "Publish to the community"}
               >
                 {saving ? (
-                  "Publishing..."
+                  isLocal ? "Saving..." : "Publishing..."
                 ) : (
                   <>
                     <DynamicIcon
-                      name="Rocket"
+                      name={isLocal ? "Save" : "Rocket"}
                       className="w-4 h-4 inline mr-2"
                     />{" "}
-                    Publish
+                    {isLocal ? "Save" : "Publish"}
                   </>
                 )}
               </button>

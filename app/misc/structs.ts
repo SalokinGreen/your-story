@@ -283,6 +283,7 @@ export interface Adventure {
   bannerUrl?: string;
   tags: string[];
   difficulty: "Easy" | "Medium" | "Hard" | "Expert";
+  visibility?: "public" | "hidden" | "private"; // Controls who can see the adventure
   estimatedDuration: string; // e.g., "2-3 hours"
   popularity: number; // For sorting/ranking
   rating?: number; // 0-5
