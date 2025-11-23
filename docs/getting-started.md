@@ -33,17 +33,24 @@ Create a `.env.local` file in the project root:
 DEEPSEEK_API_KEY=your_deepseek_api_key_here
 DEEPSEEK_MODEL=deepseek-chat
 
-# OR OpenRouter (Optional)
+# OpenRouter (for multi-model support)
 OPENROUTER_API_KEY=your_openrouter_key
-DEFAULT_AI_MODEL=anthropic/claude-3-sonnet
+DEFAULT_AI_MODEL=Deepseek Chat
+
+# Speechify TTS (Optional)
+SPEECHIFY_API_KEY=your_speechify_key
 
 # Supabase (Server-side)
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # Supabase (Client-side - must have NEXT_PUBLIC_ prefix)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_KEY=your_supabase_anon_key
+
+# Optional
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 **Important**: Client-side environment variables MUST be prefixed with `NEXT_PUBLIC_` for Next.js to expose them to the browser.

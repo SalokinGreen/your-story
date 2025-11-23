@@ -246,15 +246,30 @@ export function buildToolPrompt({
   storyData,
   storyContent,
   commandResponses,
+  existingToolCalls,
+  existingToolResponses,
 }: {
   storyData: StoryData;
   storyContent: string; // The story text just generated
   commandResponses?: CommandResponse[];
+  existingToolCalls?: any[]; // Tool calls from previous iterations
+  existingToolResponses?: CommandResponse[]; // Tool responses from previous iterations
 }): { messages: ChatMessage[] } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
   const systemPrompt = `You are a game mechanics analyzer for an interactive text-based adventure game.
 Your role is to determine what game state changes should happen based on the narrative that was just written.
+
+⚠️ IMPORTANT: The user will NOT see your messages. You can (and should) use the message content to think out loud about what tools are needed.
+
+Think step-by-step in your message content:
+1. What items were mentioned or obtained? (use add_item for each)
+2. What stats changed? (use update_stat for each)
+3. What resources were used or gained? (use update_resource for each)
+4. What should the player remember? (use add_memory for important events with specific details)
+5. Any achievements unlocked? (use unlock_achievement for each that meets its trigger condition)
+6. Any quests updated? (use update_quest for progress)
+7. Any relationships changed? (use update_relationship for each)
 
 You have access to various tools (functions) to modify game state. Use them to:
 - Add/remove items from inventory
@@ -271,6 +286,7 @@ When referencing skills, resources, items, achievements, quests, or relationship
 - The system uses exact string matching and will fail if names don't match perfectly
 
 Guidelines:
+- Call ALL necessary tools. You can make MULTIPLE tool calls in one response.
 - Only use tools for clear, explicit changes in the story
 - Don't unlock achievements unless their trigger conditions are explicitly met
 - Track resource and stat changes that result from story events
@@ -301,10 +317,53 @@ ${
     {
       role: "user",
       content: cleanString(
-        `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen?`
+        `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.`
       ),
     },
   ];
+
+  // If we have existing tool calls, add them to history and prompt for more
+  if (existingToolCalls && existingToolCalls.length > 0) {
+    // Add assistant's previous tool calls
+    messages.push({
+      role: "assistant",
+      content: "Analyzing game state changes...",
+      tool_calls: existingToolCalls,
+    });
+
+    // Add tool responses
+    if (existingToolResponses && existingToolResponses.length > 0) {
+      for (const response of existingToolResponses) {
+        messages.push({
+          role: "tool",
+          content: cleanString(
+            `${
+              response.success ? "✓" : response.success === false ? "✗" : "⚠"
+            } ${response.message}`
+          ),
+          tool_call_id: response.toolCallId,
+        });
+      }
+    }
+
+    // Ask if anything else is needed
+    const toolCallSummary = existingToolCalls
+      .map((t, i) => {
+        const args = JSON.parse(t.function.arguments || "{}");
+        const argsStr = Object.entries(args)
+          .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+          .join(", ");
+        return `${i + 1}. ${t.function.name}(${argsStr})`;
+      })
+      .join("\n");
+
+    messages.push({
+      role: "user",
+      content: cleanString(
+        `You already called these tools:\n${toolCallSummary}\n\nAnything else needed? Review the story and game state carefully. Return NO tool calls if everything is handled, or call additional tools if you missed something.`
+      ),
+    });
+  }
 
   return { messages };
 }

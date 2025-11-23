@@ -133,12 +133,13 @@ Authorization: Bearer <token>
 
 ### POST /api/story/next
 
-Generate the next story segment using AI.
+Generate the next story segment using AI (standard mode).
 
 **Headers:**
 
 ```
 Content-Type: application/json
+Authorization: Bearer <token>
 ```
 
 **Request Body:**
@@ -147,72 +148,131 @@ Content-Type: application/json
 {
   storyData: StoryData;      // Current game state
   userChoice?: string;       // Optional: player's choice text
-  model?: string;            // Optional: specific model to use (e.g., "anthropic/claude-3-sonnet")
+  model?: string;            // Optional: specific model to use (e.g., "Deepseek Chat")
   useRawContext?: boolean;   // Optional: use raw AI output in context (default: false)
+  openRouterKey?: string;    // Optional: BYOK OpenRouter API key
+  commandResponses?: CommandResponse[]; // Optional: previous command execution results
+  toolCallingEnabled?: boolean; // Optional: enable tool calling (default: true)
 }
 ```
 
 **Notes:**
 
-- `model`: If provided, overrides the default model. Useful for testing different models via OpenRouter.
+- `model`: If provided, overrides the default model. See AI_MODELS in `ai_prices.ts` for available options.
 - `useRawContext`: If true, the history context sent to the AI will use the raw, unparsed output from previous turns. This preserves XML tags and hidden reasoning, potentially improving continuity.
-
-````
-
-**StoryData Structure:**
-```typescript
-interface StoryData {
-  player_name: string;
-  story_name: string;
-  intro: string;
-  premise: string;
-  scene: Scene;
-  stats: Stat[];
-  resources: Resource[];
-  inventory: InventoryItem[];
-  achievements: Achievement[];
-  story_lore: StoryLore;
-  chapters: Chapter[];
-}
-````
+- `openRouterKey`: Bring Your Own Key - if provided with a custom model, generation costs 0 tokens.
 
 **Response (200 OK):**
 
 ```typescript
 {
-  part: ScenePart;
+  parts: ScenePart[];
   meta: {
     model: string;
+    modelName: string;
+    provider: "deepseek" | "openrouter";
     usage: {
       prompt_tokens: number;
       completion_tokens: number;
       total_tokens: number;
-    }
+    };
+    tokensDeducted: number;
+    tokenCost: number; // USD cost
+    remainingBalance: {
+      total: number;
+      tradable: number;
+      locked: number;
+    };
   }
-}
-```
-
-**ScenePart Structure:**
-
-```typescript
-interface ScenePart {
-  content: string; // Story text (Markdown)
-  imageUrl: string; // Optional image URL
-  user: boolean; // false for AI, true for player
-  choices?: Choice[]; // Available player choices
-  commands?: string[]; // Game state modification commands
-  memoryEntries?: string[]; // Important events to remember
-  endChapter?: boolean; // Chapter completion marker
-  endStory?: boolean; // Story completion marker
-  gameOver?: boolean; // Game over state
 }
 ```
 
 **Error Responses:**
 
 - `400 Bad Request` - Invalid request body
+- `401 Unauthorized` - Authentication required
+- `402 Payment Required` - Insufficient tokens
 - `500 Internal Server Error` - AI generation failed
-- `503 Service Unavailable` - DeepSeek API unavailable
+
+---
+
+### POST /api/story/next-staged
+
+Generate story using staged mode (3 separate AI calls for higher quality).
+
+**Headers:**
+
+```
+Content-Type: application/json
+Authorization: Bearer <token>
+```
+
+**Request Body:**
+
+```typescript
+{
+  storyData: StoryData;
+  userChoice?: string;
+  model?: string;            // Fallback model for all stages
+  modelStory?: string;       // Stage 1: Story narration model
+  modelTools?: string;       // Stage 2a: Tools/commands model
+  modelChoices?: string;     // Stage 2b: Player choices model
+  useRawContext?: boolean;
+  openRouterKey?: string;
+  commandResponses?: CommandResponse[];
+  toolCallingEnabled?: boolean;
+}
+```
+
+**Notes:**
+
+- Costs approximately 2x tokens compared to standard generation
+- Each stage can use a different model for optimization
+- Empty stage model parameters default to `model` parameter
+- Stage 2a uses native OpenAI tool calling for precise game state updates
+
+**Response (200 OK):**
+
+```typescript
+{
+  parts: ScenePart[];
+  meta: {
+    model: string;
+    modelName: string; // Combined: "Story / Tools / Choices"
+    provider: string;  // "staged (provider1/provider2/provider3)"
+    usage: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+    };
+    tokensDeducted: number;
+    tokenCost: number;
+    remainingBalance: {
+      total: number;
+      tradable: number;
+      locked: number;
+    };
+    staged: true;
+    stageBreakdown: {
+      story: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+      tools: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+      choices: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+    };
+    models: {
+      story: string;
+      tools: string;
+      choices: string;
+    };
+  }
+}
+```
+
+**Error Responses:**
+
+- `400 Bad Request` - Invalid request body
+- `401 Unauthorized` - Authentication required
+- `402 Payment Required` - Insufficient tokens
+- `500 Internal Server Error` - AI generation failed
 
 ---
 

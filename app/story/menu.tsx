@@ -281,8 +281,9 @@ function AIModelSelector({
     };
   });
 
-  const currentModel = availableModels[currentModelKey] || AI_MODELS.Prometheus;
-  AI_MODELS.Prometheus;
+  const currentModel =
+    availableModels[currentModelKey] || AI_MODELS["Deepseek Chat"];
+  AI_MODELS["Deepseek Chat"];
 
   const handleModelChange = (newModelKey: string) => {
     if (typeof window !== "undefined") {
@@ -521,8 +522,8 @@ function AIModelSelector({
                 {showModelConfig && (
                   <div className="space-y-4 pl-2">
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Choose different models for each generation stage. Empty
-                      = use main model.
+                      Choose different models for each generation stage. Empty =
+                      use main model.
                     </p>
 
                     {/* Story Model Selector */}

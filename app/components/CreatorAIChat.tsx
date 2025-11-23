@@ -55,10 +55,11 @@ export default function CreatorAIChat({
   const [model, setModel] = useState<string>(() => {
     if (typeof window !== "undefined") {
       return (
-        localStorage.getItem("creatorAiModel") || AI_MODELS.Prometheus.model
+        localStorage.getItem("creatorAiModel") ||
+        AI_MODELS["Deepseek Chat"].model
       );
     }
-    return AI_MODELS.Prometheus.model;
+    return AI_MODELS["Deepseek Chat"].model;
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

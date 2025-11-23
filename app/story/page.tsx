@@ -1946,8 +1946,8 @@ function StoryPageContent() {
     //Getcurrentmodelconfigfordynamicmemorycap
     const modelKey =
       typeof window !== "undefined"
-        ? localStorage.getItem("aiModel") || "deep-seek/deepseek-chat"
-        : "deep-seek/deepseek-chat";
+        ? localStorage.getItem("aiModel") || "Deepseek Chat"
+        : "Deepseek Chat";
     const modelConfig = getModelConfig(modelKey);
 
     // Dynamic memory cap: Reserve maxOutputTokens, then use 25% of remaining for memory
@@ -2019,8 +2019,8 @@ function StoryPageContent() {
     //Getcurrentmodelconfigtoestimateneededcontext
     const modelKey =
       typeof window !== "undefined"
-        ? localStorage.getItem("aiModel") || "deep-seek/deepseek-chat"
-        : "deep-seek/deepseek-chat";
+        ? localStorage.getItem("aiModel") || "Deepseek Chat"
+        : "Deepseek Chat";
     const modelConfig = getModelConfig(modelKey);
 
     // Reserve maxOutputTokens, then split remaining: 75% history, 25% memory (4 chars per token)
@@ -3432,8 +3432,8 @@ function StoryPageContent() {
     //Getcurrentmodelconfigtoestimateneededcontext
     const modelKey =
       typeof window !== "undefined"
-        ? localStorage.getItem("aiModel") || "deep-seek/deepseek-chat"
-        : "deep-seek/deepseek-chat";
+        ? localStorage.getItem("aiModel") || "Deepseek Chat"
+        : "Deepseek Chat";
     const modelConfig = getModelConfig(modelKey);
 
     // Reserve maxOutputTokens, then split remaining: 75% history, 25% memory (4 chars per token)
@@ -3775,8 +3775,8 @@ function StoryPageContent() {
     //Getcurrentmodelconfigtoestimateneededcontext
     const modelKey =
       typeof window !== "undefined"
-        ? localStorage.getItem("aiModel") || "deep-seek/deepseek-chat"
-        : "deep-seek/deepseek-chat";
+        ? localStorage.getItem("aiModel") || "Deepseek Chat"
+        : "Deepseek Chat";
     const modelConfig = getModelConfig(modelKey);
 
     // Reserve maxOutputTokens, then split remaining: 75% history, 25% memory (4 chars per token)

@@ -35,12 +35,20 @@ This document explains the system architecture, data flow, and design patterns u
 ┌─────────────────────────────────────────────────────────────┐
 │                    Next.js API Routes                        │
 ├─────────────────────────────────────────────────────────────┤
-│  /api/story/next (POST)                                     │
-│    ├─ Receives StoryData + user choice                      │
+│  /api/story/next (POST) - Standard Generation              │
+│    ├─ Receives StoryData + user choice + model              │
 │    ├─ Builds prompt (buildMessages)                         │
-│    ├─ Calls DeepSeek API                                    │
+│    ├─ Calls AI provider (DeepSeek/OpenRouter)              │
 │    ├─ Parses response (outputToScenePart)                   │
-│    └─ Returns ScenePart                                     │
+│    └─ Returns ScenePart + metadata                          │
+├─────────────────────────────────────────────────────────────┤
+│  /api/story/next-staged (POST) - Staged Generation         │
+│    ├─ Receives StoryData + model options per stage          │
+│    ├─ Stage 1: Story narration (buildStoryPrompt)          │
+│    ├─ Stage 2a: Tool calls (buildToolPrompt + schemas)     │
+│    ├─ Stage 2b: Choices (buildChoicesPrompt)               │
+│    ├─ Executes tools via executeTools                       │
+│    └─ Returns ScenePart + stage breakdown                   │
 ├─────────────────────────────────────────────────────────────┤
 │  /api/folders (GET, POST)                                   │
 │    ├─ Requires auth (Bearer token)                          │
@@ -68,9 +76,13 @@ This document explains the system architecture, data flow, and design patterns u
 │  DeepSeek API (https://api.deepseek.com)                    │
 │    └─ Chat Completions endpoint                             │
 ├─────────────────────────────────────────────────────────────┤
+│  OpenRouter API (https://openrouter.ai)                     │
+│    └─ Multi-model proxy (Claude, GPT-4o, Gemini, etc.)     │
+├─────────────────────────────────────────────────────────────┤
 │  Supabase                                                    │
 │    ├─ Authentication                                         │
-│    └─ Database: stories, adventures, story_folders          │
+│    ├─ Database: stories, adventures, story_folders          │
+│    └─ Storage: avatars, images                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 

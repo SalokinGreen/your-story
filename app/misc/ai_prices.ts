@@ -1,5 +1,5 @@
 export const AI_MODELS = {
-  Hades: {
+  "Grok 4 Fast": {
     name: "Grok 4 Fast",
     original_model: "Grok 4 Fast",
     model: "x-ai/grok-4-fast",
@@ -18,7 +18,7 @@ export const AI_MODELS = {
     finetunes: [],
   },
 
-  Prometheus: {
+  "Deepseek Chat": {
     name: "Deepseek Chat",
     original_model: "Deepseek Chat",
     model: "deepseek-chat",
@@ -36,7 +36,7 @@ export const AI_MODELS = {
       "A versatile model known for its creativity and ability to handle long-form content, making it suitable for detailed storytelling and complex narratives.",
     bannerUrl: undefined,
   },
-  Hermes: {
+  "Gemini 2.5 Flash": {
     name: "Gemini 2.5 Flash",
     original_model: "Gemini 2.5 Flash",
     model: "google/gemini-2.5-flash",
@@ -55,7 +55,7 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
-  Hercules: {
+  "Gemini 2.5 Flash Lite": {
     name: "Gemini 2.5 Flash Lite",
     original_model: "Gemini 2.5 Flash Lite",
     model: "google/gemini-2.5-flash-lite",
@@ -74,7 +74,7 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
-  Poseidon: {
+  "GLM 4.6": {
     name: "GLM 4.6",
     original_model: "GLM 4.6",
     model: "z-ai/glm-4.6",
@@ -92,7 +92,7 @@ export const AI_MODELS = {
       "A robust model designed for handling extensive context and delivering powerful performance, making it suitable for complex storytelling and detailed narratives.",
     bannerUrl: undefined,
   },
-  Chronos: {
+  "Qwen 2.5 72B Instruct": {
     name: "Qwen 2.5 72B Instruct",
     original_model: "Qwen3 235B A22B Instruct 2507",
     model: "qwen/qwen-2.5-72b-instruct",
@@ -111,7 +111,7 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
-  Athena: {
+  "GPT-OSS 120B": {
     name: "GPT-OSS 120B",
     original_model: "gpt-oss-120b",
     model: "openai/gpt-oss-120b",
@@ -129,7 +129,7 @@ export const AI_MODELS = {
       "A powerful open-source model with 120 billion parameters, suitable for tasks requiring high computational power and detailed content generation.",
     bannerUrl: undefined,
   },
-  Zeus: {
+  "Gemini 2.5 Pro": {
     name: "Gemini 2.5 Pro",
     original_model: "Gemini 2.5 Pro",
     model: "google/gemini-2.5-pro",
@@ -147,7 +147,7 @@ export const AI_MODELS = {
       "The premium model in the lineup, offering unparalleled performance, creativity, and the ability to handle extensive contexts, making it ideal for the most demanding storytelling tasks.",
     bannerUrl: undefined,
   },
-  Hephaestus: {
+  "DeepSeek R1": {
     name: "DeepSeek R1",
     original_model: "DeepSeek R1",
     model: "deepseek-reasoner",
@@ -160,9 +160,27 @@ export const AI_MODELS = {
     outputPrice: 2.19,
     finetunes: [],
     strengths: ["reasoning", "coding", "complex logic"],
-    weaknesses: ["speed"],
+    weaknesses: ["speed", "no tool calling"],
     description:
       "A reasoning-focused model that excels at complex logic, planning, and structured generation. Perfect for intricate scenario design.",
+    bannerUrl: undefined,
+  },
+  "Mistral Medium 3.1": {
+    name: "Mistral Medium 3.1",
+    original_model: "Mistral Medium 3.1",
+    model: "mistralai/mistral-medium-3.1",
+    maxTokens: 131000,
+    maxOutputTokens: 4000,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.4,
+    outputPrice: 2,
+    finetunes: [],
+    strengths: ["powerful", "cost-effective"],
+    weaknesses: ["logic"],
+    description:
+      "A small-sized model from Mistral, offering a balance between performance and cost, suitable for story generation..",
     bannerUrl: undefined,
   },
 } as const;
@@ -189,8 +207,12 @@ export interface AIModelConfig {
 export type AIModelKey = keyof typeof AI_MODELS;
 
 export function getModelConfig(modelKey: string): AIModelConfig {
-  return (
-    (AI_MODELS[modelKey as AIModelKey] as unknown as AIModelConfig) ||
-    (AI_MODELS["Prometheus"] as unknown as AIModelConfig)
-  );
+  // Check if the key exists in AI_MODELS
+  if (modelKey in AI_MODELS) {
+    return AI_MODELS[modelKey as AIModelKey] as unknown as AIModelConfig;
+  }
+  
+  // Fallback to Deepseek Chat if key not found
+  console.warn(`Model key "${modelKey}" not found, falling back to Deepseek Chat`);
+  return AI_MODELS["Deepseek Chat"] as unknown as AIModelConfig;
 }

@@ -60,9 +60,11 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
     - `buildMessages` reconstructs tool_calls in assistant messages and tool role messages with proper tool_call_id linking
     - Enables AI self-reference ("I just gave you that sword") and multi-turn tool interactions
     - Tool responses marked with ✓ (success), ✗ (failure), ⚠ (partial success)
+- app/misc/ai_staged.ts: Staged generation prompt builders for API v2. Exports buildStoryPrompt(), buildToolPrompt(), buildChoicesPrompt() - each returns specialized prompts without XML wrappers. Uses 75% of available context for history, 25% for memory.
 - app/misc/toolExecutor.ts: Executes tool calls from AI responses, mapping AI tool names to XML command format. Returns CommandResponse array with success/failure status and toolCallId linking.
-- app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter). Includes getModelConfig() helper for dynamic model selection.
+- app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter). Includes getModelConfig() helper for dynamic model selection. Exports AI_MODELS constant with 9 predefined models (Prometheus, Hades, Hermes, Hercules, Poseidon, Chronos, Athena, Zeus, Hephaestus).
 - app/api/story/next/route.ts: POST endpoint supporting multiple AI providers (DeepSeek, OpenRouter); accepts optional `model` parameter; deducts tokens via service role; stores tool calls in returned ScenePart; returns { part: ScenePart, meta: { model, modelName, provider, usage, tokenCost, balance } }.
+- app/api/story/next-staged/route.ts: POST endpoint for staged generation (v2 API). Generates story, tools, and choices in 3 separate stages. Accepts `modelStory`, `modelTools`, `modelChoices` parameters for per-stage model selection. Stage 1: story narration (plain text), Stage 2a: tool calls (native OpenAI tool calling), Stage 2b: player choices (plain text list). Returns same format as /next with additional stageBreakdown and models metadata.
 - app/api/tts/generate/route.ts: POST endpoint for Speechify text-to-speech generation; deducts 3 tokens per generation; returns audio blob with token metadata.
 
 ### API Routes
@@ -158,19 +160,22 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Keep server components for Next 16 app router by default.
 - Toast notifications via NotificationContext; use addNotification("message", "success"|"failure"|"warning").
 - Profile page: Admin controls must always be at the very bottom (see comment in profile/[userId]/page.tsx).
-- **AI Config Menu**: Model selection saved to localStorage as "aiModel", defaults to "deep-seek/deepseek-chat".
+- **AI Config Menu**: Model selection saved to localStorage as "aiModel", defaults to "Deepseek Chat".
+- **Staged Generation**: Optional mode that splits generation into 3 stages (story, tools, choices). Enabled via "aiStagedMode" localStorage key. Costs ~2x tokens but offers better quality. Per-stage model selection via "aiModelStory", "aiModelTools", "aiModelChoices" localStorage keys.
 - **TTS Settings**: All TTS preferences saved to localStorage (ttsEnabled, ttsLastVoice, ttsAutoGenerate, ttsVolume, ttsCustomVoices).
 
-### DeepSeek API
+### AI API Patterns
 
 - app/api/story/next/route.ts accepts { storyData, userChoice?, model? } and returns { part: ScenePart, meta: { model, modelName, provider, usage, tokenCost, balance } }.
+- app/api/story/next-staged/route.ts accepts { storyData, userChoice?, model?, modelStory?, modelTools?, modelChoices? } and returns { parts: ScenePart[], meta: { staged: true, stageBreakdown, models } }.
 - **Multi-provider support**: Automatically routes to DeepSeek or OpenRouter based on model parameter.
 - Requires DEEPSEEK_API_KEY for DeepSeek models, OPENROUTER_API_KEY for OpenRouter models.
 - Optional: DEFAULT_AI_MODEL, DEEPSEEK_MODEL, NEXT_PUBLIC_SITE_URL environment variables.
-- Deducts 1 token before generation; returns updated balance in response meta.
+- Deducts tokens based on actual usage; returns updated balance in response meta.
 - **Payload optimization**: Client trims storyData before sending to stay under Vercel's 4.5MB limit. Only sends last 6 scene parts with minimal fields (content, user, role), caps text fields, and strips heavy nested data like choices/commands from history.
+- **Context allocation**: Staged mode uses (maxTokens - maxOutputTokens) then allocates 75% to history, 25% to memory.
 - **Creator payload**: Adventure creation logs payload size and warns if >4MB to help creators manage content size.
-- **Model selection**: Client reads from localStorage "aiModel" key and includes in API request.
+- **Model selection**: Client reads from localStorage "aiModel" key (main) or "aiModelStory"/"aiModelTools"/"aiModelChoices" (staged) and includes in API request.
 
 ## Developer workflows
 
@@ -188,7 +193,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - SUPABASE_URL=<your_url> (same as NEXT_PUBLIC)
   - SUPABASE_KEY=<your_anon_key> (same as NEXT_PUBLIC)
   - SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
-  - Optional: DEFAULT_AI_MODEL=deep-seek/deepseek-chat
+  - Optional: DEFAULT_AI_MODEL=Deepseek Chat
   - Optional: DEEPSEEK_MODEL=deepseek-chat
   - Optional: NEXT_PUBLIC_SITE_URL=<your_site_url>
 

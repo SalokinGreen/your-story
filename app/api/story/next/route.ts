@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
 
   // Get model configuration
   let modelKey =
-    requestedModel || process.env.DEFAULT_AI_MODEL || "deep-seek/deepseek-chat";
+    requestedModel || process.env.DEFAULT_AI_MODEL || "Deepseek Chat";
 
   // Handle custom model from user settings
   let modelConfig = getModelConfig(modelKey);
