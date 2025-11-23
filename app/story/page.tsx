@@ -101,6 +101,14 @@ async function streamStoryGeneration(
     const decoder = new TextDecoder();
     let buffer = "";
 
+    // Track which events we've received to prevent duplicates
+    const receivedEvents = {
+      story: false,
+      tools: false,
+      choices: false,
+      complete: false,
+    };
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -117,15 +125,35 @@ async function streamStoryGeneration(
 
           switch (data.type) {
             case "story":
+              if (receivedEvents.story) {
+                console.warn("[Stream] Duplicate story event ignored");
+                break;
+              }
+              receivedEvents.story = true;
               callbacks.onStory(data.content, data.usage);
               break;
             case "tools":
+              if (receivedEvents.tools) {
+                console.warn("[Stream] Duplicate tools event ignored");
+                break;
+              }
+              receivedEvents.tools = true;
               callbacks.onTools(data.toolCalls, data.toolResponses, data.usage);
               break;
             case "choices":
+              if (receivedEvents.choices) {
+                console.warn("[Stream] Duplicate choices event ignored");
+                break;
+              }
+              receivedEvents.choices = true;
               callbacks.onChoices(data.choices, data.usage);
               break;
             case "complete":
+              if (receivedEvents.complete) {
+                console.warn("[Stream] Duplicate complete event ignored");
+                break;
+              }
+              receivedEvents.complete = true;
               callbacks.onComplete(data.meta);
               break;
             case "error":
@@ -3460,15 +3488,15 @@ function StoryPageContent() {
     if (choice.item_used && itemQuantityBefore > 0) {
       if (itemBroken) {
         choiceDetails.push(
-          `[ItemUsed:${choice.item_used};x${itemQuantityBefore}?broken]`
+          `[Item Used: ${choice.item_used}; x${itemQuantityBefore}? broken]`
         );
       } else if (choice.item_loss) {
         choiceDetails.push(
-          `[ItemUsed:${choice.item_used};x${itemQuantityBefore}?${itemQuantityAfter}]`
+          `[Item Used: ${choice.item_used}; x${itemQuantityBefore}? ${itemQuantityAfter}]`
         );
       } else {
         choiceDetails.push(
-          `[ItemUsed:${choice.item_used};x${itemQuantityBefore}]`
+          `[Item Used: ${choice.item_used}; x${itemQuantityBefore}]`
         );
       }
     }
