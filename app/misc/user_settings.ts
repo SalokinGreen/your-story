@@ -34,18 +34,36 @@ export async function getUserSettings(
   }
 
   if (!data) {
-    // Create new settings if not found
-    const { data: newData, error: insertError } = await supabase
-      .from("user_settings")
-      .insert([{ user_id: userId }])
-      .select()
-      .single();
+    // Settings not found - this should have been auto-created by the database trigger
+    // Try to create using service role as fallback
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const serviceRoleClient = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        }
+      );
 
-    if (insertError) {
-      console.error("Error creating user settings:", insertError);
+      const { data: newData, error: insertError } = await serviceRoleClient
+        .from("user_settings")
+        .insert([{ user_id: userId }])
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("Error creating user settings:", insertError);
+        return null;
+      }
+      return newData as UserSettings;
+    } catch (serviceError) {
+      console.error("Error using service role for settings creation:", serviceError);
       return null;
     }
-    return newData as UserSettings;
   }
 
   return data as UserSettings;

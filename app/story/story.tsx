@@ -11,6 +11,7 @@ interface StoryProps {
   choices: Choices;
   input: Record<string, boolean>;
   loading: boolean;
+  loadingStage?: "story" | "tools" | "choices" | null;
   momentumMode: "none" | "reroll" | "guarantee";
   onMomentumModeChange: (mode: "none" | "reroll" | "guarantee") => void;
   handleChoice: () => void;
@@ -33,6 +34,7 @@ export default function Story({
   choices,
   input,
   loading,
+  loadingStage,
   momentumMode,
   onMomentumModeChange,
   handleChoice,
@@ -210,11 +212,17 @@ export default function Story({
             <TTSControls text={storyText} disabled={loading} />
           </div>
 
-          {loading ? (
+          {loading || loadingStage ? (
             <div className="flex flex-col items-center justify-center w-full py-8 border-t border-gray-200 dark:border-gray-700">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
               <p className="mt-4 text-gray-600 dark:text-gray-400 text-sm font-medium">
-                Weaving your tale...
+                {loading
+                  ? "Weaving your tale..."
+                  : loadingStage === "tools"
+                  ? "Analyzing game state..."
+                  : loadingStage === "choices"
+                  ? "Preparing your options..."
+                  : "Completing generation..."}
               </p>
             </div>
           ) : (

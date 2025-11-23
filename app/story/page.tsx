@@ -2,6 +2,7 @@
 
 import {
   Scene,
+  ScenePart,
   StoryData,
   Choices,
   Choice,
@@ -62,6 +63,90 @@ function getModelsFromPreset() {
     choicesModel: preset.choicesModel,
   };
 }
+
+// Helper function for streaming story generation via SSE
+async function streamStoryGeneration(
+  endpoint: string,
+  payload: any,
+  token: string,
+  callbacks: {
+    onStory: (content: string, usage: any) => void;
+    onTools: (
+      toolCalls: any[],
+      toolResponses: CommandResponse[],
+      usage: any
+    ) => void;
+    onChoices: (choices: Choices, usage: any) => void;
+    onComplete: (meta: any) => void;
+    onError: (message: string) => void;
+  }
+) {
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("No response body");
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n\n");
+      buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+
+        try {
+          const data = JSON.parse(line.slice(6));
+
+          switch (data.type) {
+            case "story":
+              callbacks.onStory(data.content, data.usage);
+              break;
+            case "tools":
+              callbacks.onTools(
+                data.toolCalls,
+                data.toolResponses,
+                data.usage
+              );
+              break;
+            case "choices":
+              callbacks.onChoices(data.choices, data.usage);
+              break;
+            case "complete":
+              callbacks.onComplete(data.meta);
+              break;
+            case "error":
+              callbacks.onError(data.message);
+              break;
+          }
+        } catch (parseError) {
+          console.error("Failed to parse SSE event:", parseError);
+          logger.error("SSE parse error", { parseError });
+        }
+      }
+    }
+  } catch (error: any) {
+    callbacks.onError(error.message);
+  }
+}
+
 import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { authenticatedFetch } from "../misc/getAuthToken";
@@ -1389,6 +1474,9 @@ function StoryPageContent() {
   const [input, setInput] = useState<Record<string, boolean>>({});
   const [storyText, setStoryText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<
+    "story" | "tools" | "choices" | null
+  >(null);
   const [momentumMode, setMomentumMode] = useState<
     "none" | "reroll" | "guarantee"
   >("none");
@@ -2024,6 +2112,7 @@ function StoryPageContent() {
     }
 
     setLoading(true);
+    setLoadingStage("story");
 
     //Adduser'scustominputtoscene
     storyData.scene.parts.push({
@@ -2161,9 +2250,9 @@ function StoryPageContent() {
       `Custom input payload size: ${(payloadSize / 1024).toFixed(2)} KB`
     );
 
-    const apiEndpoint = "/api/story/next-staged";
+    const apiEndpoint = "/api/story/next-staged-stream";
 
-    logger.ai_request("Sending custom input to AI", {
+    logger.ai_request("Sending custom input to AI (streaming)", {
       modelStory: storyModel,
       modelTools: toolsModel,
       modelChoices: choicesModel,
@@ -2177,131 +2266,129 @@ function StoryPageContent() {
       return;
     }
 
-    await fetch(apiEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify(payload),
-    })
-      .then(async (res) => {
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          addNotification(
-            `?Invalidresponsefromserver(expectedJSON)`,
-            "failure"
-          );
-          setLoading(false);
-          return;
-        }
+    // Track partial scene part as we stream
+    let partialPart: ScenePart = {
+      content: "",
+      imageUrl: "",
+      user: false,
+      role: "assistant",
+      choices: [],
+    };
 
-        const text = await res.text();
-        if (!text || text.trim() === "") {
-          addNotification(`⚠ Empty response from server`, "failure");
-          setLoading(false);
-          return;
-        }
+    await streamStoryGeneration(
+      apiEndpoint,
+      payload,
+      session.access_token,
+      {
+        onStory: (content: string, usage: any) => {
+          // Story narration arrives first - show immediately!
+          partialPart.content = content;
+          storyData.scene.parts.push(partialPart);
 
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          console.error("Failed to parse response:", text);
-          addNotification(`⚠ Invalid JSON response from server`, "failure");
-          setLoading(false);
-          return;
-        }
+          setStoryText(content);
+          setStoryData({ ...storyData });
+          setLoading(false); // Let player read while tools/choices generate
+          setLoadingStage("tools"); // Now analyzing game state
 
-        if (res.status === 402) {
-          addNotification(`⚠ ${data.error}`, "failure");
-          if (data.balance) {
-            addNotification(
-              `Your balance: ${data.balance.tradable} tradable, ${data.balance.locked} locked`,
-              "info"
-            );
-          }
-          setLoading(false);
-          return;
-        }
-
-        if (res.status === 401) {
-          addNotification(
-            `??${data.error || "Authenticationrequired"}`,
-            "failure"
-          );
-          setLoading(false);
-          return;
-        }
-
-        if (!res.ok) {
-          logger.error("AIrequestfailed", {
-            status: res.status,
-            error: data.error,
+          logger.ai_response("Story narration received (custom input)", {
+            length: content.length,
+            usage,
           });
-          addNotification(
-            `Error: ${data.error || "Failed to generate story"}`,
-            "failure"
-          );
-          setLoading(false);
-          return;
-        }
-
-        // Handle parts array response
-        if (!data.parts || data.parts.length === 0) {
-          addNotification("⚠️ Empty response from AI", "failure");
-          setLoading(false);
-          return;
-        }
-
-        logger.ai_response("AI response received (custom input)", {
-          tokensDeducted: data.meta?.tokensDeducted,
-          partsCount: data.parts.length,
-        });
-
-        if (data.meta?.tokensDeducted) {
-          addNotification(
-            `✨ Used ${data.meta.tokensDeducted} tokens`,
-            "success"
-          );
-          if (data.meta.remainingBalance) {
-            addNotification(
-              `Balance: ${data.meta.remainingBalance.total} tokens remaining (${data.meta.remainingBalance.tradable} tradable)`,
-              "info"
-            );
+        },
+        onTools: (
+          toolCalls: any[],
+          toolResponses: CommandResponse[],
+          usage: any
+        ) => {
+          // Tools arrive - update the last part in scene
+          const lastPartIndex = storyData.scene.parts.length - 1;
+          if (lastPartIndex >= 0) {
+            storyData.scene.parts[lastPartIndex] = {
+              ...storyData.scene.parts[lastPartIndex],
+              toolCalls,
+              toolResponses,
+            };
           }
-        }
 
-        // Process all parts from the chain
-        const lastPart = processSceneParts(
-          data.parts,
-          storyData,
-          addNotification
-        );
+          // Process tool responses (update stats, inventory, etc.)
+          const lastPart = processSceneParts(
+            [storyData.scene.parts[lastPartIndex]],
+            storyData,
+            addNotification
+          );
+          if (lastPart) {
+            setStoryData({ ...storyData });
+          }
 
-        if (!lastPart) {
-          addNotification("⚠️ No valid content generated", "failure");
+          setLoadingStage("choices"); // Now generating choices
+
+          logger.ai_response("Tool calls received (custom input)", {
+            toolCallsCount: toolCalls?.length || 0,
+            toolResponsesCount: toolResponses?.length || 0,
+            usage,
+          });
+        },
+        onChoices: (newChoices: Choices, usage: any) => {
+          // Choices arrive - update the last part in scene
+          const lastPartIndex = storyData.scene.parts.length - 1;
+          if (lastPartIndex >= 0) {
+            storyData.scene.parts[lastPartIndex] = {
+              ...storyData.scene.parts[lastPartIndex],
+              choices: newChoices.choices,
+            };
+          }
+          setChoices(newChoices);
+          setStoryData({ ...storyData });
+          setLoadingStage(null); // All done
+
+          logger.ai_response("Choices received (custom input)", {
+            choicesCount: newChoices.choices.length,
+            usage,
+          });
+        },
+        onComplete: (meta: any) => {
+          // All done - update token balance
+          if (meta?.remainingBalance?.total !== undefined) {
+            setTokenBalance(meta.remainingBalance.total);
+          }
+
+          if (meta?.tokensDeducted) {
+            addNotification(
+              `✨ Used ${meta.tokensDeducted} tokens`,
+              "success"
+            );
+            if (meta.remainingBalance) {
+              addNotification(
+                `Balance: ${meta.remainingBalance.total} tokens remaining (${meta.remainingBalance.tradable} tradable)`,
+                "info"
+              );
+            }
+          }
+
+          setCanRetry(true);
+          setCanUndo(true);
+          setLoadingStage(null); // Ensure cleared on complete
+
+          // Clear command responses after successful AI generation
+          setPendingCommandResponses([]);
+
+          // Save progress to database
+          saveProgress(storyData);
+
+          logger.ai_response("Generation complete (custom input)", {
+            tokensDeducted: meta?.tokensDeducted,
+            totalCost: meta?.totalCost,
+          });
+        },
+        onError: (message: string) => {
+          addNotification(`Error: ${message}`, "failure");
           setLoading(false);
-          return;
-        }
+          setLoadingStage(null);
 
-        setStoryData({ ...storyData });
-        setStoryText(lastPart.content || "");
-        setCanRetry(true);
-        setCanUndo(true);
-        setChoices({ choices: lastPart.choices || [] });
-        setLoading(false);
-
-        // Clear command responses after successful AI generation
-        setPendingCommandResponses([]);
-
-        await saveProgress(storyData);
-      })
-      .catch((err) => {
-        console.error("Custom input error:", err);
-        addNotification(`⚠ Error generating story: ${err.message}`, "failure");
-        setLoading(false);
-      });
+          logger.error("Streaming error (custom input)", { message });
+        },
+      }
+    );
   }
 
   async function handleChoice() {
@@ -2342,6 +2429,7 @@ function StoryPageContent() {
     }
 
     setLoading(true);
+    setLoadingStage("story");
 
     //Handlemomentumspending
     if (momentumMode === "reroll" && storyData.momentum >= 1) {
@@ -3559,9 +3647,9 @@ function StoryPageContent() {
     const payloadSize = JSON.stringify(payload).length;
     console.log(`Payload size: ${(payloadSize / 1024).toFixed(2)} KB`);
 
-    const apiEndpoint = "/api/story/next-staged";
+    const apiEndpoint = "/api/story/next-staged-stream";
 
-    logger.ai_request("Sending choice to AI", {
+    logger.ai_request("Sending choice to AI (streaming)", {
       modelStory: storyModel,
       modelTools: toolsModel,
       modelChoices: choicesModel,
@@ -3575,138 +3663,135 @@ function StoryPageContent() {
       return;
     }
 
-    await fetch(apiEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify(payload),
-    })
-      .then(async (res) => {
-        //CheckifresponsehascontentbeforeparsingJSON
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          addNotification(
-            `?Invalidresponsefromserver(expectedJSON)`,
-            "failure"
+    // Track partial scene part as we stream
+    let partialPart: ScenePart = {
+      content: "",
+      imageUrl: "",
+      user: false,
+      role: "assistant",
+      choices: [],
+    };
+
+    await streamStoryGeneration(
+      apiEndpoint,
+      payload,
+      session.access_token,
+      {
+        onStory: (content: string, usage: any) => {
+          // Story narration arrives first - show immediately!
+          partialPart.content = content;
+          storyData.scene.parts.push(partialPart);
+
+          setStoryText(content);
+          setStoryData({ ...storyData });
+          setLoading(false); // Let player read while tools/choices generate
+          setLoadingStage("tools"); // Now analyzing game state
+
+          logger.ai_response("Story narration received", {
+            length: content.length,
+            usage,
+          });
+        },
+        onTools: (
+          toolCalls: any[],
+          toolResponses: CommandResponse[],
+          usage: any
+        ) => {
+          // Tools arrive - update the last part in scene
+          const lastPartIndex = storyData.scene.parts.length - 1;
+          if (lastPartIndex >= 0) {
+            storyData.scene.parts[lastPartIndex] = {
+              ...storyData.scene.parts[lastPartIndex],
+              toolCalls,
+              toolResponses,
+            };
+          }
+
+          // Process tool responses (update stats, inventory, etc.)
+          const lastPart = processSceneParts(
+            [storyData.scene.parts[lastPartIndex]],
+            storyData,
+            addNotification
           );
-          setLoading(false);
-          setChoices({
-            choices:
-              storyData.scene.parts[storyData.scene.parts.length - 1].choices ||
-              [],
-          });
-          return;
-        }
+          if (lastPart) {
+            setStoryData({ ...storyData });
+          }
 
-        const text = await res.text();
-        if (!text || text.trim() === "") {
-          addNotification(`⚠ Empty response from server`, "failure");
-          setLoading(false);
-          setChoices({
-            choices:
-              storyData.scene.parts[storyData.scene.parts.length - 1].choices ||
-              [],
-          });
-          return;
-        }
+          setLoadingStage("choices"); // Now generating choices
 
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          addNotification(`⚠ Invalid JSON response`, "failure");
-          setLoading(false);
-          setChoices({
-            choices:
-              storyData.scene.parts[storyData.scene.parts.length - 1].choices ||
-              [],
+          logger.ai_response("Tool calls received", {
+            toolCallsCount: toolCalls?.length || 0,
+            toolResponsesCount: toolResponses?.length || 0,
+            usage,
           });
-          return;
-        }
+        },
+        onChoices: (newChoices: Choices, usage: any) => {
+          // Choices arrive - update the last part in scene
+          const lastPartIndex = storyData.scene.parts.length - 1;
+          if (lastPartIndex >= 0) {
+            storyData.scene.parts[lastPartIndex] = {
+              ...storyData.scene.parts[lastPartIndex],
+              choices: newChoices.choices,
+            };
+          }
+          setChoices(newChoices);
+          setStoryData({ ...storyData });
+          setLoadingStage(null); // All done
 
-        if (!res.ok) {
-          addNotification(
-            `Error: ${data.error || "Failed to generate story"}`,
-            "failure"
-          );
+          logger.ai_response("Choices received", {
+            choicesCount: newChoices.choices.length,
+            usage,
+          });
+        },
+        onComplete: (meta: any) => {
+          // All done - update token balance
+          if (meta?.remainingBalance?.total !== undefined) {
+            setTokenBalance(meta.remainingBalance.total);
+          }
+
+          // Check for chapter completion
+          if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
+            const currentChapter = storyData.chapters.length;
+            if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
+              storyData.earnedPointsFromChapters.push(currentChapter);
+              storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
+              addNotification(
+                `✨ Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                "success"
+              );
+            }
+          }
+
+          setCanRetry(true);
+          setCanUndo(true);
+          setLoadingStage(null); // Ensure cleared on complete
+
+          // Clear command responses after successful AI generation
+          setPendingCommandResponses([]);
+
+          // Save progress to database
+          saveProgress(storyData);
+
+          logger.ai_response("Generation complete (choice)", {
+            tokensDeducted: meta?.tokensDeducted,
+            totalCost: meta?.totalCost,
+          });
+        },
+        onError: (message: string) => {
+          addNotification(`Error: ${message}`, "failure");
           setLoading(false);
+          setLoadingStage(null);
           setCanRetry(true);
           setChoices({
             choices:
-              storyData.scene.parts[storyData.scene.parts.length - 1].choices ||
+              storyData.scene.parts[storyData.scene.parts.length - 1]?.choices ||
               [],
           });
-          return;
-        }
 
-        //Updatetokenbalance
-        if (data.meta?.remainingBalance?.total !== undefined) {
-          setTokenBalance(data.meta.remainingBalance.total);
-        }
-
-        // Handle parts array response
-        if (!data.parts || data.parts.length === 0) {
-          addNotification("⚠️ Empty response from AI", "failure");
-          setLoading(false);
-          return;
-        }
-
-        logger.ai_response("AI response received (choice)", {
-          tokensDeducted: data.meta?.tokensDeducted,
-          partsCount: data.parts.length,
-        });
-
-        // Process all parts from the chain
-        const lastPart = processSceneParts(
-          data.parts,
-          storyData,
-          addNotification
-        );
-
-        if (!lastPart) {
-          addNotification("⚠️ No valid content generated", "failure");
-          setLoading(false);
-          return;
-        }
-
-        //Checkforchaptercompletionandawardpoints
-        if (lastPart.content && lastPart.content.includes("!!!ENDCHAPTER!!!")) {
-          const currentChapter = storyData.chapters.length;
-          if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
-            storyData.earnedPointsFromChapters.push(currentChapter);
-            storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
-            addNotification(
-              `✨ Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
-              "success"
-            );
-          }
-        }
-
-        setStoryData({ ...storyData });
-        setStoryText(lastPart.content || "");
-        setChoices({ choices: lastPart.choices || [] });
-        setLoading(false);
-        setCanRetry(true);
-        setCanUndo(true);
-
-        // Clear command responses after successful AI generation
-        setPendingCommandResponses([]);
-
-        //Saveprogresstodatabase
-        await saveProgress(storyData);
-      })
-      .catch((error) => {
-        console.error("Error fetching next story part:", error);
-        addNotification("Network error. Please try again.", "failure");
-        setLoading(false);
-        setChoices({
-          choices:
-            storyData.scene.parts[storyData.scene.parts.length - 1].choices ||
-            [],
-        });
-      });
+          logger.error("Streaming error (choice)", { message });
+        },
+      }
+    );
   }
 
   function handleSelect(index: number): void {
@@ -3741,6 +3826,7 @@ function StoryPageContent() {
     }
 
     setLoading(true);
+    setLoadingStage("story");
     setCanRetry(false);
 
     //RemovethelastAIresponse
@@ -3874,113 +3960,137 @@ function StoryPageContent() {
           : true,
     };
 
-    const apiEndpoint = "/api/story/next-staged";
+    const apiEndpoint = "/api/story/next-staged-stream";
 
-    await fetch(apiEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify(payload),
-    })
-      .then(async (res) => {
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          addNotification(`⚠ Invalid response from server`, "failure");
-          setLoading(false);
-          setCanRetry(true);
-          return;
-        }
+    // Track partial scene part as we stream
+    let partialPart: ScenePart = {
+      content: "",
+      imageUrl: "",
+      user: false,
+      role: "assistant",
+      choices: [],
+    };
 
-        const text = await res.text();
-        if (!text || text.trim() === "") {
-          addNotification(`⚠ Empty response from server`, "failure");
-          setLoading(false);
-          setCanRetry(true);
-          return;
-        }
+    await streamStoryGeneration(
+      apiEndpoint,
+      payload,
+      session.access_token,
+      {
+        onStory: (content: string, usage: any) => {
+          // Story narration arrives first - show immediately!
+          partialPart.content = content;
+          storyData.scene.parts.push(partialPart);
 
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          addNotification(`⚠ Invalid JSON response`, "failure");
-          setLoading(false);
-          setCanRetry(true);
-          return;
-        }
+          setStoryText(content);
+          setStoryData({ ...storyData });
+          setLoading(false); // Let player read while tools/choices generate
+          setLoadingStage("tools"); // Now analyzing game state
 
-        if (!res.ok) {
-          addNotification(
-            `Error: ${data.error || "Failed to generate story"}`,
-            "failure"
-          );
-          setLoading(false);
-          setCanRetry(true);
-          return;
-        }
-
-        // Update token balance
-        if (data.meta?.remainingBalance?.total !== undefined) {
-          setTokenBalance(data.meta.remainingBalance.total);
-        }
-
-        // Process all parts from the multi-part response
-        const lastPart = processSceneParts(
-          data.parts,
-          storyData,
-          addNotification
-        );
-
-        logger.ai_response("AI response received (retry)", {
-          tokensDeducted: data.meta?.tokensDeducted,
-          partsCount: data.parts.length,
-          lastPartLength: lastPart.content.length,
-          raw: lastPart.raw || lastPart.content,
-          parsed: {
-            content: lastPart.content,
-            choices: lastPart.choices?.length || 0,
-            commands: lastPart.commands?.length || 0,
-            memoryEntries: lastPart.memoryEntries?.length || 0,
-          },
-        });
-
-        // Process lore triggers based on new content
-        processLoreTriggers(storyData, addNotification);
-
-        // Check for chapter completion
-        if (lastPart.content.includes("!!!ENDCHAPTER!!!")) {
-          const currentChapter = storyData.chapters.length;
-          if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
-            storyData.earnedPointsFromChapters.push(currentChapter);
-            storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
-            addNotification(
-              `🎉 Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
-              "success"
-            );
+          logger.ai_response("Story narration received (retry)", {
+            length: content.length,
+            usage,
+          });
+        },
+        onTools: (
+          toolCalls: any[],
+          toolResponses: CommandResponse[],
+          usage: any
+        ) => {
+          // Tools arrive - update the last part in scene
+          const lastPartIndex = storyData.scene.parts.length - 1;
+          if (lastPartIndex >= 0) {
+            storyData.scene.parts[lastPartIndex] = {
+              ...storyData.scene.parts[lastPartIndex],
+              toolCalls,
+              toolResponses,
+            };
           }
-        }
 
-        setStoryData({ ...storyData });
-        setStoryText(lastPart.content);
-        setChoices({ choices: lastPart.choices || [] });
-        setLoading(false);
-        setCanRetry(true);
-        setCanUndo(true);
-        addNotification("✓ Response regenerated", "success");
+          // Process tool responses (update stats, inventory, etc.)
+          const lastPart = processSceneParts(
+            [storyData.scene.parts[lastPartIndex]],
+            storyData,
+            addNotification
+          );
+          if (lastPart) {
+            setStoryData({ ...storyData });
+          }
 
-        // Clear command responses after successful AI generation
-        setPendingCommandResponses([]);
+          setLoadingStage("choices"); // Now generating choices
 
-        await saveProgress(storyData);
-      })
-      .catch((error) => {
-        console.error("Error retrying story:", error);
-        addNotification("Network error. Please try again.", "failure");
-        setLoading(false);
-        setCanRetry(true);
-      });
+          logger.ai_response("Tool calls received (retry)", {
+            toolCallsCount: toolCalls?.length || 0,
+            toolResponsesCount: toolResponses?.length || 0,
+            usage,
+          });
+        },
+        onChoices: (newChoices: Choices, usage: any) => {
+          // Choices arrive - update the last part in scene
+          const lastPartIndex = storyData.scene.parts.length - 1;
+          if (lastPartIndex >= 0) {
+            storyData.scene.parts[lastPartIndex] = {
+              ...storyData.scene.parts[lastPartIndex],
+              choices: newChoices.choices,
+            };
+          }
+          setChoices(newChoices);
+          setStoryData({ ...storyData });
+          setLoadingStage(null); // All done
+
+          logger.ai_response("Choices received (retry)", {
+            choicesCount: newChoices.choices.length,
+            usage,
+          });
+        },
+        onComplete: (meta: any) => {
+          // All done - update token balance
+          if (meta?.remainingBalance?.total !== undefined) {
+            setTokenBalance(meta.remainingBalance.total);
+          }
+
+          // Check for chapter completion
+          if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
+            const currentChapter = storyData.chapters.length;
+            if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
+              storyData.earnedPointsFromChapters.push(currentChapter);
+              storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
+              addNotification(
+                `🎉 Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                "success"
+              );
+            }
+          }
+
+          // Process lore triggers based on new content
+          processLoreTriggers(storyData, addNotification);
+
+          setCanRetry(true);
+          setCanUndo(true);
+          setLoadingStage(null); // Ensure cleared on complete
+
+          // Clear command responses after successful AI generation
+          setPendingCommandResponses([]);
+
+          // Save progress to database
+          saveProgress(storyData);
+
+          addNotification("✓ Response regenerated", "success");
+
+          logger.ai_response("Generation complete (retry)", {
+            tokensDeducted: meta?.tokensDeducted,
+            totalCost: meta?.totalCost,
+          });
+        },
+        onError: (message: string) => {
+          addNotification(`Error: ${message}`, "failure");
+          setLoading(false);
+          setLoadingStage(null);
+          setCanRetry(true);
+
+          logger.error("Streaming error (retry)", { message });
+        },
+      }
+    );
   }
 
   async function handleUndo() {
@@ -4779,6 +4889,7 @@ function StoryPageContent() {
             choices={choices}
             input={input}
             loading={loading}
+            loadingStage={loadingStage}
             momentumMode={momentumMode}
             onMomentumModeChange={setMomentumMode}
             handleChoice={handleChoice}
