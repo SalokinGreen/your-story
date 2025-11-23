@@ -255,6 +255,29 @@ export const AI_MODELS = {
       "The premium storytelling model from NovelAI, featuring the longest context length and enhanced capabilities for crafting intricate and immersive narratives.",
     bannerUrl: undefined,
   },
+  "Mistral Nemo": {
+    name: "Mistral Nemo",
+    original_model: "Mistral Nemo",
+    model: "mistralai/mistral-nemo",
+    maxTokens: 131000,
+    maxOutputTokens: 4000,
+    provider: "openrouter",
+    supportsToolCalling: false,
+    cost: 1,
+    inputPrice: 0.02,
+    outputPrice: 0.04,
+    finetunes: [],
+    strengths: ["cost-effective", "general purpose"],
+    weaknesses: [
+      "creativity",
+      "complex tasks",
+      "no tool calling",
+      "weak ass brains",
+    ],
+    description:
+      "A cost-effective general-purpose model from Mistral, suitable for a variety of tasks but less creative and without tool calling capabilities.",
+    bannerUrl: undefined,
+  },
 } as const;
 
 export interface ModelPreset {
@@ -287,12 +310,12 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     estimatedCost: 13, // 2 + 10 + 1
   },
   budget: {
-    id: "budget",
-    name: "Budget (Cost-Effective)",
-    description: "Optimized for low token usage while maintaining quality",
-    storyModel: "Gemini 2.5 Flash Lite",
+    id: "broke",
+    name: "Broke (Cost-Effective)",
+    description: "Best if you owe money or are hiding from the IRS",
+    storyModel: "Mistral Nemo",
     toolsModel: "Gemini 2.5 Flash Lite",
-    choicesModel: "Gemini 2.5 Flash Lite",
+    choicesModel: "Mistral Nemo",
     estimatedCost: 3, // 1 + 1 + 1
   },
   creative: {
