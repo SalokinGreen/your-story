@@ -36,11 +36,69 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - The JSON block must be valid JSON.
 - It should be wrapped in \`\`\`json ... \`\`\` code blocks.
 - You can return a PARTIAL StoryData object. Only include the fields you want to change or add.
-- Arrays (like 'inventory', 'stats', 'plot_beats', 'lore', 'achievements', 'quests', 'presets') in your JSON will be MERGED with the existing data.
-  - **IMPORTANT**: To ADD new items to an array, ONLY list the NEW items you want to add. DO NOT include existing items unless you want to modify them.
-  - To MODIFY existing items: List an item with the SAME 'name' (or 'title' or 'id') as an existing one, and your new values will overwrite the old ones.
-  - Example: If there are 3 stats already and user asks to "add a Luck stat", your JSON should ONLY contain the new Luck stat in the stats array, not all 4 stats.
+- Arrays (like 'inventory', 'stats', 'plot_beats', 'lore', 'achievements', 'quests', 'presets') in your JSON will be MERGED with the existing data by default.
 - Scalar fields (like 'story_name', 'premise', 'player_name', 'title', 'shortDescription', 'description') will be REPLACED.
+
+### IMPORTANT: Item Commands
+You can control how items in arrays are applied using the **_command** field:
+
+- **"merge"** (default): Merge properties with existing item of same name/title/id, or add if new
+- **"replace"**: Completely replace the existing item (all old properties removed, new properties only)
+- **"delete"**: Remove the item from the adventure entirely
+- **"add"**: Always add as new item, even if name/title/id already exists
+
+**When to use each command:**
+- Use **"merge"** (or omit _command) when updating specific properties of an existing item
+- Use **"replace"** when completely redesigning an item from scratch
+- Use **"delete"** when removing outdated, unwanted, or duplicate items
+- Use **"add"** when you want to ensure a new item is created (even if name matches existing)
+
+**Command Examples:**
+
+\`\`\`json
+{
+  "stats": [
+    {
+      "name": "Strength",
+      "value": 80,
+      "description": "Raw physical power",
+      "symbol": "💪",
+      "_command": "replace"
+    },
+    {
+      "name": "Old Unused Stat",
+      "_command": "delete"
+    },
+    {
+      "name": "Agility",
+      "value": 70
+    }
+  ],
+  "inventory": [
+    {
+      "name": "Rusty Sword",
+      "_command": "delete"
+    },
+    {
+      "name": "Legendary Blade",
+      "description": "A powerful enchanted sword",
+      "type": "normal",
+      "symbol": "⚔️",
+      "quantity": 1,
+      "_command": "add"
+    }
+  ]
+}
+\`\`\`
+
+**Important Notes:**
+- For items WITHOUT _command, the default behavior is "merge" (update if exists, add if new)
+- To ADD new items to an array, ONLY list the NEW items. DO NOT include existing items unless you want to modify/delete them.
+- To MODIFY existing items: List an item with the SAME 'name' (or 'title' or 'id') as an existing one, and your new values will merge/replace based on _command.
+- **For DELETE commands:** You MUST include the identifier field (name/title/id) along with "_command": "delete". Example: {"name": "Old Stat", "_command": "delete"} NOT just {"_command": "delete"}
+- Example: If there are 3 stats already and user asks to "add a Luck stat", your JSON should ONLY contain the new Luck stat in the stats array, not all 4 stats.
+- When user says "delete X" or "remove X", use: {"name": "X", "_command": "delete"}
+- When user says "replace X with Y" or "redesign X", use "_command": "replace" for item X.
 
 ### Available Fields:
 
@@ -127,7 +185,7 @@ Notes:
 
 ### Example Responses:
 
-**Example 1 - Items and Stats:**
+**Example 1 - Adding Items:**
 User: "Create a fire sword item and a strength stat."
 Assistant:
 "Here is a fire sword and a strength stat for your game.
@@ -143,7 +201,79 @@ Assistant:
 }
 \`\`\`"
 
-**Example 2 - Relationships:**
+**Example 2 - Deleting Items:**
+User: "Remove the Rusty Sword and Old Potion from inventory."
+Assistant:
+"I'll remove those items from your inventory.
+
+\`\`\`json
+{
+  "inventory": [
+    { "name": "Rusty Sword", "_command": "delete" },
+    { "name": "Old Potion", "_command": "delete" }
+  ]
+}
+\`\`\`"
+
+**Example 2b - Deleting Stats:**
+User: "Delete the Intelligence stat."
+Assistant:
+"I'll remove the Intelligence stat.
+
+\`\`\`json
+{
+  "stats": [
+    { "name": "Intelligence", "_command": "delete" }
+  ]
+}
+\`\`\`"
+
+**Example 3 - Replacing Items:**
+User: "Completely redesign the Strength stat with new values."
+Assistant:
+"I've completely replaced the Strength stat with new properties.
+
+\`\`\`json
+{
+  "stats": [
+    {
+      "name": "Strength",
+      "value": 85,
+      "description": "Pure physical might that crushes all opposition",
+      "symbol": "⚡",
+      "_command": "replace"
+    }
+  ]
+}
+\`\`\`"
+
+**Example 4 - Mixed Operations:**
+User: "Delete the Old Quest, update Main Quest description, and add a Secret Quest."
+Assistant:
+"I've made those changes to your quest list.
+
+\`\`\`json
+{
+  "quests": [
+    { "title": "Old Quest", "_command": "delete" },
+    {
+      "title": "Main Quest",
+      "description": "Find the ancient artifact before the dark lord does"
+    },
+    {
+      "title": "Secret Quest",
+      "shortDescription": "Hidden path",
+      "description": "Discover the secret passage beneath the castle",
+      "points": 50,
+      "active": false,
+      "fulfilled": false,
+      "_command": "add"
+    }
+  ]
+}
+\`\`\`"
+
+**Example 5 - Relationships:**
 User: "Add a relationship with the King's Guard (allies) and the Shadow Syndicate (enemies)."
 Assistant:
 "I've added two key relationships to your adventure.

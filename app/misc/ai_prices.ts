@@ -204,7 +204,7 @@ export const AI_MODELS = {
   "NovelAI GLM scribe": {
     name: "NovelAI GLM Tablet",
     original_model: "NovelAI GLM Tablet",
-    model: "glm",
+    model: "glm-tablet",
     maxTokens: 8000,
     maxOutputTokens: 2000,
     provider: "novelai",
@@ -222,7 +222,7 @@ export const AI_MODELS = {
   "NovelAI GLM Scribe": {
     name: "NovelAI GLM Scribe",
     original_model: "NovelAI GLM Scribe",
-    model: "glm",
+    model: "glm-scribe",
     maxTokens: 14000,
     maxOutputTokens: 2000,
     provider: "novelai",
@@ -240,7 +240,7 @@ export const AI_MODELS = {
   "NovelAI GLM Opus": {
     name: "NovelAI GLM Opus",
     original_model: "NovelAI GLM Opus",
-    model: "glm",
+    model: "glm-opus",
     maxTokens: 28000,
     maxOutputTokens: 2000,
     provider: "novelai",
@@ -276,6 +276,15 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     toolsModel: "Grok Code Fast 1",
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 12, // 1 + 10 + 1
+  },
+  mainBrain: {
+    id: "mainBrain",
+    name: "Main with Brain",
+    description: "Creative narration, powerful tools, fast choices with Brain",
+    storyModel: "Deepseek R1",
+    toolsModel: "Grok Code Fast 1",
+    choicesModel: "Gemini 2.5 Flash Lite",
+    estimatedCost: 13, // 2 + 10 + 1
   },
   budget: {
     id: "budget",

@@ -143,6 +143,89 @@ function AdventureCreatorContent() {
 
   const [isAIMenuOpen, setIsAIMenuOpen] = useState(false);
 
+  // Helper function to apply item changes with command support
+  function applyItemChanges<
+    T extends { name?: string; title?: string; id?: string }
+  >(
+    existingItems: T[],
+    newItems: Array<
+      Partial<T> & { _command?: "add" | "replace" | "delete" | "merge" }
+    >,
+    itemType: string,
+    identifierKey: "name" | "title" | "id" = "name"
+  ): T[] {
+    let updated = [...existingItems];
+
+    newItems.forEach((newItem) => {
+      const command = newItem._command || "merge"; // Default to merge for backward compatibility
+      const itemIdentifier = newItem[identifierKey] as string | undefined;
+
+      // Skip if no identifier provided
+      if (!itemIdentifier) {
+        console.warn(
+          `[AI] Skipping ${itemType} - no ${identifierKey} provided`
+        );
+        return;
+      }
+
+      const index = updated.findIndex(
+        (item) => item[identifierKey] === itemIdentifier
+      );
+
+      switch (command) {
+        case "delete":
+          if (index !== -1) {
+            updated.splice(index, 1);
+            console.log(`[AI] Deleted ${itemType}: ${itemIdentifier}`);
+          } else {
+            console.warn(
+              `[AI] Cannot delete ${itemType} "${itemIdentifier}" - not found`
+            );
+          }
+          break;
+
+        case "replace":
+          if (index !== -1) {
+            // Remove _command before storing
+            const { _command, ...cleanItem } = newItem;
+            updated[index] = cleanItem as T;
+            console.log(`[AI] Replaced ${itemType}: ${itemIdentifier}`);
+          } else {
+            // If item doesn't exist, treat replace as add
+            const { _command, ...cleanItem } = newItem;
+            updated.push(cleanItem as T);
+            console.log(
+              `[AI] Added ${itemType} (replace on non-existent): ${itemIdentifier}`
+            );
+          }
+          break;
+
+        case "add":
+          // Always add as new item, even if name exists
+          const { _command: _, ...cleanItem } = newItem;
+          updated.push(cleanItem as T);
+          console.log(`[AI] Added ${itemType}: ${itemIdentifier}`);
+          break;
+
+        case "merge":
+        default:
+          // Default behavior: merge properties if exists, add if not
+          if (index !== -1) {
+            const { _command, ...itemWithoutCommand } = newItem;
+            updated[index] = { ...updated[index], ...itemWithoutCommand };
+            console.log(`[AI] Merged ${itemType}: ${itemIdentifier}`);
+          } else {
+            const { _command, ...cleanItem } = newItem;
+            updated.push(cleanItem as T);
+            console.log(`[AI] Added ${itemType}: ${itemIdentifier}`);
+          }
+          break;
+      }
+    });
+
+    return updated;
+  }
+
   const handleApplyAIChanges = (
     data: Partial<StoryData> & {
       title?: string;
@@ -150,6 +233,96 @@ function AdventureCreatorContent() {
       description?: string;
     }
   ) => {
+    console.log("[AI] Received data:", JSON.stringify(data, null, 2));
+
+    // Collect deletion warnings
+    const deletions: string[] = [];
+
+    if (data.stats) {
+      data.stats.forEach((stat: any) => {
+        if (stat._command === "delete") {
+          deletions.push(`Stat: ${stat.name}`);
+        }
+      });
+    }
+
+    if (data.resources) {
+      data.resources.forEach((resource: any) => {
+        if (resource._command === "delete") {
+          deletions.push(`Resource: ${resource.name}`);
+        }
+      });
+    }
+
+    if (data.inventory) {
+      data.inventory.forEach((item: any) => {
+        if (item._command === "delete") {
+          deletions.push(`Item: ${item.name}`);
+        }
+      });
+    }
+
+    if (data.plot_beats) {
+      data.plot_beats.forEach((beat: any) => {
+        if (beat._command === "delete") {
+          deletions.push(`Plot Beat: ${beat.title}`);
+        }
+      });
+    }
+
+    if (data.lore) {
+      data.lore.forEach((l: any) => {
+        if (l._command === "delete") {
+          deletions.push(`Lore: ${l.title}`);
+        }
+      });
+    }
+
+    if (data.achievements) {
+      data.achievements.forEach((a: any) => {
+        if (a._command === "delete") {
+          deletions.push(`Achievement: ${a.title}`);
+        }
+      });
+    }
+
+    if (data.quests) {
+      data.quests.forEach((q: any) => {
+        if (q._command === "delete") {
+          deletions.push(`Quest: ${q.title}`);
+        }
+      });
+    }
+
+    if (data.relationships) {
+      data.relationships.forEach((r: any) => {
+        if (r._command === "delete") {
+          deletions.push(`Relationship: ${r.name}`);
+        }
+      });
+    }
+
+    if (data.presets) {
+      data.presets.forEach((p: any) => {
+        if (p._command === "delete") {
+          deletions.push(`Preset: ${p.name}`);
+        }
+      });
+    }
+
+    // Show confirmation if deletions exist
+    if (deletions.length > 0) {
+      const confirmed = window.confirm(
+        `The AI will delete the following items:\n\n${deletions.join(
+          "\n"
+        )}\n\nContinue?`
+      );
+      if (!confirmed) {
+        addNotification("Changes cancelled", "info");
+        return;
+      }
+    }
+
     // Apply adventure metadata
     if (data.title !== undefined) setTitle(data.title);
     if (data.shortDescription !== undefined)
@@ -165,114 +338,68 @@ function AdventureCreatorContent() {
     if (data.intro) setIntro(data.intro);
     if (data.author_notes) setAuthorNotes(data.author_notes);
 
+    // Apply with commands
     if (data.stats) {
-      const newStats = [...stats];
-      data.stats.forEach((newStat) => {
-        const index = newStats.findIndex((s) => s.name === newStat.name);
-        if (index !== -1) {
-          newStats[index] = { ...newStats[index], ...newStat };
-        } else {
-          newStats.push(newStat as Stat);
-        }
-      });
-      setStats(newStats);
+      setStats(applyItemChanges(stats, data.stats as any, "stat", "name"));
     }
 
     if (data.resources) {
-      const newResources = [...resources];
-      data.resources.forEach((newRes) => {
-        const index = newResources.findIndex((r) => r.name === newRes.name);
-        if (index !== -1) {
-          newResources[index] = { ...newResources[index], ...newRes };
-        } else {
-          newResources.push(newRes as Resource);
-        }
-      });
-      setResources(newResources);
+      setResources(
+        applyItemChanges(resources, data.resources as any, "resource", "name")
+      );
     }
 
     if (data.inventory) {
-      const newInventory = [...inventory];
-      data.inventory.forEach((newItem) => {
-        const index = newInventory.findIndex((i) => i.name === newItem.name);
-        if (index !== -1) {
-          newInventory[index] = { ...newInventory[index], ...newItem };
-        } else {
-          newInventory.push(newItem as InventoryItem);
-        }
-      });
-      setInventory(newInventory);
+      setInventory(
+        applyItemChanges(inventory, data.inventory as any, "item", "name")
+      );
     }
 
     if (data.plot_beats) {
-      const newBeats = [...plotBeats];
-      data.plot_beats.forEach((newBeat) => {
-        const index = newBeats.findIndex((b) => b.title === newBeat.title);
-        if (index !== -1) {
-          newBeats[index] = { ...newBeats[index], ...newBeat };
-        } else {
-          newBeats.push(newBeat as PlotBeat);
-        }
-      });
-      setPlotBeats(newBeats);
+      setPlotBeats(
+        applyItemChanges(
+          plotBeats,
+          data.plot_beats as any,
+          "plot beat",
+          "title"
+        )
+      );
     }
 
     if (data.lore) {
-      const newLore = [...lore];
-      data.lore.forEach((l) => {
-        const index = newLore.findIndex(
-          (existing) => existing.title === l.title
-        );
-        if (index !== -1) {
-          newLore[index] = { ...newLore[index], ...l };
-        } else {
-          newLore.push(l as StoryLore);
-        }
-      });
-      setLore(newLore);
+      setLore(applyItemChanges(lore, data.lore as any, "lore entry", "title"));
     }
 
     if (data.achievements) {
-      const newAchievements = [...achievements];
-      data.achievements.forEach((a) => {
-        const index = newAchievements.findIndex(
-          (existing) => existing.title === a.title
-        );
-        if (index !== -1) {
-          newAchievements[index] = { ...newAchievements[index], ...a };
-        } else {
-          newAchievements.push(a as Achievement);
-        }
-      });
-      setAchievements(newAchievements);
+      setAchievements(
+        applyItemChanges(
+          achievements,
+          data.achievements as any,
+          "achievement",
+          "title"
+        )
+      );
     }
 
     if (data.quests) {
-      const newQuests = [...quests];
-      data.quests.forEach((q) => {
-        const index = newQuests.findIndex(
-          (existing) => existing.title === q.title
-        );
-        if (index !== -1) {
-          newQuests[index] = { ...newQuests[index], ...q };
-        } else {
-          newQuests.push(q as Quest);
-        }
-      });
-      setQuests(newQuests);
+      setQuests(applyItemChanges(quests, data.quests as any, "quest", "title"));
+    }
+
+    if (data.relationships) {
+      setRelationships(
+        applyItemChanges(
+          relationships,
+          data.relationships as any,
+          "relationship",
+          "name"
+        )
+      );
     }
 
     if (data.presets) {
-      const newPresets = [...presets];
-      data.presets.forEach((p) => {
-        const index = newPresets.findIndex((existing) => existing.id === p.id);
-        if (index !== -1) {
-          newPresets[index] = { ...newPresets[index], ...p };
-        } else {
-          newPresets.push(p as Preset);
-        }
-      });
-      setPresets(newPresets);
+      setPresets(
+        applyItemChanges(presets, data.presets as any, "preset", "id")
+      );
     }
 
     addNotification("AI changes applied successfully!", "success");
@@ -370,7 +497,7 @@ function AdventureCreatorContent() {
         // Load points and momentum
         setPoints(template.points || 0);
         setMomentum(template.momentum || 0);
-        setMaxMomentum(template.maxMomentum || 100);
+        setMaxMomentum(template.maxMomentum || 5);
 
         // After loading from API, overlay any unsaved draft changes
         try {
@@ -1619,10 +1746,11 @@ function AdventureCreatorContent() {
         presets: presets,
       };
 
-      // Generate unique ID with 'local:' prefix
-      const localId = `local:${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
+      // Use existing ID if editing a local adventure, otherwise generate new ID
+      const localId =
+        isLocal && editAdventureId
+          ? editAdventureId
+          : `local:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // Save to IndexedDB using localAdventureManager
       await saveLocalAdventure(localId, adventureTemplate);
@@ -1631,6 +1759,17 @@ function AdventureCreatorContent() {
         "Adventure saved locally! 🎮 You can find it in your library.",
         "success"
       );
+
+      // If this is a new adventure, update the URL to edit mode and set isLocal
+      if (!editAdventureId) {
+        setIsLocal(true);
+        // Update URL without navigation to switch to edit mode
+        window.history.replaceState(null, "", `/creator?edit=${localId}`);
+        // Clear the new adventure draft since we now have a saved local adventure
+        if (draftKey && typeof window !== "undefined") {
+          window.localStorage.removeItem(draftKey);
+        }
+      }
 
       // Navigate to library to see the saved adventure
       router.push("/library");

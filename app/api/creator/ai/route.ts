@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
         model: modelConfig.model,
         messages: aiMessages,
         temperature: 0.7,
-        max_tokens: 4000, // Allow larger output for JSON
+        max_tokens: 12000, // Allow larger output for JSON
         stream: false,
       }),
       signal: controller.signal,

@@ -216,10 +216,29 @@ export default function CreatorAIChat({
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                   How can I help you create?
                 </h3>
-                <p className="text-sm mb-6">
+                <p className="text-sm mb-4">
                   I can design items, write plot beats, balance stats, or create
                   entire scenarios from scratch.
                 </p>
+
+                {/* AI Commands Info Box */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4 text-left">
+                  <h4 className="text-sm font-bold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                    <DynamicIcon name="Info" className="w-4 h-4" />
+                    AI Commands
+                  </h4>
+                  <p className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
+                    The AI can <strong>merge</strong> (update properties),{" "}
+                    <strong>replace</strong> (completely overwrite),
+                    <strong>delete</strong> (remove), or <strong>add</strong>{" "}
+                    (create new) items in your adventure.
+                  </p>
+                  <p className="text-xs text-blue-800 dark:text-blue-200 mt-2 leading-relaxed">
+                    Examples: "Delete the Rusty Sword", "Replace Strength stat
+                    completely", "Add a new healing potion"
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-1 gap-2 text-sm">
                   <button
                     onClick={() =>
@@ -236,6 +255,14 @@ export default function CreatorAIChat({
                     className="px-4 py-2 rounded-lg bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-500 transition-colors text-left shadow-xs"
                   >
                     "Write a plot beat about..."
+                  </button>
+                  <button
+                    onClick={() =>
+                      setInput("Delete the Old Weapon and add a Magic Staff")
+                    }
+                    className="px-4 py-2 rounded-lg bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-500 transition-colors text-left shadow-xs"
+                  >
+                    "Delete... and add..."
                   </button>
                 </div>
               </div>
