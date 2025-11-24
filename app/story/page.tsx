@@ -1997,26 +1997,30 @@ function StoryPageContent() {
     if (!storyData) return;
     logger.action("User selected preset", { preset: preset.name });
 
+    // If custom preset, route to character creation page
+    if (preset.id === "custom") {
+      router.push(`/story/create-character?storyId=${storyDbId}`);
+      return;
+    }
+
     const updatedStoryData = { ...storyData };
 
-    //Applypresettostorydata(skipifcustom)
-    if (preset.id !== "custom") {
-      if (preset.playerName) updatedStoryData.player_name = preset.playerName;
-      if (preset.playerSummary)
-        updatedStoryData.player_summary = preset.playerSummary;
-      if (preset.stats.length > 0)
-        updatedStoryData.stats = JSON.parse(JSON.stringify(preset.stats));
-      if (preset.resources.length > 0)
-        updatedStoryData.resources = JSON.parse(
-          JSON.stringify(preset.resources)
-        );
-      if (preset.inventory.length > 0)
-        updatedStoryData.inventory = JSON.parse(
-          JSON.stringify(preset.inventory)
-        );
-      if (preset.authorNotes)
-        updatedStoryData.author_notes = preset.authorNotes;
-    }
+    //Applypresettostorydata
+    if (preset.playerName) updatedStoryData.player_name = preset.playerName;
+    if (preset.playerSummary)
+      updatedStoryData.player_summary = preset.playerSummary;
+    if (preset.stats.length > 0)
+      updatedStoryData.stats = JSON.parse(JSON.stringify(preset.stats));
+    if (preset.resources.length > 0)
+      updatedStoryData.resources = JSON.parse(
+        JSON.stringify(preset.resources)
+      );
+    if (preset.inventory.length > 0)
+      updatedStoryData.inventory = JSON.parse(
+        JSON.stringify(preset.inventory)
+      );
+    if (preset.authorNotes)
+      updatedStoryData.author_notes = preset.authorNotes;
 
     //Addstartingscenepart
     updatedStoryData.scene.parts.push({
