@@ -587,7 +587,21 @@ Superb (+5): Very difficult, exceptional effort needed
 Fantastic (+6): EXTRAORDINARY, near-impossible
 Epic (+7+): Legendary, mythic difficulty
 
-Use Fair (2) as your DEFAULT. Use Great (4) for serious challenges. Use Fantastic (6) for climactic moments.`,
+Use Fair (2) as your DEFAULT. Use Great (4) for serious challenges. Use Fantastic (6) for climactic moments.
+
+⚠️ WHEN TO CALL FOR ROLLS:
+Call for rolls when outcomes are UNCERTAIN and CONSEQUENTIAL:
+• Physical actions with real risk: climbing, fighting, sneaking, chasing
+• Social pressure points: persuading authorities, lying under scrutiny, intimidating enemies
+• Mental challenges: solving puzzles, resisting manipulation, noticing hidden details
+• Any moment where failure would create interesting complications
+
+DON'T call for rolls when:
+• Outcome is certain (trivial tasks, overwhelming advantage)
+• Success/failure doesn't matter to the story
+• It would slow down the narrative momentum
+
+ACTIVE OPPOSITION: When facing NPCs, their skill level = opposition (guards with Good (+3) Awareness, noble with Superb (+5) Will, etc.)`,
     challengeGuidance: `Fate FOUR-OUTCOME SYSTEM (based on margin):
 
 **FAIL** (Roll < Opposition): Player fails to achieve goal.
@@ -643,11 +657,20 @@ EXAMPLES:
   • Total 2: "TIE! You make it across but stumble - lose 1 Physical Stress from the hard landing."
   • Total 0: "FAIL! You miss the far side. Spend Fate Point to catch the edge, or take Moderate Consequence 'Dangling Desperately'."
 
-Remember: Success with Style MUST include a meaningful bonus, not just flavor. Ties MUST have a cost or complication. Use The Ladder names in narration ("That's a Great result!").`,
+Remember: Success with Style MUST include a meaningful bonus, not just flavor. Ties MUST have a cost or complication. Use The Ladder names in narration ("That's a Great result!").
+
+⚠️ CREATING DRAMATIC TENSION:
+Fate thrives on contested actions and uncertain outcomes. Structure scenes around:
+• OBSTACLES: Physical barriers (locked doors, chasms, guards) require rolls to overcome
+• CONFLICTS: Social/physical confrontations (arguments, fights, chases) need active opposition
+• CHALLENGES: Multi-step problems (investigations, heists, journeys) broken into skill checks
+• DISCOVERIES: Finding clues, spotting danger, reading people - all opportunities for rolls
+
+When players take ACTION, convert it to a roll. When they declare INTENT, ask which skill and set opposition. Keep the dice moving to maintain energy and stakes.`,
     choiceSyntax:
-      "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; mythic_check: question (likelihood) or none; mythic_table: category or none>\\nFate Core System - DC is the opposition level (Poor to Legendary scale):\\nExample:\\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 3); use_resource: none; use_item: none; mythic_check: Is the dragon asleep? (Likely); mythic_table: sounds>\\n- You climb the treacherous cliff. <use_skill: Athletics (DC 4); use_resource: Stamina; use_item: Climbing Gear; mythic_check: none; mythic_table: terrain>",
+      "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; mythic_check: question (likelihood) or none; mythic_table: category or none>\\nFate Core System - Present meaningful obstacles and opposition that require rolls. DC is the ladder level (use Fair +2 as default, Great +4 for serious challenges):\\nExample:\\n- You carefully sneak past the alert guards (Awareness: Great +4). <use_skill: Stealth (DC 4); use_resource: none; use_item: none; mythic_check: none; mythic_table: sounds>\\n- You try to convince the skeptical merchant (Will: Good +3). <use_skill: Rapport (DC 3); use_resource: none; use_item: none; mythic_check: Is he desperate? (Unlikely); mythic_table: none>\\n- You scale the treacherous cliff face. <use_skill: Athletics (DC 4); use_resource: Stamina; use_item: Climbing Gear; mythic_check: none; mythic_table: terrain>",
     dcGuidelines:
-      "⚠️ FATE CORE DC GUIDELINES:\\n- DC is the opposition level on the Fate ladder:\\n  * DC 0-1: Average/Fair (routine tasks)\\n  * DC 2-3: Good/Great (skilled work)\\n  * DC 4-5: Superb/Fantastic (impressive feats)\\n  * DC 6+: Epic/Legendary (near-impossible)\\n- Success with style (beat DC by 3+) grants boosts or extra benefits.\\n- Ties are partial successes - the player succeeds at a cost.",
+      "⚠️ FATE CORE DC GUIDELINES:\\n- DC is the opposition level on the Fate ladder. Set opposition for every meaningful action with uncertain outcome.\\n- Active Opposition: When facing NPCs, use their relevant skill as DC (guard's Awareness, noble's Will, etc.)\\n- Passive Opposition: For environmental challenges, set ladder level based on difficulty\\n  * DC 0-1: Average/Fair (routine skilled work, minor obstacles)\\n  * DC 2-3: Good/Great (serious challenges, trained opposition)\\n  * DC 4-5: Superb/Fantastic (impressive feats, expert opposition)\\n  * DC 6+: Epic/Legendary (near-impossible, legendary opposition)\\n- Success with style (beat DC by 3+) grants boosts or extra benefits. Describe them vividly!\\n- Ties are partial successes - success at a cost. Make the cost meaningful.\\n- Present obstacles, opposition, and challenges that naturally require rolls to resolve.",
   },
 };
 

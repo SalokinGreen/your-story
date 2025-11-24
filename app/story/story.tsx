@@ -567,14 +567,17 @@ const choice_button_factory = (
   onClick: () => void
 ) => {};
 const convert_choice_to_text = (choice: Choice, storyData: StoryData) => {
-  let extra: React.ReactNode = null;
+  const icons: React.ReactNode[] = [];
+  
+  // Skill icon
   if (choice.skill_used) {
     const skill = storyData.stats.find(
       (stat) => stat.name === choice.skill_used
     );
     if (skill?.symbol) {
-      extra = (
+      icons.push(
         <DynamicIcon
+          key="skill"
           name={skill.symbol as any}
           className="inline w-4 h-4 ml-1"
         />
@@ -582,10 +585,75 @@ const convert_choice_to_text = (choice: Choice, storyData: StoryData) => {
     }
   }
 
+  // Resource icon
+  if (choice.resource_used) {
+    const resource = storyData.resources.find(
+      (res) => res.name === choice.resource_used
+    );
+    if (resource?.symbol) {
+      icons.push(
+        <DynamicIcon
+          key="resource"
+          name={resource.symbol as any}
+          className="inline w-4 h-4 ml-1"
+        />
+      );
+    }
+  }
+
+  // Item icon
+  if (choice.item_used) {
+    const item = storyData.inventory.find(
+      (inv) => inv.name === choice.item_used
+    );
+    if (item?.symbol) {
+      icons.push(
+        <DynamicIcon
+          key="item"
+          name={item.symbol as any}
+          className="inline w-4 h-4 ml-1"
+        />
+      );
+    }
+  }
+
+  // Mythic check icon
+  if (choice.mythic_check) {
+    icons.push(
+      <DynamicIcon
+        key="mythic"
+        name="Sparkles"
+        className="inline w-4 h-4 ml-1 text-purple-500"
+      />
+    );
+  }
+
+  // Mythic table icon
+  if (choice.mythic_table) {
+    icons.push(
+      <DynamicIcon
+        key="table"
+        name="Dices"
+        className="inline w-4 h-4 ml-1 text-blue-500"
+      />
+    );
+  }
+
+  // Custom table icon
+  if (choice.custom_table) {
+    icons.push(
+      <DynamicIcon
+        key="custom"
+        name="Table"
+        className="inline w-4 h-4 ml-1 text-green-500"
+      />
+    );
+  }
+
   return (
     <span>
       {choice.text}
-      {extra}
+      {icons.length > 0 && icons}
     </span>
   );
 };
