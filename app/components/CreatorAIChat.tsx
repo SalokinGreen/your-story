@@ -570,6 +570,65 @@ function ChangeSummary({
       icon: "LayoutTemplate",
     });
   }
+  if (data.relationships?.length) {
+    changes.push({
+      type: "Add/Update",
+      label: "Relationships",
+      value: `${data.relationships.length} relationships`,
+      details: data.relationships,
+      icon: "Users",
+    });
+  }
+  if (data.customTables?.length) {
+    changes.push({
+      type: "Add/Update",
+      label: "Custom Tables",
+      value: `${data.customTables.length} tables`,
+      details: data.customTables,
+      icon: "Table",
+    });
+  }
+  if (data.upgradeSettings) {
+    changes.push({
+      type: "Update",
+      label: "Upgrade Settings",
+      value: "Upgrade shop configuration",
+      details: data.upgradeSettings,
+      icon: "ShoppingCart",
+    });
+  }
+  if (data.points !== undefined) {
+    changes.push({
+      type: "Update",
+      label: "Starting Points",
+      value: `${data.points} points`,
+      icon: "Coins",
+    });
+  }
+  if (data.momentum !== undefined) {
+    changes.push({
+      type: "Update",
+      label: "Starting Momentum",
+      value: `${data.momentum}`,
+      icon: "Zap",
+    });
+  }
+  if (data.maxMomentum !== undefined) {
+    changes.push({
+      type: "Update",
+      label: "Max Momentum",
+      value: `${data.maxMomentum}`,
+      icon: "Battery",
+    });
+  }
+  if (data.rpgSystem) {
+    changes.push({
+      type: "Update",
+      label: "RPG System",
+      value: data.rpgSystem,
+      icon: "Dices",
+    });
+  }
 
   return (
     <div className="space-y-2">
