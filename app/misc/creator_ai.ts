@@ -177,11 +177,52 @@ You can control how items in arrays are applied using the **_command** field:
   - resources: Array of starting resources for this preset
   - inventory: Array of starting items for this preset
   - authorNotes: Private notes about this preset
+- upgradeSettings (Object with upgrade shop configuration)
+  - enabled: Boolean - master toggle for the entire upgrade system
+  - statShopEnabled: Boolean - whether stat shop is available
+  - resourceShopEnabled: Boolean - whether resource shop is available
+  - itemShopEnabled: Boolean - whether item shop is available
+  - statShop: Array of { name, description, symbol, startingValue, cost } - new stats players can unlock
+    - name: Name of the new stat to unlock
+    - description: What the stat represents
+    - symbol: Emoji/icon for the stat
+    - startingValue: Initial value when unlocked (1-100, 50 = average)
+    - cost: Progression points required to unlock
+  - resourceShop: Array of { name, description, symbol, startingValue, startingMaxValue, cost } - new resources players can unlock
+    - name: Name of the new resource to unlock
+    - description: What the resource represents
+    - symbol: Emoji/icon for the resource
+    - startingValue: Initial current value when unlocked
+    - startingMaxValue: Initial maximum value when unlocked
+    - cost: Progression points required to unlock
+  - itemShop: Array of { name, description, type, symbol, quantity, cost } - items players can purchase
+    - name: Item name
+    - description: Item description
+    - type: "normal" | "consumable" | "story" | "misc"
+    - symbol: Emoji/icon representing the item
+    - quantity: How many of this item to grant
+    - cost: Progression points required to purchase
+- mythicState (Object with Mythic GME state - if provided, Mythic system will be enabled for this adventure)
+  - chaosFactor: Number 1-9 representing narrative chaos/unpredictability
+  - sceneCount: Number >= 0 tracking scenes played
+  - threads: Array of { id, description, status } - narrative threads
+    - id: Unique identifier (auto-generated if omitted)
+    - description: What this thread represents
+    - status: "active" | "closed"
+  - characters: Array of { id, name, description, status } - NPCs/characters
+    - id: Unique identifier (auto-generated if omitted)
+    - name: Character name
+    - description: Character details
+    - status: "active" | "deceased" | "departed"
 
 Notes:
 - All characters should share the same stats and resources, but they may have different values.
 - Use the 'symbol' field to add an emoji or icon representing the item/stat/resource.
 - Be creative and thematic in your additions/modifications based on the story setting.
+- When creating stat/resource shop items, these are NEW stats/resources that players can unlock, not upgrades to existing ones.
+- Mythic GME is enabled by providing a mythicState object. If you want to enable Mythic, simply include mythicState with at least chaosFactor.
+- Mythic chaos factor must be between 1-9, scene count must be >= 0.
+- Thread and character IDs are auto-generated if not provided, so you can omit them for new entries.
 
 ### Example Responses:
 
@@ -284,6 +325,90 @@ Assistant:
     { "name": "King's Guard", "value": 60, "description": "Loyal protectors of the realm who trust you", "symbol": "💙" },
     { "name": "Shadow Syndicate", "value": -80, "description": "Criminal organization that wants you dead", "symbol": "💔" }
   ]
+}
+\`\`\`"
+
+**Example 6 - Upgrade Shops:**
+User: "Enable upgrades and create a shop with a new Magic stat (10 points) and a Health Potion item (5 points)."
+Assistant:
+"I've enabled upgrades and created shop items.
+
+\`\`\`json
+{
+  "upgradeSettings": {
+    "enabled": true,
+    "statShopEnabled": true,
+    "itemShopEnabled": true,
+    "statShop": [
+      {
+        "name": "Magic",
+        "description": "Arcane power and spell effectiveness",
+        "symbol": "✨",
+        "startingValue": 50,
+        "cost": 10
+      }
+    ],
+    "itemShop": [
+      {
+        "name": "Health Potion",
+        "description": "Restores health when consumed",
+        "type": "consumable",
+        "symbol": "🧪",
+        "quantity": 1,
+        "cost": 5
+      }
+    ]
+  }
+}
+\`\`\`"
+
+**Example 7 - Mythic GME:**
+User: "Enable Mythic with chaos 5, add a thread about finding the ancient temple, and an NPC named Elara."
+Assistant:
+"I've enabled Mythic GME with your settings.
+
+\`\`\`json
+{
+  "mythicState": {
+    "chaosFactor": 5,
+    "sceneCount": 0,
+    "threads": [
+      {
+        "description": "Find and explore the ancient temple before it collapses",
+        "status": "active"
+      }
+    ],
+    "characters": [
+      {
+        "name": "Elara",
+        "description": "Mysterious guide who knows the temple's secrets",
+        "status": "active"
+      }
+    ]
+  }
+}
+\`\`\`"
+
+**Example 8 - Managing Mythic Threads:**
+User: "Close the temple thread and add a new thread about the dragon awakening."
+Assistant:
+"I've updated the Mythic threads.
+
+\`\`\`json
+{
+  "mythicState": {
+    "threads": [
+      {
+        "description": "Find and explore the ancient temple before it collapses",
+        "status": "closed"
+      },
+      {
+        "description": "Stop the ancient dragon from awakening and destroying the kingdom",
+        "status": "active",
+        "_command": "add"
+      }
+    ]
+  }
 }
 \`\`\`"
 

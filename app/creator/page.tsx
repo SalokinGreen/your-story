@@ -336,6 +336,51 @@ function AdventureCreatorContent() {
       });
     }
 
+    // Check upgrade shop deletions
+    if (data.upgradeSettings) {
+      const us = data.upgradeSettings;
+      if (us.statShop) {
+        us.statShop.forEach((s: any) => {
+          if (s._command === "delete") {
+            deletions.push(`Stat Shop Item: ${s.name}`);
+          }
+        });
+      }
+      if (us.resourceShop) {
+        us.resourceShop.forEach((r: any) => {
+          if (r._command === "delete") {
+            deletions.push(`Resource Shop Item: ${r.name}`);
+          }
+        });
+      }
+      if (us.itemShop) {
+        us.itemShop.forEach((i: any) => {
+          if (i._command === "delete") {
+            deletions.push(`Item Shop Item: ${i.name}`);
+          }
+        });
+      }
+    }
+
+    // Check Mythic deletions
+    if (data.mythicState) {
+      const ms = data.mythicState;
+      if (ms.threads) {
+        ms.threads.forEach((t: any) => {
+          if (t._command === "delete") {
+            deletions.push(`Mythic Thread: ${t.description}`);
+          }
+        });
+      }
+      if (ms.characters) {
+        ms.characters.forEach((c: any) => {
+          if (c._command === "delete") {
+            deletions.push(`Mythic Character: ${c.name}`);
+          }
+        });
+      }
+    }
+
     // Show confirmation if deletions exist
     if (deletions.length > 0) {
       const confirmed = window.confirm(
@@ -426,6 +471,117 @@ function AdventureCreatorContent() {
       setPresets(
         applyItemChanges(presets, data.presets as any, "preset", "id")
       );
+    }
+
+    // Apply upgrade shop settings
+    if (data.upgradeSettings) {
+      const us = data.upgradeSettings;
+      setUpgradeSettings((prev) => {
+        const updated = { ...prev };
+
+        // Update boolean flags
+        if (us.enabled !== undefined) updated.enabled = us.enabled;
+        if (us.statShopEnabled !== undefined)
+          updated.statShopEnabled = us.statShopEnabled;
+        if (us.resourceShopEnabled !== undefined)
+          updated.resourceShopEnabled = us.resourceShopEnabled;
+        if (us.itemShopEnabled !== undefined)
+          updated.itemShopEnabled = us.itemShopEnabled;
+
+        // Update shop arrays
+        if (us.statShop) {
+          updated.statShop = applyItemChanges(
+            prev.statShop,
+            us.statShop as any,
+            "stat shop item",
+            "name"
+          );
+        }
+
+        if (us.resourceShop) {
+          updated.resourceShop = applyItemChanges(
+            prev.resourceShop,
+            us.resourceShop as any,
+            "resource shop item",
+            "name"
+          );
+        }
+
+        if (us.itemShop) {
+          updated.itemShop = applyItemChanges(
+            prev.itemShop,
+            us.itemShop as any,
+            "item shop item",
+            "name"
+          );
+        }
+
+        return updated;
+      });
+    }
+
+    // Apply Mythic GME settings
+    // mythicEnabled is derived from mythicState presence, not a separate field
+    if (data.mythicState) {
+      const ms = data.mythicState;
+      
+      // If mythicState is provided, enable Mythic
+      if (!mythicEnabled) {
+        setMythicEnabled(true);
+      }
+
+      const newState = { ...mythicState };
+
+      // Chaos factor validation (1-9)
+      if (ms.chaosFactor !== undefined) {
+        const chaos = Math.max(1, Math.min(9, ms.chaosFactor));
+        newState.chaosFactor = chaos;
+      }
+
+      // Scene count validation (>= 0)
+      if (ms.sceneCount !== undefined) {
+        newState.sceneCount = Math.max(0, ms.sceneCount);
+      }
+
+      // Threads
+      if (ms.threads) {
+        const threadChanges = ms.threads as any[];
+        newState.threads = applyItemChanges(
+          mythicState.threads,
+          threadChanges,
+          "mythic thread",
+          "id"
+        ).map((thread: any) => {
+          // Auto-generate ID for new threads without one
+          if (!thread.id) {
+            thread.id = `thread-${Date.now()}-${Math.random()
+              .toString(36)
+              .substring(2, 9)}`;
+          }
+          return thread;
+        });
+      }
+
+      // Characters
+      if (ms.characters) {
+        const charChanges = ms.characters as any[];
+        newState.characters = applyItemChanges(
+          mythicState.characters,
+          charChanges,
+          "mythic character",
+          "id"
+        ).map((char: any) => {
+          // Auto-generate ID for new characters without one
+          if (!char.id) {
+            char.id = `char-${Date.now()}-${Math.random()
+              .toString(36)
+              .substring(2, 9)}`;
+          }
+          return char;
+        });
+      }
+
+      setMythicState(newState);
     }
 
     addNotification("AI changes applied successfully!", "success");
@@ -1873,6 +2029,13 @@ function AdventureCreatorContent() {
       setSelectedPreset("custom");
       setPresets([DEFAULT_PRESET]);
       setUpgradeSettings(DEFAULT_UPGRADE_SETTINGS);
+      setMythicEnabled(false);
+      setMythicState({
+        chaosFactor: 5,
+        threads: [],
+        characters: [],
+        sceneCount: 0,
+      });
       setCurrentStep("basic");
       addNotification("Draft cleared", "success");
     } else {
@@ -8624,6 +8787,8 @@ function AdventureCreatorContent() {
           achievements,
           quests,
           presets,
+          upgradeSettings,
+          mythicState: mythicEnabled ? mythicState : undefined,
         }}
         adventureMetadata={{
           title: title,
