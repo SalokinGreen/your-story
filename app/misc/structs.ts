@@ -103,6 +103,8 @@ export interface Choice {
   skill_used?: string;
   skill_dc?: number;
   resource_used?: string;
+  mythic_check?: string; // Format: "question (likelihood)" e.g., "Is the door locked? (Likely)"
+  mythic_table?: string; // Element category name e.g., "character_descriptors", "locations"
 }
 export interface Scene {
   parts: ScenePart[];
@@ -192,6 +194,30 @@ export interface StoryData {
     | "explosive"; // RPG dice system
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)
+  mythicState?: MythicState; // Mythic GME state (chaos factor, threads, characters)
+}
+
+// Mythic GME state tracking
+export interface MythicState {
+  chaosFactor: number; // 1-9, default 5
+  threads: MythicThread[]; // Active story threads
+  characters: MythicCharacter[]; // Known NPCs
+  sceneCount: number; // Number of scenes played
+}
+
+export interface MythicThread {
+  id: string;
+  description: string;
+  status: "active" | "closed";
+  createdAt: number;
+}
+
+export interface MythicCharacter {
+  id: string;
+  name: string;
+  role: string;
+  status: "active" | "deceased" | "departed";
+  createdAt: number;
 }
 
 // Upgrade system configuration

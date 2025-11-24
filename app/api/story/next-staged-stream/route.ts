@@ -235,7 +235,7 @@ export async function POST(req: NextRequest) {
           userChoice,
           commandResponses,
         });
-
+        console.log(storyPrompt);
         const storyApiKey = getApiKey(
           storyModelConfig.provider as "deepseek" | "openrouter",
           openRouterKey
@@ -427,6 +427,7 @@ export async function POST(req: NextRequest) {
         // Parse choices from response
         const choicesContent =
           choicesResponse.choices[0]?.message?.content || "";
+        console.log("[Stream] Raw choices content:", choicesContent);
         const choicesUsage = choicesResponse.usage || {
           prompt_tokens: 0,
           completion_tokens: 0,
@@ -440,14 +441,16 @@ export async function POST(req: NextRequest) {
         const parsedChoices: Choice[] = lines.map((line) => {
           const text = line.replace(/^-\s*/, "").trim();
 
-          // Parse metadata from angle brackets (use_skill:, use_resource:, use_item:)
+          // Parse metadata from angle brackets (use_skill:, use_resource:, use_item:, mythic_check:, mythic_table:)
           let skillUsed: string | undefined;
           let skillDC: number | undefined;
           let itemUsed: string | undefined;
           let resourceUsed: string | undefined;
+          let mythicCheck: string | undefined;
+          let mythicTable: string | undefined;
           let cleanText = text;
 
-          // Match the format: <use_skill: Skill (DC #); use_resource: Resource; use_item: Item>
+          // Match the format: <use_skill: Skill (DC #); use_resource: Resource; use_item: Item; mythic_check: question (likelihood); mythic_table: category>
           const metadataMatch = text.match(/<([^>]+)>/);
           if (metadataMatch) {
             const metadata = metadataMatch[1];
@@ -481,12 +484,34 @@ export async function POST(req: NextRequest) {
             }
 
             // Parse use_item: Item or use_item: none
-            const itemMatch = metadata.match(/use_item:\s*(.+?)(?:;|$)/i);
+            const itemMatch = metadata.match(/use_item:\s*([^;]+?)(?:;|$)/i);
             if (
               itemMatch &&
               !itemMatch[1].trim().toLowerCase().includes("none")
             ) {
               itemUsed = itemMatch[1].trim();
+            }
+
+            // Parse mythic_check: question (likelihood) or mythic_check: none
+            const mythicCheckMatch = metadata.match(
+              /mythic_check:\s*([^;]+?)(?:;|$)/i
+            );
+            if (
+              mythicCheckMatch &&
+              !mythicCheckMatch[1].trim().toLowerCase().includes("none")
+            ) {
+              mythicCheck = mythicCheckMatch[1].trim();
+            }
+
+            // Parse mythic_table: category or mythic_table: none
+            const mythicTableMatch = metadata.match(
+              /mythic_table:\s*([^;]+?)(?:;|$)/i
+            );
+            if (
+              mythicTableMatch &&
+              !mythicTableMatch[1].trim().toLowerCase().includes("none")
+            ) {
+              mythicTable = mythicTableMatch[1].trim();
             }
           }
 
@@ -496,9 +521,11 @@ export async function POST(req: NextRequest) {
             skill_dc: skillDC,
             item_used: itemUsed,
             resource_used: resourceUsed,
+            mythic_check: mythicCheck,
+            mythic_table: mythicTable,
           };
         });
-
+        console.log("[Stream] Parsed choices:", parsedChoices);
         // SEND CHOICES EVENT
         controller.enqueue(
           encoder.encode(

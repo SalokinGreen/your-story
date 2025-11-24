@@ -332,7 +332,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     name: "Balanced (Quality + Cost)",
     description: "Good balance between quality and token cost",
     storyModel: "Deepseek Chat",
-    toolsModel: "Qwen 2.5 72B Instruct",
+    toolsModel: "Grok Code Fast 1",
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 3, // 1 + 1 + 1
   },

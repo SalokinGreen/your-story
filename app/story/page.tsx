@@ -16,6 +16,12 @@ import {
   checkSuccess,
   calculateResourceRequirements,
 } from "../misc/rpgSystems";
+import {
+  askFate,
+  generateElement,
+  type Likelihood,
+  type ElementCategory,
+} from "../misc/mythic";
 import { MODEL_PRESETS } from "../misc/ai_prices";
 import Story from "./story";
 import StatsPage from "./stats";
@@ -2353,7 +2359,7 @@ function StoryPageContent() {
       onStory: (content: string, usage: any) => {
         // Story narration arrives first - show immediately!
         partialPart.content = content;
-        storyData.scene.parts.push(partialPart);
+        storyData.scene.parts = [...storyData.scene.parts, partialPart];
 
         setStoryText(content);
         setStoryData({ ...storyData });
@@ -2417,6 +2423,18 @@ function StoryPageContent() {
         });
       },
       onComplete: (meta: any) => {
+        // Remove duplicate parts (safety check)
+        const seen = new Set<string>();
+        storyData.scene.parts = storyData.scene.parts.filter((part) => {
+          const key = `${part.user ? 'user' : 'assistant'}-${part.content.substring(0, 100)}`;
+          if (seen.has(key) && !part.user) {
+            console.log('[Dedup] Removing duplicate assistant part:', part.content.substring(0, 50));
+            return false;
+          }
+          seen.add(key);
+          return true;
+        });
+
         // All done - update token balance
         if (meta?.remainingBalance?.total !== undefined) {
           setTokenBalance(meta.remainingBalance.total);
@@ -3564,6 +3582,60 @@ function StoryPageContent() {
       );
     }
 
+    // Process Mythic GME checks/tables
+    if (choice.mythic_check) {
+      try {
+        // Parse format: "question (likelihood)" or just "question"
+        const match = choice.mythic_check.match(
+          /^(.+?)(?:\s*\(\s*([^)]+)\s*\))?$/
+        );
+        if (match) {
+          const question = match[1].trim();
+          const likelihood = (match[2]?.trim() || "50/50") as Likelihood;
+          const chaosFactor = storyData.mythicState?.chaosFactor || 5;
+
+          const result = askFate(likelihood, chaosFactor);
+
+          let mythicLine = `[Mythic Question: ${question}]`;
+          let answerLine = `[Mythic Answer: ${result.answer}`;
+          if (result.randomEvent) {
+            answerLine += " - RANDOM EVENT TRIGGERED!";
+          }
+          answerLine += `]`;
+
+          choiceDetails.push(mythicLine);
+          choiceDetails.push(answerLine);
+
+          logger.action("Mythic fate check from choice", {
+            question,
+            likelihood,
+            answer: result.answer,
+            roll: result.roll,
+            randomEvent: result.randomEvent,
+          });
+        }
+      } catch (error) {
+        console.error("Error processing mythic_check:", error);
+      }
+    }
+
+    if (choice.mythic_table) {
+      try {
+        const result = generateElement(choice.mythic_table as ElementCategory);
+        const tableName = choice.mythic_table
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (l) => l.toUpperCase());
+        choiceDetails.push(`[Mythic ${tableName} Table: ${result.element}]`);
+
+        logger.action("Mythic table roll from choice", {
+          table: choice.mythic_table,
+          result: result.element,
+        });
+      } catch (error) {
+        console.error("Error processing mythic_table:", error);
+      }
+    }
+
     //  const ructfinalchoicetext
     let text = "";
     if (choiceDetails.length > 0) {
@@ -3743,7 +3815,7 @@ function StoryPageContent() {
       onStory: (content: string, usage: any) => {
         // Story narration arrives first - show immediately!
         partialPart.content = content;
-        storyData.scene.parts.push(partialPart);
+        storyData.scene.parts = [...storyData.scene.parts, partialPart];
 
         setStoryText(content);
         setStoryData({ ...storyData });
@@ -3807,6 +3879,18 @@ function StoryPageContent() {
         });
       },
       onComplete: (meta: any) => {
+        // Remove duplicate parts (safety check)
+        const seen = new Set<string>();
+        storyData.scene.parts = storyData.scene.parts.filter((part) => {
+          const key = `${part.user ? 'user' : 'assistant'}-${part.content.substring(0, 100)}`;
+          if (seen.has(key) && !part.user) {
+            console.log('[Dedup] Removing duplicate assistant part:', part.content.substring(0, 50));
+            return false;
+          }
+          seen.add(key);
+          return true;
+        });
+
         // All done - update token balance
         if (meta?.remainingBalance?.total !== undefined) {
           setTokenBalance(meta.remainingBalance.total);
@@ -4037,7 +4121,7 @@ function StoryPageContent() {
       onStory: (content: string, usage: any) => {
         // Story narration arrives first - show immediately!
         partialPart.content = content;
-        storyData.scene.parts.push(partialPart);
+        storyData.scene.parts = [...storyData.scene.parts, partialPart];
 
         setStoryText(content);
         setStoryData({ ...storyData });
@@ -4101,6 +4185,18 @@ function StoryPageContent() {
         });
       },
       onComplete: (meta: any) => {
+        // Remove duplicate parts (safety check)
+        const seen = new Set<string>();
+        storyData.scene.parts = storyData.scene.parts.filter((part) => {
+          const key = `${part.user ? 'user' : 'assistant'}-${part.content.substring(0, 100)}`;
+          if (seen.has(key) && !part.user) {
+            console.log('[Dedup] Removing duplicate assistant part:', part.content.substring(0, 50));
+            return false;
+          }
+          seen.add(key);
+          return true;
+        });
+
         // All done - update token balance
         if (meta?.remainingBalance?.total !== undefined) {
           setTokenBalance(meta.remainingBalance.total);

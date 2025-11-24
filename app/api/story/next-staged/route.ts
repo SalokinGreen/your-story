@@ -474,6 +474,28 @@ export async function POST(req: NextRequest) {
               choice.item_used = itemName;
             }
           }
+
+          // Parse mythic_check: question (likelihood)
+          const mythicCheckMatch = metadata.match(
+            /mythic_check:\s*([^;]+?)(?:;|$)/i
+          );
+          if (mythicCheckMatch) {
+            const mythicCheck = mythicCheckMatch[1].trim();
+            if (mythicCheck.toLowerCase() !== "none") {
+              choice.mythic_check = mythicCheck;
+            }
+          }
+
+          // Parse mythic_table: category
+          const mythicTableMatch = metadata.match(
+            /mythic_table:\s*([^;]+?)(?:;|$)/i
+          );
+          if (mythicTableMatch) {
+            const mythicTable = mythicTableMatch[1].trim();
+            if (mythicTable.toLowerCase() !== "none") {
+              choice.mythic_table = mythicTable;
+            }
+          }
         }
 
         return choice;

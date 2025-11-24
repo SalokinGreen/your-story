@@ -303,7 +303,7 @@ ${
     { role: "user", content: cleanString(infoMessage) },
   ];
 
-  // Add last 10 scene parts for context
+  // Add last 10 scene parts for context (INCLUDING PAST TOOL CALLS)
   const recentParts = storyData.scene.parts.slice(-10);
   for (const part of recentParts) {
     if (part.user) {
@@ -312,11 +312,37 @@ ${
         content: cleanString(part.content),
       });
     } else {
-      const assistantContent = part.raw || part.content;
-      messages.push({
-        role: "assistant",
-        content: cleanString(assistantContent),
-      });
+      // Check if this assistant message had tool calls
+      if (part.toolCalls && part.toolCalls.length > 0) {
+        // Add assistant message WITH tool_calls array (preserves tool history)
+        messages.push({
+          role: "assistant",
+          content: cleanString(part.raw || part.content),
+          tool_calls: part.toolCalls,
+        });
+
+        // Add tool responses as separate "tool" role messages
+        if (part.toolResponses && part.toolResponses.length > 0) {
+          for (const response of part.toolResponses) {
+            messages.push({
+              role: "tool",
+              content: cleanString(response.message),
+              tool_call_id: response.toolCallId,
+            });
+          }
+        }
+
+        console.log(
+          `[buildToolPrompt] Including tool history: ${part.toolCalls.length} calls, ${part.toolResponses?.length || 0} responses`
+        );
+      } else {
+        // Regular assistant message without tools
+        const assistantContent = part.raw || part.content;
+        messages.push({
+          role: "assistant",
+          content: cleanString(assistantContent),
+        });
+      }
     }
   }
 
