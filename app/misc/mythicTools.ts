@@ -5,7 +5,9 @@
  * Enables AI to manage story threads, NPCs, chaos factor, and scene tracking.
  */
 
-export const MYTHIC_TOOLS = [
+import { ToolSchema } from "./toolSchemas";
+
+export const MYTHIC_TOOLS: ToolSchema[] = [
   {
     type: "function",
     function: {

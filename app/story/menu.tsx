@@ -4989,9 +4989,9 @@ export default function MenuPage({
                         };
                         onUpdateStoryData({
                           mythicState: {
-                            ...storyData.mythicState,
+                            ...storyData.mythicState!,
                             threads: [
-                              ...storyData.mythicState.threads,
+                              ...storyData.mythicState!.threads,
                               newThread,
                             ],
                           },
@@ -5204,9 +5204,9 @@ export default function MenuPage({
                         };
                         onUpdateStoryData({
                           mythicState: {
-                            ...storyData.mythicState,
+                            ...storyData.mythicState!,
                             characters: [
-                              ...storyData.mythicState.characters,
+                              ...storyData.mythicState!.characters,
                               newChar,
                             ],
                           },
