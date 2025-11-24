@@ -1842,6 +1842,17 @@ function StoryPageContent() {
 
           console.log("Local story loaded:", localStory);
           setStoryDbId(localStory.id);
+
+          // Migrate Mythic state to include new performance tracking fields
+          if (localStory.storyData.mythicState) {
+            const { migrateMythicState } = await import(
+              "@/app/misc/mythicChaos"
+            );
+            localStory.storyData.mythicState = migrateMythicState(
+              localStory.storyData.mythicState
+            );
+          }
+
           setStoryData(localStory.storyData);
 
           //Initializestoryifnopartsyet-showpresetselection
@@ -1936,6 +1947,14 @@ function StoryPageContent() {
         if (!loadedStoryData.quests) loadedStoryData.quests = [];
         if (!loadedStoryData.earnedPointsFromQuests)
           loadedStoryData.earnedPointsFromQuests = [];
+
+        // Migrate Mythic state to include new performance tracking fields
+        if (loadedStoryData.mythicState) {
+          const { migrateMythicState } = await import("@/app/misc/mythicChaos");
+          loadedStoryData.mythicState = migrateMythicState(
+            loadedStoryData.mythicState
+          );
+        }
 
         //ProcessLoretriggersonloadtoinitializeLorevisibility
         processLoreTriggers(loadedStoryData, addNotification, true);
@@ -2723,7 +2742,10 @@ function StoryPageContent() {
 
       if (matchedResource) {
         // Ensure resource.value is a valid number (prevent NaN)
-        if (typeof matchedResource.value !== "number" || isNaN(matchedResource.value)) {
+        if (
+          typeof matchedResource.value !== "number" ||
+          isNaN(matchedResource.value)
+        ) {
           matchedResource.value = 0;
         }
 
@@ -3189,6 +3211,25 @@ function StoryPageContent() {
           passed: dc_passed,
         });
 
+        // Track skill check for Mythic chaos adjustment
+        if (storyData.mythicState && choice.skill_used) {
+          const { addSkillCheckResult } = await import(
+            "@/app/misc/mythicChaos"
+          );
+          const skillResult = {
+            sceneNumber: storyData.mythicState.sceneCount,
+            success: dc_passed,
+            skill: choice.skill_used,
+            difficulty: dc,
+            margin: total - dc,
+            timestamp: Date.now(),
+          };
+          storyData.mythicState = addSkillCheckResult(
+            storyData.mythicState,
+            skillResult
+          );
+        }
+
         // Show dice visualizer
         const usedItem = choice.item_used
           ? storyData.inventory.find((i) => i.name === choice.item_used)
@@ -3328,7 +3369,10 @@ function StoryPageContent() {
           //Recoverresourceonsuccess
           if (choice.resource_used && matchedResource) {
             // Ensure resource.value is a valid number (prevent NaN)
-            if (typeof matchedResource.value !== "number" || isNaN(matchedResource.value)) {
+            if (
+              typeof matchedResource.value !== "number" ||
+              isNaN(matchedResource.value)
+            ) {
               matchedResource.value = 0;
             }
 
@@ -3442,13 +3486,19 @@ function StoryPageContent() {
           // On failure: Lose additional resource if one was used (DC-based penalty)
           if (choice.resource_used && matchedResource) {
             // Ensure resource.value is a valid number (prevent NaN)
-            if (typeof matchedResource.value !== "number" || isNaN(matchedResource.value)) {
+            if (
+              typeof matchedResource.value !== "number" ||
+              isNaN(matchedResource.value)
+            ) {
               matchedResource.value = 0;
             }
 
             const lossBefore = matchedResource.value;
             const penalty = resourceReqs.loss; // Use system-specific loss formula
-            matchedResource.value = Math.max(0, matchedResource.value - penalty);
+            matchedResource.value = Math.max(
+              0,
+              matchedResource.value - penalty
+            );
             const lossAfter = matchedResource.value;
             logger.action("Resource lost (Failure)", {
               resource: choice.resource_used,

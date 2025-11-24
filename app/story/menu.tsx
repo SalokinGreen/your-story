@@ -5438,6 +5438,128 @@ export default function MenuPage({
                     </div>
                   </div>
 
+                  {/* Performance Tracking */}
+                  {storyData.mythicState && (
+                    <div className="p-6 bg-gradient to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 rounded-lg border-2 border-gray-300 dark:border-gray-700">
+                      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+                        <DynamicIcon name="TrendingUp" className="w-4 h-4" />
+                        Performance Tracking
+                      </h4>
+
+                      {/* Current Streak */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-600 dark:text-gray-400">
+                            Current Streak
+                          </span>
+                          <span
+                            className={`text-sm font-bold ${
+                              storyData.mythicState.currentStreak > 0
+                                ? "text-green-400"
+                                : storyData.mythicState.currentStreak < 0
+                                ? "text-red-400"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            {storyData.mythicState.currentStreak > 0 && "+"}
+                            {storyData.mythicState.currentStreak || 0}
+                            {Math.abs(storyData.mythicState.currentStreak) >=
+                              3 && " 🔥"}
+                          </span>
+                        </div>
+                        <div className="h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all ${
+                              storyData.mythicState.currentStreak > 0
+                                ? "bg-green-500"
+                                : "bg-red-500"
+                            }`}
+                            style={{
+                              width: `${Math.min(
+                                Math.abs(storyData.mythicState.currentStreak) *
+                                  20,
+                                100
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Recent Performance */}
+                      {storyData.mythicState.skillCheckHistory.length > 0 && (
+                        <div>
+                          <span className="text-xs text-gray-600 dark:text-gray-400 block mb-2">
+                            Last{" "}
+                            {storyData.mythicState.skillCheckHistory.length}{" "}
+                            Checks
+                          </span>
+                          <div className="flex gap-1 flex-wrap">
+                            {storyData.mythicState.skillCheckHistory
+                              .slice(-10)
+                              .map((check, i) => (
+                                <div
+                                  key={i}
+                                  className={`w-4 h-4 rounded-sm ${
+                                    check.success
+                                      ? "bg-green-500"
+                                      : "bg-red-500"
+                                  }`}
+                                  title={`${check.skill}: ${
+                                    check.success ? "Success" : "Failure"
+                                  } (${check.margin > 0 ? "+" : ""}${
+                                    check.margin
+                                  })`}
+                                />
+                              ))}
+                          </div>
+                          <div className="flex justify-between mt-2 text-xs">
+                            <span className="text-green-400">
+                              {
+                                storyData.mythicState.skillCheckHistory.filter(
+                                  (c) => c.success
+                                ).length
+                              }{" "}
+                              wins
+                            </span>
+                            <span className="text-red-400">
+                              {
+                                storyData.mythicState.skillCheckHistory.filter(
+                                  (c) => !c.success
+                                ).length
+                              }{" "}
+                              losses
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Next Adjustment Info */}
+                      <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400">
+                        {storyData.mythicState.sceneCount -
+                          storyData.mythicState.lastChaosAdjustment <
+                        2 ? (
+                          <span className="flex items-center gap-1">
+                            <DynamicIcon name="Clock" className="w-3 h-3" />
+                            Chaos stabilizing (adjusted recently)
+                          </span>
+                        ) : storyData.mythicState.skillCheckHistory.length <
+                          5 ? (
+                          <span className="flex items-center gap-1">
+                            <DynamicIcon name="Activity" className="w-3 h-3" />
+                            Building performance history (
+                            {storyData.mythicState.skillCheckHistory.length}/5
+                            checks)
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <DynamicIcon name="Zap" className="w-3 h-3" />
+                            Chaos may adjust at next scene transition
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Quick Stats */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">

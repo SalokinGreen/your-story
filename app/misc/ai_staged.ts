@@ -343,8 +343,8 @@ Mythic GME Guidelines (if enabled):
 - Use add_character when important NPCs are introduced in the narrative
 - Use update_character to reflect character development (e.g., "Suspicious merchant" → "Revealed traitor")
 - Use update_character_status when characters die, leave, or return to the story
-- Use adjust_chaos (+1 for unexpected twists/chaos, -1 for order restored)
 - Use increment_scene for major scene transitions (new location, significant time skip)
+  - Chaos will automatically adjust based on player performance (more failures = higher chaos, more successes = lower chaos)
 - Keep thread descriptions clear and specific (e.g., "Find the stolen crown" not "Quest")
 - Always include the ID when updating/closing threads or updating characters
 

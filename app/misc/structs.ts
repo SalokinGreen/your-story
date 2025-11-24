@@ -203,6 +203,18 @@ export interface MythicState {
   threads: MythicThread[]; // Active story threads
   characters: MythicCharacter[]; // Known NPCs
   sceneCount: number; // Number of scenes played
+  skillCheckHistory: SkillCheckResult[]; // Recent skill check results
+  currentStreak: number; // Positive = success streak, negative = failure streak
+  lastChaosAdjustment: number; // Scene number of last chaos adjustment
+}
+
+export interface SkillCheckResult {
+  sceneNumber: number;
+  success: boolean;
+  skill: string;
+  difficulty: number;
+  margin: number; // How much they beat/missed the DC by
+  timestamp: number;
 }
 
 export interface MythicThread {

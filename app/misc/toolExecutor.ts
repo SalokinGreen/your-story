@@ -14,6 +14,10 @@ import {
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
 import { logger } from "@/app/misc/logger";
+import {
+  applyChaosAdjustment,
+  getChaosAdjustmentReason,
+} from "@/app/misc/mythicChaos";
 
 export interface ToolCall {
   id?: string;
@@ -366,6 +370,9 @@ export function executeTools(
           threads: [],
           characters: [],
           sceneCount: 0,
+          skillCheckHistory: [],
+          currentStreak: 0,
+          lastChaosAdjustment: -999,
         };
 
         storyData.mythicState.threads.push(newThread);
@@ -616,6 +623,9 @@ export function executeTools(
           threads: [],
           characters: [],
           sceneCount: 0,
+          skillCheckHistory: [],
+          currentStreak: 0,
+          lastChaosAdjustment: -999,
         };
 
         storyData.mythicState.characters.push(newCharacter);
@@ -774,55 +784,6 @@ export function executeTools(
         continue;
       }
 
-      // Adjust chaos
-      if (toolCall.function.name === "adjust_chaos") {
-        const delta = args.delta;
-
-        if (typeof delta !== "number" || isNaN(delta)) {
-          const errorMsg = "Delta must be a number";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/adjust_chaos: ${delta}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        storyData.mythicState = storyData.mythicState || {
-          chaosFactor: 5,
-          threads: [],
-          characters: [],
-          sceneCount: 0,
-        };
-
-        const oldChaos = storyData.mythicState.chaosFactor;
-        const newChaos = Math.max(1, Math.min(9, oldChaos + delta));
-        storyData.mythicState.chaosFactor = newChaos;
-
-        logger.action("Chaos factor adjusted via tool", {
-          toolCallId: toolId,
-          oldChaos,
-          newChaos,
-          delta,
-        });
-        responses.push({
-          command: `/adjust_chaos: ${oldChaos} → ${newChaos} (${
-            delta > 0 ? "+" : ""
-          }${delta})`,
-          success: true,
-          message: `✓ Chaos Factor: ${oldChaos} → ${newChaos}`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
       // Increment scene
       if (toolCall.function.name === "increment_scene") {
         storyData.mythicState = storyData.mythicState || {
@@ -830,20 +791,47 @@ export function executeTools(
           threads: [],
           characters: [],
           sceneCount: 0,
+          skillCheckHistory: [],
+          currentStreak: 0,
+          lastChaosAdjustment: -999,
         };
 
         const oldCount = storyData.mythicState.sceneCount;
+        const oldChaos = storyData.mythicState.chaosFactor;
+
+        // Increment scene
         storyData.mythicState.sceneCount++;
+
+        // Auto-adjust chaos based on performance
+        const adjustedState = applyChaosAdjustment(storyData.mythicState);
+        const newChaos = adjustedState.chaosFactor;
+
+        storyData.mythicState = adjustedState;
+
+        // Build response message
+        let message = `✓ Scene count: ${oldCount} → ${oldCount + 1}`;
+
+        if (newChaos !== oldChaos) {
+          const reason = getChaosAdjustmentReason(
+            oldChaos,
+            newChaos,
+            adjustedState
+          );
+          message += `\n${reason}`;
+        }
 
         logger.action("Scene count incremented via tool", {
           toolCallId: toolId,
           oldCount,
           newCount: oldCount + 1,
+          oldChaos,
+          newChaos,
+          chaosAdjusted: newChaos !== oldChaos,
         });
         responses.push({
           command: `/increment_scene: ${oldCount} → ${oldCount + 1}`,
           success: true,
-          message: `✓ Scene count: ${oldCount} → ${oldCount + 1}`,
+          message,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });

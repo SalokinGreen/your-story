@@ -161,25 +161,6 @@ export const MYTHIC_TOOLS: ToolSchema[] = [
   {
     type: "function",
     function: {
-      name: "adjust_chaos",
-      description:
-        "Adjust the Chaos Factor up or down. Increase after unexpected events, decrease after order is restored.",
-      parameters: {
-        type: "object",
-        properties: {
-          delta: {
-            type: "number",
-            description:
-              "Amount to change chaos by (-2 to +2 recommended). Positive = more chaotic, negative = more ordered",
-          },
-        },
-        required: ["delta"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "increment_scene",
       description:
         "Increment the scene counter. Use when a major scene transition occurs (new location, time skip, etc.).",

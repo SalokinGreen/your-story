@@ -524,7 +524,7 @@ function AdventureCreatorContent() {
     // mythicEnabled is derived from mythicState presence, not a separate field
     if (data.mythicState) {
       const ms = data.mythicState;
-      
+
       // If mythicState is provided, enable Mythic
       if (!mythicEnabled) {
         setMythicEnabled(true);
@@ -917,6 +917,9 @@ function AdventureCreatorContent() {
     threads: [],
     characters: [],
     sceneCount: 0,
+    skillCheckHistory: [],
+    currentStreak: 0,
+    lastChaosAdjustment: -999,
   });
   const [newThread, setNewThread] = useState("");
   const [newCharacterName, setNewCharacterName] = useState("");
@@ -2035,6 +2038,9 @@ function AdventureCreatorContent() {
         threads: [],
         characters: [],
         sceneCount: 0,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
       });
       setCurrentStep("basic");
       addNotification("Draft cleared", "success");
