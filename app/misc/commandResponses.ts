@@ -1605,10 +1605,17 @@ export function executeCommandWithResponse(
     const relationship = matchResult?.item;
 
     if (!relationship) {
+      // Provide helpful error with available relationships
+      const availableNames = storyData.relationships
+        .map((r) => r.name)
+        .join(", ");
+      const helpText = availableNames
+        ? ` (available: ${availableNames})`
+        : " (no relationships exist yet - use add_relationship to create one)";
       return {
         command: trimmed,
         success: false,
-        message: `Relationship "${name}" not found`,
+        message: `Relationship "${name}" not found${helpText}`,
         timestamp,
       };
     }

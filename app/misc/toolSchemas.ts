@@ -6,6 +6,8 @@
  * and type safety while maintaining backward compatibility.
  */
 
+import { MYTHIC_TOOLS } from "@/app/misc/mythicTools";
+
 export interface ToolSchema {
   type: "function";
   function: {
@@ -854,6 +856,9 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
 
   // Memory (1 tool)
   addMemoryTool,
+
+  // Mythic GME (9 tools)
+  ...MYTHIC_TOOLS,
 ];
 
 // Export map for quick lookup by name

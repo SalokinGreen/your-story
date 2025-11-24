@@ -18,6 +18,9 @@ import {
   UpgradeSettings,
   DEFAULT_UPGRADE_SETTINGS,
   Adventure,
+  MythicState,
+  MythicThread,
+  MythicCharacter,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
@@ -50,8 +53,31 @@ type CreatorStep =
   | "achievements"
   | "quests"
   | "plot"
+  | "mythic"
   | "upgrades"
   | "preview";
+
+// Helper functions for Mythic UI
+function getChaosColor(chaos: number): string {
+  if (chaos <= 3) return "text-blue-400";
+  if (chaos <= 5) return "text-yellow-400";
+  if (chaos <= 7) return "text-orange-400";
+  return "text-red-400";
+}
+
+function getChaosLabel(chaos: number): string {
+  if (chaos <= 3) return "Very Ordered";
+  if (chaos <= 5) return "Normal";
+  if (chaos <= 7) return "Chaotic";
+  return "Extreme Chaos";
+}
+
+function getChaosDescription(chaos: number): string {
+  if (chaos <= 3) return "Things go as expected";
+  if (chaos <= 5) return "Standard chaos level";
+  if (chaos <= 7) return "Unexpected twists likely";
+  return "Anything can happen!";
+}
 
 function AdventureCreatorContent() {
   const router = useRouter();
@@ -551,6 +577,9 @@ function AdventureCreatorContent() {
             if (Array.isArray(saved.quests)) setQuests(saved.quests);
             if (saved.upgradeSettings)
               setUpgradeSettings(saved.upgradeSettings);
+            if (saved.mythicEnabled !== undefined)
+              setMythicEnabled(saved.mythicEnabled);
+            if (saved.mythicState) setMythicState(saved.mythicState);
 
             if (
               typeof saved.currentStep === "string" &&
@@ -725,6 +754,25 @@ function AdventureCreatorContent() {
   const [relationshipPage, setRelationshipPage] = useState(1);
   const relationshipItemsPerPage = 10;
 
+  // Mythic GME
+  const [mythicEnabled, setMythicEnabled] = useState(false);
+  const [mythicState, setMythicState] = useState<MythicState>({
+    chaosFactor: 5,
+    threads: [],
+    characters: [],
+    sceneCount: 0,
+  });
+  const [newThread, setNewThread] = useState("");
+  const [newCharacterName, setNewCharacterName] = useState("");
+  const [newCharacterRole, setNewCharacterRole] = useState("");
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editThreadDescription, setEditThreadDescription] = useState("");
+  const [editingCharacterId, setEditingCharacterId] = useState<string | null>(
+    null
+  );
+  const [editCharacterName, setEditCharacterName] = useState("");
+  const [editCharacterRole, setEditCharacterRole] = useState("");
+
   // Achievements
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [newAchievement, setNewAchievement] = useState<Partial<Achievement>>({
@@ -803,6 +851,7 @@ function AdventureCreatorContent() {
     { id: "achievements", label: "Achievements", icon: "Trophy" },
     { id: "quests", label: "Quests", icon: "ClipboardList" },
     { id: "plot", label: "Plot Beats", icon: "Clapperboard" },
+    { id: "mythic", label: "Mythic GME", icon: "Sparkles" },
     { id: "upgrades", label: "Upgrade Settings", icon: "ArrowUpCircle" },
     { id: "preview", label: "Preview", icon: "Eye" },
   ];
@@ -857,6 +906,9 @@ function AdventureCreatorContent() {
         setAchievements(saved.achievements);
       if (Array.isArray(saved.quests)) setQuests(saved.quests);
       if (saved.upgradeSettings) setUpgradeSettings(saved.upgradeSettings);
+      if (saved.mythicEnabled !== undefined)
+        setMythicEnabled(saved.mythicEnabled);
+      if (saved.mythicState) setMythicState(saved.mythicState);
 
       if (
         typeof saved.currentStep === "string" &&
@@ -914,6 +966,8 @@ function AdventureCreatorContent() {
       achievements,
       quests,
       upgradeSettings,
+      mythicEnabled,
+      mythicState,
       currentStep,
       updatedAt: Date.now(),
     };
@@ -956,6 +1010,8 @@ function AdventureCreatorContent() {
     relationships,
     achievements,
     quests,
+    mythicEnabled,
+    mythicState,
     upgradeSettings,
     currentStep,
   ]);
@@ -1728,6 +1784,7 @@ function AdventureCreatorContent() {
       presets: presets,
       upgradeSettings: upgradeSettings,
       rpgSystem: rpgSystem,
+      mythicState: mythicEnabled ? mythicState : undefined,
     };
 
     // Save complete adventure using localAdventureManager
@@ -1878,6 +1935,7 @@ function AdventureCreatorContent() {
         presets: presets,
         upgradeSettings: upgradeSettings,
         rpgSystem: rpgSystem,
+        mythicState: mythicEnabled ? mythicState : undefined,
       };
 
       // Get auth token
@@ -2010,6 +2068,7 @@ function AdventureCreatorContent() {
       presets: presets,
       upgradeSettings: upgradeSettings,
       rpgSystem: rpgSystem,
+      mythicState: mythicEnabled ? mythicState : undefined,
     };
 
     // If editing a local adventure, save to IndexedDB instead of database
@@ -6973,6 +7032,486 @@ function AdventureCreatorContent() {
                 )
               )}
             </div>
+          </div>
+        );
+
+      case "mythic":
+        return (
+          <div className="space-y-6">
+            {/* Header Card */}
+            <div className="flex items-center justify-between p-4 rounded-lg bg-linear-to-r from-purple-500/10 to-transparent border-l-4 border-purple-500">
+              <div>
+                <h3 className="text-xl font-bold text-purple-400 flex items-center gap-2">
+                  <span className="text-2xl">🎲</span>
+                  Mythic GME Settings
+                </h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  Optional oracle-driven storytelling with dynamic chaos
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={mythicEnabled}
+                  onChange={(e) => setMythicEnabled(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-14 h-7 bg-gray-700 peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+              </label>
+            </div>
+
+            {mythicEnabled && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
+                {/* Chaos Factor - Enhanced Visual Slider */}
+                <div className="p-6 rounded-lg bg-linear-to-br from-gray-800/50 to-gray-900/50 border border-gray-700">
+                  <label className="block text-sm font-semibold text-gray-300 mb-3">
+                    Starting Chaos Factor
+                  </label>
+                  <div className="space-y-3">
+                    <input
+                      type="range"
+                      min="1"
+                      max="9"
+                      value={mythicState.chaosFactor}
+                      onChange={(e) =>
+                        setMythicState({
+                          ...mythicState,
+                          chaosFactor: parseInt(e.target.value),
+                        })
+                      }
+                      className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-linear-to-br [&::-webkit-slider-thumb]:from-purple-500 [&::-webkit-slider-thumb]:to-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:transition-transform"
+                    />
+                    <div className="flex justify-between items-center">
+                      <div className="text-center">
+                        <span
+                          className={`text-3xl font-bold ${getChaosColor(
+                            mythicState.chaosFactor
+                          )}`}
+                        >
+                          {mythicState.chaosFactor}
+                        </span>
+                        <span className="text-xs text-gray-400 block mt-1">
+                          / 9
+                        </span>
+                      </div>
+                      <div className="text-right flex-1 ml-4">
+                        <p
+                          className={`text-sm font-semibold ${getChaosColor(
+                            mythicState.chaosFactor
+                          )}`}
+                        >
+                          {getChaosLabel(mythicState.chaosFactor)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {getChaosDescription(mythicState.chaosFactor)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Starting Threads */}
+                <div className="p-6 rounded-lg bg-linear-to-br from-blue-900/20 to-gray-900/50 border border-blue-500/20">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-bold text-blue-400 flex items-center gap-2">
+                      <span>🧵</span>
+                      Starting Story Threads
+                      {mythicState.threads.length > 0 && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-300">
+                          {mythicState.threads.length}
+                        </span>
+                      )}
+                    </h4>
+                  </div>
+                  <div className="space-y-3 mb-4">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newThread}
+                        onChange={(e) => setNewThread(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newThread.trim()) {
+                            setMythicState({
+                              ...mythicState,
+                              threads: [
+                                ...mythicState.threads,
+                                {
+                                  id: crypto.randomUUID(),
+                                  description: newThread.trim(),
+                                  status: "active",
+                                  createdAt: Date.now(),
+                                },
+                              ],
+                            });
+                            setNewThread("");
+                          }
+                        }}
+                        placeholder="Add a story thread (e.g., 'Find the missing heir')"
+                        className="flex-1 px-3 py-2 border-2 border-gray-600 rounded-lg bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        onClick={() => {
+                          if (newThread.trim()) {
+                            setMythicState({
+                              ...mythicState,
+                              threads: [
+                                ...mythicState.threads,
+                                {
+                                  id: crypto.randomUUID(),
+                                  description: newThread.trim(),
+                                  status: "active",
+                                  createdAt: Date.now(),
+                                },
+                              ],
+                            });
+                            setNewThread("");
+                          }
+                        }}
+                        disabled={!newThread.trim()}
+                        className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 disabled:bg-gray-700 disabled:text-gray-500 text-blue-400 font-semibold rounded-lg transition-colors border border-blue-500/30 hover:border-blue-500/50"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                    {mythicState.threads.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <p className="text-sm">No threads yet</p>
+                        <p className="text-xs mt-1">
+                          Threads track ongoing plotlines and mysteries
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {mythicState.threads.map((thread) => (
+                          <div
+                            key={thread.id}
+                            className="group p-4 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-blue-500/50 transition-all duration-200"
+                          >
+                            {editingThreadId === thread.id ? (
+                              <div className="flex gap-3">
+                                <span className="text-2xl">🧵</span>
+                                <input
+                                  type="text"
+                                  value={editThreadDescription}
+                                  onChange={(e) =>
+                                    setEditThreadDescription(e.target.value)
+                                  }
+                                  className="flex-1 px-2 py-1 border border-gray-600 rounded bg-gray-900 text-white"
+                                />
+                                <button
+                                  onClick={() => {
+                                    setMythicState({
+                                      ...mythicState,
+                                      threads: mythicState.threads.map((t) =>
+                                        t.id === thread.id
+                                          ? {
+                                              ...t,
+                                              description:
+                                                editThreadDescription,
+                                            }
+                                          : t
+                                      ),
+                                    });
+                                    setEditingThreadId(null);
+                                    setEditThreadDescription("");
+                                  }}
+                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded"
+                                >
+                                  <DynamicIcon
+                                    name="Check"
+                                    className="w-4 h-4"
+                                  />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingThreadId(null);
+                                    setEditThreadDescription("");
+                                  }}
+                                  className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded"
+                                >
+                                  <DynamicIcon name="X" className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-3">
+                                <span className="text-2xl">🧵</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-gray-200 leading-relaxed">
+                                    {thread.description}
+                                  </p>
+                                  {thread.description.length < 10 &&
+                                    thread.description.length > 0 && (
+                                      <p className="text-xs text-red-400 mt-1">
+                                        Too short (min 10 characters)
+                                      </p>
+                                    )}
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => {
+                                      setEditingThreadId(thread.id);
+                                      setEditThreadDescription(
+                                        thread.description
+                                      );
+                                    }}
+                                    className="text-blue-400 hover:text-blue-300"
+                                  >
+                                    <DynamicIcon
+                                      name="Edit2"
+                                      className="w-4 h-4"
+                                    />
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      setMythicState({
+                                        ...mythicState,
+                                        threads: mythicState.threads.filter(
+                                          (t) => t.id !== thread.id
+                                        ),
+                                      })
+                                    }
+                                    className="text-red-400 hover:text-red-300"
+                                  >
+                                    <DynamicIcon
+                                      name="Trash2"
+                                      className="w-4 h-4"
+                                    />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Starting Characters/NPCs */}
+                <div className="p-6 rounded-lg bg-linear-to-br from-green-900/20 to-gray-900/50 border border-green-500/20">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-bold text-green-400 flex items-center gap-2">
+                      <span>👤</span>
+                      Starting NPCs
+                      {mythicState.characters.length > 0 && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-300">
+                          {mythicState.characters.length}
+                        </span>
+                      )}
+                    </h4>
+                  </div>
+                  <div className="space-y-3 mb-4">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newCharacterName}
+                        onChange={(e) => setNewCharacterName(e.target.value)}
+                        placeholder="Name (e.g., 'Marcus the Merchant')"
+                        className="flex-1 px-3 py-2 border-2 border-gray-600 rounded-lg bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                      <input
+                        type="text"
+                        value={newCharacterRole}
+                        onChange={(e) => setNewCharacterRole(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (
+                            e.key === "Enter" &&
+                            newCharacterName.trim() &&
+                            newCharacterRole.trim()
+                          ) {
+                            setMythicState({
+                              ...mythicState,
+                              characters: [
+                                ...mythicState.characters,
+                                {
+                                  id: crypto.randomUUID(),
+                                  name: newCharacterName.trim(),
+                                  role: newCharacterRole.trim(),
+                                  status: "active",
+                                  createdAt: Date.now(),
+                                },
+                              ],
+                            });
+                            setNewCharacterName("");
+                            setNewCharacterRole("");
+                          }
+                        }}
+                        placeholder="Role (e.g., 'Tavern keeper')"
+                        className="flex-1 px-3 py-2 border-2 border-gray-600 rounded-lg bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                      <button
+                        onClick={() => {
+                          if (
+                            newCharacterName.trim() &&
+                            newCharacterRole.trim()
+                          ) {
+                            setMythicState({
+                              ...mythicState,
+                              characters: [
+                                ...mythicState.characters,
+                                {
+                                  id: crypto.randomUUID(),
+                                  name: newCharacterName.trim(),
+                                  role: newCharacterRole.trim(),
+                                  status: "active",
+                                  createdAt: Date.now(),
+                                },
+                              ],
+                            });
+                            setNewCharacterName("");
+                            setNewCharacterRole("");
+                          }
+                        }}
+                        disabled={
+                          !newCharacterName.trim() || !newCharacterRole.trim()
+                        }
+                        className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 disabled:bg-gray-700 disabled:text-gray-500 text-green-400 font-semibold rounded-lg transition-colors border border-green-500/30 hover:border-green-500/50"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                    {mythicState.characters.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <p className="text-sm">No characters yet</p>
+                        <p className="text-xs mt-1">
+                          Add important NPCs that will appear in the story
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {mythicState.characters.map((char) => (
+                          <div
+                            key={char.id}
+                            className="group p-4 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-green-500/50 transition-all duration-200"
+                          >
+                            {editingCharacterId === char.id ? (
+                              <div className="flex gap-3">
+                                <span className="text-2xl">👤</span>
+                                <div className="flex-1 space-y-2">
+                                  <input
+                                    type="text"
+                                    value={editCharacterName}
+                                    onChange={(e) =>
+                                      setEditCharacterName(e.target.value)
+                                    }
+                                    placeholder="Character name..."
+                                    className="w-full bg-transparent text-gray-200 placeholder-gray-500 focus:outline-none text-sm font-semibold border-b border-gray-700 focus:border-green-500/50 transition-colors pb-1"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={editCharacterRole}
+                                    onChange={(e) =>
+                                      setEditCharacterRole(e.target.value)
+                                    }
+                                    placeholder="Role/description..."
+                                    className="w-full bg-transparent text-gray-300 placeholder-gray-500 focus:outline-none text-sm"
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setMythicState({
+                                      ...mythicState,
+                                      characters: mythicState.characters.map(
+                                        (c) =>
+                                          c.id === char.id
+                                            ? {
+                                                ...c,
+                                                name: editCharacterName,
+                                                role: editCharacterRole,
+                                              }
+                                            : c
+                                      ),
+                                    });
+                                    setEditingCharacterId(null);
+                                    setEditCharacterName("");
+                                    setEditCharacterRole("");
+                                  }}
+                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded"
+                                >
+                                  <DynamicIcon
+                                    name="Check"
+                                    className="w-4 h-4"
+                                  />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingCharacterId(null);
+                                    setEditCharacterName("");
+                                    setEditCharacterRole("");
+                                  }}
+                                  className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded"
+                                >
+                                  <DynamicIcon name="X" className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-3">
+                                <span className="text-2xl">👤</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-200">
+                                    {char.name}
+                                  </p>
+                                  <p className="text-xs text-gray-400 mt-0.5">
+                                    {char.role}
+                                  </p>
+                                  {((char.name.length < 2 &&
+                                    char.name.length > 0) ||
+                                    (char.role.length < 5 &&
+                                      char.role.length > 0)) && (
+                                    <p className="text-xs text-red-400 mt-1">
+                                      {char.name.length < 2 &&
+                                      char.name.length > 0
+                                        ? "Name too short (min 2)"
+                                        : ""}
+                                      {char.role.length < 5 &&
+                                      char.role.length > 0
+                                        ? "Role too short (min 5)"
+                                        : ""}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => {
+                                      setEditingCharacterId(char.id);
+                                      setEditCharacterName(char.name);
+                                      setEditCharacterRole(char.role);
+                                    }}
+                                    className="text-blue-400 hover:text-blue-300"
+                                  >
+                                    <DynamicIcon
+                                      name="Edit2"
+                                      className="w-4 h-4"
+                                    />
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      setMythicState({
+                                        ...mythicState,
+                                        characters:
+                                          mythicState.characters.filter(
+                                            (c) => c.id !== char.id
+                                          ),
+                                      })
+                                    }
+                                    className="text-red-400 hover:text-red-300"
+                                  >
+                                    <DynamicIcon
+                                      name="Trash2"
+                                      className="w-4 h-4"
+                                    />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
 

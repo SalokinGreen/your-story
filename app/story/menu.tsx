@@ -10,6 +10,9 @@ import {
   PlotBeat,
   Quest,
   Relationship,
+  MythicState,
+  MythicThread,
+  MythicCharacter,
 } from "../misc/structs";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -4043,6 +4046,9 @@ export default function MenuPage({
     | "quests"
     | "lore"
     | "relationships"
+    | "threads"
+    | "characters"
+    | "mythic"
     | "story"
     | "tts"
   >("basic");
@@ -4878,6 +4884,13 @@ export default function MenuPage({
                 { id: "quests", label: "Quests", icon: "Scroll" },
                 { id: "lore", label: "Lore", icon: "Book" },
                 { id: "relationships", label: "Relationships", icon: "Users" },
+                ...(storyData.mythicState
+                  ? [
+                      { id: "threads", label: "Threads", icon: "ListTodo" },
+                      { id: "characters", label: "NPCs", icon: "Users" },
+                      { id: "mythic", label: "Mythic", icon: "Sparkles" },
+                    ]
+                  : []),
                 { id: "story", label: "Story", icon: "BookOpen" },
                 { id: "tts", label: "AI Config", icon: "Bot" },
               ].map((tab) => (
@@ -4956,6 +4969,522 @@ export default function MenuPage({
                       onUpdateStoryData({ relationships })
                     }
                   />
+                </div>
+              )}
+
+              {activeTab === "threads" && storyData.mythicState && (
+                <div className="mt-4 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <DynamicIcon name="ListTodo" className="w-6 h-6" />
+                      Story Threads
+                    </h4>
+                    <button
+                      onClick={() => {
+                        const newThread: MythicThread = {
+                          id: crypto.randomUUID(),
+                          description: "",
+                          status: "active",
+                          createdAt: Date.now(),
+                        };
+                        onUpdateStoryData({
+                          mythicState: {
+                            ...storyData.mythicState,
+                            threads: [
+                              ...storyData.mythicState.threads,
+                              newThread,
+                            ],
+                          },
+                        });
+                      }}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg flex items-center gap-2"
+                    >
+                      <DynamicIcon name="Plus" className="w-4 h-4" />
+                      New Thread
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Active Threads (
+                      {
+                        storyData.mythicState.threads.filter(
+                          (t) => t.status === "active"
+                        ).length
+                      }
+                      )
+                    </h5>
+                    {storyData.mythicState.threads
+                      .filter((t) => t.status === "active")
+                      .map((thread) => (
+                        <div
+                          key={thread.id}
+                          className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800 space-y-3"
+                        >
+                          <textarea
+                            value={thread.description}
+                            onChange={(e) => {
+                              onUpdateStoryData({
+                                mythicState: {
+                                  ...storyData.mythicState!,
+                                  threads: storyData.mythicState!.threads.map(
+                                    (t) =>
+                                      t.id === thread.id
+                                        ? { ...t, description: e.target.value }
+                                        : t
+                                  ),
+                                },
+                              });
+                            }}
+                            placeholder="Thread description..."
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                            rows={2}
+                          />
+                          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                            <span>
+                              Created{" "}
+                              {new Date(thread.createdAt).toLocaleDateString()}
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  onUpdateStoryData({
+                                    mythicState: {
+                                      ...storyData.mythicState!,
+                                      threads:
+                                        storyData.mythicState!.threads.map(
+                                          (t) =>
+                                            t.id === thread.id
+                                              ? { ...t, status: "closed" }
+                                              : t
+                                        ),
+                                    },
+                                  });
+                                  addNotification("Thread resolved", "success");
+                                }}
+                                className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded"
+                              >
+                                Mark Resolved
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setConfirmDialog({
+                                    isOpen: true,
+                                    title: "Delete Thread",
+                                    message:
+                                      "Are you sure you want to delete this thread?",
+                                    icon: "Trash2",
+                                    onConfirm: () => {
+                                      onUpdateStoryData({
+                                        mythicState: {
+                                          ...storyData.mythicState!,
+                                          threads:
+                                            storyData.mythicState!.threads.filter(
+                                              (t) => t.id !== thread.id
+                                            ),
+                                        },
+                                      });
+                                      addNotification(
+                                        "Thread deleted",
+                                        "success"
+                                      );
+                                      setConfirmDialog({
+                                        ...confirmDialog,
+                                        isOpen: false,
+                                      });
+                                    },
+                                  });
+                                }}
+                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    {storyData.mythicState.threads.filter(
+                      (t) => t.status === "active"
+                    ).length === 0 && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 italic">
+                        No active threads. Click "New Thread" to add one.
+                      </p>
+                    )}
+                  </div>
+
+                  <details className="border border-gray-300 dark:border-gray-600 rounded-lg">
+                    <summary className="px-4 py-3 cursor-pointer font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                      Closed Threads (
+                      {
+                        storyData.mythicState.threads.filter(
+                          (t) => t.status === "closed"
+                        ).length
+                      }
+                      )
+                    </summary>
+                    <div className="px-4 pb-4 space-y-3">
+                      {storyData.mythicState.threads
+                        .filter((t) => t.status === "closed")
+                        .map((thread) => (
+                          <div
+                            key={thread.id}
+                            className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                          >
+                            <p className="text-sm text-gray-700 dark:text-gray-300 line-through">
+                              {thread.description}
+                            </p>
+                            <div className="flex justify-end gap-2 mt-2">
+                              <button
+                                onClick={() => {
+                                  onUpdateStoryData({
+                                    mythicState: {
+                                      ...storyData.mythicState!,
+                                      threads:
+                                        storyData.mythicState!.threads.map(
+                                          (t) =>
+                                            t.id === thread.id
+                                              ? { ...t, status: "active" }
+                                              : t
+                                        ),
+                                    },
+                                  });
+                                  addNotification("Thread reopened", "success");
+                                }}
+                                className="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded"
+                              >
+                                Reopen
+                              </button>
+                              <button
+                                onClick={() => {
+                                  onUpdateStoryData({
+                                    mythicState: {
+                                      ...storyData.mythicState!,
+                                      threads:
+                                        storyData.mythicState!.threads.filter(
+                                          (t) => t.id !== thread.id
+                                        ),
+                                    },
+                                  });
+                                  addNotification("Thread deleted", "success");
+                                }}
+                                className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      {storyData.mythicState.threads.filter(
+                        (t) => t.status === "closed"
+                      ).length === 0 && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 italic py-2">
+                          No closed threads yet.
+                        </p>
+                      )}
+                    </div>
+                  </details>
+                </div>
+              )}
+
+              {activeTab === "characters" && storyData.mythicState && (
+                <div className="mt-4 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <DynamicIcon name="Users" className="w-6 h-6" />
+                      NPCs
+                    </h4>
+                    <button
+                      onClick={() => {
+                        const newChar: MythicCharacter = {
+                          id: crypto.randomUUID(),
+                          name: "",
+                          role: "",
+                          status: "active",
+                          createdAt: Date.now(),
+                        };
+                        onUpdateStoryData({
+                          mythicState: {
+                            ...storyData.mythicState,
+                            characters: [
+                              ...storyData.mythicState.characters,
+                              newChar,
+                            ],
+                          },
+                        });
+                      }}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg flex items-center gap-2"
+                    >
+                      <DynamicIcon name="Plus" className="w-4 h-4" />
+                      New NPC
+                    </button>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {storyData.mythicState.characters.map((char) => (
+                      <div
+                        key={char.id}
+                        className={`p-4 rounded-lg border space-y-3 ${
+                          char.status === "active"
+                            ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
+                            : char.status === "deceased"
+                            ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 opacity-75"
+                            : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-75"
+                        }`}
+                      >
+                        <div className="flex gap-3">
+                          <input
+                            type="text"
+                            value={char.name}
+                            onChange={(e) => {
+                              onUpdateStoryData({
+                                mythicState: {
+                                  ...storyData.mythicState!,
+                                  characters:
+                                    storyData.mythicState!.characters.map((c) =>
+                                      c.id === char.id
+                                        ? { ...c, name: e.target.value }
+                                        : c
+                                    ),
+                                },
+                              });
+                            }}
+                            placeholder="Character name..."
+                            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-semibold"
+                          />
+                          <select
+                            value={char.status}
+                            onChange={(e) => {
+                              onUpdateStoryData({
+                                mythicState: {
+                                  ...storyData.mythicState!,
+                                  characters:
+                                    storyData.mythicState!.characters.map((c) =>
+                                      c.id === char.id
+                                        ? {
+                                            ...c,
+                                            status: e.target.value as any,
+                                          }
+                                        : c
+                                    ),
+                                },
+                              });
+                            }}
+                            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          >
+                            <option value="active">Active</option>
+                            <option value="deceased">Deceased</option>
+                            <option value="departed">Departed</option>
+                          </select>
+                        </div>
+                        <textarea
+                          value={char.role}
+                          onChange={(e) => {
+                            onUpdateStoryData({
+                              mythicState: {
+                                ...storyData.mythicState!,
+                                characters:
+                                  storyData.mythicState!.characters.map((c) =>
+                                    c.id === char.id
+                                      ? { ...c, role: e.target.value }
+                                      : c
+                                  ),
+                              },
+                            });
+                          }}
+                          placeholder="Role/description..."
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                          rows={2}
+                        />
+                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>
+                            Introduced{" "}
+                            {new Date(char.createdAt).toLocaleDateString()}
+                          </span>
+                          <button
+                            onClick={() => {
+                              setConfirmDialog({
+                                isOpen: true,
+                                title: "Delete Character",
+                                message: `Delete ${
+                                  char.name || "this character"
+                                }?`,
+                                icon: "Trash2",
+                                onConfirm: () => {
+                                  onUpdateStoryData({
+                                    mythicState: {
+                                      ...storyData.mythicState!,
+                                      characters:
+                                        storyData.mythicState!.characters.filter(
+                                          (c) => c.id !== char.id
+                                        ),
+                                    },
+                                  });
+                                  addNotification(
+                                    "Character deleted",
+                                    "success"
+                                  );
+                                  setConfirmDialog({
+                                    ...confirmDialog,
+                                    isOpen: false,
+                                  });
+                                },
+                              });
+                            }}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {storyData.mythicState.characters.length === 0 && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 italic">
+                        No NPCs added yet. Click "New NPC" to add one.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "mythic" && storyData.mythicState && (
+                <div className="mt-4 space-y-6">
+                  <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <DynamicIcon name="Sparkles" className="w-6 h-6" />
+                    Mythic GME Settings
+                  </h4>
+
+                  {/* Chaos Factor */}
+                  <div className="p-6 bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                      Chaos Factor: {storyData.mythicState.chaosFactor}
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="9"
+                      value={storyData.mythicState.chaosFactor}
+                      onChange={(e) => {
+                        onUpdateStoryData({
+                          mythicState: {
+                            ...storyData.mythicState!,
+                            chaosFactor: parseInt(e.target.value),
+                          },
+                        });
+                      }}
+                      className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                    />
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                      {storyData.mythicState.chaosFactor <= 3 &&
+                        "Very Ordered - Things go as expected"}
+                      {storyData.mythicState.chaosFactor > 3 &&
+                        storyData.mythicState.chaosFactor <= 5 &&
+                        "Normal - Standard chaos level"}
+                      {storyData.mythicState.chaosFactor > 5 &&
+                        storyData.mythicState.chaosFactor <= 7 &&
+                        "Chaotic - Unexpected twists likely"}
+                      {storyData.mythicState.chaosFactor > 7 &&
+                        "Extreme Chaos - Anything can happen!"}
+                    </p>
+                  </div>
+
+                  {/* Scene Count */}
+                  <div className="p-6 bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                      Scene Count: {storyData.mythicState.sceneCount}
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          onUpdateStoryData({
+                            mythicState: {
+                              ...storyData.mythicState!,
+                              sceneCount: Math.max(
+                                0,
+                                storyData.mythicState!.sceneCount - 1
+                              ),
+                            },
+                          });
+                        }}
+                        className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                      >
+                        -1
+                      </button>
+                      <button
+                        onClick={() => {
+                          onUpdateStoryData({
+                            mythicState: {
+                              ...storyData.mythicState!,
+                              sceneCount: storyData.mythicState!.sceneCount + 1,
+                            },
+                          });
+                        }}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                      >
+                        +1 Scene
+                      </button>
+                      <button
+                        onClick={() => {
+                          onUpdateStoryData({
+                            mythicState: {
+                              ...storyData.mythicState!,
+                              sceneCount: 0,
+                            },
+                          });
+                        }}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick Stats */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {
+                          storyData.mythicState.threads.filter(
+                            (t) => t.status === "active"
+                          ).length
+                        }
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Active Threads
+                      </div>
+                    </div>
+                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {
+                          storyData.mythicState.characters.filter(
+                            (c) => c.status === "active"
+                          ).length
+                        }
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Active NPCs
+                      </div>
+                    </div>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                        {
+                          storyData.mythicState.threads.filter(
+                            (t) => t.status === "closed"
+                          ).length
+                        }
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Closed Threads
+                      </div>
+                    </div>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                        {storyData.mythicState.characters.length}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Total NPCs
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 

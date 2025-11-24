@@ -21,6 +21,14 @@ function cleanString(text: string): string {
     .trim();
 }
 
+// Helper to describe chaos factor level
+function getChaosDescription(chaos: number): string {
+  if (chaos <= 3) return "Very Ordered - Things go as expected";
+  if (chaos <= 5) return "Normal - Standard chaos level";
+  if (chaos <= 7) return "Chaotic - Unexpected twists likely";
+  return "Extreme Chaos - Anything can happen!";
+}
+
 // Build info message - shared across all stages
 export function buildInfoMessage(storyData: StoryData): string {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
@@ -118,6 +126,44 @@ export function buildInfoMessage(storyData: StoryData): string {
         .join("\n")}`
     : "";
 
+  // Build mythic GME section if enabled
+  const mythicSection = storyData.mythicState
+    ? `Mythic GME State:
+- Chaos Factor: ${storyData.mythicState.chaosFactor}/9 (${getChaosDescription(
+        storyData.mythicState.chaosFactor
+      )})
+- Scene Count: ${storyData.mythicState.sceneCount}
+- Active Threads: ${
+        storyData.mythicState.threads.filter((t) => t.status === "active")
+          .length
+      }/${storyData.mythicState.threads.length}
+- Active NPCs: ${
+        storyData.mythicState.characters.filter((c) => c.status === "active")
+          .length
+      }/${storyData.mythicState.characters.length}
+
+Story Threads:
+${
+  storyData.mythicState.threads
+    .filter((t) => t.status === "active")
+    .map((t) => `  - [Active] ${t.description} (ID: ${t.id})`)
+    .join("\n") || "  (none)"
+}
+${
+  storyData.mythicState.threads
+    .filter((t) => t.status === "closed")
+    .map((t) => `  - [Closed] ${t.description} (ID: ${t.id})`)
+    .join("\n") || ""
+}
+
+NPCs:
+${
+  storyData.mythicState.characters
+    .map((c) => `  - ${c.name} (${c.role}) [${c.status}] (ID: ${c.id})`)
+    .join("\n") || "  (none)"
+}`
+    : "";
+
   // Combine all sections
   const sections = [
     `Story: ${cleanString(storyData.story_name || "Untitled Story")}`,
@@ -139,6 +185,7 @@ export function buildInfoMessage(storyData: StoryData): string {
     plotBeatsSection,
     relationshipsSection,
     questsSection,
+    mythicSection,
     storyData.author_notes
       ? `Author Notes: ${cleanString(storyData.author_notes)}`
       : "",
@@ -287,6 +334,19 @@ Memory Guidelines:
 - Make entries DETAILED and SPECIFIC with names, locations, consequences, emotional context
 - Track important story developments, character actions, world changes
 - BAD: "Met a merchant" GOOD: "Met Aldric, a suspicious merchant in Darkwater who tried to sell cursed artifacts and fled when confronted"
+
+Mythic GME Guidelines (if enabled):
+- Use add_thread when new plotlines/mysteries/goals emerge in the story
+- Use close_thread when plotlines resolve, fail, or become irrelevant
+- Use reopen_thread if a resolved plotline becomes relevant again
+- Use update_thread to refine descriptions as threads develop
+- Use add_character when important NPCs are introduced in the narrative
+- Use update_character to reflect character development (e.g., "Suspicious merchant" → "Revealed traitor")
+- Use update_character_status when characters die, leave, or return to the story
+- Use adjust_chaos (+1 for unexpected twists/chaos, -1 for order restored)
+- Use increment_scene for major scene transitions (new location, significant time skip)
+- Keep thread descriptions clear and specific (e.g., "Find the stolen crown" not "Quest")
+- Always include the ID when updating/closing threads or updating characters
 
 ${
   commandResponses && commandResponses.length > 0
@@ -482,7 +542,36 @@ Choice Design Guidelines:
 - Make choices reflect the player's agency and the current story situation
 - Avoid dead-end choices that just lead to "Continue..."
 - Balance challenge with narrative flow: not every choice needs a skill check
-- Use skill checks for dramatic moments, high-stakes decisions, and character-defining actions`;
+- Use skill checks for dramatic moments, high-stakes decisions, and character-defining actions${
+    storyData.mythicState
+      ? `
+
+MYTHIC GME ORACLE TABLES:
+The following oracle tables are available for creating choices that involve uncertainty, discovery, or world-building:
+
+Core Tables:
+- Fate Chart: Ask yes/no questions with likelihood modifiers (Impossible to Has To Be) adjusted by chaos factor
+- Event Focus: Determine what type of random event occurs (Remote event, NPC action, New NPC, Thread movement, PC/NPC positive/negative)
+- Event Meaning: Generate random events using Action + Subject (100 actions × 100 subjects)
+
+Element Tables (45+ categories):
+Character: actions_combat, actions_general, appearance, background, conversations, descriptors, identity, motivations, personality, skills, traits_flaws
+Environment: adventure_tone, cavern, city, civilization, domicile, dungeon, dungeon_traps, forest, locations, terrain
+Creatures: alien_species, animal_actions, creature_abilities, creature_descriptors, undead
+Items: magic_item, objects, powers, scavenging_results, spell_effects
+Narrative: cryptic_message, curses, gods, legends, names, plot_twists, visions_dreams
+Combat: army
+Sensory: smells, sounds
+Special: mutation, noble_house, starship
+
+Example choices using tables: 
+- "Ask the Fate Chart if the guard is trustworthy (Somewhat Likely)"
+- "Roll on Event Meaning to see what happens next"
+- "Generate a character_appearance for the mysterious stranger"
+- "Check creature_abilities to determine what this beast can do"
+- "Roll on plot_twists to add a surprising development"`
+      : ""
+  }`;
 
   const infoMessage = buildInfoMessage(storyData);
 

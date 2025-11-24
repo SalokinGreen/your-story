@@ -5,7 +5,12 @@
  * commandResponses.ts implementation, reusing all validation and fuzzy matching logic.
  */
 
-import { StoryData, CommandResponse } from "@/app/misc/structs";
+import {
+  StoryData,
+  CommandResponse,
+  MythicThread,
+  MythicCharacter,
+} from "@/app/misc/structs";
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
 import { logger } from "@/app/misc/logger";
@@ -322,6 +327,523 @@ export function executeTools(
           command: toolCall.function.name,
           success: true,
           message: successMsg,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // === MYTHIC GME TOOL HANDLERS ===
+
+      // Add thread
+      if (toolCall.function.name === "add_thread") {
+        const description = args.description?.trim();
+        if (!description || description.length < 10) {
+          const errorMsg = "Thread description must be at least 10 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_thread: ${description || ""}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const newThread: MythicThread = {
+          id: crypto.randomUUID(),
+          description,
+          status: "active",
+          createdAt: Date.now(),
+        };
+
+        storyData.mythicState = storyData.mythicState || {
+          chaosFactor: 5,
+          threads: [],
+          characters: [],
+          sceneCount: 0,
+        };
+
+        storyData.mythicState.threads.push(newThread);
+
+        logger.action("Thread added via tool", {
+          toolCallId: toolId,
+          description,
+        });
+        responses.push({
+          command: `/add_thread: ${description}`,
+          success: true,
+          message: `✓ Added thread: "${description}"`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Close thread
+      if (toolCall.function.name === "close_thread") {
+        const threadId = args.threadId;
+        if (!storyData.mythicState) {
+          const errorMsg = "Mythic GME not enabled";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/close_thread: ${threadId}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const thread = storyData.mythicState.threads.find(
+          (t) => t.id === threadId
+        );
+        if (!thread) {
+          const errorMsg = `Thread not found (ID: ${threadId})`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/close_thread: ${threadId}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        thread.status = "closed";
+
+        logger.action("Thread closed via tool", {
+          toolCallId: toolId,
+          description: thread.description,
+        });
+        responses.push({
+          command: `/close_thread: ${thread.description}`,
+          success: true,
+          message: `✓ Closed thread: "${thread.description}"`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Reopen thread
+      if (toolCall.function.name === "reopen_thread") {
+        const threadId = args.threadId;
+        if (!storyData.mythicState) {
+          const errorMsg = "Mythic GME not enabled";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/reopen_thread: ${threadId}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const thread = storyData.mythicState.threads.find(
+          (t) => t.id === threadId
+        );
+        if (!thread) {
+          const errorMsg = `Thread not found (ID: ${threadId})`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/reopen_thread: ${threadId}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        thread.status = "active";
+
+        logger.action("Thread reopened via tool", {
+          toolCallId: toolId,
+          description: thread.description,
+        });
+        responses.push({
+          command: `/reopen_thread: ${thread.description}`,
+          success: true,
+          message: `✓ Reopened thread: "${thread.description}"`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Update thread
+      if (toolCall.function.name === "update_thread") {
+        const threadId = args.threadId;
+        const description = args.description?.trim();
+
+        if (!description || description.length < 10) {
+          const errorMsg = "Thread description must be at least 10 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/update_thread: ${threadId}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!storyData.mythicState) {
+          const errorMsg = "Mythic GME not enabled";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/update_thread: ${threadId}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const thread = storyData.mythicState.threads.find(
+          (t) => t.id === threadId
+        );
+        if (!thread) {
+          const errorMsg = `Thread not found (ID: ${threadId})`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/update_thread: ${threadId}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const oldDesc = thread.description;
+        thread.description = description;
+
+        logger.action("Thread updated via tool", {
+          toolCallId: toolId,
+          oldDescription: oldDesc,
+          newDescription: description,
+        });
+        responses.push({
+          command: `/update_thread: ${oldDesc} → ${description}`,
+          success: true,
+          message: `✓ Updated thread: "${oldDesc}" → "${description}"`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Add character
+      if (toolCall.function.name === "add_character") {
+        const name = args.name?.trim();
+        const role = args.role?.trim();
+
+        if (!name || name.length < 2) {
+          const errorMsg = "Character name must be at least 2 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_character: ${name || ""}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!role || role.length < 5) {
+          const errorMsg = "Character role must be at least 5 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_character: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const newCharacter: MythicCharacter = {
+          id: crypto.randomUUID(),
+          name,
+          role,
+          status: "active",
+          createdAt: Date.now(),
+        };
+
+        storyData.mythicState = storyData.mythicState || {
+          chaosFactor: 5,
+          threads: [],
+          characters: [],
+          sceneCount: 0,
+        };
+
+        storyData.mythicState.characters.push(newCharacter);
+
+        logger.action("Character added via tool", {
+          toolCallId: toolId,
+          name,
+          role,
+        });
+        responses.push({
+          command: `/add_character: ${name} (${role})`,
+          success: true,
+          message: `✓ Added character: ${name} - ${role}`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Update character
+      if (toolCall.function.name === "update_character") {
+        const characterId = args.characterId;
+        const name = args.name?.trim();
+        const role = args.role?.trim();
+
+        if (!storyData.mythicState) {
+          const errorMsg = "Mythic GME not enabled";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/update_character: ${characterId}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const character = storyData.mythicState.characters.find(
+          (c) => c.id === characterId
+        );
+        if (!character) {
+          const errorMsg = `Character not found (ID: ${characterId})`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/update_character: ${characterId}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const oldName = character.name;
+        const oldRole = character.role;
+
+        if (name) character.name = name;
+        if (role) character.role = role;
+
+        logger.action("Character updated via tool", {
+          toolCallId: toolId,
+          oldName,
+          newName: character.name,
+          oldRole,
+          newRole: character.role,
+        });
+        responses.push({
+          command: `/update_character: ${oldName} → ${character.name} (${character.role})`,
+          success: true,
+          message: `✓ Updated character: ${oldName} (${oldRole}) → ${character.name} (${character.role})`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Update character status
+      if (toolCall.function.name === "update_character_status") {
+        const characterId = args.characterId;
+        const status = args.status as "active" | "deceased" | "departed";
+
+        if (!["active", "deceased", "departed"].includes(status)) {
+          const errorMsg = "Status must be 'active', 'deceased', or 'departed'";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/update_character_status: ${characterId} ${status}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!storyData.mythicState) {
+          const errorMsg = "Mythic GME not enabled";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/update_character_status: ${characterId}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const character = storyData.mythicState.characters.find(
+          (c) => c.id === characterId
+        );
+        if (!character) {
+          const errorMsg = `Character not found (ID: ${characterId})`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/update_character_status: ${characterId}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const oldStatus = character.status;
+        character.status = status;
+
+        logger.action("Character status updated via tool", {
+          toolCallId: toolId,
+          name: character.name,
+          oldStatus,
+          newStatus: status,
+        });
+        responses.push({
+          command: `/update_character_status: ${character.name} ${oldStatus} → ${status}`,
+          success: true,
+          message: `✓ ${character.name} status changed: ${oldStatus} → ${status}`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Adjust chaos
+      if (toolCall.function.name === "adjust_chaos") {
+        const delta = args.delta;
+
+        if (typeof delta !== "number" || isNaN(delta)) {
+          const errorMsg = "Delta must be a number";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/adjust_chaos: ${delta}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        storyData.mythicState = storyData.mythicState || {
+          chaosFactor: 5,
+          threads: [],
+          characters: [],
+          sceneCount: 0,
+        };
+
+        const oldChaos = storyData.mythicState.chaosFactor;
+        const newChaos = Math.max(1, Math.min(9, oldChaos + delta));
+        storyData.mythicState.chaosFactor = newChaos;
+
+        logger.action("Chaos factor adjusted via tool", {
+          toolCallId: toolId,
+          oldChaos,
+          newChaos,
+          delta,
+        });
+        responses.push({
+          command: `/adjust_chaos: ${oldChaos} → ${newChaos} (${
+            delta > 0 ? "+" : ""
+          }${delta})`,
+          success: true,
+          message: `✓ Chaos Factor: ${oldChaos} → ${newChaos}`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Increment scene
+      if (toolCall.function.name === "increment_scene") {
+        storyData.mythicState = storyData.mythicState || {
+          chaosFactor: 5,
+          threads: [],
+          characters: [],
+          sceneCount: 0,
+        };
+
+        const oldCount = storyData.mythicState.sceneCount;
+        storyData.mythicState.sceneCount++;
+
+        logger.action("Scene count incremented via tool", {
+          toolCallId: toolId,
+          oldCount,
+          newCount: oldCount + 1,
+        });
+        responses.push({
+          command: `/increment_scene: ${oldCount} → ${oldCount + 1}`,
+          success: true,
+          message: `✓ Scene count: ${oldCount} → ${oldCount + 1}`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
