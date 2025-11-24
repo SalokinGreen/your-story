@@ -3680,6 +3680,42 @@ function StoryPageContent() {
       }
     }
 
+    // Process custom table rolls
+    if (choice.custom_table && storyData.customTables) {
+      try {
+        const { getTableByName, rollOnCustomTable } = await import(
+          "../misc/tableRoller"
+        );
+        const table = getTableByName(
+          storyData.customTables,
+          choice.custom_table
+        );
+
+        if (table) {
+          const result = rollOnCustomTable(table);
+          if (result) {
+            choiceDetails.push(`[${table.name}: ${result.text}]`);
+            logger.action("Custom table roll from choice", {
+              table: table.name,
+              result: result.text,
+            });
+          } else {
+            addNotification(`⚠️ Table "${table.name}" is empty`, "warning");
+          }
+        } else {
+          addNotification(
+            `⚠️ Table not found: ${choice.custom_table}`,
+            "warning"
+          );
+          logger.action("Custom table not found", {
+            requestedTable: choice.custom_table,
+          });
+        }
+      } catch (error) {
+        console.error("Error processing custom_table:", error);
+      }
+    }
+
     //  const ructfinalchoicetext
     let text = "";
     if (choiceDetails.length > 0) {

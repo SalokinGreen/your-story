@@ -571,6 +571,18 @@ Example choices using tables:
 - "Check creature_abilities to determine what this beast can do"
 - "Roll on plot_twists to add a surprising development"`
       : ""
+  }${
+    storyData.customTables && storyData.customTables.length > 0
+      ? `
+
+CUSTOM TABLES:
+The creator has defined these custom weighted-random tables. Use them in choices with custom_table parameter when they fit the narrative:
+${storyData.customTables.map((t) => `- ${t.name}: ${t.description}`).join("\n")}
+
+Example: "Take a risk [custom_table: ${
+          storyData.customTables[0]?.name || "TableName"
+        }]"`
+      : ""
   }`;
 
   const infoMessage = buildInfoMessage(storyData);

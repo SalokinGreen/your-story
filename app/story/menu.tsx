@@ -13,6 +13,7 @@ import {
   MythicState,
   MythicThread,
   MythicCharacter,
+  CustomTable,
 } from "../misc/structs";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -30,6 +31,7 @@ import {
 import { useAuth } from "../misc/AuthContext";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { IconPicker } from "../components/IconPicker";
+import { CustomTablesEditor } from "../components/CustomTablesEditor";
 
 // AI Model Selector Component with state management
 function AIModelSelector({
@@ -4046,6 +4048,7 @@ export default function MenuPage({
     | "quests"
     | "lore"
     | "relationships"
+    | "tables"
     | "threads"
     | "characters"
     | "mythic"
@@ -4883,6 +4886,7 @@ export default function MenuPage({
                 { id: "inventory", label: "Inventory", icon: "Backpack" },
                 { id: "quests", label: "Quests", icon: "Scroll" },
                 { id: "lore", label: "Lore", icon: "Book" },
+                { id: "tables", label: "Tables", icon: "Dices" },
                 { id: "relationships", label: "Relationships", icon: "Users" },
                 ...(storyData.mythicState
                   ? [
@@ -4957,6 +4961,17 @@ export default function MenuPage({
                     lore={storyData.lore}
                     plotBeats={storyData.plot_beats}
                     onUpdate={(lore) => onUpdateStoryData({ lore })}
+                  />
+                </div>
+              )}
+
+              {activeTab === "tables" && (
+                <div className="mt-4">
+                  <CustomTablesEditor
+                    tables={storyData.customTables || []}
+                    setTables={(tables) =>
+                      onUpdateStoryData({ customTables: tables })
+                    }
                   />
                 </div>
               )}

@@ -105,6 +105,7 @@ export interface Choice {
   resource_used?: string;
   mythic_check?: string; // Format: "question (likelihood)" e.g., "Is the door locked? (Likely)"
   mythic_table?: string; // Element category name e.g., "character_descriptors", "locations"
+  custom_table?: string; // Name or ID of custom table to roll on
 }
 export interface Scene {
   parts: ScenePart[];
@@ -148,6 +149,19 @@ export interface Preset {
   inventory: InventoryItem[];
   relationships: Relationship[];
   authorNotes: string;
+}
+
+// Custom random tables
+export interface CustomTableEntry {
+  text: string; // The result text
+  weight: number; // Probability weight (higher = more likely)
+}
+
+export interface CustomTable {
+  id: string; // Unique identifier
+  name: string; // Display name (e.g., "Weather Conditions")
+  description: string; // What this table is for
+  entries: CustomTableEntry[]; // Array of possible results
 }
 
 export interface StoryData {
@@ -195,6 +209,7 @@ export interface StoryData {
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)
   mythicState?: MythicState; // Mythic GME state (chaos factor, threads, characters)
+  customTables?: CustomTable[]; // Creator-defined random tables
 }
 
 // Mythic GME state tracking

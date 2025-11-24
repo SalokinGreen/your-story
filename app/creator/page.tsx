@@ -21,6 +21,7 @@ import {
   MythicState,
   MythicThread,
   MythicCharacter,
+  CustomTable,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
@@ -36,6 +37,7 @@ import {
 import CreatorAIChat from "@/app/components/CreatorAIChat";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { IconPicker } from "@/app/components/IconPicker";
+import { CustomTablesEditor } from "@/app/components/CustomTablesEditor";
 import {
   saveLocalAdventure,
   getLocalAdventure,
@@ -54,6 +56,7 @@ type CreatorStep =
   | "quests"
   | "plot"
   | "mythic"
+  | "tables"
   | "upgrades"
   | "preview";
 
@@ -672,6 +675,7 @@ function AdventureCreatorContent() {
         setRelationships(template.relationships || []);
         setAchievements(template.achievements || []);
         setQuests(template.quests || []);
+        setCustomTables(template.customTables || []);
         setUpgradeSettings(
           template.upgradeSettings || DEFAULT_UPGRADE_SETTINGS
         );
@@ -731,6 +735,8 @@ function AdventureCreatorContent() {
             if (Array.isArray(saved.achievements))
               setAchievements(saved.achievements);
             if (Array.isArray(saved.quests)) setQuests(saved.quests);
+            if (Array.isArray(saved.customTables))
+              setCustomTables(saved.customTables);
             if (saved.upgradeSettings)
               setUpgradeSettings(saved.upgradeSettings);
             if (saved.mythicEnabled !== undefined)
@@ -968,6 +974,18 @@ function AdventureCreatorContent() {
   );
   const [editQuest, setEditQuest] = useState<Partial<Quest>>({});
 
+  // Custom Tables
+  const [customTables, setCustomTables] = useState<CustomTable[]>([]);
+  const [newTable, setNewTable] = useState<Partial<CustomTable>>({
+    name: "",
+    description: "",
+    entries: [],
+  });
+  const [editingTableIndex, setEditingTableIndex] = useState<number | null>(
+    null
+  );
+  const [editTable, setEditTable] = useState<Partial<CustomTable>>({});
+
   // Local draft persistence (separate keys for new vs edit mode)
   const draftKey = editAdventureId
     ? `your-story:creator-draft:${editAdventureId}`
@@ -1009,6 +1027,7 @@ function AdventureCreatorContent() {
     { id: "relationships", label: "Relationships", icon: "Users" },
     { id: "achievements", label: "Achievements", icon: "Trophy" },
     { id: "quests", label: "Quests", icon: "ClipboardList" },
+    { id: "tables", label: "Custom Tables", icon: "Dices" },
     { id: "plot", label: "Plot Beats", icon: "Clapperboard" },
     { id: "mythic", label: "Mythic GME", icon: "Sparkles" },
     { id: "upgrades", label: "Upgrade Settings", icon: "ArrowUpCircle" },
@@ -1064,6 +1083,8 @@ function AdventureCreatorContent() {
       if (Array.isArray(saved.achievements))
         setAchievements(saved.achievements);
       if (Array.isArray(saved.quests)) setQuests(saved.quests);
+      if (Array.isArray(saved.customTables))
+        setCustomTables(saved.customTables);
       if (saved.upgradeSettings) setUpgradeSettings(saved.upgradeSettings);
       if (saved.mythicEnabled !== undefined)
         setMythicEnabled(saved.mythicEnabled);
@@ -1124,6 +1145,7 @@ function AdventureCreatorContent() {
       relationships,
       achievements,
       quests,
+      customTables,
       upgradeSettings,
       mythicEnabled,
       mythicState,
@@ -1169,6 +1191,7 @@ function AdventureCreatorContent() {
     relationships,
     achievements,
     quests,
+    customTables,
     mythicEnabled,
     mythicState,
     upgradeSettings,
@@ -1932,6 +1955,7 @@ function AdventureCreatorContent() {
       lore,
       relationships,
       quests,
+      customTables,
       earnedPointsFromQuests: [],
       momentum,
       maxMomentum,
@@ -2029,6 +2053,7 @@ function AdventureCreatorContent() {
       setRelationships([]);
       setAchievements([]);
       setQuests([]);
+      setCustomTables([]);
       setSelectedPreset("custom");
       setPresets([DEFAULT_PRESET]);
       setUpgradeSettings(DEFAULT_UPGRADE_SETTINGS);
@@ -2093,6 +2118,7 @@ function AdventureCreatorContent() {
         lore,
         relationships,
         quests,
+        customTables,
         earnedPointsFromQuests: [],
         momentum,
         maxMomentum,
@@ -2226,6 +2252,7 @@ function AdventureCreatorContent() {
       lore,
       relationships,
       quests,
+      customTables,
       earnedPointsFromQuests: [],
       momentum,
       maxMomentum,
@@ -7202,6 +7229,14 @@ function AdventureCreatorContent() {
               )}
             </div>
           </div>
+        );
+
+      case "tables":
+        return (
+          <CustomTablesEditor
+            tables={customTables}
+            setTables={setCustomTables}
+          />
         );
 
       case "mythic":
