@@ -333,7 +333,9 @@ ${
         }
 
         console.log(
-          `[buildToolPrompt] Including tool history: ${part.toolCalls.length} calls, ${part.toolResponses?.length || 0} responses`
+          `[buildToolPrompt] Including tool history: ${
+            part.toolCalls.length
+          } calls, ${part.toolResponses?.length || 0} responses`
         );
       } else {
         // Regular assistant message without tools

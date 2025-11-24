@@ -2426,9 +2426,14 @@ function StoryPageContent() {
         // Remove duplicate parts (safety check)
         const seen = new Set<string>();
         storyData.scene.parts = storyData.scene.parts.filter((part) => {
-          const key = `${part.user ? 'user' : 'assistant'}-${part.content.substring(0, 100)}`;
+          const key = `${
+            part.user ? "user" : "assistant"
+          }-${part.content.substring(0, 100)}`;
           if (seen.has(key) && !part.user) {
-            console.log('[Dedup] Removing duplicate assistant part:', part.content.substring(0, 50));
+            console.log(
+              "[Dedup] Removing duplicate assistant part:",
+              part.content.substring(0, 50)
+            );
             return false;
           }
           seen.add(key);
@@ -3882,9 +3887,14 @@ function StoryPageContent() {
         // Remove duplicate parts (safety check)
         const seen = new Set<string>();
         storyData.scene.parts = storyData.scene.parts.filter((part) => {
-          const key = `${part.user ? 'user' : 'assistant'}-${part.content.substring(0, 100)}`;
+          const key = `${
+            part.user ? "user" : "assistant"
+          }-${part.content.substring(0, 100)}`;
           if (seen.has(key) && !part.user) {
-            console.log('[Dedup] Removing duplicate assistant part:', part.content.substring(0, 50));
+            console.log(
+              "[Dedup] Removing duplicate assistant part:",
+              part.content.substring(0, 50)
+            );
             return false;
           }
           seen.add(key);
@@ -4188,9 +4198,14 @@ function StoryPageContent() {
         // Remove duplicate parts (safety check)
         const seen = new Set<string>();
         storyData.scene.parts = storyData.scene.parts.filter((part) => {
-          const key = `${part.user ? 'user' : 'assistant'}-${part.content.substring(0, 100)}`;
+          const key = `${
+            part.user ? "user" : "assistant"
+          }-${part.content.substring(0, 100)}`;
           if (seen.has(key) && !part.user) {
-            console.log('[Dedup] Removing duplicate assistant part:', part.content.substring(0, 50));
+            console.log(
+              "[Dedup] Removing duplicate assistant part:",
+              part.content.substring(0, 50)
+            );
             return false;
           }
           seen.add(key);

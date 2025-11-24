@@ -157,6 +157,90 @@ export function executeTools(
         continue;
       }
 
+      // Special handling for update_quest with both shortDescription and description
+      // Need to execute two commands
+      if (
+        toolCall.function.name === "update_quest" &&
+        args.shortDescription &&
+        args.description
+      ) {
+        logger.action("Special handling: update_quest with both descriptions", {
+          toolCallId: toolId,
+          questTitle: args.title,
+        });
+
+        // First: update description
+        const descCommand = `/update_quest_description: ${args.title} | ${args.description}`;
+        logger.action(`Executing command: ${descCommand}`, {
+          toolCallId: toolId,
+        });
+        const descResponse = executeCommandWithResponse(descCommand, storyData);
+
+        if (!descResponse || !descResponse.success) {
+          const errorMsg =
+            descResponse?.message || `Failed to update quest description`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+            command: descCommand,
+          });
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Second: update short description
+        const shortCommand = `/update_quest_short_description: ${args.title} | ${args.shortDescription}`;
+        logger.action(`Executing command: ${shortCommand}`, {
+          toolCallId: toolId,
+        });
+        const shortResponse = executeCommandWithResponse(
+          shortCommand,
+          storyData
+        );
+
+        if (!shortResponse || !shortResponse.success) {
+          // Description was updated but short description failed - return partial success
+          const partialMsg = `${
+            descResponse.message
+          } (short description update failed: ${
+            shortResponse?.message || "unknown error"
+          })`;
+          logger.warn(`Tool call partial success: ${partialMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: toolCall.function.name,
+            success: true,
+            message: partialMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Both succeeded - combine messages
+        const successMsg = `${descResponse.message} and updated short description`;
+        logger.action(`Tool call succeeded: ${successMsg}`, {
+          toolCallId: toolId,
+          toolName,
+        });
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: successMsg,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
       // Special handling for modify_relationship with description
       // Need to execute two commands: modify value, then update description
       if (
@@ -347,9 +431,10 @@ function convertToolToCommand(
   switch (toolName) {
     // Quest Management
     case "create_quest":
+      // Points defaults to 50 if not provided (per schema)
       return `/create_quest: ${args.title} | ${args.shortDescription} | ${
         args.description
-      }${args.points ? ` | ${args.points}` : ""}`;
+      } | ${args.points || 50}`;
 
     case "complete_quest":
       return `/complete_quest: ${args.title}`;
@@ -359,13 +444,15 @@ function convertToolToCommand(
 
     case "update_quest":
       if (args.shortDescription && args.description) {
-        return `/update_quest: ${args.title} | ${args.shortDescription} | ${args.description}`;
+        // Update both - do description first
+        return `/update_quest_description: ${args.title} | ${args.description}`;
       } else if (args.shortDescription) {
-        return `/update_quest_short: ${args.title} | ${args.shortDescription}`;
+        return `/update_quest_short_description: ${args.title} | ${args.shortDescription}`;
       } else if (args.description) {
-        return `/update_quest_desc: ${args.title} | ${args.description}`;
+        return `/update_quest_description: ${args.title} | ${args.description}`;
       }
-      return `/complete_quest: ${args.title}`; // Fallback
+      // No updates provided - this shouldn't happen but return null to fail gracefully
+      return null;
 
     case "delete_quest":
       return `/delete_quest: ${args.title}`;
