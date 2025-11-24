@@ -6,6 +6,7 @@ import {
   StoryData,
   Choices,
   Choice,
+  Resource,
   UPGRADE_COSTS,
   Preset,
   CommandResponse,
@@ -2694,13 +2695,14 @@ function StoryPageContent() {
     }
 
     //Processresourceusage(resourceisautomaticallyatriskonskillcheckfailure)
+    let matchedResource: Resource | null = null;
     if (choice.resource_used) {
       // Try fuzzy matching first
       const matchResult = findResourceMatch(
         choice.resource_used,
         storyData.resources
       );
-      const resource = matchResult?.item;
+      matchedResource = matchResult ? (matchResult.item as Resource) : null;
 
       // Log fuzzy match result
       if (matchResult && !matchResult.isExact) {
@@ -2719,32 +2721,32 @@ function StoryPageContent() {
         choice.resource_used = matchResult.name;
       }
 
-      if (resource) {
+      if (matchedResource) {
         // Ensure resource.value is a valid number (prevent NaN)
-        if (typeof resource.value !== "number" || isNaN(resource.value)) {
-          resource.value = 0;
+        if (typeof matchedResource.value !== "number" || isNaN(matchedResource.value)) {
+          matchedResource.value = 0;
         }
 
         const dc = choice.skill_dc || 0;
         const resourceReqs = calculateResourceRequirements(rpgSystem, dc);
         const requiredAmount = resourceReqs.required;
 
-        resourceUsedBefore = resource.value;
+        resourceUsedBefore = matchedResource.value;
 
         //Check if player has enough resource
-        if (resource.value < requiredAmount) {
+        if (matchedResource.value < requiredAmount) {
           insufficientResource = true;
           insufficientResourceDisadvantage = true; // Set disadvantage flag
           disadvantageCount++;
-          disadvantageSources.push(`insufficient ${resource.name}`);
+          disadvantageSources.push(`insufficient ${matchedResource.name}`);
           logger.action("Insufficient resource", {
             resource: choice.resource_used,
             required: requiredAmount,
-            available: resource.value,
+            available: matchedResource.value,
             disadvantage: true,
           });
           addNotification(
-            `⚠️ Insufficient ${resource.name}! Need ${requiredAmount}, have ${resource.value}. Disadvantage on roll!`,
+            `⚠️ Insufficient ${matchedResource.name}! Need ${requiredAmount}, have ${matchedResource.value}. Disadvantage on roll!`,
             "warning"
           );
         }
@@ -3324,33 +3326,28 @@ function StoryPageContent() {
           }
 
           //Recoverresourceonsuccess
-          if (choice.resource_used) {
-            const resource = storyData.resources.find(
-              (r) => r.name === choice.resource_used
-            );
-            if (resource) {
-              // Ensure resource.value is a valid number (prevent NaN)
-              if (typeof resource.value !== "number" || isNaN(resource.value)) {
-                resource.value = 0;
-              }
-
-              const recovery = resourceReqs.recovery; // Use system-specific recovery formula
-              const beforeRecovery = resource.value;
-              resource.value = Math.min(
-                resource.maxValue,
-                resource.value + recovery
-              );
-              resourceUsedAfter = resource.value;
-              logger.action("Resource recovered", {
-                resource: choice.resource_used,
-                amount: recovery,
-                newTotal: resource.value,
-              });
-              addNotification(
-                `✓ ${resource.name} recovered: ${beforeRecovery} → ${resourceUsedAfter} (+${recovery})`,
-                "success"
-              );
+          if (choice.resource_used && matchedResource) {
+            // Ensure resource.value is a valid number (prevent NaN)
+            if (typeof matchedResource.value !== "number" || isNaN(matchedResource.value)) {
+              matchedResource.value = 0;
             }
+
+            const recovery = resourceReqs.recovery; // Use system-specific recovery formula
+            const beforeRecovery = matchedResource.value;
+            matchedResource.value = Math.min(
+              matchedResource.maxValue,
+              matchedResource.value + recovery
+            );
+            resourceUsedAfter = matchedResource.value;
+            logger.action("Resource recovered", {
+              resource: choice.resource_used,
+              amount: recovery,
+              newTotal: matchedResource.value,
+            });
+            addNotification(
+              `✓ ${matchedResource.name} recovered: ${beforeRecovery} → ${resourceUsedAfter} (+${recovery})`,
+              "success"
+            );
           }
 
           //Earnmomentumonsuccess(notwhenusingguaranteeorreroll)
@@ -3443,30 +3440,25 @@ function StoryPageContent() {
           }
 
           // On failure: Lose additional resource if one was used (DC-based penalty)
-          if (choice.resource_used) {
-            const resource = storyData.resources.find(
-              (r) => r.name === choice.resource_used
-            );
-            if (resource) {
-              // Ensure resource.value is a valid number (prevent NaN)
-              if (typeof resource.value !== "number" || isNaN(resource.value)) {
-                resource.value = 0;
-              }
-
-              const lossBefore = resource.value;
-              const penalty = resourceReqs.loss; // Use system-specific loss formula
-              resource.value = Math.max(0, resource.value - penalty);
-              const lossAfter = resource.value;
-              logger.action("Resource lost (Failure)", {
-                resource: choice.resource_used,
-                penalty,
-                newTotal: resource.value,
-              });
-              addNotification(
-                `⚠️ ${resource.name} lost from failure: ${lossBefore} → ${lossAfter} (-${penalty})`,
-                "failure"
-              );
+          if (choice.resource_used && matchedResource) {
+            // Ensure resource.value is a valid number (prevent NaN)
+            if (typeof matchedResource.value !== "number" || isNaN(matchedResource.value)) {
+              matchedResource.value = 0;
             }
+
+            const lossBefore = matchedResource.value;
+            const penalty = resourceReqs.loss; // Use system-specific loss formula
+            matchedResource.value = Math.max(0, matchedResource.value - penalty);
+            const lossAfter = matchedResource.value;
+            logger.action("Resource lost (Failure)", {
+              resource: choice.resource_used,
+              penalty,
+              newTotal: matchedResource.value,
+            });
+            addNotification(
+              `⚠️ ${matchedResource.name} lost from failure: ${lossBefore} → ${lossAfter} (-${penalty})`,
+              "failure"
+            );
           }
 
           //Handleitembreakageonfailure(onlyfor'normal'typeitems)
@@ -3576,14 +3568,11 @@ function StoryPageContent() {
     }
 
     //Buildresourceusageline(includesanyadditionallossfromfailure)
-    if (choice.resource_used && resourceUsedBefore > 0) {
-      const resource = storyData.resources.find(
-        (r) => r.name === choice.resource_used
-      );
-      const maxValue = resource?.maxValue || 100;
-      const currentValue = resource?.value || 0;
+    if (choice.resource_used && resourceUsedBefore > 0 && matchedResource) {
+      const maxValue = matchedResource.maxValue || 100;
+      const currentValue = matchedResource.value || 0;
       choiceDetails.push(
-        `[Resource: ${choice.resource_used} used; ${resourceUsedBefore} -> ${currentValue}/${maxValue}]`
+        `[Resource: ${matchedResource.name} used; ${resourceUsedBefore} -> ${currentValue}/${maxValue}]`
       );
     }
 
