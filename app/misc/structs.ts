@@ -104,6 +104,7 @@ export interface Choice {
   skill_dc?: number;
   resource_used?: string;
   mythic_check?: string; // Format: "question (likelihood)" e.g., "Is the door locked? (Likely)"
+  mythic_context_only?: boolean; // When true with skill_used, mythic provides context only and doesn't override skill check result
   mythic_table?: string; // Element category name e.g., "character_descriptors", "locations"
   custom_table?: string; // Name or ID of custom table to roll on
 }

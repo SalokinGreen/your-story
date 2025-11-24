@@ -333,6 +333,7 @@ Memory Guidelines:
 - Add NEW memory entries that don't already exist in the Memory section
 - Make entries DETAILED and SPECIFIC with names, locations, consequences, emotional context
 - Track important story developments, character actions, world changes
+- Avoid overusing memory for minor details or repetitive events
 - BAD: "Met a merchant" GOOD: "Met Aldric, a suspicious merchant in Darkwater who tried to sell cursed artifacts and fled when confronted"
 
 Mythic GME Guidelines (if enabled):
@@ -546,7 +547,67 @@ Choice Design Guidelines:
     storyData.mythicState
       ? `
 
-Only use mythic questions when stat checks are not appropriate for the situation. For example, if a character makes a skill check, do not also ask a mythic question about the same action. Use mythic questions to introduce unexpected twists, complications, or opportunities that arise from the chaos of the story
+⚠️ MYTHIC QUESTIONS vs SKILL CHECKS - STRICT HIERARCHY:
+
+1. SKILL CHECKS DETERMINE SUCCESS/FAILURE - Their result is FINAL and CANNOT be overridden
+   - If a choice has skill_used parameter, the skill check result determines whether the player succeeds
+   - Success = player accomplishes the action
+   - Failure = player fails at the action
+   - DO NOT ask Mythic questions that duplicate or "second guess" the skill check outcome
+
+2. MYTHIC QUESTIONS are for situations where SKILL CHECKS DON'T ANSWER THE QUESTION:
+   
+   ✅ GOOD USE CASES (asking questions skill checks can't answer):
+   - World discovery: "Is the artifact here? (Unlikely)" "Is the door locked? (50/50)"
+   - NPC state: "Is the merchant friendly? (Somewhat Likely)" "Does the guard recognize you? (Unlikely)"
+   - Environmental factors: "Is the path clear? (Likely)" "Is it raining? (50/50)"
+   - Complications: "Does something go wrong? (Likely)" [adds narrative tension]
+   - Opportunities: "Is there another way? (50/50)" [offers alternatives]
+   - Random events: Use Event Meaning for unexpected developments
+   
+   ✅ GOOD COMBINATIONS (skill + mythic asking DIFFERENT questions):
+   "Search the ruins [Perception DC 12] [mythic: Is anything valuable here? (Unlikely) (context)]"
+   → Perception check = Can you find what's there (player ability)
+   → Mythic = What's actually there to find (world state)
+   → Set mythic_context_only: true
+   
+   "Convince the guard [Diplomacy DC 15] [mythic: Is the guard corrupt? (50/50) (context)]"
+   → Diplomacy = Your persuasion skill (player ability)
+   → Mythic = Guard's moral flexibility (NPC trait)
+   → Set mythic_context_only: true
+   
+   "Sneak past patrols [Stealth DC 18] [mythic: Are guards alert? (Likely) (context)]"
+   → Stealth = Your sneaking ability (player ability)
+   → Mythic = Environmental difficulty (world state)
+   → Set mythic_context_only: true
+   
+   ❌ BAD USE CASES (redundant with skill check - NEVER DO THIS):
+   "Climb the wall [Athletics DC 14] [mythic: Can you reach the top? (Somewhat Likely)]"
+   ❌ WRONG: Both determine if you climb successfully - Mythic duplicates skill check
+   
+   "Persuade the king [Diplomacy DC 18] [mythic: Does the king agree? (Likely)]"
+   ❌ WRONG: Diplomacy already answers if you persuade him - Mythic overrides skill check
+   
+   "Decode the runes [Intelligence DC 16] [mythic: Can you understand it? (50/50)]"
+   ❌ WRONG: Intelligence determines comprehension - Mythic second-guesses the result
+
+3. WHEN COMBINING BOTH:
+   - ALWAYS set mythic_context_only: true when using mythic_check with skill_used
+   - Skill check determines if PLAYER ACTION succeeds (primary outcome)
+   - Mythic determines WORLD RESPONSE or CONTEXT (narrative color)
+   - Skill result takes absolute priority for success/failure
+   - Mythic adds complications, opportunities, or environmental factors
+   
+   Example outcomes:
+   - Skill Success + Mythic Yes = Clean success with favorable circumstances
+   - Skill Success + Mythic No = Success despite unfavorable circumstances
+   - Skill Failure + Mythic Yes = Failure with mitigating factors or silver lining
+   - Skill Failure + Mythic No = Complete failure with additional complications
+
+4. STANDALONE MYTHIC (no skill check):
+   - Use for pure world-building, NPC reactions, environmental queries
+   - No mythic_context_only flag needed (there's no skill check to contextualize)
+   - Result directly affects narrative but doesn't test player ability
 
 MYTHIC GME ORACLE TABLES:
 The following oracle tables are available for creating choices that involve uncertainty, discovery, or world-building:

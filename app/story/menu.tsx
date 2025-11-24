@@ -4604,14 +4604,6 @@ export default function MenuPage({
                   if (!storyDbId) return;
 
                   try {
-                    const {
-                      data: { session },
-                    } = await supabase.auth.getSession();
-                    if (!session) {
-                      addNotification("Please sign in to restart", "warning");
-                      return;
-                    }
-
                     // Full reset - clear everything
                     const resetStoryData = {
                       ...storyData,
@@ -4648,14 +4640,30 @@ export default function MenuPage({
                       newGamePlusMode: false,
                     };
 
-                    await fetch(`/api/stories/${storyDbId}`, {
-                      method: "PATCH",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${session.access_token}`,
-                      },
-                      body: JSON.stringify({ storyData: resetStoryData }),
-                    });
+                    // Check if this is a local story
+                    if (storyDbId.startsWith("local_")) {
+                      const { saveLocalStory } = await import(
+                        "@/app/misc/localStoryManager"
+                      );
+                      await saveLocalStory(storyDbId, resetStoryData);
+                    } else {
+                      const {
+                        data: { session },
+                      } = await supabase.auth.getSession();
+                      if (!session) {
+                        addNotification("Please sign in to restart", "warning");
+                        return;
+                      }
+
+                      await fetch(`/api/stories/${storyDbId}`, {
+                        method: "PATCH",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${session.access_token}`,
+                        },
+                        body: JSON.stringify({ storyData: resetStoryData }),
+                      });
+                    }
 
                     addNotification("Story restarted! Reloading...", "success");
                     window.location.reload();
@@ -4694,17 +4702,6 @@ export default function MenuPage({
                   if (!storyDbId) return;
 
                   try {
-                    const {
-                      data: { session },
-                    } = await supabase.auth.getSession();
-                    if (!session) {
-                      addNotification(
-                        "Please sign in for New Game Plus",
-                        "warning"
-                      );
-                      return;
-                    }
-
                     const ngPlusCount = (storyData.newGamePlusCount || 0) + 1;
                     const bonusPoints = ngPlusCount * 50;
                     const bonusMomentum = Math.min(ngPlusCount, 3);
@@ -4748,14 +4745,33 @@ export default function MenuPage({
                       newGamePlusMode: true,
                     };
 
-                    await fetch(`/api/stories/${storyDbId}`, {
-                      method: "PATCH",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${session.access_token}`,
-                      },
-                      body: JSON.stringify({ storyData: ngPlusStoryData }),
-                    });
+                    // Check if this is a local story
+                    if (storyDbId.startsWith("local_")) {
+                      const { saveLocalStory } = await import(
+                        "@/app/misc/localStoryManager"
+                      );
+                      await saveLocalStory(storyDbId, ngPlusStoryData);
+                    } else {
+                      const {
+                        data: { session },
+                      } = await supabase.auth.getSession();
+                      if (!session) {
+                        addNotification(
+                          "Please sign in for New Game Plus",
+                          "warning"
+                        );
+                        return;
+                      }
+
+                      await fetch(`/api/stories/${storyDbId}`, {
+                        method: "PATCH",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${session.access_token}`,
+                        },
+                        body: JSON.stringify({ storyData: ngPlusStoryData }),
+                      });
+                    }
 
                     addNotification(
                       `New Game Plus ${ngPlusCount} activated! +${bonusPoints} points, +${bonusMomentum} max momentum`,

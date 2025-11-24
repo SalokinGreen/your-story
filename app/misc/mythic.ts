@@ -178,6 +178,15 @@ export function askFate(
   // Clamp chaos factor to valid range
   chaosFactor = Math.max(1, Math.min(9, chaosFactor));
 
+  // Validate likelihood exists in chart
+  if (!FATE_CHART[chaosFactor] || !FATE_CHART[chaosFactor][likelihood]) {
+    console.error(
+      `Invalid Mythic parameters: chaosFactor=${chaosFactor}, likelihood="${likelihood}"`
+    );
+    // Default to 50/50 if invalid
+    likelihood = "50/50";
+  }
+
   const roll = rollD100();
   const thresholds = FATE_CHART[chaosFactor][likelihood];
   const [exceptionalNo, no, yes, exceptionalYes] = thresholds;

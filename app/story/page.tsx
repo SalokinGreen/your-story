@@ -1814,6 +1814,20 @@ function StoryPageContent() {
     fetchBalance();
   }, []);
 
+  // Update canUndo and canRetry based on story state
+  useEffect(() => {
+    if (!storyData) return;
+
+    const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
+    const hasAIPart = lastPart && !lastPart.user;
+
+    // Can undo if we have at least 2 parts and last part is from AI
+    setCanUndo(storyData.scene.parts.length > 1 && hasAIPart);
+
+    // Can retry if we have at least 1 part and last part is from AI
+    setCanRetry(storyData.scene.parts.length > 0 && hasAIPart);
+  }, [storyData]);
+
   // Load story from database on mount
   useEffect(() => {
     if (!storyId) {
@@ -1867,6 +1881,12 @@ function StoryPageContent() {
             localStory.storyData.scene.parts[
               localStory.storyData.scene.parts.length - 1
             ];
+          console.log("Loading local story - last part:", {
+            user: lastPart.user,
+            role: lastPart.role,
+            choicesCount: lastPart.choices?.length || 0,
+            contentPreview: lastPart.content.substring(0, 50),
+          });
           setStoryText(lastPart.content);
           setChoices({ choices: lastPart.choices || [] });
 
@@ -2077,7 +2097,7 @@ function StoryPageContent() {
   };
 
   //Savestoryprogresstodatabase(debounced)
-  async function saveProgress(updatedStoryData: StoryData) {
+  async function saveProgress(updatedStoryData: StoryData, immediate = false) {
     if (!storyDbId) return;
 
     //Clearexistingtimeout
@@ -2085,78 +2105,99 @@ function StoryPageContent() {
       clearTimeout(saveTimeoutRef.current);
     }
 
+    // If immediate, save now without debounce
+    if (immediate) {
+      return performSave(updatedStoryData);
+    }
+
     // Debounce: Only save after 3 seconds of no activity
-    saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        logger.info("Saving story progress...");
-        //Handlelocalstorysaving
-        if (storyDbId.startsWith("local_")) {
-          const { saveLocalStory } = await import(
-            "@/app/misc/localStoryManager"
-          );
-          //Trimscenehistorybeforesavingtoreducedatasize
-          const trimmedData = trimStoryData(updatedStoryData);
-          await saveLocalStory(storyDbId, trimmedData);
-          console.log("Local story saved");
-          return;
-        }
+    saveTimeoutRef.current = setTimeout(() => {
+      performSave(updatedStoryData);
+    }, 3000); //3seconddebounce
+  }
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (!session) return;
+  //Actualsa velogicisolated
+  async function performSave(updatedStoryData: StoryData) {
+    if (!storyDbId) return;
 
-        //Checkforencryptioncredentials
-        const password = getEncryptionPassword();
-        const email = user?.email;
-
-        if (!password || !email) {
-          //No credentials available - require user to re-login for security
-          console.error(
-            "Cannot save story: encryption credentials not available"
-          );
-          addNotification(
-            "⚠️ Please sign out and sign back in to enable encrypted story saving",
-            "warning"
-          );
-          return; //Abortsavetopreventunencrypteddatastorage
-        }
-
+    try {
+      logger.info("Saving story progress...");
+      //Handlelocalstorysaving
+      if (storyDbId.startsWith("local_")) {
+        const { saveLocalStory } = await import("@/app/misc/localStoryManager");
         //Trimscenehistorybeforesavingtoreducedatasize
         const trimmedData = trimStoryData(updatedStoryData);
 
-        //Encryptthestorydatabeforesaving
-        let dataToSave: any;
-        try {
-          dataToSave = await encryptStoryData(trimmedData, email, password);
-          console.log("Story data encrypted for saving");
-        } catch (encryptError) {
-          console.error("Encryption failed:", encryptError);
-          addNotification(
-            "⚠ Failed to encrypt story data. Please sign out and sign back in.",
-            "failure"
-          );
-          return; //Abortsaveonencryptionfailure
-        }
-
-        await fetch(`/api/stories/${storyDbId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            storyData: dataToSave,
-          }),
+        // Log what we're saving
+        const lastPartBeingSaved =
+          trimmedData.scene.parts[trimmedData.scene.parts.length - 1];
+        console.log("Saving local story - last part:", {
+          user: lastPartBeingSaved?.user,
+          role: lastPartBeingSaved?.role,
+          choicesCount: lastPartBeingSaved?.choices?.length || 0,
+          contentPreview: lastPartBeingSaved?.content.substring(0, 50),
         });
-      } catch (error) {
-        console.error("Error saving progress:", error);
+
+        await saveLocalStory(storyDbId, trimmedData);
+        console.log("Local story saved successfully");
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) return;
+
+      //Checkforencryptioncredentials
+      const password = getEncryptionPassword();
+      const email = user?.email;
+
+      if (!password || !email) {
+        //No credentials available - require user to re-login for security
+        console.error(
+          "Cannot save story: encryption credentials not available"
+        );
         addNotification(
-          "Failed to save story progress. Please try again.",
+          "⚠️ Please sign out and sign back in to enable encrypted story saving",
+          "warning"
+        );
+        return; //Abortsavetopreventunencrypteddatastorage
+      }
+
+      //Trimscenehistorybeforesavingtoreducedatasize
+      const trimmedData = trimStoryData(updatedStoryData);
+
+      //Encryptthestorydatabeforesaving
+      let dataToSave: any;
+      try {
+        dataToSave = await encryptStoryData(trimmedData, email, password);
+        console.log("Story data encrypted for saving");
+      } catch (encryptError) {
+        console.error("Encryption failed:", encryptError);
+        addNotification(
+          "⚠ Failed to encrypt story data. Please sign out and sign back in.",
           "failure"
         );
+        return; //Abortsaveonencryptionfailure
       }
-    }, 3000); //3seconddebounce
+
+      await fetch(`/api/stories/${storyDbId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          storyData: dataToSave,
+        }),
+      });
+    } catch (error) {
+      console.error("Error saving progress:", error);
+      addNotification(
+        "Failed to save story progress. Please try again.",
+        "failure"
+      );
+    }
   }
 
   //Updatestorydatainstate
@@ -2442,22 +2483,55 @@ function StoryPageContent() {
         });
       },
       onComplete: (meta: any) => {
-        // Remove duplicate parts (safety check)
+        // Remove duplicate parts (safety check) - but preserve the one with choices
         const seen = new Set<string>();
+        const should_remove = new Set<string>();
         storyData.scene.parts = storyData.scene.parts.filter((part) => {
           const key = `${
             part.user ? "user" : "assistant"
           }-${part.content.substring(0, 100)}`;
           if (seen.has(key) && !part.user) {
-            console.log(
-              "[Dedup] Removing duplicate assistant part:",
-              part.content.substring(0, 50)
-            );
-            return false;
+            // If this is a duplicate, only remove it if it has no choices
+            // Keep the one with choices (the completed one)
+            if (!part.choices || part.choices.length === 0) {
+              console.log(
+                "[Dedup] Removing duplicate assistant part without choices:",
+                part.content.substring(0, 50)
+              );
+              return false;
+            } else {
+              // Keep this one with choices and remove previous duplicates
+              console.log(
+                "[Dedup] Keeping assistant part with choices, removing previous duplicates:",
+                part.content.substring(0, 50)
+              );
+              should_remove.add(key);
+              return true;
+            }
           }
           seen.add(key);
           return true;
         });
+
+        // Remove any previously marked duplicates
+        // Note: Issue was that earlier duplicates without choices were kept instead of the final one with choices. Now we'
+        const already_removed = new Set<string>();
+        if (should_remove.size > 0) {
+          storyData.scene.parts = storyData.scene.parts.filter((part) => {
+            const key = `${
+              part.user ? "user" : "assistant"
+            }-${part.content.substring(0, 100)}`;
+            if (already_removed.has(key)) {
+              return true;
+            }
+            console.log(
+              "[Dedup] Final check, removing duplicate part:",
+              part.content.substring(0, 50)
+            );
+            already_removed.add(key);
+            return !should_remove.has(key);
+          });
+        }
 
         // All done - update token balance
         if (meta?.remainingBalance?.total !== undefined) {
@@ -2481,8 +2555,15 @@ function StoryPageContent() {
         // Clear command responses after successful AI generation
         setPendingCommandResponses([]);
 
-        // Save progress to database
-        saveProgress(storyData);
+        // Save progress to database immediately
+        const lastPartForSave =
+          storyData.scene.parts[storyData.scene.parts.length - 1];
+        console.log(
+          "Saving story (custom input) - last part choices:",
+          lastPartForSave.choices?.length || 0,
+          "choices"
+        );
+        saveProgress(storyData, true); // immediate=true to bypass debounce
 
         logger.ai_response("Generation complete (custom input)", {
           tokensDeducted: meta?.tokensDeducted,
@@ -2598,6 +2679,126 @@ function StoryPageContent() {
 
     //BuilddetailedRPG-stylechoicetextwithbrackets
     let choiceDetails: string[] = [];
+
+    // Process Mythic GME checks first (less important, shown at top)
+    const mythicDetails: string[] = [];
+    if (choice.mythic_check) {
+      try {
+        // Parse format: "question (likelihood)" or just "question"
+        const match = choice.mythic_check.match(
+          /^(.+?)(?:\s*\(\s*([^)]+)\s*\))?$/
+        );
+        if (match) {
+          const question = match[1].trim();
+          let likelihood = (match[2]?.trim() || "50/50") as Likelihood;
+
+          // Validate and normalize likelihood
+          const validLikelihoods: Likelihood[] = [
+            "Impossible",
+            "No Way",
+            "Very Unlikely",
+            "Unlikely",
+            "50/50",
+            "Somewhat Likely",
+            "Likely",
+            "Very Likely",
+            "Near Sure Thing",
+            "A Sure Thing",
+            "Has To Be",
+          ];
+          if (!validLikelihoods.includes(likelihood)) {
+            console.warn(
+              `Invalid Mythic likelihood "${likelihood}", defaulting to 50/50`
+            );
+            likelihood = "50/50";
+          }
+
+          const chaosFactor = storyData.mythicState?.chaosFactor || 5;
+
+          const result = askFate(likelihood, chaosFactor);
+
+          let mythicLine = `[Mythic Question: ${question}]`;
+          let answerLine = `[Mythic Answer: ${result.answer}`;
+          if (result.randomEvent) {
+            answerLine += " - RANDOM EVENT TRIGGERED!";
+          }
+          answerLine += `]`;
+
+          mythicDetails.push(mythicLine);
+          mythicDetails.push(answerLine);
+
+          // Add context flag if skill check exists or mythic_context_only is set
+          if (choice.skill_used || choice.mythic_context_only) {
+            mythicDetails.push(
+              `[Note: Mythic is context only - skill check determines success/failure]`
+            );
+          }
+
+          logger.action("Mythic fate check from choice", {
+            question,
+            likelihood,
+            answer: result.answer,
+            roll: result.roll,
+            randomEvent: result.randomEvent,
+            contextOnly: !!(choice.skill_used || choice.mythic_context_only),
+          });
+        }
+      } catch (error) {
+        console.error("Error processing mythic_check:", error);
+      }
+    }
+
+    if (choice.mythic_table) {
+      try {
+        const result = generateElement(choice.mythic_table as ElementCategory);
+        const tableName = choice.mythic_table
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (l) => l.toUpperCase());
+        mythicDetails.push(`[Mythic ${tableName} Table: ${result.element}]`);
+
+        logger.action("Mythic table roll from choice", {
+          table: choice.mythic_table,
+          result: result.element,
+        });
+      } catch (error) {
+        console.error("Error processing mythic_table:", error);
+      }
+    }
+
+    // Process custom tables (also less important context)
+    if (choice.custom_table) {
+      try {
+        const table = storyData.customTables?.find(
+          (t) => t.name === choice.custom_table
+        );
+        if (table) {
+          const totalWeight = table.entries.reduce(
+            (sum, e) => sum + e.weight,
+            0
+          );
+          const roll = Math.random() * totalWeight;
+          let cumulative = 0;
+          let result: { text: string; weight: number } | undefined;
+          for (const entry of table.entries) {
+            cumulative += entry.weight;
+            if (roll <= cumulative) {
+              result = entry;
+              break;
+            }
+          }
+          if (result) {
+            mythicDetails.push(`[${table.name}: ${result.text}]`);
+            logger.action("Custom table roll from choice", {
+              table: table.name,
+              result: result.text,
+              weight: result.weight,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error processing custom_table:", error);
+      }
+    }
 
     //Trackstatechangesfordisplay
     let itemQuantityBefore = 0;
@@ -3550,40 +3751,42 @@ function StoryPageContent() {
 
       //Buildskillcheckline
       const insufficientText = insufficientResource ? " (no skill bonus)" : "";
-      let skillCheckLine = `[${choice.skill_used}: `;
+      let skillCheckLine = `[Skill check (${choice.skill_used})`;
 
       // Add system-specific context for AI
       if (rpgSystem.id === "pbta" && skillCheckResult === "partial") {
         // PbtA: Partial success (7-9) - AI should add complications
-        skillCheckLine += `partial success (7-9)`;
+        skillCheckLine += `: partial success (7-9)`;
       } else if (rpgSystem.id === "fate") {
         // Fate: Include tie/style outcomes and margin
         const margin = rollTotal - rollDC;
         if (skillCheckResult === "tie") {
-          skillCheckLine += `tie (margin 0)`;
+          skillCheckLine += `: tie (margin 0)`;
         } else if (skillCheckResult === "style") {
-          skillCheckLine += `success with style (+${margin})`;
+          skillCheckLine += `: success with style (+${margin})`;
         } else if (skillCheckResult === "success") {
-          skillCheckLine += `success (margin +${margin})`;
+          skillCheckLine += `: success (margin +${margin})`;
         } else {
-          skillCheckLine += skillCheckResult;
+          skillCheckLine += `: ${skillCheckResult}`;
         }
       } else if (rpgSystem.id === "explosive") {
         // Explosive: Include explosion count and die size
         const dieSize = yzeData.dieSize || 20;
         const explosions = yzeData.explosions || 0;
         if (explosions > 0) {
-          skillCheckLine += `${skillCheckResult} (d${dieSize} exploded x${explosions})`;
+          skillCheckLine += `: ${skillCheckResult} (d${dieSize} exploded x${explosions})`;
         } else {
-          skillCheckLine += `${skillCheckResult} (d${dieSize})`;
+          skillCheckLine += `: ${skillCheckResult} (d${dieSize})`;
         }
       } else if (rpgSystem.id === "yze") {
         // YZE: Include success count
         const successes = yzeData.successes || 0;
-        skillCheckLine += `${skillCheckResult} (${successes} successes vs ${rollDC})`;
+        skillCheckLine += `: ${skillCheckResult} (${successes} successes vs ${rollDC})`;
       } else {
-        // Standard systems
-        skillCheckLine += skillCheckResult;
+        // Standard systems: capitalize first letter for readability
+        const formattedResult =
+          skillCheckResult.charAt(0).toUpperCase() + skillCheckResult.slice(1);
+        skillCheckLine += `: ${formattedResult}`;
       }
 
       skillCheckLine += `${insufficientText}]`;
@@ -3625,58 +3828,9 @@ function StoryPageContent() {
       );
     }
 
-    // Process Mythic GME checks/tables
-    if (choice.mythic_check) {
-      try {
-        // Parse format: "question (likelihood)" or just "question"
-        const match = choice.mythic_check.match(
-          /^(.+?)(?:\s*\(\s*([^)]+)\s*\))?$/
-        );
-        if (match) {
-          const question = match[1].trim();
-          const likelihood = (match[2]?.trim() || "50/50") as Likelihood;
-          const chaosFactor = storyData.mythicState?.chaosFactor || 5;
-
-          const result = askFate(likelihood, chaosFactor);
-
-          let mythicLine = `[Mythic Question: ${question}]`;
-          let answerLine = `[Mythic Answer: ${result.answer}`;
-          if (result.randomEvent) {
-            answerLine += " - RANDOM EVENT TRIGGERED!";
-          }
-          answerLine += `]`;
-
-          choiceDetails.push(mythicLine);
-          choiceDetails.push(answerLine);
-
-          logger.action("Mythic fate check from choice", {
-            question,
-            likelihood,
-            answer: result.answer,
-            roll: result.roll,
-            randomEvent: result.randomEvent,
-          });
-        }
-      } catch (error) {
-        console.error("Error processing mythic_check:", error);
-      }
-    }
-
-    if (choice.mythic_table) {
-      try {
-        const result = generateElement(choice.mythic_table as ElementCategory);
-        const tableName = choice.mythic_table
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, (l) => l.toUpperCase());
-        choiceDetails.push(`[Mythic ${tableName} Table: ${result.element}]`);
-
-        logger.action("Mythic table roll from choice", {
-          table: choice.mythic_table,
-          result: result.element,
-        });
-      } catch (error) {
-        console.error("Error processing mythic_table:", error);
-      }
+    // Add mythic details at the beginning (less important info first)
+    if (mythicDetails.length > 0) {
+      choiceDetails = [...mythicDetails, ...choiceDetails];
     }
 
     // Process custom table rolls
@@ -3715,7 +3869,7 @@ function StoryPageContent() {
       }
     }
 
-    //  const ructfinalchoicetext
+    //Assemblechoicetext
     let text = "";
     if (choiceDetails.length > 0) {
       text = choiceDetails.join("\n") + "\n";
@@ -3730,7 +3884,7 @@ function StoryPageContent() {
       imageUrl: "",
       user: true,
       role: "user",
-      choices: [...choices.choices],
+      choices: [], // User parts don't have choices - choices come from AI response
     });
 
     setChoices({ choices: [] });
@@ -3958,22 +4112,55 @@ function StoryPageContent() {
         });
       },
       onComplete: (meta: any) => {
-        // Remove duplicate parts (safety check)
+        // Remove duplicate parts (safety check) - but preserve the one with choices
         const seen = new Set<string>();
+        const should_remove = new Set<string>();
         storyData.scene.parts = storyData.scene.parts.filter((part) => {
           const key = `${
             part.user ? "user" : "assistant"
           }-${part.content.substring(0, 100)}`;
           if (seen.has(key) && !part.user) {
-            console.log(
-              "[Dedup] Removing duplicate assistant part:",
-              part.content.substring(0, 50)
-            );
-            return false;
+            // If this is a duplicate, only remove it if it has no choices
+            // Keep the one with choices (the completed one)
+            if (!part.choices || part.choices.length === 0) {
+              console.log(
+                "[Dedup] Removing duplicate assistant part without choices:",
+                part.content.substring(0, 50)
+              );
+              return false;
+            } else {
+              // Keep this one with choices and remove previous duplicates
+              console.log(
+                "[Dedup] Keeping assistant part with choices, removing previous duplicates:",
+                part.content.substring(0, 50)
+              );
+              should_remove.add(key);
+              return true;
+            }
           }
           seen.add(key);
           return true;
         });
+
+        // Remove any previously marked duplicates
+        // Note: Issue was that earlier duplicates without choices were kept instead of the final one with choices. Now we'
+        const already_removed = new Set<string>();
+        if (should_remove.size > 0) {
+          storyData.scene.parts = storyData.scene.parts.filter((part) => {
+            const key = `${
+              part.user ? "user" : "assistant"
+            }-${part.content.substring(0, 100)}`;
+            if (already_removed.has(key)) {
+              return true;
+            }
+            console.log(
+              "[Dedup] Final check, removing duplicate part:",
+              part.content.substring(0, 50)
+            );
+            already_removed.add(key);
+            return !should_remove.has(key);
+          });
+        }
 
         // All done - update token balance
         if (meta?.remainingBalance?.total !== undefined) {
@@ -4000,8 +4187,19 @@ function StoryPageContent() {
         // Clear command responses after successful AI generation
         setPendingCommandResponses([]);
 
-        // Save progress to database
-        saveProgress(storyData);
+        // Update state first, then save
+        setStoryData({ ...storyData });
+
+        // Save progress to database with updated data
+        // Log the last part to verify choices are present
+        const lastPartForSave =
+          storyData.scene.parts[storyData.scene.parts.length - 1];
+        console.log(
+          "Saving story - last part choices:",
+          lastPartForSave.choices?.length || 0,
+          "choices"
+        );
+        saveProgress(storyData, true); // immediate=true to bypass debounce
 
         logger.ai_response("Generation complete (choice)", {
           tokensDeducted: meta?.tokensDeducted,
@@ -4269,22 +4467,55 @@ function StoryPageContent() {
         });
       },
       onComplete: (meta: any) => {
-        // Remove duplicate parts (safety check)
+        /// Remove duplicate parts (safety check) - but preserve the one with choices
         const seen = new Set<string>();
+        const should_remove = new Set<string>();
         storyData.scene.parts = storyData.scene.parts.filter((part) => {
           const key = `${
             part.user ? "user" : "assistant"
           }-${part.content.substring(0, 100)}`;
           if (seen.has(key) && !part.user) {
-            console.log(
-              "[Dedup] Removing duplicate assistant part:",
-              part.content.substring(0, 50)
-            );
-            return false;
+            // If this is a duplicate, only remove it if it has no choices
+            // Keep the one with choices (the completed one)
+            if (!part.choices || part.choices.length === 0) {
+              console.log(
+                "[Dedup] Removing duplicate assistant part without choices:",
+                part.content.substring(0, 50)
+              );
+              return false;
+            } else {
+              // Keep this one with choices and remove previous duplicates
+              console.log(
+                "[Dedup] Keeping assistant part with choices, removing previous duplicates:",
+                part.content.substring(0, 50)
+              );
+              should_remove.add(key);
+              return true;
+            }
           }
           seen.add(key);
           return true;
         });
+
+        // Remove any previously marked duplicates
+        // Note: Issue was that earlier duplicates without choices were kept instead of the final one with choices. Now we'
+        const already_removed = new Set<string>();
+        if (should_remove.size > 0) {
+          storyData.scene.parts = storyData.scene.parts.filter((part) => {
+            const key = `${
+              part.user ? "user" : "assistant"
+            }-${part.content.substring(0, 100)}`;
+            if (already_removed.has(key)) {
+              return true;
+            }
+            console.log(
+              "[Dedup] Final check, removing duplicate part:",
+              part.content.substring(0, 50)
+            );
+            already_removed.add(key);
+            return !should_remove.has(key);
+          });
+        }
 
         // All done - update token balance
         if (meta?.remainingBalance?.total !== undefined) {
