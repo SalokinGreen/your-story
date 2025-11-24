@@ -546,9 +546,10 @@ Choice Design Guidelines:
     storyData.mythicState
       ? `
 
+Only use mythic questions when stat checks are not appropriate for the situation. For example, if a character makes a skill check, do not also ask a mythic question about the same action. Use mythic questions to introduce unexpected twists, complications, or opportunities that arise from the chaos of the story
+
 MYTHIC GME ORACLE TABLES:
 The following oracle tables are available for creating choices that involve uncertainty, discovery, or world-building:
-
 Core Tables:
 - Fate Chart: Ask yes/no questions with likelihood modifiers (Impossible to Has To Be) adjusted by chaos factor
 - Event Focus: Determine what type of random event occurs (Remote event, NPC action, New NPC, Thread movement, PC/NPC positive/negative)

@@ -2012,15 +2012,10 @@ function StoryPageContent() {
     if (preset.stats.length > 0)
       updatedStoryData.stats = JSON.parse(JSON.stringify(preset.stats));
     if (preset.resources.length > 0)
-      updatedStoryData.resources = JSON.parse(
-        JSON.stringify(preset.resources)
-      );
+      updatedStoryData.resources = JSON.parse(JSON.stringify(preset.resources));
     if (preset.inventory.length > 0)
-      updatedStoryData.inventory = JSON.parse(
-        JSON.stringify(preset.inventory)
-      );
-    if (preset.authorNotes)
-      updatedStoryData.author_notes = preset.authorNotes;
+      updatedStoryData.inventory = JSON.parse(JSON.stringify(preset.inventory));
+    if (preset.authorNotes) updatedStoryData.author_notes = preset.authorNotes;
 
     //Addstartingscenepart
     updatedStoryData.scene.parts.push({
