@@ -168,3 +168,13 @@ export function findRelationshipMatch(
     0.6
   );
 }
+
+/**
+ * Convenience function for matching lore by title
+ */
+export function findLoreMatch(
+  searchTitle: string | undefined,
+  lore: Array<{ title: string; [key: string]: any }>
+) {
+  return findBestMatch(searchTitle, lore, (loreEntry) => loreEntry.title, 0.6);
+}

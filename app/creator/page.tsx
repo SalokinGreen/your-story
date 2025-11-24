@@ -685,6 +685,23 @@ function AdventureCreatorContent() {
         setMomentum(template.momentum || 0);
         setMaxMomentum(template.maxMomentum || 5);
 
+        // Load Mythic GME state
+        if (template.mythicState) {
+          setMythicEnabled(true);
+          setMythicState(template.mythicState);
+        } else {
+          setMythicEnabled(false);
+          setMythicState({
+            chaosFactor: 5,
+            threads: [],
+            characters: [],
+            sceneCount: 0,
+            skillCheckHistory: [],
+            currentStreak: 0,
+            lastChaosAdjustment: -999,
+          });
+        }
+
         // After loading from API, overlay any unsaved draft changes
         try {
           const draftKey = `your-story:creator-draft:${editAdventureId}`;

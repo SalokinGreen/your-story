@@ -565,7 +565,6 @@ function CreateCharacterContent() {
               {upgradeSettings.allowStatUpgrade && stats.length > 0 && (
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                    <span className="text-2xl">💪</span>
                     Character Stats
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
@@ -579,8 +578,12 @@ function CreateCharacterContent() {
                         className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700"
                       >
                         <div className="flex-1">
-                          <div className="font-semibold text-gray-900 dark:text-white">
-                            {stat.symbol} {stat.name}
+                          <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                            <DynamicIcon
+                              name={stat.symbol}
+                              className="w-5 h-5"
+                            />
+                            {stat.name}
                           </div>
                           <div className="text-sm text-gray-600 dark:text-gray-400">
                             Base: {storyData.stats?.[index]?.value || 0}
@@ -621,7 +624,6 @@ function CreateCharacterContent() {
                 upgradeSettings.statShop.length > 0 && (
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                      <span className="text-2xl">🏪</span>
                       Unlock New Stats
                     </h3>
                     <div className="space-y-3">
@@ -640,7 +642,11 @@ function CreateCharacterContent() {
                           >
                             <div className="flex-1">
                               <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                {shopStat.symbol} {shopStat.name}
+                                <DynamicIcon
+                                  name={shopStat.symbol}
+                                  className="w-5 h-5"
+                                />
+                                {shopStat.name}
                                 {alreadyPurchased && (
                                   <span className="text-xs px-2 py-0.5 bg-green-600 text-white rounded-full">
                                     Unlocked
@@ -677,7 +683,6 @@ function CreateCharacterContent() {
               {upgradeSettings.allowResourceUpgrade && resources.length > 0 && (
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                    <span className="text-2xl">⚡</span>
                     Resources
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
@@ -691,8 +696,12 @@ function CreateCharacterContent() {
                         className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700"
                       >
                         <div className="flex-1">
-                          <div className="font-semibold text-gray-900 dark:text-white">
-                            {resource.symbol} {resource.name}
+                          <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                            <DynamicIcon
+                              name={resource.symbol}
+                              className="w-5 h-5"
+                            />
+                            {resource.name}
                           </div>
                           <div className="text-sm text-gray-600 dark:text-gray-400">
                             Base: {storyData.resources?.[index]?.value || 0} /{" "}
@@ -742,7 +751,6 @@ function CreateCharacterContent() {
                 upgradeSettings.resourceShop.length > 0 && (
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                      <span className="text-2xl">🏪</span>
                       Unlock New Resources
                     </h3>
                     <div className="space-y-3">
@@ -762,7 +770,11 @@ function CreateCharacterContent() {
                             >
                               <div className="flex-1">
                                 <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                  {shopResource.symbol} {shopResource.name}
+                                  <DynamicIcon
+                                    name={shopResource.symbol}
+                                    className="w-5 h-5"
+                                  />
+                                  {shopResource.name}
                                   {alreadyPurchased && (
                                     <span className="text-xs px-2 py-0.5 bg-green-600 text-white rounded-full">
                                       Unlocked
@@ -804,7 +816,6 @@ function CreateCharacterContent() {
                 upgradeSettings.itemShop.length > 0 && (
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                      <span className="text-2xl">🏪</span>
                       Purchase Items
                     </h3>
                     <div className="space-y-3">
@@ -819,7 +830,11 @@ function CreateCharacterContent() {
                           >
                             <div className="flex-1">
                               <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                {shopItem.symbol} {shopItem.name}
+                                <DynamicIcon
+                                  name={shopItem.symbol}
+                                  className="w-5 h-5"
+                                />
+                                {shopItem.name}
                                 {purchaseCount > 0 && (
                                   <span className="text-xs px-2 py-0.5 bg-green-600 text-white rounded-full">
                                     x{purchaseCount}
@@ -902,8 +917,12 @@ function CreateCharacterContent() {
                           key={index}
                           className="flex justify-between text-sm"
                         >
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {stat.symbol} {stat.name}:
+                          <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                            <DynamicIcon
+                              name={stat.symbol}
+                              className="w-4 h-4"
+                            />
+                            {stat.name}:
                           </span>
                           <span className="font-bold text-gray-900 dark:text-white">
                             {stat.value}
@@ -924,8 +943,12 @@ function CreateCharacterContent() {
                           key={`purchased-${index}`}
                           className="flex justify-between text-sm"
                         >
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {stat.symbol} {stat.name}:
+                          <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                            <DynamicIcon
+                              name={stat.symbol}
+                              className="w-4 h-4"
+                            />
+                            {stat.name}:
                           </span>
                           <span className="font-bold text-gray-900 dark:text-white">
                             {stat.value}
@@ -950,8 +973,12 @@ function CreateCharacterContent() {
                           key={index}
                           className="flex justify-between text-sm"
                         >
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {resource.symbol} {resource.name}:
+                          <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                            <DynamicIcon
+                              name={resource.symbol}
+                              className="w-4 h-4"
+                            />
+                            {resource.name}:
                           </span>
                           <span className="font-bold text-gray-900 dark:text-white">
                             {resource.value} / {resource.maxValue}
@@ -975,8 +1002,12 @@ function CreateCharacterContent() {
                           key={`purchased-${index}`}
                           className="flex justify-between text-sm"
                         >
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {resource.symbol} {resource.name}:
+                          <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                            <DynamicIcon
+                              name={resource.symbol}
+                              className="w-4 h-4"
+                            />
+                            {resource.name}:
                           </span>
                           <span className="font-bold text-gray-900 dark:text-white">
                             {resource.value} / {resource.maxValue}
@@ -999,9 +1030,10 @@ function CreateCharacterContent() {
                       {purchasedItems.map((item, index) => (
                         <div
                           key={index}
-                          className="text-sm text-gray-700 dark:text-gray-300"
+                          className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2"
                         >
-                          {item.symbol} {item.name} x{item.quantity}
+                          <DynamicIcon name={item.symbol} className="w-4 h-4" />
+                          {item.name} x{item.quantity}
                           <span className="text-purple-600 dark:text-purple-400 ml-1">
                             ✨
                           </span>

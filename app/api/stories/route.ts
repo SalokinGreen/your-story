@@ -159,6 +159,7 @@ export async function POST(request: NextRequest) {
           user_id: userId,
           story_name: storyName,
           story_data: storyData,
+          mythic_state: storyData?.mythicState || null,
           is_completed: false,
           is_public: isPublic || false,
           nsfw: storyData.nsfw || body.nsfw || false,

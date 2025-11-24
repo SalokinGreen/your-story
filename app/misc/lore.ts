@@ -10,9 +10,9 @@ export function processLoreTriggers(
   ) => void,
   initialLoad: boolean = false
 ) {
-  // Only check last 5 scene parts for lore triggers to reduce token costs
+  // Only check intro + last 5 scene parts for lore triggers to reduce token costs
   const recentParts = storyData.scene.parts.slice(-5);
-  const recentContent = [...recentParts.map((p) => p.content)]
+  const recentContent = [storyData.intro, ...recentParts.map((p) => p.content)]
     .join("\n")
     .toLowerCase();
 
@@ -115,11 +115,11 @@ export function processLoreTriggers(
       });
 
       if (!initialLoad) {
-        // if (isActive) {
-        //   addNotification(`📜 Lore discovered: ${loreItem.title}`, "success");
-        // } else {
-        //   addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
-        // }
+        if (isActive) {
+          addNotification(`📜 Lore discovered: ${loreItem.title}`, "success");
+        } else {
+          addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
+        }
       }
     } else if (isActive && !loreItem.alwaysOn && shouldTurnOn) {
       // Refresh lastTriggeredIndex if lore is re-triggered

@@ -3559,7 +3559,9 @@ function RelationshipsEditor({
               key={index}
               className="flex items-start gap-3 p-4 bg-pink-50 dark:bg-pink-900/20 rounded-lg border border-pink-200 dark:border-pink-800"
             >
-              <div className="text-3xl shrink-0">{rel.symbol}</div>
+              <div className="shrink-0">
+                <DynamicIcon name={rel.symbol} className="w-8 h-8" />
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2 flex-wrap mb-1">
                   <span>{rel.name}</span>
@@ -4152,6 +4154,18 @@ export default function MenuPage({
 
     setDeleting(true);
     try {
+      // Check if this is a local story
+      if (storyDbId.startsWith("local_")) {
+        const { deleteLocalStory } = await import(
+          "../misc/localStoryManager"
+        );
+        await deleteLocalStory(storyDbId);
+        addNotification("Story deleted", "info");
+        router.push("/library");
+        return;
+      }
+
+      // Online story - use API
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -4386,6 +4400,18 @@ export default function MenuPage({
 
                   setDeleting(true);
                   try {
+                    // Check if this is a local story
+                    if (storyDbId.startsWith("local_")) {
+                      const { deleteLocalStory } = await import(
+                        "../misc/localStoryManager"
+                      );
+                      await deleteLocalStory(storyDbId);
+                      addNotification("Story deleted", "info");
+                      router.push("/library");
+                      return;
+                    }
+
+                    // Online story - use API
                     const {
                       data: { session },
                     } = await supabase.auth.getSession();
@@ -4904,11 +4930,11 @@ export default function MenuPage({
                 { id: "lore", label: "Lore", icon: "Book" },
                 { id: "tables", label: "Tables", icon: "Dices" },
                 { id: "relationships", label: "Relationships", icon: "Users" },
+                { id: "mythic", label: "Mythic", icon: "Sparkles" },
                 ...(storyData.mythicState
                   ? [
                       { id: "threads", label: "Threads", icon: "ListTodo" },
                       { id: "characters", label: "NPCs", icon: "Users" },
-                      { id: "mythic", label: "Mythic", icon: "Sparkles" },
                     ]
                   : []),
                 { id: "story", label: "Story", icon: "BookOpen" },
@@ -5377,46 +5403,92 @@ export default function MenuPage({
                 </div>
               )}
 
-              {activeTab === "mythic" && storyData.mythicState && (
+              {activeTab === "mythic" && (
                 <div className="mt-4 space-y-6">
                   <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                     <DynamicIcon name="Sparkles" className="w-6 h-6" />
                     Mythic GME Settings
                   </h4>
 
-                  {/* Chaos Factor */}
+                  {/* Enable/Disable Mythic GME */}
                   <div className="p-6 bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600">
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                      Chaos Factor: {storyData.mythicState.chaosFactor}
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="9"
-                      value={storyData.mythicState.chaosFactor}
-                      onChange={(e) => {
-                        onUpdateStoryData({
-                          mythicState: {
-                            ...storyData.mythicState!,
-                            chaosFactor: parseInt(e.target.value),
-                          },
-                        });
-                      }}
-                      className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                    />
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                      {storyData.mythicState.chaosFactor <= 3 &&
-                        "Very Ordered - Things go as expected"}
-                      {storyData.mythicState.chaosFactor > 3 &&
-                        storyData.mythicState.chaosFactor <= 5 &&
-                        "Normal - Standard chaos level"}
-                      {storyData.mythicState.chaosFactor > 5 &&
-                        storyData.mythicState.chaosFactor <= 7 &&
-                        "Chaotic - Unexpected twists likely"}
-                      {storyData.mythicState.chaosFactor > 7 &&
-                        "Extreme Chaos - Anything can happen!"}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          Enable Mythic GME
+                        </label>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Use Mythic Game Master Emulator for dynamic story
+                          generation
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!storyData.mythicState}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              // Enable Mythic with default state
+                              onUpdateStoryData({
+                                mythicState: {
+                                  chaosFactor: 5,
+                                  threads: [],
+                                  characters: [],
+                                  sceneCount: 0,
+                                  skillCheckHistory: [],
+                                  currentStreak: 0,
+                                  lastChaosAdjustment: -999,
+                                },
+                              });
+                            } else {
+                              // Disable Mythic
+                              onUpdateStoryData({
+                                mythicState: undefined,
+                              });
+                            }
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-14 h-7 bg-gray-300 dark:bg-gray-700 peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+                      </label>
+                    </div>
                   </div>
+
+                  {storyData.mythicState && (
+                    <>
+                      {/* Chaos Factor */}
+                      <div className="p-6 bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                          Chaos Factor: {storyData.mythicState.chaosFactor}
+                        </label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="9"
+                          value={storyData.mythicState.chaosFactor}
+                          onChange={(e) => {
+                            onUpdateStoryData({
+                              mythicState: {
+                                ...storyData.mythicState!,
+                                chaosFactor: parseInt(e.target.value),
+                              },
+                            });
+                          }}
+                          className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                        />
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                          {storyData.mythicState.chaosFactor <= 3 &&
+                            "Very Ordered - Things go as expected"}
+                          {storyData.mythicState.chaosFactor > 3 &&
+                            storyData.mythicState.chaosFactor <= 5 &&
+                            "Normal - Standard chaos level"}
+                          {storyData.mythicState.chaosFactor > 5 &&
+                            storyData.mythicState.chaosFactor <= 7 &&
+                            "Chaotic - Unexpected twists likely"}
+                          {storyData.mythicState.chaosFactor > 7 &&
+                            "Extreme Chaos - Anything can happen!"}
+                        </p>
+                      </div>
 
                   {/* Scene Count */}
                   <div className="p-6 bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600">
@@ -5638,6 +5710,8 @@ export default function MenuPage({
                       </div>
                     </div>
                   </div>
+                    </>
+                  )}
                 </div>
               )}
 

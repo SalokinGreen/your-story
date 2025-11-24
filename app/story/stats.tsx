@@ -502,7 +502,9 @@ export default function StatsPage(storyData: StoryData) {
                       key={index}
                       className="flex flex-row items-start gap-3 p-4 rounded-lg bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800"
                     >
-                      <div className="shrink-0 text-3xl">{rel.symbol}</div>
+                      <div className="shrink-0">
+                        <DynamicIcon name={rel.symbol} className="w-8 h-8" />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-row items-center justify-between mb-2 gap-2">
                           <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">

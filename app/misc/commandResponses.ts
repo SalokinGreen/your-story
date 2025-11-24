@@ -18,6 +18,7 @@ import {
   findAchievementMatch,
   findQuestMatch,
   findRelationshipMatch,
+  findLoreMatch,
 } from "./fuzzyMatch";
 import { logger } from "./logger";
 
@@ -1068,16 +1069,18 @@ export function executeCommandWithResponse(
   if (achievementMatch) {
     const achievementTitle = achievementMatch[1].trim();
 
-    // Use exact match only - no fuzzy matching for achievements
-    const existing = storyData.achievements.find(
-      (a) => a.title.toLowerCase() === achievementTitle.toLowerCase()
+    // Use fuzzy matching to handle AI variations
+    const matchResult = findAchievementMatch(
+      achievementTitle,
+      storyData.achievements
     );
+    const existing = matchResult?.item;
 
     if (!existing) {
       return {
         command: trimmed,
         success: false,
-        message: `Achievement "${achievementTitle}" not found (exact match required)`,
+        message: `Achievement "${achievementTitle}" not found`,
         timestamp,
       };
     }
@@ -1099,10 +1102,17 @@ export function executeCommandWithResponse(
       points: existing.points,
     });
 
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${achievementTitle}" → "${existing.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
+        : "";
+
     return {
       command: trimmed,
       success: true,
-      message: `Unlocked achievement "${existing.title}" (+${existing.points} points)`,
+      message: `Unlocked achievement "${existing.title}" (+${existing.points} points)${fuzzyNote}`,
       timestamp,
     };
   }
@@ -1178,7 +1188,9 @@ export function executeCommandWithResponse(
 
     if (!storyData.lore) storyData.lore = [];
 
-    const loreEntry = storyData.lore.find((l) => l.title === loreTitle);
+    const matchResult = findLoreMatch(loreTitle, storyData.lore);
+    const loreEntry = matchResult?.item;
+
     if (!loreEntry) {
       return {
         command: trimmed,
@@ -1190,14 +1202,21 @@ export function executeCommandWithResponse(
 
     loreEntry.content = loreEntry.content.trim() + "\n" + newText;
     logger.action("Content added to lore via command response", {
-      title: loreTitle,
+      title: loreEntry.title,
       addedText: newText,
     });
+
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
+        : "";
 
     return {
       command: trimmed,
       success: true,
-      message: `Added content to lore "${loreTitle}"`,
+      message: `Added content to lore "${loreEntry.title}"${fuzzyNote}`,
       timestamp,
     };
   }
@@ -1213,7 +1232,9 @@ export function executeCommandWithResponse(
 
     if (!storyData.lore) storyData.lore = [];
 
-    const loreEntry = storyData.lore.find((l) => l.title === loreTitle);
+    const matchResult = findLoreMatch(loreTitle, storyData.lore);
+    const loreEntry = matchResult?.item;
+
     if (!loreEntry) {
       return {
         command: trimmed,
@@ -1234,15 +1255,22 @@ export function executeCommandWithResponse(
 
     loreEntry.content = loreEntry.content.replace(oldText, newText);
     logger.action("Lore content replaced via command response", {
-      title: loreTitle,
+      title: loreEntry.title,
       oldText,
       newText,
     });
 
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
+        : "";
+
     return {
       command: trimmed,
       success: true,
-      message: `Replaced content in lore "${loreTitle}"`,
+      message: `Replaced content in lore "${loreEntry.title}"${fuzzyNote}`,
       timestamp,
     };
   }
@@ -1257,7 +1285,9 @@ export function executeCommandWithResponse(
 
     if (!storyData.lore) storyData.lore = [];
 
-    const loreEntry = storyData.lore.find((l) => l.title === loreTitle);
+    const matchResult = findLoreMatch(loreTitle, storyData.lore);
+    const loreEntry = matchResult?.item;
+
     if (!loreEntry) {
       return {
         command: trimmed,
@@ -1282,14 +1312,21 @@ export function executeCommandWithResponse(
     loreEntry.content = loreEntry.content.replace(/\n{3,}/g, "\n\n");
 
     logger.action("Content deleted from lore via command response", {
-      title: loreTitle,
+      title: loreEntry.title,
       deletedText: textToDelete,
     });
+
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
+        : "";
 
     return {
       command: trimmed,
       success: true,
-      message: `Deleted content from lore "${loreTitle}"`,
+      message: `Deleted content from lore "${loreEntry.title}"${fuzzyNote}`,
       timestamp,
     };
   }

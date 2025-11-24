@@ -1201,9 +1201,12 @@ export function calculateResourceRequirements(
   recovery: number;
   loss: number;
 } {
-  // For systems with 0 divisors or 0 DC, use minimum values
+  // For systems with 0 divisors, return Infinity (division by zero)
+  // For 0 DC, use minimum values
   const safeRequired =
-    system.resources.requiredDivisor === 0 || dc === 0
+    system.resources.requiredDivisor === 0
+      ? Infinity
+      : dc === 0
       ? system.resources.minRequired
       : Math.max(
           system.resources.minRequired,
@@ -1211,7 +1214,9 @@ export function calculateResourceRequirements(
         );
 
   const safePenalty =
-    system.resources.penaltyDivisor === 0 || dc === 0
+    system.resources.penaltyDivisor === 0
+      ? Infinity
+      : dc === 0
       ? system.resources.minPenalty
       : Math.max(
           system.resources.minPenalty,
@@ -1219,7 +1224,9 @@ export function calculateResourceRequirements(
         );
 
   const safeRecovery =
-    system.resources.recoverDivisor === 0 || dc === 0
+    system.resources.recoverDivisor === 0
+      ? Infinity
+      : dc === 0
       ? system.resources.minRecover
       : Math.max(
           system.resources.minRecover,
@@ -1227,7 +1234,9 @@ export function calculateResourceRequirements(
         );
 
   const safeLoss =
-    system.resources.lossDivisor === 0 || dc === 0
+    system.resources.lossDivisor === 0
+      ? Infinity
+      : dc === 0
       ? system.resources.minLoss
       : Math.max(
           system.resources.minLoss,

@@ -120,11 +120,26 @@ export function buildInfoMessage(storyData: StoryData): string {
 
   // Build quests section if any exist
   const activeQuests = storyData.quests?.filter((q) => q.active) || [];
-  const questsSection = activeQuests.length
-    ? `Active Quests:\n${activeQuests
-        .map((q) => `- ${q.title}: ${q.description}`)
-        .join("\n")}`
-    : "";
+  const inactiveQuests =
+    storyData.quests?.filter((q) => !q.active && !q.fulfilled) || [];
+  const questsSection =
+    activeQuests.length || inactiveQuests.length
+      ? `${
+          activeQuests.length
+            ? `Active Quests:\n${activeQuests
+                .map((q) => `- ${q.title}: ${q.description}`)
+                .join("\n")}`
+            : ""
+        }${
+          inactiveQuests.length
+            ? `${
+                activeQuests.length ? "\n\n" : ""
+              }Inactive Quests (not yet started):\n${inactiveQuests
+                .map((q) => `- ${q.title}`)
+                .join("\n")}`
+            : ""
+        }`
+      : "";
 
   // Build mythic GME section if enabled
   const mythicSection = storyData.mythicState

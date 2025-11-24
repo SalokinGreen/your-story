@@ -221,8 +221,11 @@ export async function PATCH(
       updateData.is_published = body.isPublished;
     if (body.isFeatured !== undefined) updateData.is_featured = body.isFeatured;
     if (body.nsfw !== undefined) updateData.nsfw = body.nsfw;
-    if (body.storyTemplate !== undefined)
+    if (body.storyTemplate !== undefined) {
       updateData.story_template = body.storyTemplate;
+      // Extract mythic_state from storyTemplate if present
+      updateData.mythic_state = body.storyTemplate?.mythicState || null;
+    }
     if (body.selectedPreset !== undefined)
       updateData.selected_preset = body.selectedPreset;
     if (body.presets !== undefined) updateData.presets = body.presets;
