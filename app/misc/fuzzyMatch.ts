@@ -104,7 +104,7 @@ export function findBestMatch<T>(
  */
 export function findStatMatch(
   searchName: string | undefined,
-  stats: Array<{ name: string; value: number }>
+  stats: Array<{ name: string; value: number; [key: string]: any }>
 ) {
   return findBestMatch(searchName, stats, (stat) => stat.name, 0.6);
 }
@@ -114,7 +114,7 @@ export function findStatMatch(
  */
 export function findResourceMatch(
   searchName: string | undefined,
-  resources: Array<{ name: string; value: number; maxValue: number }>
+  resources: Array<{ name: string; value: number; maxValue: number; [key: string]: any }>
 ) {
   return findBestMatch(searchName, resources, (resource) => resource.name, 0.6);
 }

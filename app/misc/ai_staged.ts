@@ -501,6 +501,7 @@ Return a plain list of choices, one per line, starting with a dash:
 
 Choice Syntax:
 ${rpgSystem.aiInstructions.choiceSyntax}
+! Only use stats and resources that the player owns!
 
 ⚠️ EXACT NAME MATCHING REQUIREMENT:
 When referencing skills, resources, or items in choices, you MUST use the EXACT names as they appear in the game state below.

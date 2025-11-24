@@ -4,6 +4,11 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import TTSControls from "../components/TTSControls";
 import { DynamicIcon } from "../components/DynamicIcon";
+import {
+  findStatMatch,
+  findResourceMatch,
+  findItemMatch,
+} from "../misc/fuzzyMatch";
 
 interface StoryProps {
   storyData: StoryData;
@@ -568,12 +573,11 @@ const choice_button_factory = (
 ) => {};
 const convert_choice_to_text = (choice: Choice, storyData: StoryData) => {
   const icons: React.ReactNode[] = [];
-  
-  // Skill icon
+
+  // Skill icon - use fuzzy matching
   if (choice.skill_used) {
-    const skill = storyData.stats.find(
-      (stat) => stat.name === choice.skill_used
-    );
+    const matchResult = findStatMatch(choice.skill_used, storyData.stats);
+    const skill = matchResult?.item;
     if (skill?.symbol) {
       icons.push(
         <DynamicIcon
@@ -585,11 +589,13 @@ const convert_choice_to_text = (choice: Choice, storyData: StoryData) => {
     }
   }
 
-  // Resource icon
+  // Resource icon - use fuzzy matching
   if (choice.resource_used) {
-    const resource = storyData.resources.find(
-      (res) => res.name === choice.resource_used
+    const matchResult = findResourceMatch(
+      choice.resource_used,
+      storyData.resources
     );
+    const resource = matchResult?.item;
     if (resource?.symbol) {
       icons.push(
         <DynamicIcon
@@ -601,11 +607,10 @@ const convert_choice_to_text = (choice: Choice, storyData: StoryData) => {
     }
   }
 
-  // Item icon
+  // Item icon - use fuzzy matching
   if (choice.item_used) {
-    const item = storyData.inventory.find(
-      (inv) => inv.name === choice.item_used
-    );
+    const matchResult = findItemMatch(choice.item_used, storyData.inventory);
+    const item = matchResult?.item;
     if (item?.symbol) {
       icons.push(
         <DynamicIcon

@@ -4156,9 +4156,7 @@ export default function MenuPage({
     try {
       // Check if this is a local story
       if (storyDbId.startsWith("local_")) {
-        const { deleteLocalStory } = await import(
-          "../misc/localStoryManager"
-        );
+        const { deleteLocalStory } = await import("../misc/localStoryManager");
         await deleteLocalStory(storyDbId);
         addNotification("Story deleted", "info");
         router.push("/library");
@@ -5490,226 +5488,236 @@ export default function MenuPage({
                         </p>
                       </div>
 
-                  {/* Scene Count */}
-                  <div className="p-6 bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600">
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                      Scene Count: {storyData.mythicState.sceneCount}
-                    </label>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          onUpdateStoryData({
-                            mythicState: {
-                              ...storyData.mythicState!,
-                              sceneCount: Math.max(
-                                0,
-                                storyData.mythicState!.sceneCount - 1
-                              ),
-                            },
-                          });
-                        }}
-                        className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
-                      >
-                        -1
-                      </button>
-                      <button
-                        onClick={() => {
-                          onUpdateStoryData({
-                            mythicState: {
-                              ...storyData.mythicState!,
-                              sceneCount: storyData.mythicState!.sceneCount + 1,
-                            },
-                          });
-                        }}
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
-                      >
-                        +1 Scene
-                      </button>
-                      <button
-                        onClick={() => {
-                          onUpdateStoryData({
-                            mythicState: {
-                              ...storyData.mythicState!,
-                              sceneCount: 0,
-                            },
-                          });
-                        }}
-                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
-                      >
-                        Reset
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Performance Tracking */}
-                  {storyData.mythicState && (
-                    <div className="p-6 bg-gradient to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 rounded-lg border-2 border-gray-300 dark:border-gray-700">
-                      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
-                        <DynamicIcon name="TrendingUp" className="w-4 h-4" />
-                        Performance Tracking
-                      </h4>
-
-                      {/* Current Streak */}
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-gray-600 dark:text-gray-400">
-                            Current Streak
-                          </span>
-                          <span
-                            className={`text-sm font-bold ${
-                              storyData.mythicState.currentStreak > 0
-                                ? "text-green-400"
-                                : storyData.mythicState.currentStreak < 0
-                                ? "text-red-400"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            {storyData.mythicState.currentStreak > 0 && "+"}
-                            {storyData.mythicState.currentStreak || 0}
-                            {Math.abs(storyData.mythicState.currentStreak) >=
-                              3 && " 🔥"}
-                          </span>
-                        </div>
-                        <div className="h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full transition-all ${
-                              storyData.mythicState.currentStreak > 0
-                                ? "bg-green-500"
-                                : "bg-red-500"
-                            }`}
-                            style={{
-                              width: `${Math.min(
-                                Math.abs(storyData.mythicState.currentStreak) *
-                                  20,
-                                100
-                              )}%`,
+                      {/* Scene Count */}
+                      <div className="p-6 bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                          Scene Count: {storyData.mythicState.sceneCount}
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              onUpdateStoryData({
+                                mythicState: {
+                                  ...storyData.mythicState!,
+                                  sceneCount: Math.max(
+                                    0,
+                                    storyData.mythicState!.sceneCount - 1
+                                  ),
+                                },
+                              });
                             }}
-                          />
+                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                          >
+                            -1
+                          </button>
+                          <button
+                            onClick={() => {
+                              onUpdateStoryData({
+                                mythicState: {
+                                  ...storyData.mythicState!,
+                                  sceneCount:
+                                    storyData.mythicState!.sceneCount + 1,
+                                },
+                              });
+                            }}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                          >
+                            +1 Scene
+                          </button>
+                          <button
+                            onClick={() => {
+                              onUpdateStoryData({
+                                mythicState: {
+                                  ...storyData.mythicState!,
+                                  sceneCount: 0,
+                                },
+                              });
+                            }}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+                          >
+                            Reset
+                          </button>
                         </div>
                       </div>
 
-                      {/* Recent Performance */}
-                      {storyData.mythicState.skillCheckHistory.length > 0 && (
-                        <div>
-                          <span className="text-xs text-gray-600 dark:text-gray-400 block mb-2">
-                            Last{" "}
-                            {storyData.mythicState.skillCheckHistory.length}{" "}
-                            Checks
-                          </span>
-                          <div className="flex gap-1 flex-wrap">
-                            {storyData.mythicState.skillCheckHistory
-                              .slice(-10)
-                              .map((check, i) => (
-                                <div
-                                  key={i}
-                                  className={`w-4 h-4 rounded-sm ${
-                                    check.success
-                                      ? "bg-green-500"
-                                      : "bg-red-500"
-                                  }`}
-                                  title={`${check.skill}: ${
-                                    check.success ? "Success" : "Failure"
-                                  } (${check.margin > 0 ? "+" : ""}${
-                                    check.margin
-                                  })`}
-                                />
-                              ))}
+                      {/* Performance Tracking */}
+                      {storyData.mythicState && (
+                        <div className="p-6 bg-gradient to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 rounded-lg border-2 border-gray-300 dark:border-gray-700">
+                          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+                            <DynamicIcon
+                              name="TrendingUp"
+                              className="w-4 h-4"
+                            />
+                            Performance Tracking
+                          </h4>
+
+                          {/* Current Streak */}
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs text-gray-600 dark:text-gray-400">
+                                Current Streak
+                              </span>
+                              <span
+                                className={`text-sm font-bold ${
+                                  storyData.mythicState.currentStreak > 0
+                                    ? "text-green-400"
+                                    : storyData.mythicState.currentStreak < 0
+                                    ? "text-red-400"
+                                    : "text-gray-400"
+                                }`}
+                              >
+                                {storyData.mythicState.currentStreak > 0 && "+"}
+                                {storyData.mythicState.currentStreak || 0}
+                                {Math.abs(
+                                  storyData.mythicState.currentStreak
+                                ) >= 3 && " 🔥"}
+                              </span>
+                            </div>
+                            <div className="h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all ${
+                                  storyData.mythicState.currentStreak > 0
+                                    ? "bg-green-500"
+                                    : "bg-red-500"
+                                }`}
+                                style={{
+                                  width: `${Math.min(
+                                    Math.abs(
+                                      storyData.mythicState.currentStreak
+                                    ) * 20,
+                                    100
+                                  )}%`,
+                                }}
+                              />
+                            </div>
                           </div>
-                          <div className="flex justify-between mt-2 text-xs">
-                            <span className="text-green-400">
-                              {
-                                storyData.mythicState.skillCheckHistory.filter(
-                                  (c) => c.success
-                                ).length
-                              }{" "}
-                              wins
-                            </span>
-                            <span className="text-red-400">
-                              {
-                                storyData.mythicState.skillCheckHistory.filter(
-                                  (c) => !c.success
-                                ).length
-                              }{" "}
-                              losses
-                            </span>
+
+                          {/* Recent Performance */}
+                          {storyData.mythicState.skillCheckHistory.length >
+                            0 && (
+                            <div>
+                              <span className="text-xs text-gray-600 dark:text-gray-400 block mb-2">
+                                Last{" "}
+                                {storyData.mythicState.skillCheckHistory.length}{" "}
+                                Checks
+                              </span>
+                              <div className="flex gap-1 flex-wrap">
+                                {storyData.mythicState.skillCheckHistory
+                                  .slice(-10)
+                                  .map((check, i) => (
+                                    <div
+                                      key={i}
+                                      className={`w-4 h-4 rounded-sm ${
+                                        check.success
+                                          ? "bg-green-500"
+                                          : "bg-red-500"
+                                      }`}
+                                      title={`${check.skill}: ${
+                                        check.success ? "Success" : "Failure"
+                                      } (${check.margin > 0 ? "+" : ""}${
+                                        check.margin
+                                      })`}
+                                    />
+                                  ))}
+                              </div>
+                              <div className="flex justify-between mt-2 text-xs">
+                                <span className="text-green-400">
+                                  {
+                                    storyData.mythicState.skillCheckHistory.filter(
+                                      (c) => c.success
+                                    ).length
+                                  }{" "}
+                                  wins
+                                </span>
+                                <span className="text-red-400">
+                                  {
+                                    storyData.mythicState.skillCheckHistory.filter(
+                                      (c) => !c.success
+                                    ).length
+                                  }{" "}
+                                  losses
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Next Adjustment Info */}
+                          <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400">
+                            {storyData.mythicState.sceneCount -
+                              storyData.mythicState.lastChaosAdjustment <
+                            2 ? (
+                              <span className="flex items-center gap-1">
+                                <DynamicIcon name="Clock" className="w-3 h-3" />
+                                Chaos stabilizing (adjusted recently)
+                              </span>
+                            ) : storyData.mythicState.skillCheckHistory.length <
+                              5 ? (
+                              <span className="flex items-center gap-1">
+                                <DynamicIcon
+                                  name="Activity"
+                                  className="w-3 h-3"
+                                />
+                                Building performance history (
+                                {storyData.mythicState.skillCheckHistory.length}
+                                /5 checks)
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <DynamicIcon name="Zap" className="w-3 h-3" />
+                                Chaos may adjust at next scene transition
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}
 
-                      {/* Next Adjustment Info */}
-                      <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400">
-                        {storyData.mythicState.sceneCount -
-                          storyData.mythicState.lastChaosAdjustment <
-                        2 ? (
-                          <span className="flex items-center gap-1">
-                            <DynamicIcon name="Clock" className="w-3 h-3" />
-                            Chaos stabilizing (adjusted recently)
-                          </span>
-                        ) : storyData.mythicState.skillCheckHistory.length <
-                          5 ? (
-                          <span className="flex items-center gap-1">
-                            <DynamicIcon name="Activity" className="w-3 h-3" />
-                            Building performance history (
-                            {storyData.mythicState.skillCheckHistory.length}/5
-                            checks)
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1">
-                            <DynamicIcon name="Zap" className="w-3 h-3" />
-                            Chaos may adjust at next scene transition
-                          </span>
-                        )}
+                      {/* Quick Stats */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                          <div className="text-2xl font-bold text-purple-600">
+                            {
+                              storyData.mythicState.threads.filter(
+                                (t) => t.status === "active"
+                              ).length
+                            }
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Active Threads
+                          </div>
+                        </div>
+                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                          <div className="text-2xl font-bold text-purple-600">
+                            {
+                              storyData.mythicState.characters.filter(
+                                (c) => c.status === "active"
+                              ).length
+                            }
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Active NPCs
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                          <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                            {
+                              storyData.mythicState.threads.filter(
+                                (t) => t.status === "closed"
+                              ).length
+                            }
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Closed Threads
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                          <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                            {storyData.mythicState.characters.length}
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Total NPCs
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Quick Stats */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {
-                          storyData.mythicState.threads.filter(
-                            (t) => t.status === "active"
-                          ).length
-                        }
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Active Threads
-                      </div>
-                    </div>
-                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {
-                          storyData.mythicState.characters.filter(
-                            (c) => c.status === "active"
-                          ).length
-                        }
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Active NPCs
-                      </div>
-                    </div>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                      <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
-                        {
-                          storyData.mythicState.threads.filter(
-                            (t) => t.status === "closed"
-                          ).length
-                        }
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Closed Threads
-                      </div>
-                    </div>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                      <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
-                        {storyData.mythicState.characters.length}
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Total NPCs
-                      </div>
-                    </div>
-                  </div>
                     </>
                   )}
                 </div>
