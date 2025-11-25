@@ -249,10 +249,10 @@ export default function Story({
               )}
             </div>
 
-            {/* Right side: TTS */}
+            {/* Right side: TTS - available as soon as story text is ready */}
             <TTSControls
               text={storyText}
-              disabled={loading || !!loadingStage}
+              disabled={loading || loadingStage === "story"}
             />
           </div>
         )}

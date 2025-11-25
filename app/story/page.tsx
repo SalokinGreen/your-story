@@ -2049,7 +2049,8 @@ function StoryPageContent() {
             );
             const result = await response.json().catch(() => null);
             await saveLocalStory(storyDbId, updatedStoryData, null, {
-              serverUpdatedAt: result?.story?.updated_at || new Date().toISOString(),
+              serverUpdatedAt:
+                result?.story?.updated_at || new Date().toISOString(),
               markAsSynced: true,
               isLocalEdit: true,
             });
