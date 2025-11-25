@@ -3231,12 +3231,7 @@ function StoryPageContent() {
           ...yzeData, // Spread YZE-specific data
         });
 
-        // Wait for dice visualizer animation to complete before continuing.
-        // Total phases: rolling (1800ms) + stopped (800ms) + calculating (1200ms) + result hold (5000ms) = 8800ms.
-        // Add small buffer.
-        await new Promise((resolve) => setTimeout(resolve, 9000));
-        setDiceRoll(null);
-
+        // Process result notifications immediately (don't wait for animation)
         if (dc_passed) {
           // Only set to "success" if not already set to partial/tie/style
           if (
@@ -3689,80 +3684,94 @@ function StoryPageContent() {
       }
     };
 
+    // Create dice animation promise (if dice roll is showing)
+    // Animation runs in parallel with generation - don't block on it
+    const diceAnimationPromise = diceRoll?.show
+      ? new Promise<void>((resolve) => {
+          // Total phases: rolling (1800ms) + stopped (800ms) + calculating (1200ms) + result hold (5000ms) = 8800ms
+          setTimeout(() => {
+            setDiceRoll(null);
+            resolve();
+          }, 9000);
+        })
+      : Promise.resolve();
+
     try {
-      await generateStoryTurn(
-        storyData,
-        "", // User choice already in storyData.scene.parts
-        {
-          storyModel,
-          toolsModel,
-          choicesModel,
-          enableTools: toolCallingEnabled,
-          maxToolLoops,
-        },
-        {
-          onStoryContent: (chunk: string, fullContent: string) => {
-            // Update partial part as content streams
-            partialPart.content = fullContent;
-
-            // Only add to scene once (when we first get content)
-            if (
-              storyData.scene.parts[storyData.scene.parts.length - 1] !==
-              partialPart
-            ) {
-              storyData.scene.parts = [...storyData.scene.parts, partialPart];
-            }
-
-            setStoryText(fullContent);
-            setStoryData({ ...storyData });
-            setLoading(false); // Let player read while tools/choices generate
+      // Run generation and dice animation in parallel
+      await Promise.all([
+        generateStoryTurn(
+          storyData,
+          "", // User choice already in storyData.scene.parts
+          {
+            storyModel,
+            toolsModel,
+            choicesModel,
+            enableTools: toolCallingEnabled,
+            maxToolLoops,
           },
-          onStoryComplete: (content: string, usage: any) => {
-            setLoadingStage("tools");
-            logger.ai_response("Story narration complete", {
-              length: content.length,
-              usage,
-            });
-          },
-          onToolsStart: () => {
-            // Keep showing tools stage while either is running
-          },
-          onToolsComplete: (toolCalls, toolResponses, usage) => {
-            // Update the last part with tool data
-            const lastPartIndex = storyData.scene.parts.length - 1;
-            if (lastPartIndex >= 0) {
-              storyData.scene.parts[lastPartIndex] = {
-                ...storyData.scene.parts[lastPartIndex],
-                toolCalls,
-                toolResponses,
-              };
-            }
+          {
+            onStoryContent: (chunk: string, fullContent: string) => {
+              // Update partial part as content streams
+              partialPart.content = fullContent;
 
-            // Store tool responses for AI feedback in next turn
-            setPendingCommandResponses(toolResponses);
+              // Only add to scene once (when we first get content)
+              if (
+                storyData.scene.parts[storyData.scene.parts.length - 1] !==
+                partialPart
+              ) {
+                storyData.scene.parts = [...storyData.scene.parts, partialPart];
+              }
 
-            setStoryData({ ...storyData });
-            toolsComplete = true;
-            checkBothComplete();
+              setStoryText(fullContent);
+              setStoryData({ ...storyData });
+              setLoading(false); // Let player read while tools/choices generate
+            },
+            onStoryComplete: (content: string, usage: any) => {
+              setLoadingStage("tools");
+              logger.ai_response("Story narration complete", {
+                length: content.length,
+                usage,
+              });
+            },
+            onToolsStart: () => {
+              // Keep showing tools stage while either is running
+            },
+            onToolsComplete: (toolCalls, toolResponses, usage) => {
+              // Update the last part with tool data
+              const lastPartIndex = storyData.scene.parts.length - 1;
+              if (lastPartIndex >= 0) {
+                storyData.scene.parts[lastPartIndex] = {
+                  ...storyData.scene.parts[lastPartIndex],
+                  toolCalls,
+                  toolResponses,
+                };
+              }
 
-            logger.ai_response("Tools complete", {
-              toolCallsCount: toolCalls.length,
-              responsesCount: toolResponses.length,
-              usage,
-            });
-          },
-          onChoicesStart: () => {
-            // Keep showing tools stage while either is running
-          },
-          onChoicesComplete: (newChoices, usage) => {
-            // Update the last part with choices
-            const lastPartIndex = storyData.scene.parts.length - 1;
-            if (lastPartIndex >= 0) {
-              storyData.scene.parts[lastPartIndex] = {
-                ...storyData.scene.parts[lastPartIndex],
-                choices: newChoices,
-              };
-            }
+              // Store tool responses for AI feedback in next turn
+              setPendingCommandResponses(toolResponses);
+
+              setStoryData({ ...storyData });
+              toolsComplete = true;
+              checkBothComplete();
+
+              logger.ai_response("Tools complete", {
+                toolCallsCount: toolCalls.length,
+                responsesCount: toolResponses.length,
+                usage,
+              });
+            },
+            onChoicesStart: () => {
+              // Keep showing tools stage while either is running
+            },
+            onChoicesComplete: (newChoices, usage) => {
+              // Update the last part with choices
+              const lastPartIndex = storyData.scene.parts.length - 1;
+              if (lastPartIndex >= 0) {
+                storyData.scene.parts[lastPartIndex] = {
+                  ...storyData.scene.parts[lastPartIndex],
+                  choices: newChoices,
+                };
+              }
 
             setChoices({ choices: newChoices });
             setStoryData({ ...storyData });
@@ -3835,7 +3844,9 @@ function StoryPageContent() {
           },
         },
         pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined
-      );
+      ),
+        diceAnimationPromise, // Wait for dice animation to complete too
+      ]);
     } catch (error: any) {
       addNotification(`Error: ${error.message}`, "failure");
       setLoading(false);
