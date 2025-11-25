@@ -214,6 +214,13 @@ You can control how items in arrays are applied using the **_command** field:
     - name: Character name
     - description: Character details
     - status: "active" | "deceased" | "departed"
+- customTables (Array of { id, name, description, entries }) - Random tables for gameplay variety
+  - id: Unique identifier (use "table-" + timestamp for new ones)
+  - name: Table name (e.g., "Weather Conditions", "Random Encounters", "Treasure Loot")
+  - description: What this table is used for
+  - entries: Array of { text, weight } - possible results when rolling on the table
+    - text: The result text that will be shown/used
+    - weight: Probability weight (higher numbers = more likely to be selected). Default is 1.
 
 Notes:
 - All characters should share the same stats and resources, but they may have different values.
@@ -409,6 +416,56 @@ Assistant:
       }
     ]
   }
+}
+\`\`\`"
+
+**Example 9 - Custom Random Tables:**
+User: "Create a weather table with sunny, cloudy, rainy, and stormy options."
+Assistant:
+"I've created a weather random table for your adventure.
+
+\`\`\`json
+{
+  "customTables": [
+    {
+      "id": "table-weather-001",
+      "name": "Weather Conditions",
+      "description": "Roll to determine the current weather",
+      "entries": [
+        { "text": "Sunny - Clear skies and warm temperatures", "weight": 3 },
+        { "text": "Cloudy - Overcast but dry", "weight": 2 },
+        { "text": "Rainy - Steady rain, reduced visibility", "weight": 2 },
+        { "text": "Stormy - Heavy rain and thunder, dangerous conditions", "weight": 1 }
+      ]
+    }
+  ]
+}
+\`\`\`"
+
+**Example 10 - Editing Custom Tables:**
+User: "Add a 'foggy' option to the weather table and delete the encounter table."
+Assistant:
+"I've updated your tables.
+
+\`\`\`json
+{
+  "customTables": [
+    {
+      "name": "Weather Conditions",
+      "entries": [
+        { "text": "Sunny - Clear skies and warm temperatures", "weight": 3 },
+        { "text": "Cloudy - Overcast but dry", "weight": 2 },
+        { "text": "Rainy - Steady rain, reduced visibility", "weight": 2 },
+        { "text": "Stormy - Heavy rain and thunder, dangerous conditions", "weight": 1 },
+        { "text": "Foggy - Dense mist, greatly reduced visibility", "weight": 2 }
+      ],
+      "_command": "replace"
+    },
+    {
+      "name": "Random Encounters",
+      "_command": "delete"
+    }
+  ]
 }
 \`\`\`"
 
