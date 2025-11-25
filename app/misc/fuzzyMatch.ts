@@ -114,7 +114,12 @@ export function findStatMatch(
  */
 export function findResourceMatch(
   searchName: string | undefined,
-  resources: Array<{ name: string; value: number; maxValue: number; [key: string]: any }>
+  resources: Array<{
+    name: string;
+    value: number;
+    maxValue: number;
+    [key: string]: any;
+  }>
 ) {
   return findBestMatch(searchName, resources, (resource) => resource.name, 0.6);
 }

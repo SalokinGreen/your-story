@@ -2337,6 +2337,10 @@ function StoryPageContent() {
       momentum: storyData.momentum,
       maxMomentum: storyData.maxMomentum,
       points: storyData.points,
+      relationships: storyData.relationships || [],
+      quests: storyData.quests || [],
+      mythicState: storyData.mythicState,
+      customTables: storyData.customTables || [],
       plot_beats: storyData.plot_beats.map((beat) => ({
         title: beat.title.substring(0, 100),
         content: beat.content.substring(0, 300),
@@ -3965,6 +3969,10 @@ function StoryPageContent() {
       momentum: storyData.momentum,
       maxMomentum: storyData.maxMomentum,
       points: storyData.points,
+      relationships: storyData.relationships || [],
+      quests: storyData.quests || [],
+      mythicState: storyData.mythicState,
+      customTables: storyData.customTables || [],
       //Trimmednarrativecontext
       plot_beats: storyData.plot_beats.map((beat) => ({
         title: beat.title.substring(0, 100),
@@ -4343,6 +4351,10 @@ function StoryPageContent() {
       momentum: storyData.momentum,
       maxMomentum: storyData.maxMomentum,
       points: storyData.points,
+      relationships: storyData.relationships || [],
+      quests: storyData.quests || [],
+      mythicState: storyData.mythicState,
+      customTables: storyData.customTables || [],
       plot_beats: storyData.plot_beats.map((beat) => ({
         title: beat.title.substring(0, 100),
         content: beat.content.substring(0, 300),

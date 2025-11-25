@@ -654,12 +654,12 @@ Example choices using tables:
       ? `
 
 CUSTOM TABLES:
-The creator has defined these custom weighted-random tables. Use them in choices with custom_table parameter when they fit the narrative:
+The creator has defined these custom weighted-random tables. Use them in choices with the custom_table parameter (inside angle brackets with other metadata) when they fit the narrative:
 ${storyData.customTables.map((t) => `- ${t.name}: ${t.description}`).join("\n")}
 
-Example: "Take a risk [custom_table: ${
+Example: "Take a risk <custom_table: ${
           storyData.customTables[0]?.name || "TableName"
-        }]"`
+        }>"`
       : ""
   }`;
 

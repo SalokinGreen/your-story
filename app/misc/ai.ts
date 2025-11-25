@@ -684,8 +684,12 @@ export function outputToScenePart(text: string): ScenePart {
       // Parse use_resource: name (automatically at risk on failure)
       const resourceMatch = metadata.match(/use_resource:\s*([^;]+?)(?:;|$)/i);
       if (resourceMatch) {
-        const resourceName = resourceMatch[1].trim();
-        if (resourceName.toLowerCase() !== "none") {
+        // Strip DC notation like "(DC 6)" and clean up the name
+        let resourceName = resourceMatch[1].trim()
+          .replace(/\s*\(DC\s*\d+\)/gi, '')
+          .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, '')
+          .trim();
+        if (resourceName.toLowerCase() !== "none" && resourceName.length > 0) {
           choice.resource_used = resourceName;
         }
       }
@@ -693,8 +697,12 @@ export function outputToScenePart(text: string): ScenePart {
       // Parse use_item: name
       const itemMatch = metadata.match(/use_item:\s*([^;]+?)(?:;|$)/i);
       if (itemMatch) {
-        const itemName = itemMatch[1].trim();
-        if (itemName.toLowerCase() !== "none") {
+        // Strip DC notation like "(DC 6)" and clean up the name
+        let itemName = itemMatch[1].trim()
+          .replace(/\s*\(DC\s*\d+\)/gi, '')
+          .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, '')
+          .trim();
+        if (itemName.toLowerCase() !== "none" && itemName.length > 0) {
           choice.item_used = itemName;
         }
       }
@@ -703,6 +711,39 @@ export function outputToScenePart(text: string): ScenePart {
       const lossMatch = metadata.match(/item_loss:\s*(true|false)/i);
       if (lossMatch) {
         choice.item_loss = lossMatch[1].toLowerCase() === "true";
+      }
+
+      // Parse mythic_check: question (likelihood)
+      const mythicCheckMatch = metadata.match(
+        /mythic_check:\s*([^;]+?)(?:;|$)/i
+      );
+      if (mythicCheckMatch) {
+        const mythicCheck = mythicCheckMatch[1].trim();
+        if (mythicCheck.toLowerCase() !== "none") {
+          choice.mythic_check = mythicCheck;
+        }
+      }
+
+      // Parse mythic_table: category
+      const mythicTableMatch = metadata.match(
+        /mythic_table:\s*([^;]+?)(?:;|$)/i
+      );
+      if (mythicTableMatch) {
+        const mythicTable = mythicTableMatch[1].trim();
+        if (mythicTable.toLowerCase() !== "none") {
+          choice.mythic_table = mythicTable;
+        }
+      }
+
+      // Parse custom_table: table name
+      const customTableMatch = metadata.match(
+        /custom_table:\s*([^;]+?)(?:;|$)/i
+      );
+      if (customTableMatch) {
+        const customTable = customTableMatch[1].trim();
+        if (customTable.toLowerCase() !== "none") {
+          choice.custom_table = customTable;
+        }
       }
     }
 

@@ -480,7 +480,11 @@ export async function POST(req: NextRequest) {
               resourceMatch &&
               !resourceMatch[1].trim().toLowerCase().includes("none")
             ) {
-              resourceUsed = resourceMatch[1].trim();
+              // Strip DC notation like "(DC 6)" and clean up the name
+              resourceUsed = resourceMatch[1].trim()
+                .replace(/\s*\(DC\s*\d+\)/gi, '')
+                .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, '')
+                .trim() || undefined;
             }
 
             // Parse use_item: Item or use_item: none
@@ -489,7 +493,11 @@ export async function POST(req: NextRequest) {
               itemMatch &&
               !itemMatch[1].trim().toLowerCase().includes("none")
             ) {
-              itemUsed = itemMatch[1].trim();
+              // Strip DC notation like "(DC 6)" and clean up the name
+              itemUsed = itemMatch[1].trim()
+                .replace(/\s*\(DC\s*\d+\)/gi, '')
+                .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, '')
+                .trim() || undefined;
             }
 
             // Parse mythic_check: question (likelihood) or mythic_check: none
@@ -513,6 +521,29 @@ export async function POST(req: NextRequest) {
             ) {
               mythicTable = mythicTableMatch[1].trim();
             }
+
+            // Parse custom_table: table name or custom_table: none
+            const customTableMatch = metadata.match(
+              /custom_table:\s*([^;]+?)(?:;|$)/i
+            );
+            let customTable: string | undefined;
+            if (
+              customTableMatch &&
+              !customTableMatch[1].trim().toLowerCase().includes("none")
+            ) {
+              customTable = customTableMatch[1].trim();
+            }
+
+            return {
+              text: cleanText,
+              skill_used: skillUsed,
+              skill_dc: skillDC,
+              item_used: itemUsed,
+              resource_used: resourceUsed,
+              mythic_check: mythicCheck,
+              mythic_table: mythicTable,
+              custom_table: customTable,
+            } as Choice;
           }
 
           return {

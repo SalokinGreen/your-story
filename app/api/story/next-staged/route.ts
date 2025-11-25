@@ -460,8 +460,12 @@ export async function POST(req: NextRequest) {
             /use_resource:\s*([^;]+?)(?:;|$)/i
           );
           if (resourceMatch) {
-            const resourceName = resourceMatch[1].trim();
-            if (resourceName.toLowerCase() !== "none") {
+            // Strip DC notation like "(DC 6)" and clean up the name
+            let resourceName = resourceMatch[1].trim()
+              .replace(/\s*\(DC\s*\d+\)/gi, '')
+              .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, '')
+              .trim();
+            if (resourceName.toLowerCase() !== "none" && resourceName.length > 0) {
               choice.resource_used = resourceName;
             }
           }
@@ -469,8 +473,12 @@ export async function POST(req: NextRequest) {
           // Parse use_item: name
           const itemMatch = metadata.match(/use_item:\s*([^;]+?)(?:;|$)/i);
           if (itemMatch) {
-            const itemName = itemMatch[1].trim();
-            if (itemName.toLowerCase() !== "none") {
+            // Strip DC notation like "(DC 6)" and clean up the name
+            let itemName = itemMatch[1].trim()
+              .replace(/\s*\(DC\s*\d+\)/gi, '')
+              .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, '')
+              .trim();
+            if (itemName.toLowerCase() !== "none" && itemName.length > 0) {
               choice.item_used = itemName;
             }
           }
@@ -494,6 +502,17 @@ export async function POST(req: NextRequest) {
             const mythicTable = mythicTableMatch[1].trim();
             if (mythicTable.toLowerCase() !== "none") {
               choice.mythic_table = mythicTable;
+            }
+          }
+
+          // Parse custom_table: table name
+          const customTableMatch = metadata.match(
+            /custom_table:\s*([^;]+?)(?:;|$)/i
+          );
+          if (customTableMatch) {
+            const customTable = customTableMatch[1].trim();
+            if (customTable.toLowerCase() !== "none") {
+              choice.custom_table = customTable;
             }
           }
         }
