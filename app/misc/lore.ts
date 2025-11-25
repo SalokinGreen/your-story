@@ -114,13 +114,13 @@ export function processLoreTriggers(
         triggers: { shouldTurnOn, shouldTurnOff, hasAnyOnTriggersDefined },
       });
 
-      if (!initialLoad) {
-        if (isActive) {
-          addNotification(`📜 Lore discovered: ${loreItem.title}`, "success");
-        } else {
-          addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
-        }
-      }
+      // if (!initialLoad) {
+      //   if (isActive) {
+      //     addNotification(`📜 Lore discovered: ${loreItem.title}`, "success");
+      //   } else {
+      //     addNotification(`📜 Lore hidden: ${loreItem.title}`, "info");
+      //   }
+      // }
     } else if (isActive && !loreItem.alwaysOn && shouldTurnOn) {
       // Refresh lastTriggeredIndex if lore is re-triggered
       loreItem.lastTriggeredIndex = currentPartIndex;
