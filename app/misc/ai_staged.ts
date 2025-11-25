@@ -468,7 +468,11 @@ ${
     // Ask if anything else is needed
     const toolCallSummary = existingToolCalls
       .map((t, i) => {
-        const args = JSON.parse(t.function.arguments || "{}");
+        // Handle arguments that could be string or already-parsed object
+        const args =
+          typeof t.function.arguments === "string"
+            ? JSON.parse(t.function.arguments || "{}")
+            : t.function.arguments || {};
         const argsStr = Object.entries(args)
           .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
           .join(", ");
@@ -558,7 +562,7 @@ ${rpgSystem.aiInstructions.challengeGuidance}
 ${rpgSystem.aiInstructions.dcGuidelines}
 
 Choice Design Guidelines:
-- Offer 6-8 meaningful choices that reflect different approaches or priorities
+- Offer 3-8 meaningful choices that reflect different approaches or priorities
 - Each choice should have clear stakes and potential consequences
 - Use skill checks for challenging actions
 - Use items for tactical advantages when appropriate

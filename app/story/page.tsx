@@ -71,113 +71,6 @@ function getModelsFromPreset() {
   };
 }
 
-// Helper function for streaming story generation via SSE
-async function streamStoryGeneration(
-  endpoint: string,
-  payload: any,
-  token: string,
-  callbacks: {
-    onStory: (content: string, usage: any) => void;
-    onTools: (
-      toolCalls: any[],
-      toolResponses: CommandResponse[],
-      usage: any
-    ) => void;
-    onChoices: (choices: Choices, usage: any) => void;
-    onComplete: (meta: any) => void;
-    onError: (message: string) => void;
-  }
-) {
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("No response body");
-
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    // Track which events we've received to prevent duplicates
-    const receivedEvents = {
-      story: false,
-      tools: false,
-      choices: false,
-      complete: false,
-    };
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n\n");
-      buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-
-        try {
-          const data = JSON.parse(line.slice(6));
-
-          switch (data.type) {
-            case "story":
-              if (receivedEvents.story) {
-                console.warn("[Stream] Duplicate story event ignored");
-                break;
-              }
-              receivedEvents.story = true;
-              callbacks.onStory(data.content, data.usage);
-              break;
-            case "tools":
-              if (receivedEvents.tools) {
-                console.warn("[Stream] Duplicate tools event ignored");
-                break;
-              }
-              receivedEvents.tools = true;
-              callbacks.onTools(data.toolCalls, data.toolResponses, data.usage);
-              break;
-            case "choices":
-              if (receivedEvents.choices) {
-                console.warn("[Stream] Duplicate choices event ignored");
-                break;
-              }
-              receivedEvents.choices = true;
-              callbacks.onChoices(data.choices, data.usage);
-              break;
-            case "complete":
-              if (receivedEvents.complete) {
-                console.warn("[Stream] Duplicate complete event ignored");
-                break;
-              }
-              receivedEvents.complete = true;
-              callbacks.onComplete(data.meta);
-              break;
-            case "error":
-              callbacks.onError(data.message);
-              break;
-          }
-        } catch (parseError) {
-          console.error("Failed to parse SSE event:", parseError);
-          logger.error("SSE parse error", { parseError });
-        }
-      }
-    }
-  } catch (error: any) {
-    callbacks.onError(error.message);
-  }
-}
-
 import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { authenticatedFetch } from "../misc/getAuthToken";
@@ -203,6 +96,7 @@ import {
   findRelationshipMatch,
 } from "../misc/fuzzyMatch";
 import { outputToScenePart } from "../misc/ai";
+import { generateStoryTurn } from "../misc/generation";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -2266,149 +2160,18 @@ function StoryPageContent() {
     //ProcessLoretriggersafteruserinput
     processLoreTriggers(storyData, addNotification);
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
-      addNotification("Session expired. Please sign in again.", "failure");
-      setLoading(false);
-      return;
-    }
-
-    //Build minimal payload for AI
-    const MAX_CONTENT_LENGTH = 50000; //Increased limit per part
-
-    //Getcurrentmodelconfigtoestimateneededcontext
-    const modelKey =
-      typeof window !== "undefined"
-        ? localStorage.getItem("aiModel") || "Deepseek Chat"
-        : "Deepseek Chat";
-    const modelConfig = getModelConfig(modelKey);
-
-    // Reserve maxOutputTokens, then split remaining: 75% history, 25% memory (4 chars per token)
-    const CHARS_PER_TOKEN = 4;
-    const availableInputTokens =
-      modelConfig.maxTokens - modelConfig.maxOutputTokens;
-    const neededChars = availableInputTokens * 0.75 * CHARS_PER_TOKEN;
-
-    let currentChars = 0;
-    const partsToSend = [];
-
-    //Iteratebackwardstogatherenoughcontext
-    for (let i = storyData.scene.parts.length - 1; i >= 0; i--) {
-      const part = storyData.scene.parts[i];
-      const content = part.content.substring(0, MAX_CONTENT_LENGTH);
-
-      partsToSend.unshift({
-        content: content,
-        user: part.user,
-        role: part.role,
-        raw: part.raw,
-        // Preserve tool call history so AI can see prior structured function usage
-        toolCalls: part.toolCalls,
-        toolResponses: part.toolResponses,
-      });
-
-      currentChars += content.length;
-      if (currentChars > neededChars) break;
-    }
-
-    console.log(
-      `Context usage: ${
-        partsToSend.length
-      } parts, ${currentChars.toLocaleString()} chars (${Math.round(
-        currentChars / CHARS_PER_TOKEN
-      ).toLocaleString()} tokens) of ${Math.round(
-        neededChars / CHARS_PER_TOKEN
-      ).toLocaleString()} available (75% of ${availableInputTokens.toLocaleString()} input tokens, output: ${modelConfig.maxOutputTokens.toLocaleString()})`
-    );
-
-    const minimalStoryData: any = {
-      story_name: storyData.story_name,
-      premise: storyData.premise?.substring(0, 1500) || "",
-      player_name: storyData.player_name,
-      player_summary: storyData.player_summary?.substring(0, 800) || "",
-      intro: storyData.intro?.substring(0, 1500) || "",
-      rpgSystem: storyData.rpgSystem || "3d6",
-      stats: storyData.stats,
-      resources: storyData.resources,
-      inventory: storyData.inventory,
-      achievements: storyData.achievements,
-      momentum: storyData.momentum,
-      maxMomentum: storyData.maxMomentum,
-      points: storyData.points,
-      relationships: storyData.relationships || [],
-      quests: storyData.quests || [],
-      mythicState: storyData.mythicState,
-      customTables: storyData.customTables || [],
-      plot_beats: storyData.plot_beats.map((beat) => ({
-        title: beat.title.substring(0, 100),
-        content: beat.content.substring(0, 300),
-        fulfilled: beat.fulfilled,
-      })),
-      memory: storyData.memory, //Sendfullmemory,servertruncates
-      lore: storyData.lore
-        .filter((l) => l.on !== false)
-        .map((l) => ({
-          title: l.title.substring(0, 100),
-          content: l.content.substring(0, 500),
-          on: l.on,
-        })),
-      author_notes: storyData.author_notes?.substring(0, 1500) || "",
-      player_notes: storyData.player_notes?.substring(0, 800) || "",
-      chapters: storyData.chapters,
-      currentChapter: storyData.currentChapter,
-      scene: {
-        parts: partsToSend,
-      },
-    };
-
     const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
+    const toolCallingEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("toolCallingEnabled") !== "false"
+        : true;
 
-    const payload = {
-      storyData: minimalStoryData,
-      userChoice: null, // No specific choice, just custom text
-      modelStory: storyModel,
-      modelTools: toolsModel,
-      modelChoices: choicesModel,
-      useRawContext:
-        typeof window !== "undefined"
-          ? localStorage.getItem("useRawContext") === "true"
-          : false,
-      openRouterKey:
-        typeof window !== "undefined"
-          ? localStorage.getItem("openRouterKey") || undefined
-          : undefined,
-      commandResponses:
-        pendingCommandResponses.length > 0
-          ? pendingCommandResponses
-          : undefined,
-      toolCallingEnabled:
-        typeof window !== "undefined"
-          ? localStorage.getItem("toolCallingEnabled") !== "false"
-          : true,
-    };
-
-    const payloadSize = JSON.stringify(payload).length;
-    console.log(
-      `Custom input payload size: ${(payloadSize / 1024).toFixed(2)} KB`
-    );
-
-    const apiEndpoint = "/api/story/next-staged-stream";
-
-    logger.ai_request("Sending custom input to AI (streaming)", {
-      modelStory: storyModel,
-      modelTools: toolsModel,
-      modelChoices: choicesModel,
-      payloadSize,
+    logger.ai_request("Starting generation (custom input)", {
+      storyModel,
+      toolsModel,
+      choicesModel,
+      toolCallingEnabled,
     });
-
-    if (payloadSize > 4 * 1024 * 1024) {
-      addNotification("⚠ Story data too large for generation.", "failure");
-      console.error("Payload exceeds 4MB limit:", payloadSize);
-      setLoading(false);
-      return;
-    }
 
     // Track partial scene part as we stream
     let partialPart: ScenePart = {
@@ -2419,169 +2182,145 @@ function StoryPageContent() {
       choices: [],
     };
 
-    await streamStoryGeneration(apiEndpoint, payload, session.access_token, {
-      onStory: (content: string, usage: any) => {
-        // Story narration arrives first - show immediately!
-        partialPart.content = content;
-        storyData.scene.parts = [...storyData.scene.parts, partialPart];
+    try {
+      await generateStoryTurn(
+        storyData,
+        "", // Custom input already in storyData.scene.parts
+        {
+          storyModel,
+          toolsModel,
+          choicesModel,
+          enableTools: toolCallingEnabled,
+          maxToolLoops: 3,
+        },
+        {
+          onStoryContent: (chunk: string, fullContent: string) => {
+            // Update partial part as content streams
+            partialPart.content = fullContent;
 
-        setStoryText(content);
-        setStoryData({ ...storyData });
-        setLoading(false); // Let player read while tools/choices generate
-        setLoadingStage("tools"); // Now analyzing game state
-
-        logger.ai_response("Story narration received (custom input)", {
-          length: content.length,
-          usage,
-        });
-      },
-      onTools: (
-        toolCalls: any[],
-        toolResponses: CommandResponse[],
-        usage: any
-      ) => {
-        // Tools arrive - update the last part in scene
-        const lastPartIndex = storyData.scene.parts.length - 1;
-        if (lastPartIndex >= 0) {
-          storyData.scene.parts[lastPartIndex] = {
-            ...storyData.scene.parts[lastPartIndex],
-            toolCalls,
-            toolResponses,
-          };
-        }
-
-        // Process tool responses (update stats, inventory, etc.)
-        const lastPart = processSceneParts(
-          [storyData.scene.parts[lastPartIndex]],
-          storyData,
-          addNotification
-        );
-        if (lastPart) {
-          setStoryData({ ...storyData });
-        }
-
-        setLoadingStage("choices"); // Now generating choices
-
-        logger.ai_response("Tool calls received (custom input)", {
-          toolCallsCount: toolCalls?.length || 0,
-          toolResponsesCount: toolResponses?.length || 0,
-          usage,
-        });
-      },
-      onChoices: (newChoices: Choices, usage: any) => {
-        // Choices arrive - update the last part in scene
-        const lastPartIndex = storyData.scene.parts.length - 1;
-        if (lastPartIndex >= 0) {
-          storyData.scene.parts[lastPartIndex] = {
-            ...storyData.scene.parts[lastPartIndex],
-            choices: newChoices.choices,
-          };
-        }
-        setChoices(newChoices);
-        setStoryData({ ...storyData });
-        setLoadingStage(null); // All done
-
-        logger.ai_response("Choices received (custom input)", {
-          choicesCount: newChoices.choices.length,
-          usage,
-        });
-      },
-      onComplete: (meta: any) => {
-        // Remove duplicate parts (safety check) - but preserve the one with choices
-        const seen = new Set<string>();
-        const should_remove = new Set<string>();
-        storyData.scene.parts = storyData.scene.parts.filter((part) => {
-          const key = `${
-            part.user ? "user" : "assistant"
-          }-${part.content.substring(0, 100)}`;
-          if (seen.has(key) && !part.user) {
-            // If this is a duplicate, only remove it if it has no choices
-            // Keep the one with choices (the completed one)
-            if (!part.choices || part.choices.length === 0) {
-              console.log(
-                "[Dedup] Removing duplicate assistant part without choices:",
-                part.content.substring(0, 50)
-              );
-              return false;
-            } else {
-              // Keep this one with choices and remove previous duplicates
-              console.log(
-                "[Dedup] Keeping assistant part with choices, removing previous duplicates:",
-                part.content.substring(0, 50)
-              );
-              should_remove.add(key);
-              return true;
+            // Only add to scene once (when we first get content)
+            if (
+              storyData.scene.parts[storyData.scene.parts.length - 1] !==
+              partialPart
+            ) {
+              storyData.scene.parts = [...storyData.scene.parts, partialPart];
             }
-          }
-          seen.add(key);
-          return true;
-        });
 
-        // Remove any previously marked duplicates
-        // Note: Issue was that earlier duplicates without choices were kept instead of the final one with choices. Now we'
-        const already_removed = new Set<string>();
-        if (should_remove.size > 0) {
-          storyData.scene.parts = storyData.scene.parts.filter((part) => {
-            const key = `${
-              part.user ? "user" : "assistant"
-            }-${part.content.substring(0, 100)}`;
-            if (already_removed.has(key)) {
-              return true;
+            setStoryText(fullContent);
+            setStoryData({ ...storyData });
+            setLoading(false); // Let player read while tools/choices generate
+          },
+          onStoryComplete: (content: string, usage: any) => {
+            setLoadingStage("tools");
+            logger.ai_response("Story narration complete (custom input)", {
+              length: content.length,
+              usage,
+            });
+          },
+          onToolsStart: () => {
+            setLoadingStage("tools");
+          },
+          onToolsComplete: (toolCalls, toolResponses, usage) => {
+            // Update the last part with tool data
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                toolCalls,
+                toolResponses,
+              };
             }
+
+            // Store tool responses for AI feedback in next turn
+            setPendingCommandResponses(toolResponses);
+
+            setLoadingStage("choices");
+            setStoryData({ ...storyData });
+
+            logger.ai_response("Tools complete (custom input)", {
+              toolCallsCount: toolCalls.length,
+              responsesCount: toolResponses.length,
+              usage,
+            });
+          },
+          onChoicesStart: () => {
+            setLoadingStage("choices");
+          },
+          onChoicesComplete: (newChoices, usage) => {
+            // Update the last part with choices
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                choices: newChoices,
+              };
+            }
+
+            setChoices({ choices: newChoices });
+            setStoryData({ ...storyData });
+            setLoadingStage(null);
+
+            logger.ai_response("Choices complete (custom input)", {
+              choicesCount: newChoices.length,
+              usage,
+            });
+          },
+          onComplete: (result) => {
+            // Update token balance
+            if (result.meta.balance !== undefined) {
+              setTokenBalance(result.meta.balance);
+            }
+
+            if (result.meta.totalTokenCost) {
+              addNotification(
+                `✨ Used ${result.meta.totalTokenCost} tokens`,
+                "success"
+              );
+            }
+
+            setCanRetry(true);
+            setCanUndo(true);
+            setLoadingStage(null);
+
+            // Clear command responses after successful generation
+            setPendingCommandResponses([]);
+
+            setStoryData({ ...storyData });
+
+            // Save progress
+            const lastPartForSave =
+              storyData.scene.parts[storyData.scene.parts.length - 1];
             console.log(
-              "[Dedup] Final check, removing duplicate part:",
-              part.content.substring(0, 50)
+              "Saving story (custom input) - last part choices:",
+              lastPartForSave.choices?.length || 0,
+              "choices"
             );
-            already_removed.add(key);
-            return !should_remove.has(key);
-          });
-        }
+            saveProgress(storyData, true);
 
-        // All done - update token balance
-        if (meta?.remainingBalance?.total !== undefined) {
-          setTokenBalance(meta.remainingBalance.total);
-        }
+            logger.ai_response("Generation complete (custom input)", {
+              totalTokenCost: result.meta.totalTokenCost,
+            });
+          },
+          onError: (error) => {
+            addNotification(`Error: ${error.message}`, "failure");
+            setLoading(false);
+            setLoadingStage(null);
 
-        if (meta?.tokensDeducted) {
-          addNotification(`✨ Used ${meta.tokensDeducted} tokens`, "success");
-          if (meta.remainingBalance) {
-            addNotification(
-              `Balance: ${meta.remainingBalance.total} tokens remaining (${meta.remainingBalance.tradable} tradable)`,
-              "info"
-            );
-          }
-        }
-
-        setCanRetry(true);
-        setCanUndo(true);
-        setLoadingStage(null); // Ensure cleared on complete
-
-        // Clear command responses after successful AI generation
-        setPendingCommandResponses([]);
-
-        // Save progress to database immediately
-        const lastPartForSave =
-          storyData.scene.parts[storyData.scene.parts.length - 1];
-        console.log(
-          "Saving story (custom input) - last part choices:",
-          lastPartForSave.choices?.length || 0,
-          "choices"
-        );
-        saveProgress(storyData, true); // immediate=true to bypass debounce
-
-        logger.ai_response("Generation complete (custom input)", {
-          tokensDeducted: meta?.tokensDeducted,
-          totalCost: meta?.totalCost,
-        });
-      },
-      onError: (message: string) => {
-        addNotification(`Error: ${message}`, "failure");
-        setLoading(false);
-        setLoadingStage(null);
-
-        logger.error("Streaming error (custom input)", { message });
-      },
-    });
+            logger.error("Generation error (custom input)", {
+              message: error.message,
+            });
+          },
+        },
+        pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined
+      );
+    } catch (error: any) {
+      addNotification(`Error: ${error.message}`, "failure");
+      setLoading(false);
+      setLoadingStage(null);
+      logger.error("Generation exception (custom input)", {
+        message: error.message,
+      });
+    }
   }
 
   async function handleChoice() {
@@ -3896,152 +3635,18 @@ function StoryPageContent() {
     //ProcessLoretriggersafteruserchoice
     processLoreTriggers(storyData, addNotification);
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
-      addNotification("Session expired. Please sign in again.", "failure");
-      setLoading(false);
-      return;
-    }
-
-    //Build minimal payload - only send what the AI needs to generate the next part
-    //TheAIusesbuildMessages()whichonlyneedsrecentcontext+currentstate
-    const MAX_CONTENT_LENGTH = 50000;
-
-    //Getcurrentmodelconfigtoestimateneededcontext
-    const modelKey =
-      typeof window !== "undefined"
-        ? localStorage.getItem("aiModel") || "Deepseek Chat"
-        : "Deepseek Chat";
-    const modelConfig = getModelConfig(modelKey);
-
-    // Reserve maxOutputTokens, then split remaining: 75% history, 25% memory (4 chars per token)
-    const CHARS_PER_TOKEN = 4;
-    const availableInputTokens =
-      modelConfig.maxTokens - modelConfig.maxOutputTokens;
-    const neededChars = availableInputTokens * 0.75 * CHARS_PER_TOKEN;
-
-    let currentChars = 0;
-    const partsToSend = [];
-
-    //Iteratebackwardstogatherenoughcontext
-    for (let i = storyData.scene.parts.length - 1; i >= 0; i--) {
-      const part = storyData.scene.parts[i];
-      const content = part.content.substring(0, MAX_CONTENT_LENGTH);
-
-      partsToSend.unshift({
-        content: content,
-        user: part.user,
-        role: part.role,
-        raw: part.raw,
-        toolCalls: part.toolCalls,
-        toolResponses: part.toolResponses,
-      });
-
-      currentChars += content.length;
-      if (currentChars > neededChars) break;
-    }
-
-    console.log(
-      `Context usage (handleChoice): ${
-        partsToSend.length
-      } parts, ${currentChars.toLocaleString()} chars (${Math.round(
-        currentChars / CHARS_PER_TOKEN
-      ).toLocaleString()} tokens) of ${Math.round(
-        neededChars / CHARS_PER_TOKEN
-      ).toLocaleString()} available (75% of ${availableInputTokens.toLocaleString()} input tokens, output: ${modelConfig.maxOutputTokens.toLocaleString()})`
-    );
-
-    //Buildminimalstorydataobject
-    const minimalStoryData: any = {
-      story_name: storyData.story_name,
-      premise: storyData.premise?.substring(0, 1500) || "",
-      player_name: storyData.player_name,
-      player_summary: storyData.player_summary?.substring(0, 800) || "",
-      intro: storyData.intro?.substring(0, 1500) || "",
-      rpgSystem: storyData.rpgSystem || "3d6",
-      //Currentgamestate-sendas-is
-      stats: storyData.stats,
-      resources: storyData.resources,
-      inventory: storyData.inventory,
-      achievements: storyData.achievements,
-      momentum: storyData.momentum,
-      maxMomentum: storyData.maxMomentum,
-      points: storyData.points,
-      relationships: storyData.relationships || [],
-      quests: storyData.quests || [],
-      mythicState: storyData.mythicState,
-      customTables: storyData.customTables || [],
-      //Trimmednarrativecontext
-      plot_beats: storyData.plot_beats.map((beat) => ({
-        title: beat.title.substring(0, 100),
-        content: beat.content.substring(0, 300),
-        fulfilled: beat.fulfilled,
-      })),
-      memory: storyData.memory, //Sendfullmemory
-      lore: storyData.lore
-        .filter((l) => l.on !== false) //OnlysendLorethatisON
-        .map((l) => ({
-          title: l.title.substring(0, 100),
-          content: l.content.substring(0, 500),
-          on: l.on,
-        })),
-      author_notes: storyData.author_notes?.substring(0, 1500) || "",
-      player_notes: storyData.player_notes?.substring(0, 800) || "",
-      //Chapterinfo
-      chapters: storyData.chapters,
-      currentChapter: storyData.currentChapter,
-      //Recentscenepartsonly
-      scene: {
-        parts: partsToSend,
-      },
-    };
-
     const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
+    const toolCallingEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("toolCallingEnabled") !== "false"
+        : true;
 
-    const payload = {
-      storyData: minimalStoryData,
-      userChoice: null, // No specific choice, just custom text
-      modelStory: storyModel,
-      modelTools: toolsModel,
-      modelChoices: choicesModel,
-      useRawContext:
-        typeof window !== "undefined"
-          ? localStorage.getItem("useRawContext") === "true"
-          : false,
-      openRouterKey:
-        typeof window !== "undefined"
-          ? localStorage.getItem("openRouterKey") || undefined
-          : undefined,
-      commandResponses:
-        pendingCommandResponses.length > 0
-          ? pendingCommandResponses
-          : undefined,
-      toolCallingEnabled:
-        typeof window !== "undefined"
-          ? localStorage.getItem("toolCallingEnabled") !== "false"
-          : true,
-    };
-
-    const payloadSize = JSON.stringify(payload).length;
-    console.log(`Payload size: ${(payloadSize / 1024).toFixed(2)} KB`);
-
-    const apiEndpoint = "/api/story/next-staged-stream";
-
-    logger.ai_request("Sending choice to AI (streaming)", {
-      modelStory: storyModel,
-      modelTools: toolsModel,
-      modelChoices: choicesModel,
-      payloadSize,
+    logger.ai_request("Starting generation (choice)", {
+      storyModel,
+      toolsModel,
+      choicesModel,
+      toolCallingEnabled,
     });
-
-    if (payloadSize > 4 * 1024 * 1024) {
-      addNotification("⚠ Story data too large for generation.", "failure");
-      console.error("Payload exceeds 4MB limit:", payloadSize);
-      setLoading(false);
-      return;
-    }
 
     // Track partial scene part as we stream
     let partialPart: ScenePart = {
@@ -4052,182 +3657,158 @@ function StoryPageContent() {
       choices: [],
     };
 
-    await streamStoryGeneration(apiEndpoint, payload, session.access_token, {
-      onStory: (content: string, usage: any) => {
-        // Story narration arrives first - show immediately!
-        partialPart.content = content;
-        storyData.scene.parts = [...storyData.scene.parts, partialPart];
+    try {
+      await generateStoryTurn(
+        storyData,
+        "", // User choice already in storyData.scene.parts
+        {
+          storyModel,
+          toolsModel,
+          choicesModel,
+          enableTools: toolCallingEnabled,
+          maxToolLoops: 3,
+        },
+        {
+          onStoryContent: (chunk: string, fullContent: string) => {
+            // Update partial part as content streams
+            partialPart.content = fullContent;
 
-        setStoryText(content);
-        setStoryData({ ...storyData });
-        setLoading(false); // Let player read while tools/choices generate
-        setLoadingStage("tools"); // Now analyzing game state
-
-        logger.ai_response("Story narration received", {
-          length: content.length,
-          usage,
-        });
-      },
-      onTools: (
-        toolCalls: any[],
-        toolResponses: CommandResponse[],
-        usage: any
-      ) => {
-        // Tools arrive - update the last part in scene
-        const lastPartIndex = storyData.scene.parts.length - 1;
-        if (lastPartIndex >= 0) {
-          storyData.scene.parts[lastPartIndex] = {
-            ...storyData.scene.parts[lastPartIndex],
-            toolCalls,
-            toolResponses,
-          };
-        }
-
-        // Process tool responses (update stats, inventory, etc.)
-        const lastPart = processSceneParts(
-          [storyData.scene.parts[lastPartIndex]],
-          storyData,
-          addNotification
-        );
-        if (lastPart) {
-          setStoryData({ ...storyData });
-        }
-
-        setLoadingStage("choices"); // Now generating choices
-
-        logger.ai_response("Tool calls received", {
-          toolCallsCount: toolCalls?.length || 0,
-          toolResponsesCount: toolResponses?.length || 0,
-          usage,
-        });
-      },
-      onChoices: (newChoices: Choices, usage: any) => {
-        // Choices arrive - update the last part in scene
-        const lastPartIndex = storyData.scene.parts.length - 1;
-        if (lastPartIndex >= 0) {
-          storyData.scene.parts[lastPartIndex] = {
-            ...storyData.scene.parts[lastPartIndex],
-            choices: newChoices.choices,
-          };
-        }
-        setChoices(newChoices);
-        setStoryData({ ...storyData });
-        setLoadingStage(null); // All done
-
-        logger.ai_response("Choices received", {
-          choicesCount: newChoices.choices.length,
-          usage,
-        });
-      },
-      onComplete: (meta: any) => {
-        // Remove duplicate parts (safety check) - but preserve the one with choices
-        const seen = new Set<string>();
-        const should_remove = new Set<string>();
-        storyData.scene.parts = storyData.scene.parts.filter((part) => {
-          const key = `${
-            part.user ? "user" : "assistant"
-          }-${part.content.substring(0, 100)}`;
-          if (seen.has(key) && !part.user) {
-            // If this is a duplicate, only remove it if it has no choices
-            // Keep the one with choices (the completed one)
-            if (!part.choices || part.choices.length === 0) {
-              console.log(
-                "[Dedup] Removing duplicate assistant part without choices:",
-                part.content.substring(0, 50)
-              );
-              return false;
-            } else {
-              // Keep this one with choices and remove previous duplicates
-              console.log(
-                "[Dedup] Keeping assistant part with choices, removing previous duplicates:",
-                part.content.substring(0, 50)
-              );
-              should_remove.add(key);
-              return true;
+            // Only add to scene once (when we first get content)
+            if (
+              storyData.scene.parts[storyData.scene.parts.length - 1] !==
+              partialPart
+            ) {
+              storyData.scene.parts = [...storyData.scene.parts, partialPart];
             }
-          }
-          seen.add(key);
-          return true;
-        });
 
-        // Remove any previously marked duplicates
-        // Note: Issue was that earlier duplicates without choices were kept instead of the final one with choices. Now we'
-        const already_removed = new Set<string>();
-        if (should_remove.size > 0) {
-          storyData.scene.parts = storyData.scene.parts.filter((part) => {
-            const key = `${
-              part.user ? "user" : "assistant"
-            }-${part.content.substring(0, 100)}`;
-            if (already_removed.has(key)) {
-              return true;
+            setStoryText(fullContent);
+            setStoryData({ ...storyData });
+            setLoading(false); // Let player read while tools/choices generate
+          },
+          onStoryComplete: (content: string, usage: any) => {
+            setLoadingStage("tools");
+            logger.ai_response("Story narration complete", {
+              length: content.length,
+              usage,
+            });
+          },
+          onToolsStart: () => {
+            setLoadingStage("tools");
+          },
+          onToolsComplete: (toolCalls, toolResponses, usage) => {
+            // Update the last part with tool data
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                toolCalls,
+                toolResponses,
+              };
             }
+
+            // Store tool responses for AI feedback in next turn
+            setPendingCommandResponses(toolResponses);
+
+            setLoadingStage("choices");
+            setStoryData({ ...storyData });
+
+            logger.ai_response("Tools complete", {
+              toolCallsCount: toolCalls.length,
+              responsesCount: toolResponses.length,
+              usage,
+            });
+          },
+          onChoicesStart: () => {
+            setLoadingStage("choices");
+          },
+          onChoicesComplete: (newChoices, usage) => {
+            // Update the last part with choices
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                choices: newChoices,
+              };
+            }
+
+            setChoices({ choices: newChoices });
+            setStoryData({ ...storyData });
+            setLoadingStage(null);
+
+            logger.ai_response("Choices complete", {
+              choicesCount: newChoices.length,
+              usage,
+            });
+          },
+          onComplete: (result) => {
+            // Update token balance
+            if (result.meta.balance !== undefined) {
+              setTokenBalance(result.meta.balance);
+            }
+
+            // Check for chapter completion
+            if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
+              const currentChapter = storyData.chapters.length;
+              if (
+                !storyData.earnedPointsFromChapters.includes(currentChapter)
+              ) {
+                storyData.earnedPointsFromChapters.push(currentChapter);
+                storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
+                addNotification(
+                  `✨ Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                  "success"
+                );
+              }
+            }
+
+            setCanRetry(true);
+            setCanUndo(true);
+            setLoadingStage(null);
+
+            // Clear command responses after successful generation
+            setPendingCommandResponses([]);
+
+            setStoryData({ ...storyData });
+
+            // Save progress
+            const lastPartForSave =
+              storyData.scene.parts[storyData.scene.parts.length - 1];
             console.log(
-              "[Dedup] Final check, removing duplicate part:",
-              part.content.substring(0, 50)
+              "Saving story - last part choices:",
+              lastPartForSave.choices?.length || 0,
+              "choices"
             );
-            already_removed.add(key);
-            return !should_remove.has(key);
-          });
-        }
+            saveProgress(storyData, true);
 
-        // All done - update token balance
-        if (meta?.remainingBalance?.total !== undefined) {
-          setTokenBalance(meta.remainingBalance.total);
-        }
+            logger.ai_response("Generation complete (choice)", {
+              totalTokenCost: result.meta.totalTokenCost,
+            });
+          },
+          onError: (error) => {
+            addNotification(`Error: ${error.message}`, "failure");
+            setLoading(false);
+            setLoadingStage(null);
+            setCanRetry(true);
+            setChoices({
+              choices:
+                storyData.scene.parts[storyData.scene.parts.length - 1]
+                  ?.choices || [],
+            });
 
-        // Check for chapter completion
-        if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
-          const currentChapter = storyData.chapters.length;
-          if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
-            storyData.earnedPointsFromChapters.push(currentChapter);
-            storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
-            addNotification(
-              `✨ Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
-              "success"
-            );
-          }
-        }
-
-        setCanRetry(true);
-        setCanUndo(true);
-        setLoadingStage(null); // Ensure cleared on complete
-
-        // Clear command responses after successful AI generation
-        setPendingCommandResponses([]);
-
-        // Update state first, then save
-        setStoryData({ ...storyData });
-
-        // Save progress to database with updated data
-        // Log the last part to verify choices are present
-        const lastPartForSave =
-          storyData.scene.parts[storyData.scene.parts.length - 1];
-        console.log(
-          "Saving story - last part choices:",
-          lastPartForSave.choices?.length || 0,
-          "choices"
-        );
-        saveProgress(storyData, true); // immediate=true to bypass debounce
-
-        logger.ai_response("Generation complete (choice)", {
-          tokensDeducted: meta?.tokensDeducted,
-          totalCost: meta?.totalCost,
-        });
-      },
-      onError: (message: string) => {
-        addNotification(`Error: ${message}`, "failure");
-        setLoading(false);
-        setLoadingStage(null);
-        setCanRetry(true);
-        setChoices({
-          choices:
-            storyData.scene.parts[storyData.scene.parts.length - 1]?.choices ||
-            [],
-        });
-
-        logger.error("Streaming error (choice)", { message });
-      },
-    });
+            logger.error("Generation error (choice)", {
+              message: error.message,
+            });
+          },
+        },
+        pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined
+      );
+    } catch (error: any) {
+      addNotification(`Error: ${error.message}`, "failure");
+      setLoading(false);
+      setLoadingStage(null);
+      setCanRetry(true);
+      logger.error("Generation exception (choice)", { message: error.message });
+    }
   }
 
   function handleSelect(index: number): void {
@@ -4280,127 +3861,18 @@ function StoryPageContent() {
     addNotification("Regenerating response...", "info");
     logger.action("User requested retry");
 
-    //Regeneratefromcurrentstate
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
-      addNotification("Session expired. Please sign in again.", "failure");
-      setLoading(false);
-      return;
-    }
-
-    //Build minimal payload
-    const MAX_CONTENT_LENGTH = 50000;
-
-    //Getcurrentmodelconfigtoestimateneededcontext
-    const modelKey =
-      typeof window !== "undefined"
-        ? localStorage.getItem("aiModel") || "Deepseek Chat"
-        : "Deepseek Chat";
-    const modelConfig = getModelConfig(modelKey);
-
-    // Reserve maxOutputTokens, then split remaining: 75% history, 25% memory (4 chars per token)
-    const CHARS_PER_TOKEN = 4;
-    const availableInputTokens =
-      modelConfig.maxTokens - modelConfig.maxOutputTokens;
-    const neededChars = availableInputTokens * 0.75 * CHARS_PER_TOKEN;
-
-    let currentChars = 0;
-    const partsToSend = [];
-
-    //Iteratebackwardstogatherenoughcontext
-    for (let i = storyData.scene.parts.length - 1; i >= 0; i--) {
-      const part = storyData.scene.parts[i];
-      const content = part.content.substring(0, MAX_CONTENT_LENGTH);
-
-      partsToSend.unshift({
-        content: content,
-        user: part.user,
-        role: part.role,
-        raw: part.raw,
-        toolCalls: part.toolCalls,
-        toolResponses: part.toolResponses,
-      });
-
-      currentChars += content.length;
-      if (currentChars > neededChars) break;
-    }
-
-    console.log(
-      `Context usage (handleRetry): ${
-        partsToSend.length
-      } parts, ${currentChars.toLocaleString()} chars (${Math.round(
-        currentChars / CHARS_PER_TOKEN
-      ).toLocaleString()} tokens) of ${Math.round(
-        neededChars / CHARS_PER_TOKEN
-      ).toLocaleString()} available (75% of ${availableInputTokens.toLocaleString()} input tokens, output: ${modelConfig.maxOutputTokens.toLocaleString()})`
-    );
-
-    const minimalStoryData: any = {
-      story_name: storyData.story_name,
-      premise: storyData.premise?.substring(0, 1500) || "",
-      player_name: storyData.player_name,
-      player_summary: storyData.player_summary?.substring(0, 800) || "",
-      intro: storyData.intro?.substring(0, 1500) || "",
-      rpgSystem: storyData.rpgSystem || "3d6",
-      stats: storyData.stats,
-      resources: storyData.resources,
-      inventory: storyData.inventory,
-      achievements: storyData.achievements,
-      momentum: storyData.momentum,
-      maxMomentum: storyData.maxMomentum,
-      points: storyData.points,
-      relationships: storyData.relationships || [],
-      quests: storyData.quests || [],
-      mythicState: storyData.mythicState,
-      customTables: storyData.customTables || [],
-      plot_beats: storyData.plot_beats.map((beat) => ({
-        title: beat.title.substring(0, 100),
-        content: beat.content.substring(0, 300),
-        fulfilled: beat.fulfilled,
-      })),
-      memory: storyData.memory, //Sendfullmemory
-      lore: storyData.lore
-        .filter((l) => l.on !== false) //OnlysendLorethatisON
-        .map((l) => ({
-          title: l.title.substring(0, 100),
-          content: l.content.substring(0, 500),
-          on: l.on,
-        })),
-      author_notes: storyData.author_notes?.substring(0, 1500) || "",
-      player_notes: storyData.player_notes?.substring(0, 800) || "",
-      chapters: storyData.chapters,
-      currentChapter: storyData.currentChapter,
-      scene: { parts: partsToSend },
-    };
-
     const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
+    const toolCallingEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("toolCallingEnabled") !== "false"
+        : true;
 
-    const payload = {
-      storyData: minimalStoryData,
-      modelStory: storyModel,
-      modelTools: toolsModel,
-      modelChoices: choicesModel,
-      useRawContext:
-        typeof window !== "undefined"
-          ? localStorage.getItem("useRawContext") === "true"
-          : false,
-      openRouterKey:
-        typeof window !== "undefined"
-          ? localStorage.getItem("openRouterKey") || undefined
-          : undefined,
-      commandResponses:
-        pendingCommandResponses.length > 0
-          ? pendingCommandResponses
-          : undefined,
-      toolCallingEnabled:
-        typeof window !== "undefined"
-          ? localStorage.getItem("toolCallingEnabled") !== "false"
-          : true,
-    };
-
-    const apiEndpoint = "/api/story/next-staged-stream";
+    logger.ai_request("Starting generation (retry)", {
+      storyModel,
+      toolsModel,
+      choicesModel,
+      toolCallingEnabled,
+    });
 
     // Track partial scene part as we stream
     let partialPart: ScenePart = {
@@ -4411,171 +3883,151 @@ function StoryPageContent() {
       choices: [],
     };
 
-    await streamStoryGeneration(apiEndpoint, payload, session.access_token, {
-      onStory: (content: string, usage: any) => {
-        // Story narration arrives first - show immediately!
-        partialPart.content = content;
-        storyData.scene.parts = [...storyData.scene.parts, partialPart];
+    try {
+      await generateStoryTurn(
+        storyData,
+        "", // The context is already in storyData.scene.parts
+        {
+          storyModel,
+          toolsModel,
+          choicesModel,
+          enableTools: toolCallingEnabled,
+          maxToolLoops: 3,
+        },
+        {
+          onStoryContent: (chunk: string, fullContent: string) => {
+            // Update partial part as content streams
+            partialPart.content = fullContent;
 
-        setStoryText(content);
-        setStoryData({ ...storyData });
-        setLoading(false); // Let player read while tools/choices generate
-        setLoadingStage("tools"); // Now analyzing game state
-
-        logger.ai_response("Story narration received (retry)", {
-          length: content.length,
-          usage,
-        });
-      },
-      onTools: (
-        toolCalls: any[],
-        toolResponses: CommandResponse[],
-        usage: any
-      ) => {
-        // Tools arrive - update the last part in scene
-        const lastPartIndex = storyData.scene.parts.length - 1;
-        if (lastPartIndex >= 0) {
-          storyData.scene.parts[lastPartIndex] = {
-            ...storyData.scene.parts[lastPartIndex],
-            toolCalls,
-            toolResponses,
-          };
-        }
-
-        // Process tool responses (update stats, inventory, etc.)
-        const lastPart = processSceneParts(
-          [storyData.scene.parts[lastPartIndex]],
-          storyData,
-          addNotification
-        );
-        if (lastPart) {
-          setStoryData({ ...storyData });
-        }
-
-        setLoadingStage("choices"); // Now generating choices
-
-        logger.ai_response("Tool calls received (retry)", {
-          toolCallsCount: toolCalls?.length || 0,
-          toolResponsesCount: toolResponses?.length || 0,
-          usage,
-        });
-      },
-      onChoices: (newChoices: Choices, usage: any) => {
-        // Choices arrive - update the last part in scene
-        const lastPartIndex = storyData.scene.parts.length - 1;
-        if (lastPartIndex >= 0) {
-          storyData.scene.parts[lastPartIndex] = {
-            ...storyData.scene.parts[lastPartIndex],
-            choices: newChoices.choices,
-          };
-        }
-        setChoices(newChoices);
-        setStoryData({ ...storyData });
-        setLoadingStage(null); // All done
-
-        logger.ai_response("Choices received (retry)", {
-          choicesCount: newChoices.choices.length,
-          usage,
-        });
-      },
-      onComplete: (meta: any) => {
-        /// Remove duplicate parts (safety check) - but preserve the one with choices
-        const seen = new Set<string>();
-        const should_remove = new Set<string>();
-        storyData.scene.parts = storyData.scene.parts.filter((part) => {
-          const key = `${
-            part.user ? "user" : "assistant"
-          }-${part.content.substring(0, 100)}`;
-          if (seen.has(key) && !part.user) {
-            // If this is a duplicate, only remove it if it has no choices
-            // Keep the one with choices (the completed one)
-            if (!part.choices || part.choices.length === 0) {
-              console.log(
-                "[Dedup] Removing duplicate assistant part without choices:",
-                part.content.substring(0, 50)
-              );
-              return false;
-            } else {
-              // Keep this one with choices and remove previous duplicates
-              console.log(
-                "[Dedup] Keeping assistant part with choices, removing previous duplicates:",
-                part.content.substring(0, 50)
-              );
-              should_remove.add(key);
-              return true;
+            // Only add to scene once (when we first get content)
+            if (
+              storyData.scene.parts[storyData.scene.parts.length - 1] !==
+              partialPart
+            ) {
+              storyData.scene.parts = [...storyData.scene.parts, partialPart];
             }
-          }
-          seen.add(key);
-          return true;
-        });
 
-        // Remove any previously marked duplicates
-        // Note: Issue was that earlier duplicates without choices were kept instead of the final one with choices. Now we'
-        const already_removed = new Set<string>();
-        if (should_remove.size > 0) {
-          storyData.scene.parts = storyData.scene.parts.filter((part) => {
-            const key = `${
-              part.user ? "user" : "assistant"
-            }-${part.content.substring(0, 100)}`;
-            if (already_removed.has(key)) {
-              return true;
+            setStoryText(fullContent);
+            setStoryData({ ...storyData });
+            setLoading(false); // Let player read while tools/choices generate
+          },
+          onStoryComplete: (content: string, usage: any) => {
+            setLoadingStage("tools");
+            logger.ai_response("Story narration complete (retry)", {
+              length: content.length,
+              usage,
+            });
+          },
+          onToolsStart: () => {
+            setLoadingStage("tools");
+          },
+          onToolsComplete: (toolCalls, toolResponses, usage) => {
+            // Update the last part with tool data
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                toolCalls,
+                toolResponses,
+              };
             }
-            console.log(
-              "[Dedup] Final check, removing duplicate part:",
-              part.content.substring(0, 50)
-            );
-            already_removed.add(key);
-            return !should_remove.has(key);
-          });
-        }
 
-        // All done - update token balance
-        if (meta?.remainingBalance?.total !== undefined) {
-          setTokenBalance(meta.remainingBalance.total);
-        }
+            // Store tool responses for AI feedback in next turn
+            setPendingCommandResponses(toolResponses);
 
-        // Check for chapter completion
-        if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
-          const currentChapter = storyData.chapters.length;
-          if (!storyData.earnedPointsFromChapters.includes(currentChapter)) {
-            storyData.earnedPointsFromChapters.push(currentChapter);
-            storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
-            addNotification(
-              `🎉 Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
-              "success"
-            );
-          }
-        }
+            setLoadingStage("choices");
+            setStoryData({ ...storyData });
 
-        // Process lore triggers based on new content
-        processLoreTriggers(storyData, addNotification);
+            logger.ai_response("Tools complete (retry)", {
+              toolCallsCount: toolCalls.length,
+              responsesCount: toolResponses.length,
+              usage,
+            });
+          },
+          onChoicesStart: () => {
+            setLoadingStage("choices");
+          },
+          onChoicesComplete: (newChoices, usage) => {
+            // Update the last part with choices
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                choices: newChoices,
+              };
+            }
 
-        setCanRetry(true);
-        setCanUndo(true);
-        setLoadingStage(null); // Ensure cleared on complete
+            setChoices({ choices: newChoices });
+            setStoryData({ ...storyData });
+            setLoadingStage(null);
 
-        // Clear command responses after successful AI generation
-        setPendingCommandResponses([]);
+            logger.ai_response("Choices complete (retry)", {
+              choicesCount: newChoices.length,
+              usage,
+            });
+          },
+          onComplete: (result) => {
+            // Update token balance
+            if (result.meta.balance !== undefined) {
+              setTokenBalance(result.meta.balance);
+            }
 
-        // Save progress to database
-        saveProgress(storyData);
+            // Check for chapter completion
+            if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
+              const currentChapter = storyData.chapters.length;
+              if (
+                !storyData.earnedPointsFromChapters.includes(currentChapter)
+              ) {
+                storyData.earnedPointsFromChapters.push(currentChapter);
+                storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
+                addNotification(
+                  `🎉 Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                  "success"
+                );
+              }
+            }
 
-        addNotification("✓ Response regenerated", "success");
+            // Process lore triggers based on new content
+            processLoreTriggers(storyData, addNotification);
 
-        logger.ai_response("Generation complete (retry)", {
-          tokensDeducted: meta?.tokensDeducted,
-          totalCost: meta?.totalCost,
-        });
-      },
-      onError: (message: string) => {
-        addNotification(`Error: ${message}`, "failure");
-        setLoading(false);
-        setLoadingStage(null);
-        setCanRetry(true);
+            setCanRetry(true);
+            setCanUndo(true);
+            setLoadingStage(null);
 
-        logger.error("Streaming error (retry)", { message });
-      },
-    });
+            // Clear command responses after successful generation
+            setPendingCommandResponses([]);
+
+            setStoryData({ ...storyData });
+
+            // Save progress
+            saveProgress(storyData);
+
+            addNotification("✓ Response regenerated", "success");
+
+            logger.ai_response("Generation complete (retry)", {
+              totalTokenCost: result.meta.totalTokenCost,
+            });
+          },
+          onError: (error) => {
+            addNotification(`Error: ${error.message}`, "failure");
+            setLoading(false);
+            setLoadingStage(null);
+            setCanRetry(true);
+
+            logger.error("Generation error (retry)", {
+              message: error.message,
+            });
+          },
+        },
+        pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined
+      );
+    } catch (error: any) {
+      addNotification(`Error: ${error.message}`, "failure");
+      setLoading(false);
+      setLoadingStage(null);
+      setCanRetry(true);
+      logger.error("Generation exception (retry)", { message: error.message });
+    }
   }
 
   async function handleUndo() {
