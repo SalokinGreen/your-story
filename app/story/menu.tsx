@@ -5857,6 +5857,63 @@ export default function MenuPage({
                         TTS Voice Settings
                       </h5>
 
+                      {/* Voice Selector */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                          <DynamicIcon
+                            name="Mic"
+                            className="inline-block w-4 h-4 mr-1"
+                          />
+                          Voice
+                        </label>
+                        <select
+                          value={
+                            typeof window !== "undefined"
+                              ? localStorage.getItem("ttsLastVoice") || "henry"
+                              : "henry"
+                          }
+                          onChange={(e) => {
+                            if (typeof window !== "undefined") {
+                              localStorage.setItem(
+                                "ttsLastVoice",
+                                e.target.value
+                              );
+                              addNotification(
+                                `Voice changed to ${
+                                  e.target.options[e.target.selectedIndex].text
+                                }`,
+                                "success"
+                              );
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        >
+                          <option value="henry">Henry (British)</option>
+                          <option value="snoop">Snoop</option>
+                          <option value="gwyneth">Gwyneth</option>
+                          <option value="cliff">Cliff (Deep)</option>
+                          <option value="george">George (US)</option>
+                          {typeof window !== "undefined" &&
+                            (() => {
+                              const customVoices =
+                                localStorage.getItem("ttsCustomVoices");
+                              if (!customVoices) return null;
+                              try {
+                                const voiceIds = JSON.parse(
+                                  customVoices
+                                ) as string[];
+                                return voiceIds.map((id) => (
+                                  <option key={id} value={id}>
+                                    {id}
+                                  </option>
+                                ));
+                              } catch {
+                                return null;
+                              }
+                            })()}
+                        </select>
+                      </div>
+
                       <CustomVoiceManager addNotification={addNotification} />
 
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 mt-4">
@@ -5919,13 +5976,14 @@ export default function MenuPage({
                       </h5>
                       <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
                         <li>
-                          • TTS controls appear at the top of the story when
-                          enabled
+                          • Press Play button in the story view to hear
+                          narration
                         </li>
                         <li>• Audio is generated once and saved for replay</li>
-                        <li>• Volume and voice settings are saved locally</li>
+                        <li>• Voice and volume settings are saved locally</li>
                         <li>
                           • New story content generates new audio automatically
+                          if enabled
                         </li>
                       </ul>
                     </div>
