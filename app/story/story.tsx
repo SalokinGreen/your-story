@@ -136,23 +136,7 @@ export default function Story({
           onMouseEnter={() => setIsHovering(true)}
           onMouseLeave={() => setIsHovering(false)}
         >
-          {loading || loadingStage ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="relative">
-                <div className="w-16 h-16 border-4 border-purple-200 dark:border-purple-900 rounded-full"></div>
-                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-purple-600 rounded-full animate-spin"></div>
-              </div>
-              <p className="mt-6 text-gray-600 dark:text-gray-400 font-medium">
-                {loading
-                  ? "Weaving your tale..."
-                  : loadingStage === "tools"
-                  ? "Updating game state..."
-                  : loadingStage === "choices"
-                  ? "Preparing your options..."
-                  : "Completing generation..."}
-              </p>
-            </div>
-          ) : editMode ? (
+          {editMode ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -206,7 +190,7 @@ export default function Story({
               {prettify(storyText)}
 
               {/* Edit button overlay */}
-              {isHovering && onEdit && !loading && (
+              {isHovering && onEdit && !loading && !loadingStage && (
                 <button
                   onClick={() => {
                     setEditMode(true);
@@ -226,14 +210,15 @@ export default function Story({
         </div>
 
         {/* Action Buttons Bar */}
-        {!loading && !editMode && (
+        {!editMode && (
           <div className="flex items-center justify-between px-6 py-4 bg-gray-50 dark:bg-blue-900/30 border-t border-gray-200 dark:border-purple-900/50">
             {/* Left side: Retry & Undo */}
             <div className="flex items-center gap-2">
               {canUndo && onUndo && (
                 <button
                   onClick={onUndo}
-                  className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-purple-900/50 rounded-lg transition-colors flex items-center gap-1.5"
+                  disabled={loading || !!loadingStage}
+                  className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-purple-900/50 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Undo last action"
                 >
                   <DynamicIcon name="Undo2" className="w-4 h-4" />
@@ -243,7 +228,8 @@ export default function Story({
               {canRetry && onRetry && (
                 <button
                   onClick={onRetry}
-                  className="px-3 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg transition-colors flex items-center gap-1.5"
+                  disabled={loading || !!loadingStage}
+                  className="px-3 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Regenerate response"
                 >
                   <DynamicIcon name="RotateCcw" className="w-4 h-4" />
@@ -253,19 +239,37 @@ export default function Story({
             </div>
 
             {/* Right side: TTS */}
-            <TTSControls text={storyText} disabled={loading} />
+            <TTSControls text={storyText} disabled={loading || !!loadingStage} />
           </div>
         )}
 
         {/* Continue Button */}
-        {!loading && !editMode && (
+        {!editMode && (
           <div className="p-6 pt-0">
             <button
               onClick={() => setShowChoicesModal(true)}
-              className="w-full py-4 text-lg font-bold bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2"
+              disabled={loading || !!loadingStage}
+              className={`w-full py-4 text-lg font-bold rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+                loading || loadingStage
+                  ? "bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-400 cursor-not-allowed"
+                  : "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white hover:shadow-xl"
+              }`}
             >
-              <DynamicIcon name="Compass" className="w-5 h-5" />
-              Continue
+              {loading || loadingStage ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-gray-300 dark:border-gray-500 border-t-white dark:border-t-gray-300 rounded-full animate-spin" />
+                  {loadingStage === "tools"
+                    ? "Updating game state..."
+                    : loadingStage === "choices"
+                    ? "Preparing choices..."
+                    : "Generating..."}
+                </>
+              ) : (
+                <>
+                  <DynamicIcon name="Compass" className="w-5 h-5" />
+                  Continue
+                </>
+              )}
             </button>
           </div>
         )}
