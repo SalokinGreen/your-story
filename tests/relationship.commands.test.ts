@@ -58,7 +58,7 @@ describe("Relationship Commands", () => {
         "Respected by the royal guards"
       );
       expect(storyData.relationships[0].symbol).toBe("😊"); // Friend symbol (25-49)
-      expect(notifications[0].type).toBe("success");
+      // Notification removed - granular relationship notifications no longer shown
     });
 
     it("should assign correct symbols based on relationship value", () => {
@@ -156,8 +156,7 @@ describe("Relationship Commands", () => {
       );
       expect(relationship?.value).toBe(55);
       expect(relationship?.symbol).toBe("💙"); // Changed from 😊 to 💙
-      expect(notifications[0].message).toContain("📈"); // Upward arrow
-      expect(notifications[0].message).toContain("25 → 55");
+      // Notification removed - granular relationship notifications no longer shown
     });
 
     it("should decrease relationship value", () => {
@@ -169,7 +168,7 @@ describe("Relationship Commands", () => {
       );
       expect(relationship?.value).toBe(20);
       expect(relationship?.symbol).toBe("🤝"); // Changed from 💙 to 🤝
-      expect(notifications[0].message).toContain("📉"); // Downward arrow
+      // Notification removed - granular relationship notifications no longer shown
     });
 
     it("should cap relationship value at 100", () => {
@@ -253,7 +252,7 @@ describe("Relationship Commands", () => {
 
       expect(storyData.relationships).toHaveLength(1);
       expect(storyData.relationships[0].name).toBe("Assassins Guild");
-      expect(notifications[0].message).toContain("removed");
+      // Notification removed - granular relationship notifications no longer shown
     });
 
     it("should use fuzzy matching", () => {
@@ -300,7 +299,7 @@ describe("Relationship Commands", () => {
       expect(storyData.relationships[0].description).toBe(
         "Now trusted advisors to the throne"
       );
-      expect(notifications[0].type).toBe("success");
+      // Notification removed - granular relationship notifications no longer shown
     });
 
     it("should use fuzzy matching", () => {

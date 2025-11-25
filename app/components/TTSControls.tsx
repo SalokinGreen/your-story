@@ -147,13 +147,9 @@ export default function TTSControls({
       setIsPlaying(true);
       setIsPaused(false);
 
+      // Log TTS cost for debugging, no notification needed - audio feedback is sufficient
       if (tokenCost && tokenBalance) {
-        addNotification(
-          `🎧 Playing narration (-${tokenCost} tokens, ${tokenBalance} remaining)`,
-          "success"
-        );
-      } else {
-        addNotification("🎧 Playing narration", "success");
+        console.log(`TTS: -${tokenCost} tokens, ${tokenBalance} remaining`);
       }
     } catch (error: any) {
       console.error("TTS error:", error);

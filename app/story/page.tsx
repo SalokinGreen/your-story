@@ -168,10 +168,6 @@ export function processCommands(
           quantity,
           newTotal: existingItem.quantity,
         });
-        addNotification(
-          `Added ${quantity} ${itemName} (${existingItem.quantity} total)`,
-          "info"
-        );
       } else {
         storyData.inventory.push({
           name: itemName,
@@ -187,10 +183,6 @@ export function processCommands(
           quantity,
           type: itemType,
         });
-        addNotification(
-          `Added ${quantity} ${itemName} to inventory`,
-          "success"
-        );
       }
       continue;
     }
@@ -209,19 +201,12 @@ export function processCommands(
         if (storyData.inventory[itemIndex].quantity <= 0) {
           storyData.inventory.splice(itemIndex, 1);
           logger.action("Item removed via command", { itemName, amount });
-          addNotification(`Removed ${itemName} from inventory`, "info");
         } else {
           logger.action("Item quantity modified via command", {
             itemName,
             amount,
             newTotal: storyData.inventory[itemIndex].quantity,
           });
-          addNotification(
-            `${amount > 0 ? "Added" : "Removed"} ${Math.abs(
-              amount
-            )} ${itemName}`,
-            "info"
-          );
         }
       } else if (amount > 0) {
         storyData.inventory.push({
@@ -237,7 +222,6 @@ export function processCommands(
           itemName,
           amount,
         });
-        addNotification(`Added ${amount} ${itemName} to inventory`, "info");
       }
       continue;
     }
@@ -294,10 +278,6 @@ export function processCommands(
         oldValue,
         newValue: storyData.momentum,
       });
-      addNotification(
-        `? Momentum: ${oldValue} ? ${storyData.momentum}/${storyData.maxMomentum}`,
-        amount > 0 ? "success" : "warning"
-      );
       continue;
     }
 
@@ -380,18 +360,11 @@ export function processCommands(
           matched: matchResult.name,
           score: matchResult.score,
         });
-        addNotification(
-          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(
-            matchResult.score * 100
-          )}% match)`,
-          "info"
-        );
       }
 
       if (quest) {
         quest.active = true;
         logger.action("Quest activated via command", { title: quest.title });
-        addNotification(`✨ Quest activated: ${quest.title}`, "info");
       } else {
         logger.warn("Quest not found or no fuzzy match", {
           quest: questTitle,
@@ -420,12 +393,6 @@ export function processCommands(
           matched: matchResult.name,
           score: matchResult.score,
         });
-        addNotification(
-          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(
-            matchResult.score * 100
-          )}% match)`,
-          "info"
-        );
       }
 
       if (quest && !quest.fulfilled) {
@@ -474,18 +441,11 @@ export function processCommands(
           matched: matchResult.name,
           score: matchResult.score,
         });
-        addNotification(
-          `📝 Matched "${questTitle}" → "${matchResult.name}" (${Math.round(
-            matchResult.score * 100
-          )}% match)`,
-          "info"
-        );
       }
 
       if (quest) {
         quest.active = false;
         logger.action("Quest deactivated via command", { title: quest.title });
-        addNotification(`✨ Quest deactivated: ${quest.title}`, "info");
       } else {
         logger.warn("Quest not found or no fuzzy match", {
           quest: questTitle,
@@ -510,6 +470,7 @@ export function processCommands(
       // Check if lore entry already exists
       const existingLore = storyData.lore.find((l) => l.title === loreTitle);
       if (existingLore) {
+        logger.warn("Lore already exists", { loreTitle });
         addNotification(`⚠️ Lore "${loreTitle}" already exists`, "warning");
       } else {
         const onTriggerArray = onTriggers
@@ -537,7 +498,6 @@ export function processCommands(
           on: onTriggerArray.length === 0, // If no triggers, show from start
         });
         logger.action("New lore created via command", { title: loreTitle });
-        addNotification(`✨ New lore entry created: ${loreTitle}`, "success");
       }
       continue;
     }
@@ -555,12 +515,10 @@ export function processCommands(
 
       const loreEntry = storyData.lore.find((l) => l.title === loreTitle);
       if (!loreEntry) {
-        addNotification(`⚠️ Lore "${loreTitle}" not found`, "warning");
         logger.warn("Lore replace failed: entry not found", {
           title: loreTitle,
         });
       } else if (!loreEntry.content.includes(oldText)) {
-        addNotification(`⚠️ Text not found in lore "${loreTitle}"`, "warning");
         logger.warn("Lore replace failed: text not found", {
           title: loreTitle,
           oldText,
@@ -572,7 +530,6 @@ export function processCommands(
           oldText,
           newText,
         });
-        addNotification(`✨ Lore "${loreTitle}" content updated`, "success");
       }
       continue;
     }
@@ -589,7 +546,6 @@ export function processCommands(
 
       const loreEntry = storyData.lore.find((l) => l.title === loreTitle);
       if (!loreEntry) {
-        addNotification(`⚠️ Lore "${loreTitle}" not found`, "warning");
         logger.warn("Lore add failed: entry not found", { title: loreTitle });
       } else {
         loreEntry.content = loreEntry.content.trim() + "\n" + newText;
@@ -597,7 +553,6 @@ export function processCommands(
           title: loreTitle,
           addedText: newText,
         });
-        addNotification(`✨ Content added to lore "${loreTitle}"`, "success");
       }
       continue;
     }
@@ -614,12 +569,10 @@ export function processCommands(
 
       const loreEntry = storyData.lore.find((l) => l.title === loreTitle);
       if (!loreEntry) {
-        addNotification(`⚠️ Lore "${loreTitle}" not found`, "warning");
         logger.warn("Lore delete failed: entry not found", {
           title: loreTitle,
         });
       } else if (!loreEntry.content.includes(textToDelete)) {
-        addNotification(`⚠️ Text not found in lore "${loreTitle}"`, "warning");
         logger.warn("Lore delete failed: text not found", {
           title: loreTitle,
           textToDelete,
@@ -633,10 +586,6 @@ export function processCommands(
           title: loreTitle,
           deletedText: textToDelete,
         });
-        addNotification(
-          `✨ Content removed from lore "${loreTitle}"`,
-          "success"
-        );
       }
       continue;
     }
@@ -663,13 +612,8 @@ export function processCommands(
       }
 
       if (!item) {
-        addNotification(`⚠️ Item "${itemName}" not found`, "warning");
         logger.warn("Item removal failed: item not found", { itemName });
       } else if (item.quantity < quantity) {
-        addNotification(
-          `⚠️ Not enough "${item.name}" (have ${item.quantity}, need ${quantity})`,
-          "warning"
-        );
         logger.warn("Item removal failed: insufficient quantity", {
           itemName: item.name,
           have: item.quantity,
@@ -685,17 +629,12 @@ export function processCommands(
             itemName: item.name,
             quantityRemoved: quantity,
           });
-          addNotification(`✨ Removed all ${item.name}`, "success");
         } else {
           logger.action("Item quantity reduced via command", {
             itemName: item.name,
             quantityRemoved: quantity,
             remaining: item.quantity,
           });
-          addNotification(
-            `✨ Removed ${quantity} ${item.name} (${item.quantity} left)`,
-            "success"
-          );
         }
       }
       continue;
@@ -721,7 +660,6 @@ export function processCommands(
       }
 
       if (!item) {
-        addNotification(`⚠️ Item "${itemName}" not found`, "warning");
         logger.warn("Item quantity modification failed: item not found", {
           itemName,
         });
@@ -737,7 +675,6 @@ export function processCommands(
             itemName: item.name,
             delta: actualDelta,
           });
-          addNotification(`✨ ${item.name} depleted`, "success");
         } else {
           item.quantity = newQuantity;
           logger.action("Item quantity modified via command", {
@@ -745,12 +682,6 @@ export function processCommands(
             delta: actualDelta,
             newQuantity,
           });
-          addNotification(
-            `✨ ${item.name}: ${
-              actualDelta > 0 ? "+" : ""
-            }${actualDelta} (now ${newQuantity})`,
-            "success"
-          );
         }
       }
       continue;
@@ -782,7 +713,6 @@ export function processCommands(
       }
 
       if (!oldItem) {
-        addNotification(`⚠️ Item "${oldItemName}" not found`, "warning");
         logger.warn("Item transformation failed: item not found", {
           oldItemName,
         });
@@ -812,10 +742,6 @@ export function processCommands(
           type: newType,
           quantity,
         });
-        addNotification(
-          `✨ ${oldItem.name} → ${newItemName} (×${quantity})`,
-          "success"
-        );
       }
       continue;
     }
@@ -834,7 +760,6 @@ export function processCommands(
 
       const existing = storyData.resources.find((r) => r.name === name);
       if (existing) {
-        addNotification(`⚠️ Resource "${name}" already exists`, "warning");
         logger.warn("Resource addition failed: already exists", { name });
       } else {
         storyData.resources.push({
@@ -846,7 +771,6 @@ export function processCommands(
           custom_symbol_url: undefined,
         });
         logger.action("Resource added via command", { name, current, max });
-        addNotification(`✨ New resource: ${name}`, "success");
       }
       continue;
     }
@@ -872,7 +796,6 @@ export function processCommands(
       }
 
       if (!resource) {
-        addNotification(`⚠️ Resource "${name}" not found`, "warning");
         logger.warn("Resource modification failed: resource not found", {
           name,
         });
@@ -900,12 +823,6 @@ export function processCommands(
           oldMax,
           newMax: resource.maxValue,
         });
-        addNotification(
-          `✨ ${resource.name}: ${resource.value}/${resource.maxValue} (${
-            currentDelta > 0 ? "+" : ""
-          }${currentDelta}/${maxDelta > 0 ? "+" : ""}${maxDelta})`,
-          "success"
-        );
       }
       continue;
     }
@@ -927,7 +844,6 @@ export function processCommands(
       }
 
       if (!resource) {
-        addNotification(`⚠️ Resource "${name}" not found`, "warning");
         logger.warn("Resource removal failed: resource not found", { name });
       } else {
         storyData.resources = storyData.resources.filter(
@@ -936,7 +852,6 @@ export function processCommands(
         logger.action("Resource removed via command", {
           name: resource.name,
         });
-        addNotification(`✨ Removed resource: ${resource.name}`, "success");
       }
       continue;
     }
@@ -954,7 +869,6 @@ export function processCommands(
 
       const existing = storyData.stats.find((s) => s.name === name);
       if (existing) {
-        addNotification(`⚠️ Stat "${name}" already exists`, "warning");
         logger.warn("Stat addition failed: already exists", { name });
       } else {
         storyData.stats.push({
@@ -965,7 +879,6 @@ export function processCommands(
           custom_symbol_url: undefined,
         });
         logger.action("Stat added via command", { name, value });
-        addNotification(`✨ New stat: ${name}`, "success");
       }
       continue;
     }
@@ -990,7 +903,6 @@ export function processCommands(
       }
 
       if (!stat) {
-        addNotification(`⚠️ Stat "${name}" not found`, "warning");
         logger.warn("Stat modification failed: stat not found", { name });
       } else {
         const oldValue = stat.value;
@@ -1002,12 +914,6 @@ export function processCommands(
           oldValue,
           newValue: stat.value,
         });
-        addNotification(
-          `✨ ${stat.name}: ${oldValue} → ${stat.value} (${
-            valueDelta > 0 ? "+" : ""
-          }${valueDelta})`,
-          "success"
-        );
       }
       continue;
     }
@@ -1029,12 +935,10 @@ export function processCommands(
       }
 
       if (!stat) {
-        addNotification(`⚠️ Stat "${name}" not found`, "warning");
         logger.warn("Stat removal failed: stat not found", { name });
       } else {
         storyData.stats = storyData.stats.filter((s) => s.name !== stat.name);
         logger.action("Stat removed via command", { name: stat.name });
-        addNotification(`✨ Removed stat: ${stat.name}`, "success");
       }
       continue;
     }
@@ -1073,10 +977,6 @@ export function processCommands(
           title: quest.title,
           newDescription,
         });
-        addNotification(
-          `✨ Quest "${quest.title}" description updated`,
-          "success"
-        );
       }
       continue;
     }
@@ -1113,7 +1013,6 @@ export function processCommands(
           title: quest.title,
           newShortDescription,
         });
-        addNotification(`✨ Quest "${quest.title}" summary updated`, "success");
       }
       continue;
     }
@@ -1142,8 +1041,8 @@ export function processCommands(
       );
 
       if (existing) {
-        addNotification(`⚠️ Relationship "${name}" already exists`, "warning");
         logger.warn("Relationship add failed: already exists", { name });
+        addNotification(`⚠️ Relationship "${name}" already exists`, "warning");
       } else if (value < -100 || value > 100) {
         addNotification(
           `⚠️ Relationship value must be between -100 and 100`,
@@ -1176,7 +1075,6 @@ export function processCommands(
           value,
           description,
         });
-        addNotification(`✨ New relationship: ${name} (${value})`, "success");
       }
       continue;
     }
@@ -1203,8 +1101,8 @@ export function processCommands(
       }
 
       if (!relationship) {
-        addNotification(`⚠️ Relationship "${name}" not found`, "warning");
         logger.warn("Relationship modify failed: not found", { name });
+        addNotification(`⚠️ Relationship not found: ${name}`, "warning");
       } else {
         const oldValue = relationship.value;
         relationship.value = Math.max(-100, Math.min(100, oldValue + delta));
@@ -1225,12 +1123,6 @@ export function processCommands(
           newValue: relationship.value,
           delta,
         });
-        addNotification(
-          `${delta > 0 ? "📈" : "📉"} ${relationship.name}: ${oldValue} → ${
-            relationship.value
-          }`,
-          "success"
-        );
       }
       continue;
     }
@@ -1256,8 +1148,8 @@ export function processCommands(
       }
 
       if (!relationship) {
-        addNotification(`⚠️ Relationship "${name}" not found`, "warning");
         logger.warn("Relationship remove failed: not found", { name });
+        addNotification(`⚠️ Relationship not found: ${name}`, "warning");
       } else {
         storyData.relationships = storyData.relationships.filter(
           (r) => r !== relationship
@@ -1266,10 +1158,6 @@ export function processCommands(
           name: relationship.name,
           value: relationship.value,
         });
-        addNotification(
-          `🗑️ Relationship with ${relationship.name} removed`,
-          "success"
-        );
       }
       continue;
     }
@@ -1296,20 +1184,16 @@ export function processCommands(
       }
 
       if (!relationship) {
-        addNotification(`⚠️ Relationship "${name}" not found`, "warning");
         logger.warn("Relationship description update failed: not found", {
           name,
         });
+        addNotification(`⚠️ Relationship not found: ${name}`, "warning");
       } else {
         relationship.description = newDescription;
         logger.action("Relationship description updated via command", {
           name: relationship.name,
           newDescription,
         });
-        addNotification(
-          `✨ Relationship with ${relationship.name} updated`,
-          "success"
-        );
       }
       continue;
     }
@@ -1323,7 +1207,10 @@ export function processCommands(
       const beatIndex = parseInt(editBeatTitleMatch[2], 10);
       if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
         storyData.plot_beats[beatIndex].title = newTitle;
-        addNotification(`✨ Story beat ${beatIndex + 1} title updated`, "info");
+        logger.action("Beat title updated via command", {
+          beatIndex,
+          newTitle,
+        });
       }
       continue;
     }
@@ -1337,10 +1224,10 @@ export function processCommands(
       const beatIndex = parseInt(editBeatContentMatch[2], 10);
       if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
         storyData.plot_beats[beatIndex].content = newContent;
-        addNotification(
-          `✨ Story beat ${beatIndex + 1} content updated`,
-          "info"
-        );
+        logger.action("Beat content updated via command", {
+          beatIndex,
+          newContent,
+        });
       }
       continue;
     }
@@ -1355,7 +1242,7 @@ export function processCommands(
         content: content,
         fulfilled: false,
       });
-      addNotification(`✨ New story beat added: ${title}`, "success");
+      logger.action("Beat added via command", { title, content });
       continue;
     }
 
@@ -1365,7 +1252,7 @@ export function processCommands(
       const beatIndex = parseInt(removeBeatMatch[1], 10);
       if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
         const removed = storyData.plot_beats.splice(beatIndex, 1)[0];
-        addNotification(`✨ Story beat removed: ${removed.content}`, "warning");
+        logger.action("Beat removed via command", { beatIndex, removed });
       }
       continue;
     }
@@ -3337,7 +3224,7 @@ function StoryPageContent() {
           ...yzeData, // Spread YZE-specific data
         });
 
-        // Process result notifications immediately (don't wait for animation)
+        // Process result - dice visualizer shows all check details
         if (dc_passed) {
           // Only set to "success" if not already set to partial/tie/style
           if (
@@ -3347,87 +3234,15 @@ function StoryPageContent() {
           ) {
             skillCheckResult = "success";
           }
-          const disadvantageText = insufficientResourceDisadvantage
-            ? " (disadvantage from insufficient resource)"
-            : "";
 
-          if (rpgSystem.id === "yze") {
-            // YZE: Show success count
-            addNotification(
-              `✓ Check Passed! (${choice.skill_used}: ${yzeData.successes} successes ≥ ${dc})`,
-              "success"
-            );
-            if (yzeData.stressRelief) {
-              addNotification(
-                `💚 Strong Success! Stress reduced by 1`,
-                "success"
-              );
-              if (storyData.stress && storyData.stress > 0) {
-                storyData.stress--;
-              }
+          // YZE stress relief on strong success
+          if (rpgSystem.id === "yze" && yzeData.stressRelief) {
+            if (storyData.stress && storyData.stress > 0) {
+              storyData.stress--;
             }
-            // Show panic effect if triggered
-            if (yzeData.panicTriggered && yzeData.panicEffect) {
-              addNotification(`💀 PANIC! ${yzeData.panicEffect}`, "failure");
-            }
-          } else if (rpgSystem.id === "explosive") {
-            // Explosive: Show die size, roll, and explosions
-            const dieSize = yzeData.dieSize || 20;
-            const explosions = yzeData.explosions || 0;
-            const explosionText =
-              explosions > 0 ? ` 💥x${explosions} BOOM!` : "";
-            addNotification(
-              `✓ Check Passed! (${choice.skill_used}: d${dieSize} rolled ${dice_roll} ≥ ${dc}${explosionText})`,
-              "success"
-            );
-          } else if (rpgSystem.rollUnder) {
-            const effectiveStat = statValue;
-            addNotification(
-              `✓ Check Passed! (${
-                choice.skill_used
-              }: ${dice_roll} ≤ ${effectiveStat}${
-                insufficientResourceDisadvantage
-                  ? " (disadvantage from insufficient resource)"
-                  : ""
-              })`,
-              "success"
-            );
-          } else if (rpgSystem.statToModifier) {
-            // Fate/PbtA: Show modifier instead of raw stat
-            const modifier = rpgSystem.statToModifier(statValue);
-            const effectiveModifier = modifier;
-            const disadvantageText = insufficientResourceDisadvantage
-              ? " (disadvantage from insufficient resource)"
-              : "";
-
-            if (rpgSystem.hasPartialSuccess && skillCheckResult === "partial") {
-              // PbtA partial success
-              addNotification(
-                `⚠️ Partial Success! (${choice.skill_used}: ${dice_roll}${
-                  modifier >= 0 ? "+" : ""
-                }${effectiveModifier} = ${total} [7-9])${disadvantageText}`,
-                "warning"
-              );
-            } else {
-              // Full success (Fate or PbtA 10+)
-              addNotification(
-                `✓ Check Passed! (${choice.skill_used}: ${dice_roll}${
-                  modifier >= 0 ? "+" : ""
-                }${effectiveModifier} = ${total} ≥ ${dc})${disadvantageText}`,
-                "success"
-              );
-            }
-          } else {
-            const disadvantageText = insufficientResourceDisadvantage
-              ? " (disadvantage from insufficient resource)"
-              : "";
-            addNotification(
-              `✓ Check Passed! (${choice.skill_used}: ${dice_roll} + ${statValue} = ${total} ≥ ${dc})${disadvantageText}`,
-              "success"
-            );
           }
 
-          //Recoverresourceonsuccess
+          // Recover resource on success
           if (choice.resource_used && matchedResource) {
             // Ensure resource.value is a valid number (prevent NaN)
             if (
@@ -3437,8 +3252,7 @@ function StoryPageContent() {
               matchedResource.value = 0;
             }
 
-            const recovery = resourceReqs.recovery; // Use system-specific recovery formula
-            const beforeRecovery = matchedResource.value;
+            const recovery = resourceReqs.recovery;
             matchedResource.value = Math.min(
               matchedResource.maxValue,
               matchedResource.value + recovery
@@ -3449,13 +3263,9 @@ function StoryPageContent() {
               amount: recovery,
               newTotal: matchedResource.value,
             });
-            addNotification(
-              `✓ ${matchedResource.name} recovered: ${beforeRecovery} → ${resourceUsedAfter} (+${recovery})`,
-              "success"
-            );
           }
 
-          //Earnmomentumonsuccess(notwhenusingguaranteeorreroll)
+          // Earn momentum on success (not when using guarantee or reroll)
           if (momentumMode === "none") {
             if (isCritical) {
               // Critical success: Earn 2 momentum
@@ -3469,80 +3279,20 @@ function StoryPageContent() {
                   earned,
                   newTotal: storyData.momentum,
                 });
-                addNotification(
-                  `✨ Critical Success! Earned ${earned} Momentum! (${storyData.momentum}/${storyData.maxMomentum})`,
-                  "success"
-                );
               }
             } else if (!rpgSystem.rollUnder && total >= dc + 20) {
-              //Strongsuccess(beatDCby20+):earn1momentum (only for roll-over systems)
+              // Strong success (beat DC by 20+): earn 1 momentum (only for roll-over systems)
               if (storyData.momentum < storyData.maxMomentum) {
                 storyData.momentum++;
                 logger.action("Momentum earned (Strong Success)", {
                   earned: 1,
                   newTotal: storyData.momentum,
                 });
-                addNotification(
-                  `✓ Strong Success! Earned 1 Momentum! (${storyData.momentum}/${storyData.maxMomentum})`,
-                  "success"
-                );
               }
             }
           }
         } else {
           skillCheckResult = "failure";
-          const disadvantageText = insufficientResourceDisadvantage
-            ? " (disadvantage from insufficient resource)"
-            : "";
-
-          if (rpgSystem.id === "yze") {
-            // YZE: Show success count failure
-            addNotification(
-              `✗ Check Failed! (${choice.skill_used}: ${yzeData.successes} successes < ${dc})`,
-              "failure"
-            );
-            // Show panic effect if triggered
-            if (yzeData.panicTriggered && yzeData.panicEffect) {
-              addNotification(`💀 PANIC! ${yzeData.panicEffect}`, "failure");
-            }
-          } else if (rpgSystem.id === "explosive") {
-            // Explosive: Show die size, roll, and explosions
-            const dieSize = yzeData.dieSize || 20;
-            const explosions = yzeData.explosions || 0;
-            const explosionText =
-              explosions > 0 ? ` (${explosions} explosions)` : "";
-            addNotification(
-              `✗ Check Failed! (${choice.skill_used}: d${dieSize} rolled ${dice_roll}${explosionText} < ${dc})`,
-              "failure"
-            );
-          } else if (rpgSystem.rollUnder) {
-            const effectiveStat = statValue;
-            addNotification(
-              `✗ Check Failed! (${
-                choice.skill_used
-              }: ${dice_roll} > ${effectiveStat}${
-                insufficientResourceDisadvantage
-                  ? " (disadvantage from insufficient resource)"
-                  : ""
-              })`,
-              "failure"
-            );
-          } else if (rpgSystem.statToModifier) {
-            // Fate/PbtA: Show modifier instead of raw stat
-            const modifier = rpgSystem.statToModifier(statValue);
-            const effectiveModifier = modifier;
-            addNotification(
-              `✗ Check Failed! (${choice.skill_used}: ${dice_roll}${
-                modifier >= 0 ? "+" : ""
-              }${effectiveModifier} = ${total} < ${dc})${disadvantageText}`,
-              "failure"
-            );
-          } else {
-            addNotification(
-              `✗ Check Failed! (${choice.skill_used}: ${dice_roll} + ${statValue} = ${total} < ${dc})${disadvantageText}`,
-              "failure"
-            );
-          }
 
           // On failure: Lose additional resource if one was used (DC-based penalty)
           if (choice.resource_used && matchedResource) {
@@ -3554,32 +3304,26 @@ function StoryPageContent() {
               matchedResource.value = 0;
             }
 
-            const lossBefore = matchedResource.value;
-            const penalty = resourceReqs.loss; // Use system-specific loss formula
+            const penalty = resourceReqs.loss;
             matchedResource.value = Math.max(
               0,
               matchedResource.value - penalty
             );
-            const lossAfter = matchedResource.value;
             logger.action("Resource lost (Failure)", {
               resource: choice.resource_used,
               penalty,
               newTotal: matchedResource.value,
             });
-            addNotification(
-              `⚠️ ${matchedResource.name} lost from failure: ${lossBefore} → ${lossAfter} (-${penalty})`,
-              "failure"
-            );
           }
 
-          //Handleitembreakageonfailure(onlyfor'normal'typeitems)
+          // Handle item breakage on failure (only for 'normal' type items)
           if (choice.item_used) {
             const item = storyData.inventory.find(
               (i) => i.name === choice.item_used
             );
             const itemType = item?.type || "normal";
 
-            //Onlynormalitemsbreakonfailure(notconsumable,story,ormisc)
+            // Only normal items break on failure (not consumable, story, or misc)
             if (itemType === "normal" && item) {
               const itemIndex = storyData.inventory.findIndex(
                 (i) => i.name === choice.item_used
@@ -3588,7 +3332,7 @@ function StoryPageContent() {
                 itemIndex !== -1 &&
                 itemQuantityAfter === itemQuantityBefore
               ) {
-                //Onlybreakifnotalreadyconsumed
+                // Only break if not already consumed
                 if (storyData.inventory[itemIndex].quantity > 1) {
                   storyData.inventory[itemIndex].quantity--;
                   itemQuantityAfter = storyData.inventory[itemIndex].quantity;
@@ -3600,10 +3344,6 @@ function StoryPageContent() {
                 logger.action("Item broken (Failure)", {
                   item: choice.item_used,
                 });
-                addNotification(
-                  `${choice.item_used}brokefromfailure!`,
-                  "failure"
-                );
               }
             }
           }

@@ -67,10 +67,7 @@ describe("processLoreTriggers", () => {
     processLoreTriggers(storyData, mockAddNotification);
 
     expect(storyData.lore[0].on).toBe(true);
-    expect(mockAddNotification).toHaveBeenCalledWith(
-      "📜 Lore discovered: Lore 1",
-      "success"
-    );
+    // Notification removed - granular lore notifications no longer shown
   });
 
   it("should activate lore when beats_trigger match fulfilled beats", () => {
@@ -122,10 +119,7 @@ describe("processLoreTriggers", () => {
     processLoreTriggers(storyData, mockAddNotification);
 
     expect(storyData.lore[0].on).toBe(false);
-    expect(mockAddNotification).toHaveBeenCalledWith(
-      "📜 Lore hidden: Lore 4",
-      "info"
-    );
+    // Notification removed - granular lore notifications no longer shown
   });
 
   it("should deactivate lore when beats_untrigger match fulfilled beats", () => {

@@ -106,10 +106,7 @@ describe("processCommands", () => {
         type: "consumable",
         quantity: 3,
       });
-      expect(mockNotification).toHaveBeenCalledWith(
-        "Added 3 Health Potion to inventory",
-        "success"
-      );
+      // Notification removed - granular item notifications no longer shown
     });
 
     it("should add to existing item quantity", () => {
@@ -133,10 +130,7 @@ describe("processCommands", () => {
 
       expect(mockStoryData.inventory).toHaveLength(1);
       expect(mockStoryData.inventory[0].quantity).toBe(5);
-      expect(mockNotification).toHaveBeenCalledWith(
-        "Added 3 Health Potion (5 total)",
-        "info"
-      );
+      // Notification removed - granular item notifications no longer shown
     });
 
     it("should support all item types", () => {
@@ -181,10 +175,7 @@ describe("processCommands", () => {
       );
 
       expect(mockStoryData.inventory[0].quantity).toBe(8);
-      expect(mockNotification).toHaveBeenCalledWith(
-        "Added 3 Health Potion",
-        "info"
-      );
+      // Notification removed - granular item notifications no longer shown
     });
 
     it("should decrease item quantity", () => {
@@ -195,10 +186,7 @@ describe("processCommands", () => {
       );
 
       expect(mockStoryData.inventory[0].quantity).toBe(3);
-      expect(mockNotification).toHaveBeenCalledWith(
-        "Removed 2 Health Potion",
-        "info"
-      );
+      // Notification removed - granular item notifications no longer shown
     });
 
     it("should remove item when quantity reaches 0 or below", () => {
@@ -209,10 +197,7 @@ describe("processCommands", () => {
       );
 
       expect(mockStoryData.inventory).toHaveLength(0);
-      expect(mockNotification).toHaveBeenCalledWith(
-        "Removed Health Potion from inventory",
-        "info"
-      );
+      // Notification removed - granular item notifications no longer shown
     });
 
     it("should create new item if adding positive quantity to non-existent item", () => {
@@ -280,10 +265,7 @@ describe("processCommands", () => {
       processCommands(["/modify_momentum: 2"], mockStoryData, mockNotification);
 
       expect(mockStoryData.momentum).toBe(2);
-      expect(mockNotification).toHaveBeenCalledWith(
-        "? Momentum: 0 ? 2/3",
-        "success"
-      );
+      // Notification removed - granular momentum notifications no longer shown
     });
 
     it("should decrease momentum", () => {
@@ -296,10 +278,7 @@ describe("processCommands", () => {
       );
 
       expect(mockStoryData.momentum).toBe(1);
-      expect(mockNotification).toHaveBeenCalledWith(
-        "? Momentum: 2 ? 1/3",
-        "warning"
-      );
+      // Notification removed - granular momentum notifications no longer shown
     });
 
     it("should not exceed max momentum", () => {
@@ -429,10 +408,7 @@ describe("processCommands", () => {
       );
 
       expect(mockStoryData.quests![0].active).toBe(true);
-      expect(mockNotification).toHaveBeenCalledWith(
-        "✨ Quest activated: Test Quest",
-        "info"
-      );
+      // Notification removed - granular quest notifications no longer shown
     });
 
     it("should handle non-existent quest", () => {
@@ -534,10 +510,7 @@ describe("processCommands", () => {
       );
 
       expect(mockStoryData.quests![0].active).toBe(false);
-      expect(mockNotification).toHaveBeenCalledWith(
-        "✨ Quest deactivated: Test Quest",
-        "info"
-      );
+      // Notification removed - granular quest notifications no longer shown
     });
 
     it("should handle non-existent quest", () => {
@@ -589,10 +562,7 @@ describe("processCommands", () => {
       expect(newLore.on_triggers).toEqual(["ancient", "order"]);
       expect(newLore.off_triggers).toEqual(["disbanded"]);
       expect(newLore.on).toBe(false); // Has triggers, so starts hidden
-      expect(mockNotification).toHaveBeenCalledWith(
-        "✨ New lore entry created: Ancient Order",
-        "success"
-      );
+      // Notification removed - granular lore notifications no longer shown
     });
 
     it("should create lore entry visible from start if no on_triggers", () => {
