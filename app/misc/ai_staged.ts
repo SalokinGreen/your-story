@@ -179,6 +179,14 @@ ${
 }`
     : "";
 
+  // Build custom tables section if any exist
+  const customTablesSection =
+    storyData.customTables && storyData.customTables.length > 0
+      ? `Custom Tables (use ONLY these exact names with custom_table parameter):\n${storyData.customTables
+          .map((t) => `- ${t.name}: ${t.description || "No description"}`)
+          .join("\n")}`
+      : "";
+
   // Combine all sections
   const sections = [
     `Story: ${cleanString(storyData.story_name || "Untitled Story")}`,
@@ -201,6 +209,7 @@ ${
     relationshipsSection,
     questsSection,
     mythicSection,
+    customTablesSection,
     storyData.author_notes
       ? `Author Notes: ${cleanString(storyData.author_notes)}`
       : "",

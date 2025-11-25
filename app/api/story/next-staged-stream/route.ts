@@ -481,10 +481,15 @@ export async function POST(req: NextRequest) {
               !resourceMatch[1].trim().toLowerCase().includes("none")
             ) {
               // Strip DC notation like "(DC 6)" and clean up the name
-              resourceUsed = resourceMatch[1].trim()
-                .replace(/\s*\(DC\s*\d+\)/gi, '')
-                .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, '')
-                .trim() || undefined;
+              resourceUsed =
+                resourceMatch[1]
+                  .trim()
+                  .replace(/\s*\(DC\s*\d+\)/gi, "")
+                  .replace(
+                    /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
+                    ""
+                  )
+                  .trim() || undefined;
             }
 
             // Parse use_item: Item or use_item: none
@@ -494,10 +499,15 @@ export async function POST(req: NextRequest) {
               !itemMatch[1].trim().toLowerCase().includes("none")
             ) {
               // Strip DC notation like "(DC 6)" and clean up the name
-              itemUsed = itemMatch[1].trim()
-                .replace(/\s*\(DC\s*\d+\)/gi, '')
-                .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, '')
-                .trim() || undefined;
+              itemUsed =
+                itemMatch[1]
+                  .trim()
+                  .replace(/\s*\(DC\s*\d+\)/gi, "")
+                  .replace(
+                    /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
+                    ""
+                  )
+                  .trim() || undefined;
             }
 
             // Parse mythic_check: question (likelihood) or mythic_check: none

@@ -685,9 +685,13 @@ export function outputToScenePart(text: string): ScenePart {
       const resourceMatch = metadata.match(/use_resource:\s*([^;]+?)(?:;|$)/i);
       if (resourceMatch) {
         // Strip DC notation like "(DC 6)" and clean up the name
-        let resourceName = resourceMatch[1].trim()
-          .replace(/\s*\(DC\s*\d+\)/gi, '')
-          .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, '')
+        let resourceName = resourceMatch[1]
+          .trim()
+          .replace(/\s*\(DC\s*\d+\)/gi, "")
+          .replace(
+            /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
+            ""
+          )
           .trim();
         if (resourceName.toLowerCase() !== "none" && resourceName.length > 0) {
           choice.resource_used = resourceName;
@@ -698,9 +702,13 @@ export function outputToScenePart(text: string): ScenePart {
       const itemMatch = metadata.match(/use_item:\s*([^;]+?)(?:;|$)/i);
       if (itemMatch) {
         // Strip DC notation like "(DC 6)" and clean up the name
-        let itemName = itemMatch[1].trim()
-          .replace(/\s*\(DC\s*\d+\)/gi, '')
-          .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, '')
+        let itemName = itemMatch[1]
+          .trim()
+          .replace(/\s*\(DC\s*\d+\)/gi, "")
+          .replace(
+            /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
+            ""
+          )
           .trim();
         if (itemName.toLowerCase() !== "none" && itemName.length > 0) {
           choice.item_used = itemName;
