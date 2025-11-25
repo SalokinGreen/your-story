@@ -63,7 +63,10 @@ export async function POST(req: NextRequest) {
         if (!authHeader) {
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: "error", error: "Unauthorized" })}\n\n`
+              `data: ${JSON.stringify({
+                type: "error",
+                error: "Unauthorized",
+              })}\n\n`
             )
           );
           controller.close();
@@ -81,7 +84,10 @@ export async function POST(req: NextRequest) {
         if (authError || !user) {
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: "error", error: "Unauthorized" })}\n\n`
+              `data: ${JSON.stringify({
+                type: "error",
+                error: "Unauthorized",
+              })}\n\n`
             )
           );
           controller.close();
@@ -102,7 +108,10 @@ export async function POST(req: NextRequest) {
         if (!messages || messages.length === 0) {
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: "error", error: "Messages are required" })}\n\n`
+              `data: ${JSON.stringify({
+                type: "error",
+                error: "Messages are required",
+              })}\n\n`
             )
           );
           controller.close();
@@ -117,7 +126,10 @@ export async function POST(req: NextRequest) {
         if (!hasTokens) {
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: "error", error: "Insufficient tokens" })}\n\n`
+              `data: ${JSON.stringify({
+                type: "error",
+                error: "Insufficient tokens",
+              })}\n\n`
             )
           );
           controller.close();
@@ -133,7 +145,10 @@ export async function POST(req: NextRequest) {
         if (!apiKey) {
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: "error", error: "API key not configured" })}\n\n`
+              `data: ${JSON.stringify({
+                type: "error",
+                error: "API key not configured",
+              })}\n\n`
             )
           );
           controller.close();
@@ -212,7 +227,10 @@ export async function POST(req: NextRequest) {
         if (!reader) {
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: "error", error: "No response body" })}\n\n`
+              `data: ${JSON.stringify({
+                type: "error",
+                error: "No response body",
+              })}\n\n`
             )
           );
           controller.close();
@@ -250,7 +268,10 @@ export async function POST(req: NextRequest) {
                 fullContent += delta.content;
                 controller.enqueue(
                   encoder.encode(
-                    `data: ${JSON.stringify({ type: "content", content: delta.content })}\n\n`
+                    `data: ${JSON.stringify({
+                      type: "content",
+                      content: delta.content,
+                    })}\n\n`
                   )
                 );
               }
@@ -269,7 +290,8 @@ export async function POST(req: NextRequest) {
                   if (tc.function?.name)
                     toolCalls[index].function.name = tc.function.name;
                   if (tc.function?.arguments)
-                    toolCalls[index].function.arguments += tc.function.arguments;
+                    toolCalls[index].function.arguments +=
+                      tc.function.arguments;
                 }
               }
 
@@ -308,14 +330,16 @@ export async function POST(req: NextRequest) {
         if (parsedToolCalls.length > 0) {
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: "tool_calls", toolCalls: parsedToolCalls })}\n\n`
+              `data: ${JSON.stringify({
+                type: "tool_calls",
+                toolCalls: parsedToolCalls,
+              })}\n\n`
             )
           );
         }
 
         // Calculate token cost
-        const inputCost =
-          (promptTokens / 1_000_000) * modelConfig.inputPrice;
+        const inputCost = (promptTokens / 1_000_000) * modelConfig.inputPrice;
         const outputCost =
           (completionTokens / 1_000_000) * modelConfig.outputPrice;
         const totalCost = inputCost + outputCost;
@@ -363,7 +387,10 @@ export async function POST(req: NextRequest) {
         logger.error("Generation stream error", { error: error.message });
         controller.enqueue(
           encoder.encode(
-            `data: ${JSON.stringify({ type: "error", error: error.message || "Internal server error" })}\n\n`
+            `data: ${JSON.stringify({
+              type: "error",
+              error: error.message || "Internal server error",
+            })}\n\n`
           )
         );
         controller.close();

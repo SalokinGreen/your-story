@@ -139,84 +139,107 @@ async function* parseSSEStream(
 function parseChoices(content: string, storyData: StoryData): Choice[] {
   const lines = content
     .split("\n")
-    .filter((l) => l.trim().startsWith("-"));
+    .map((l) => l.trim())
+    // strip common bullet prefixes: -, *, •
+    .map((l) => l.replace(/^[\-\*\u2022]\s+/, ""))
+    .filter((l) => l.length > 0);
 
   return lines.map((line) => {
-    const text = line.replace(/^-\s*/, "").trim();
+    // Extract metadata from angle brackets: <use_skill: ...; use_item: ...; etc>
+    const metaMatch = line.match(/<([^>]+)>/);
+    // Remove angle brackets from the END of the line for clean display text
+    const text = line.replace(/\s*<[^>]*>\s*$/, "").trim();
 
-    // Parse metadata from angle brackets
-    let skillUsed: string | undefined;
-    let skillDC: number | undefined;
-    let itemUsed: string | undefined;
-    let resourceUsed: string | undefined;
-    let mythicCheck: string | undefined;
-    let mythicTable: string | undefined;
-    let customTable: string | undefined;
+    const choice: Choice = { text };
 
-    // Extract angle bracket metadata
-    const bracketMatch = text.match(/<([^>]+)>/);
-    if (bracketMatch) {
-      const meta = bracketMatch[1];
+    if (metaMatch) {
+      const metadata = metaMatch[1];
 
-      // Parse skill:DC
-      const skillMatch = meta.match(/use_skill:\s*([^,<>]+?)(?:\s*DC\s*(\d+))?(?:,|$)/i);
+      // Parse use_skill: name (DC number) or (X success(es) needed/required)
+      const skillMatch = metadata.match(
+        /use_skill:\s*([^(;]+?)(?:\s*\((?:DC\s*(\d+)|(?:needs?\s*)?(\d+)\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?)\))?(?:;|$)/i
+      );
       if (skillMatch) {
-        skillUsed = skillMatch[1].trim();
-        if (skillMatch[2]) skillDC = parseInt(skillMatch[2], 10);
+        const skillName = skillMatch[1].trim();
+        if (skillName.toLowerCase() !== "none") {
+          choice.skill_used = skillName;
+          // Try DC format first (group 2), then success count format (group 3)
+          const dc = skillMatch[2] || skillMatch[3];
+          if (dc) {
+            choice.skill_dc = parseInt(dc, 10);
+          }
+        }
       }
 
-      // Parse resource
-      const resourceMatch = meta.match(/use_resource:\s*([^,<>]+)/i);
+      // Parse use_resource: name (automatically at risk on failure)
+      const resourceMatch = metadata.match(/use_resource:\s*([^;]+?)(?:;|$)/i);
       if (resourceMatch) {
-        // Strip DC notation if AI incorrectly included it
-        resourceUsed = resourceMatch[1]
+        // Strip DC notation like "(DC 6)" and clean up the name
+        let resourceName = resourceMatch[1]
           .trim()
           .replace(/\s*\(DC\s*\d+\)/gi, "")
-          .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, "");
+          .replace(
+            /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
+            ""
+          )
+          .trim();
+        if (resourceName.toLowerCase() !== "none" && resourceName.length > 0) {
+          choice.resource_used = resourceName;
+        }
       }
 
-      // Parse item
-      const itemMatch = meta.match(/use_item:\s*([^,<>]+)/i);
+      // Parse use_item: name
+      const itemMatch = metadata.match(/use_item:\s*([^;]+?)(?:;|$)/i);
       if (itemMatch) {
-        // Strip DC notation if AI incorrectly included it
-        itemUsed = itemMatch[1]
+        // Strip DC notation like "(DC 6)" and clean up the name
+        let itemName = itemMatch[1]
           .trim()
           .replace(/\s*\(DC\s*\d+\)/gi, "")
-          .replace(/\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi, "");
+          .replace(
+            /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
+            ""
+          )
+          .trim();
+        if (itemName.toLowerCase() !== "none" && itemName.length > 0) {
+          choice.item_used = itemName;
+        }
       }
 
-      // Parse mythic check
-      const mythicCheckMatch = meta.match(/mythic_check:\s*([^,<>]+)/i);
+      // Parse mythic_check: question (likelihood)
+      const mythicCheckMatch = metadata.match(
+        /mythic_check:\s*([^;]+?)(?:;|$)/i
+      );
       if (mythicCheckMatch) {
-        mythicCheck = mythicCheckMatch[1].trim();
+        const mythicCheck = mythicCheckMatch[1].trim();
+        if (mythicCheck.toLowerCase() !== "none") {
+          choice.mythic_check = mythicCheck;
+        }
       }
 
-      // Parse mythic table
-      const mythicTableMatch = meta.match(/mythic_table:\s*([^,<>]+)/i);
+      // Parse mythic_table: category
+      const mythicTableMatch = metadata.match(
+        /mythic_table:\s*([^;]+?)(?:;|$)/i
+      );
       if (mythicTableMatch) {
-        mythicTable = mythicTableMatch[1].trim();
+        const mythicTable = mythicTableMatch[1].trim();
+        if (mythicTable.toLowerCase() !== "none") {
+          choice.mythic_table = mythicTable;
+        }
       }
 
-      // Parse custom table
-      const customTableMatch = meta.match(/custom_table:\s*([^,<>]+)/i);
+      // Parse custom_table: table name
+      const customTableMatch = metadata.match(
+        /custom_table:\s*([^;]+?)(?:;|$)/i
+      );
       if (customTableMatch) {
-        customTable = customTableMatch[1].trim();
+        const customTable = customTableMatch[1].trim();
+        if (customTable.toLowerCase() !== "none") {
+          choice.custom_table = customTable;
+        }
       }
     }
 
-    // Clean display text (remove angle brackets)
-    const cleanText = text.replace(/<[^>]+>/g, "").trim();
-
-    return {
-      text: cleanText,
-      skill_used: skillUsed,
-      skill_dc: skillDC,
-      item_used: itemUsed,
-      resource_used: resourceUsed,
-      mythic_check: mythicCheck,
-      mythic_table: mythicTable,
-      custom_table: customTable,
-    };
+    return choice;
   });
 }
 
@@ -277,7 +300,9 @@ export async function generateStoryTurn(
 
     if (!storyResponse.ok) {
       const errorText = await storyResponse.text().catch(() => "");
-      throw new Error(`Story generation failed: ${storyResponse.status} - ${errorText}`);
+      throw new Error(
+        `Story generation failed: ${storyResponse.status} - ${errorText}`
+      );
     }
 
     // Process story stream
@@ -296,7 +321,14 @@ export async function generateStoryTurn(
       }
     }
 
-    callbacks.onStoryComplete?.(storyContent, storyMeta?.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+    callbacks.onStoryComplete?.(
+      storyContent,
+      storyMeta?.usage || {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      }
+    );
     logger.action("Stage 1 complete", { contentLength: storyContent.length });
 
     // ========================================
@@ -336,7 +368,9 @@ export async function generateStoryTurn(
 
         if (!toolResponse.ok) {
           const errorText = await toolResponse.text().catch(() => "");
-          throw new Error(`Tool generation failed: ${toolResponse.status} - ${errorText}`);
+          throw new Error(
+            `Tool generation failed: ${toolResponse.status} - ${errorText}`
+          );
         }
 
         let newToolCalls: ToolCall[] = [];
@@ -357,12 +391,16 @@ export async function generateStoryTurn(
 
         // No more tool calls needed
         if (newToolCalls.length === 0) {
-          logger.action("Tool loop complete - no more tools", { iterations: toolLoopCount });
+          logger.action("Tool loop complete - no more tools", {
+            iterations: toolLoopCount,
+          });
           break;
         }
 
         // Execute tools LOCALLY on storyData
-        logger.action("Executing tools locally", { count: newToolCalls.length });
+        logger.action("Executing tools locally", {
+          count: newToolCalls.length,
+        });
         const newResponses = executeTools(newToolCalls, storyData);
 
         allToolCalls = [...allToolCalls, ...newToolCalls];
@@ -372,7 +410,11 @@ export async function generateStoryTurn(
       callbacks.onToolsComplete?.(
         allToolCalls,
         allToolResponses,
-        toolsMeta?.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+        toolsMeta?.usage || {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        }
       );
       logger.action("Stage 2 complete", {
         toolCalls: allToolCalls.length,
@@ -407,7 +449,9 @@ export async function generateStoryTurn(
 
     if (!choicesResponse.ok) {
       const errorText = await choicesResponse.text().catch(() => "");
-      throw new Error(`Choices generation failed: ${choicesResponse.status} - ${errorText}`);
+      throw new Error(
+        `Choices generation failed: ${choicesResponse.status} - ${errorText}`
+      );
     }
 
     let choicesContent = "";
@@ -428,10 +472,14 @@ export async function generateStoryTurn(
 
     // Parse choices
     choices = parseChoices(choicesContent, storyData);
-    
+
     callbacks.onChoicesComplete?.(
       choices,
-      choicesMeta?.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+      choicesMeta?.usage || {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      }
     );
     logger.action("Stage 3 complete", { choicesCount: choices.length });
 

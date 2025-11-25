@@ -243,7 +243,9 @@ export async function POST(req: NextRequest) {
 
     // Deduct tokens
     await deductTokens(user.id, tokenCost, supabase);
-    const balance = await getUserTokenBalance(user.id, supabase) || { total: 0 };
+    const balance = (await getUserTokenBalance(user.id, supabase)) || {
+      total: 0,
+    };
 
     logger.action("AI generation complete", {
       userId: user.id,
