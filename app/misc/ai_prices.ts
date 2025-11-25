@@ -147,7 +147,7 @@ export const AI_MODELS = {
       "The premium model in the lineup, offering unparalleled performance, creativity, and the ability to handle extensive contexts, making it ideal for the most demanding storytelling tasks.",
     bannerUrl: undefined,
   },
-  "DeepSeek R1": {
+  "Deepseek R1": {
     name: "DeepSeek R1",
     original_model: "DeepSeek R1",
     model: "deepseek-reasoner",

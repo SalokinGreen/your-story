@@ -29,6 +29,7 @@ import {
   CustomModel,
 } from "../misc/user_settings";
 import { useAuth } from "../misc/AuthContext";
+import { encryptStoryData } from "../misc/encryption";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { IconPicker } from "../components/IconPicker";
 import { CustomTablesEditor } from "../components/CustomTablesEditor";
@@ -42,7 +43,7 @@ function AIModelSelector({
     type: "success" | "failure" | "warning"
   ) => void;
 }) {
-  const { user } = useAuth();
+  const { user, getEncryptionPassword } = useAuth();
   const [currentPreset, setCurrentPreset] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("aiPreset") || "main";
@@ -4067,6 +4068,7 @@ export default function MenuPage({
 }: MenuProps) {
   const router = useRouter();
   const { addNotification } = useNotification();
+  const { user, getEncryptionPassword } = useAuth();
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -4730,13 +4732,29 @@ export default function MenuPage({
                         return;
                       }
 
+                      // Encrypt before saving
+                      const password = getEncryptionPassword();
+                      const email = user?.email;
+                      if (!password || !email) {
+                        addNotification(
+                          "Please sign out and sign back in to save encrypted stories",
+                          "warning"
+                        );
+                        return;
+                      }
+                      const encryptedData = await encryptStoryData(
+                        resetStoryData,
+                        email,
+                        password
+                      );
+
                       await fetch(`/api/stories/${storyDbId}`, {
                         method: "PATCH",
                         headers: {
                           "Content-Type": "application/json",
                           Authorization: `Bearer ${session.access_token}`,
                         },
-                        body: JSON.stringify({ storyData: resetStoryData }),
+                        body: JSON.stringify({ storyData: encryptedData }),
                       });
                     }
 
@@ -4838,13 +4856,29 @@ export default function MenuPage({
                         return;
                       }
 
+                      // Encrypt before saving
+                      const password = getEncryptionPassword();
+                      const email = user?.email;
+                      if (!password || !email) {
+                        addNotification(
+                          "Please sign out and sign back in to save encrypted stories",
+                          "warning"
+                        );
+                        return;
+                      }
+                      const encryptedData = await encryptStoryData(
+                        ngPlusStoryData,
+                        email,
+                        password
+                      );
+
                       await fetch(`/api/stories/${storyDbId}`, {
                         method: "PATCH",
                         headers: {
                           "Content-Type": "application/json",
                           Authorization: `Bearer ${session.access_token}`,
                         },
-                        body: JSON.stringify({ storyData: ngPlusStoryData }),
+                        body: JSON.stringify({ storyData: encryptedData }),
                       });
                     }
 

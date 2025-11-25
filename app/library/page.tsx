@@ -13,6 +13,12 @@ import { IconPicker } from "@/app/components/IconPicker";
 import { isEncrypted } from "@/app/misc/encryption";
 import EncryptionMigration from "@/app/components/EncryptionMigration";
 import {
+  LibrarySkeleton,
+  StoryGridSkeleton,
+  AdventureGridSkeleton,
+  FolderSidebarSkeleton,
+} from "@/app/components/Skeleton";
+import {
   listLocalStories,
   LocalStory,
   deleteLocalStory,
@@ -817,9 +823,11 @@ export default function LibraryPage() {
 
         {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
-          </div>
+          view === "stories" ? (
+            <LibrarySkeleton />
+          ) : (
+            <AdventureGridSkeleton count={6} />
+          )
         ) : view === "stories" ? (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Folders Sidebar */}

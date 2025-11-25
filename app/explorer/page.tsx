@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { Adventure } from "@/app/misc/structs";
 import { useAuth } from "@/app/misc/AuthContext";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
+import {
+  AdventureGridSkeleton,
+  FeaturedCarouselSkeleton,
+} from "@/app/components/Skeleton";
 
 export default function ExplorerPage() {
   const router = useRouter();
@@ -13,6 +17,7 @@ export default function ExplorerPage() {
   const [featuredAdventures, setFeaturedAdventures] = useState<Adventure[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingFeatured, setLoadingFeatured] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -67,6 +72,7 @@ export default function ExplorerPage() {
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
+        setLoadingFeatured(true);
         const response = await fetch("/api/adventures?featured=true");
         if (!response.ok) throw new Error("Failed to fetch featured");
 
@@ -74,6 +80,8 @@ export default function ExplorerPage() {
         setFeaturedAdventures(featured);
       } catch (error) {
         console.error("Error fetching featured:", error);
+      } finally {
+        setLoadingFeatured(false);
       }
     };
 
@@ -149,129 +157,139 @@ export default function ExplorerPage() {
         </div>
 
         {/* Featured Carousel */}
-        {featuredAdventures.length > 0 && (
+        {loadingFeatured ? (
           <div className="mb-12">
             <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
               <DynamicIcon name="Star" className="w-6 h-6 text-yellow-500" />{" "}
               Featured Adventures
             </h2>
-            <div className="relative bg-white dark:bg-blue-950 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
-              <div className="relative h-96 sm:h-80 md:h-96">
-                {featuredAdventures.map((adventure, index) => (
-                  <div
-                    key={adventure.id}
-                    className={`absolute inset-0 transition-opacity duration-500 ${
-                      index === currentSlide ? "opacity-100" : "opacity-0"
-                    }`}
-                  >
+            <FeaturedCarouselSkeleton />
+          </div>
+        ) : (
+          featuredAdventures.length > 0 && (
+            <div className="mb-12">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
+                <DynamicIcon name="Star" className="w-6 h-6 text-yellow-500" />{" "}
+                Featured Adventures
+              </h2>
+              <div className="relative bg-white dark:bg-blue-950 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                <div className="relative h-96 sm:h-80 md:h-96">
+                  {featuredAdventures.map((adventure, index) => (
                     <div
-                      className={`h-full p-6 sm:p-8 md:p-12 flex flex-col justify-end sm:justify-center relative ${
-                        adventure.bannerUrl
-                          ? "bg-cover bg-center"
-                          : "bg-linear-to-r from-purple-600 via-pink-600 to-blue-600"
+                      key={adventure.id}
+                      className={`absolute inset-0 transition-opacity duration-500 ${
+                        index === currentSlide ? "opacity-100" : "opacity-0"
                       }`}
-                      style={
-                        adventure.bannerUrl
-                          ? { backgroundImage: `url(${adventure.bannerUrl})` }
-                          : {}
-                      }
                     >
-                      {adventure.bannerUrl && (
-                        <div className="absolute inset-0 bg-linear-to-t sm:bg-linear-to-r from-black/95 via-black/80 to-black/40 sm:from-black/90 sm:via-black/60 sm:to-transparent z-0"></div>
-                      )}
-                      <div className="max-w-2xl relative z-10">
-                        <div className="flex items-center gap-2 mb-3 flex-wrap">
-                          <span
-                            className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold border-2 ${getDifficultyColor(
-                              adventure.difficulty
-                            )}`}
-                          >
-                            {adventure.difficulty}
-                          </span>
-                          <span className="px-2 sm:px-3 py-1 bg-white/20 text-white rounded-full text-xs sm:text-sm font-semibold flex items-center gap-1">
-                            <DynamicIcon
-                              name="Star"
-                              className="w-3 sm:w-4 h-3 sm:h-4 fill-current"
-                            />{" "}
-                            {adventure.rating?.toFixed(1)}
-                          </span>
-                        </div>
-                        <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4 leading-tight">
-                          {adventure.title}
-                        </h3>
-                        <p className="text-white/90 text-sm sm:text-base md:text-lg mb-4 sm:mb-6 line-clamp-2 sm:line-clamp-3">
-                          {adventure.description}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-6">
-                          {adventure.tags.slice(0, 4).map((tag) => (
+                      <div
+                        className={`h-full p-6 sm:p-8 md:p-12 flex flex-col justify-end sm:justify-center relative ${
+                          adventure.bannerUrl
+                            ? "bg-cover bg-center"
+                            : "bg-linear-to-r from-purple-600 via-pink-600 to-blue-600"
+                        }`}
+                        style={
+                          adventure.bannerUrl
+                            ? { backgroundImage: `url(${adventure.bannerUrl})` }
+                            : {}
+                        }
+                      >
+                        {adventure.bannerUrl && (
+                          <div className="absolute inset-0 bg-linear-to-t sm:bg-linear-to-r from-black/95 via-black/80 to-black/40 sm:from-black/90 sm:via-black/60 sm:to-transparent z-0"></div>
+                        )}
+                        <div className="max-w-2xl relative z-10">
+                          <div className="flex items-center gap-2 mb-3 flex-wrap">
                             <span
-                              key={tag}
-                              className="px-2 sm:px-3 py-1 bg-white/20 text-white rounded-full text-xs sm:text-sm"
+                              className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold border-2 ${getDifficultyColor(
+                                adventure.difficulty
+                              )}`}
                             >
-                              {tag}
+                              {adventure.difficulty}
                             </span>
-                          ))}
+                            <span className="px-2 sm:px-3 py-1 bg-white/20 text-white rounded-full text-xs sm:text-sm font-semibold flex items-center gap-1">
+                              <DynamicIcon
+                                name="Star"
+                                className="w-3 sm:w-4 h-3 sm:h-4 fill-current"
+                              />{" "}
+                              {adventure.rating?.toFixed(1)}
+                            </span>
+                          </div>
+                          <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4 leading-tight">
+                            {adventure.title}
+                          </h3>
+                          <p className="text-white/90 text-sm sm:text-base md:text-lg mb-4 sm:mb-6 line-clamp-2 sm:line-clamp-3">
+                            {adventure.description}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-6">
+                            {adventure.tags.slice(0, 4).map((tag) => (
+                              <span
+                                key={tag}
+                                className="px-2 sm:px-3 py-1 bg-white/20 text-white rounded-full text-xs sm:text-sm"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() =>
+                              router.push(`/explorer/${adventure.id}`)
+                            }
+                            className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white text-purple-600 font-bold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 text-sm sm:text-base"
+                          >
+                            Start Adventure →
+                          </button>
                         </div>
-                        <button
-                          onClick={() =>
-                            router.push(`/explorer/${adventure.id}`)
-                          }
-                          className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white text-purple-600 font-bold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 text-sm sm:text-base"
-                        >
-                          Start Adventure →
-                        </button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
 
-              {/* Carousel Navigation */}
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-20">
-                {featuredAdventures.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentSlide(index)}
-                    className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all ${
-                      index === currentSlide
-                        ? "bg-white w-6 sm:w-8"
-                        : "bg-white/50 hover:bg-white/75"
-                    }`}
+                {/* Carousel Navigation */}
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-20">
+                  {featuredAdventures.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentSlide(index)}
+                      className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all ${
+                        index === currentSlide
+                          ? "bg-white w-6 sm:w-8"
+                          : "bg-white/50 hover:bg-white/75"
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {/* Arrow Navigation */}
+                <button
+                  onClick={() =>
+                    setCurrentSlide(
+                      (prev) =>
+                        (prev - 1 + featuredAdventures.length) %
+                        featuredAdventures.length
+                    )
+                  }
+                  className="absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors z-20"
+                >
+                  <DynamicIcon
+                    name="ChevronLeft"
+                    className="w-5 h-5 sm:w-6 sm:h-6"
                   />
-                ))}
+                </button>
+                <button
+                  onClick={() =>
+                    setCurrentSlide(
+                      (prev) => (prev + 1) % featuredAdventures.length
+                    )
+                  }
+                  className="absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors z-20"
+                >
+                  <DynamicIcon
+                    name="ChevronRight"
+                    className="w-5 h-5 sm:w-6 sm:h-6"
+                  />
+                </button>
               </div>
-
-              {/* Arrow Navigation */}
-              <button
-                onClick={() =>
-                  setCurrentSlide(
-                    (prev) =>
-                      (prev - 1 + featuredAdventures.length) %
-                      featuredAdventures.length
-                  )
-                }
-                className="absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors z-20"
-              >
-                <DynamicIcon
-                  name="ChevronLeft"
-                  className="w-5 h-5 sm:w-6 sm:h-6"
-                />
-              </button>
-              <button
-                onClick={() =>
-                  setCurrentSlide(
-                    (prev) => (prev + 1) % featuredAdventures.length
-                  )
-                }
-                className="absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors z-20"
-              >
-                <DynamicIcon
-                  name="ChevronRight"
-                  className="w-5 h-5 sm:w-6 sm:h-6"
-                />
-              </button>
             </div>
-          </div>
+          )
         )}
 
         {/* Create Your Own Section */}
@@ -440,15 +458,10 @@ export default function ExplorerPage() {
         {/* Adventures Grid */}
         <div>
           <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
-            All Adventures ({adventures.length})
+            All Adventures {!loading && `(${adventures.length})`}
           </h2>
           {loading ? (
-            <div className="text-center py-12 bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent mx-auto"></div>
-              <p className="text-gray-600 dark:text-gray-400 text-lg mt-4">
-                Loading adventures...
-              </p>
-            </div>
+            <AdventureGridSkeleton count={6} />
           ) : adventures.length === 0 ? (
             <div className="text-center py-12 bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
               <p className="text-gray-600 dark:text-gray-400 text-lg">

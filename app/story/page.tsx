@@ -73,6 +73,8 @@ function getModelsFromPreset() {
 
 import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
+import SyncConflictModal from "../components/SyncConflictModal";
+import SyncIndicator from "../components/SyncIndicator";
 import { authenticatedFetch } from "../misc/getAuthToken";
 import {
   encryptStoryData,
@@ -1479,6 +1481,24 @@ function StoryPageContent() {
   // Story part navigation
   const [viewingPartIndex, setViewingPartIndex] = useState<number | null>(null);
 
+  // Sync state
+  const [syncStatus, setSyncStatus] = useState<
+    "synced" | "pending" | "conflict" | "local-only"
+  >("synced");
+  const [syncConflict, setSyncConflict] = useState<{
+    isOpen: boolean;
+    serverData: StoryData | null;
+    serverUpdatedAt: string;
+    localPartCount: number;
+    serverPartCount: number;
+  }>({
+    isOpen: false,
+    serverData: null,
+    serverUpdatedAt: "",
+    localPartCount: 0,
+    serverPartCount: 0,
+  });
+
   // Helper to process multiple scene parts from API
   function processSceneParts(
     parts: any[],
@@ -1722,7 +1742,7 @@ function StoryPageContent() {
     setCanRetry(storyData.scene.parts.length > 0 && hasAIPart);
   }, [storyData]);
 
-  // Load story from database on mount
+  // Load story from database on mount - OFFLINE FIRST
   useEffect(() => {
     if (!storyId) {
       addNotification("No story ID provided", "failure");
@@ -1735,9 +1755,53 @@ function StoryPageContent() {
       return;
     }
 
+    // Helper to setup UI state from loaded story data
+    function setupUIFromStory(loadedStoryData: StoryData) {
+      // Migrate Mythic state to include new performance tracking fields
+      if (loadedStoryData.mythicState) {
+        import("@/app/misc/mythicChaos").then(({ migrateMythicState }) => {
+          loadedStoryData.mythicState = migrateMythicState(
+            loadedStoryData.mythicState!
+          );
+        });
+      }
+
+      //Initializequestarraysiftheydon'texist(forbackwardscompatibility)
+      if (!loadedStoryData.quests) loadedStoryData.quests = [];
+      if (!loadedStoryData.earnedPointsFromQuests)
+        loadedStoryData.earnedPointsFromQuests = [];
+
+      //ProcessLoretriggersonloadtoinitializeLorevisibility
+      processLoreTriggers(loadedStoryData, addNotification, true);
+
+      setStoryData(loadedStoryData);
+
+      //Initializestoryifnopartsyet-showpresetselection
+      if (loadedStoryData.scene.parts.length === 0) {
+        setShowPresetSelection(true);
+        setLoadingStory(false);
+        return true; // early return signal
+      }
+
+      //SetupUIstatefromloadedstory
+      const lastPart =
+        loadedStoryData.scene.parts[loadedStoryData.scene.parts.length - 1];
+      setStoryText(lastPart.content);
+      setChoices({ choices: lastPart.choices || [] });
+
+      const inputs =
+        lastPart.choices?.reduce(
+          (acc, choice) => ({ ...acc, [choice.text]: false }),
+          {} as Record<string, boolean>
+        ) || {};
+      setInput(inputs);
+      setStarted(true);
+      return false;
+    }
+
     async function loadStory() {
       try {
-        //Checkifthisisalocalstory
+        //Checkifthisisalocalstory (local-only, no sync needed)
         if (storyId?.startsWith("local_")) {
           const { getLocalStory } = await import(
             "@/app/misc/localStoryManager"
@@ -1745,57 +1809,40 @@ function StoryPageContent() {
           const localStory = await getLocalStory(storyId);
 
           if (!localStory) {
-            throw new Error("Localstorynotfound");
+            throw new Error("Local story not found");
           }
 
           console.log("Local story loaded:", localStory);
           setStoryDbId(localStory.id);
+          setSyncStatus("local-only");
 
-          // Migrate Mythic state to include new performance tracking fields
-          if (localStory.storyData.mythicState) {
-            const { migrateMythicState } = await import(
-              "@/app/misc/mythicChaos"
-            );
-            localStory.storyData.mythicState = migrateMythicState(
-              localStory.storyData.mythicState
-            );
-          }
-
-          setStoryData(localStory.storyData);
-
-          //Initializestoryifnopartsyet-showpresetselection
-          if (localStory.storyData.scene.parts.length === 0) {
-            setShowPresetSelection(true);
-            setLoadingStory(false);
-            return;
-          }
-
-          //SetupUIstatefromloadedstory
-          const lastPart =
-            localStory.storyData.scene.parts[
-              localStory.storyData.scene.parts.length - 1
-            ];
-          console.log("Loading local story - last part:", {
-            user: lastPart.user,
-            role: lastPart.role,
-            choicesCount: lastPart.choices?.length || 0,
-            contentPreview: lastPart.content.substring(0, 50),
-          });
-          setStoryText(lastPart.content);
-          setChoices({ choices: lastPart.choices || [] });
-
-          const inputs =
-            lastPart.choices?.reduce(
-              (acc, choice) => ({ ...acc, [choice.text]: false }),
-              {} as Record<string, boolean>
-            ) || {};
-          setInput(inputs);
-          setStarted(true);
+          if (setupUIFromStory(localStory.storyData)) return;
           setLoadingStory(false);
           return;
         }
 
-        //Getauthtoken
+        // ONLINE STORY - Try offline cache first for instant loading
+        const { getLocalStory, saveLocalStory, determineSyncAction } =
+          await import("@/app/misc/localStoryManager");
+
+        // storyId is guaranteed non-null at this point (checked at function start)
+        const localStory = await getLocalStory(storyId!);
+        let usedLocalCache = false;
+
+        // If we have a local cache, show it immediately
+        if (localStory && localStory.storyData) {
+          console.log("Loading from offline cache for instant display...");
+          setStoryDbId(storyId!);
+          setSyncStatus(localStory.syncStatus || "synced");
+          if (setupUIFromStory(localStory.storyData)) {
+            setLoadingStory(false);
+            return;
+          }
+          usedLocalCache = true;
+          setLoadingStory(false);
+        }
+
+        // Fetch from server in background (or foreground if no cache)
         const {
           data: { session },
         } = await supabase.auth.getSession();
@@ -1812,6 +1859,12 @@ function StoryPageContent() {
         console.log("Story fetch response status:", response.status);
 
         if (!response.ok) {
+          if (usedLocalCache) {
+            // We already showed local cache, just warn about sync
+            console.warn("Server fetch failed, using offline cache");
+            setSyncStatus("pending");
+            return;
+          }
           const errorData = await response
             .json()
             .catch(() => ({ error: "Unknown error" }));
@@ -1820,11 +1873,11 @@ function StoryPageContent() {
         }
 
         const { story } = await response.json();
-        console.log("Story loaded:", story);
+        console.log("Story loaded from server:", story);
         setStoryDbId(story.id);
 
         //Checkifstorydataisencrypted
-        let loadedStoryData: StoryData;
+        let serverStoryData: StoryData;
         if (isEncrypted(story.storyData)) {
           console.log("Story is encrypted, attempting decryption...");
 
@@ -1840,7 +1893,7 @@ function StoryPageContent() {
 
           try {
             //Decryptthestorydata
-            loadedStoryData = await decryptStoryData(
+            serverStoryData = await decryptStoryData(
               story.storyData,
               email,
               password
@@ -1854,47 +1907,65 @@ function StoryPageContent() {
           }
         } else {
           //Storyisnotencrypted,useas-is
-          loadedStoryData = story.storyData;
+          serverStoryData = story.storyData;
         }
 
-        //Initializequestarraysiftheydon'texist(forbackwardscompatibility)
-        if (!loadedStoryData.quests) loadedStoryData.quests = [];
-        if (!loadedStoryData.earnedPointsFromQuests)
-          loadedStoryData.earnedPointsFromQuests = [];
+        // Determine sync action
+        const syncAction = determineSyncAction(localStory, story.updated_at);
+        console.log("Sync action determined:", syncAction, {
+          localUpdatedAt: localStory?.updatedAt,
+          serverUpdatedAt: story.updated_at,
+        });
 
-        // Migrate Mythic state to include new performance tracking fields
-        if (loadedStoryData.mythicState) {
-          const { migrateMythicState } = await import("@/app/misc/mythicChaos");
-          loadedStoryData.mythicState = migrateMythicState(
-            loadedStoryData.mythicState
+        if (syncAction === "none" || syncAction === "download") {
+          // Server is same or newer - use server data
+          if (usedLocalCache && syncAction === "download") {
+            console.log("Server has newer data, updating...");
+          }
+
+          // Save to local cache (mark as synced)
+          await saveLocalStory(storyId!, serverStoryData, null, {
+            serverUpdatedAt: story.updated_at,
+            markAsSynced: true,
+          });
+
+          setSyncStatus("synced");
+          if (!usedLocalCache || syncAction === "download") {
+            setupUIFromStory(serverStoryData);
+          }
+        } else if (syncAction === "upload") {
+          // Local is newer and was edited on this device - auto-sync to server
+          console.log(
+            "Local changes detected from this device, syncing to server..."
           );
+          setSyncStatus("pending");
+
+          // We'll upload in the background - keep using local data
+          if (!usedLocalCache && localStory) {
+            setupUIFromStory(localStory.storyData);
+          }
+
+          // Trigger upload (will be handled by save mechanism)
+          // For now just mark as pending - the next save will push it
+        } else if (syncAction === "conflict") {
+          // Conflict - show modal
+          console.log("Sync conflict detected!");
+          setSyncStatus("conflict");
+
+          setSyncConflict({
+            isOpen: true,
+            serverData: serverStoryData,
+            serverUpdatedAt: story.updated_at,
+            localPartCount: localStory?.storyData.scene.parts.length || 0,
+            serverPartCount: serverStoryData.scene.parts.length,
+          });
+
+          // Keep using local data until user decides
+          if (!usedLocalCache && localStory) {
+            setupUIFromStory(localStory.storyData);
+          }
         }
 
-        //ProcessLoretriggersonloadtoinitializeLorevisibility
-        processLoreTriggers(loadedStoryData, addNotification, true);
-
-        setStoryData(loadedStoryData);
-
-        //Initializestoryifnopartsyet-showpresetselection
-        if (loadedStoryData.scene.parts.length === 0) {
-          setShowPresetSelection(true);
-          setLoadingStory(false);
-          return;
-        }
-
-        //SetupUIstatefromloadedstory
-        const lastPart =
-          loadedStoryData.scene.parts[loadedStoryData.scene.parts.length - 1];
-        setStoryText(lastPart.content);
-        setChoices({ choices: lastPart.choices || [] });
-
-        const inputs =
-          lastPart.choices?.reduce(
-            (acc, choice) => ({ ...acc, [choice.text]: false }),
-            {} as Record<string, boolean>
-          ) || {};
-        setInput(inputs);
-        setStarted(true);
         setLoadingStory(false);
       } catch (error: any) {
         console.error("Error loading story:", error);
@@ -1971,6 +2042,17 @@ function StoryPageContent() {
 
           if (!response.ok) {
             console.error("Failed to save preset selection");
+          } else {
+            // Also save to local cache for offline-first loading
+            const { saveLocalStory } = await import(
+              "@/app/misc/localStoryManager"
+            );
+            const result = await response.json().catch(() => null);
+            await saveLocalStory(storyDbId, updatedStoryData, null, {
+              serverUpdatedAt: result?.story?.updated_at || new Date().toISOString(),
+              markAsSynced: true,
+              isLocalEdit: true,
+            });
           }
         }
       } catch (error) {
@@ -2075,7 +2157,8 @@ function StoryPageContent() {
         return; //Abortsaveonencryptionfailure
       }
 
-      await fetch(`/api/stories/${storyDbId}`, {
+      // Save to server
+      const response = await fetch(`/api/stories/${storyDbId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -2085,6 +2168,28 @@ function StoryPageContent() {
           storyData: dataToSave,
         }),
       });
+
+      // Also save to local cache for offline access
+      if (response.ok) {
+        const { saveLocalStory } = await import("@/app/misc/localStoryManager");
+        const result = await response.json().catch(() => null);
+        await saveLocalStory(storyDbId, trimmedData, null, {
+          serverUpdatedAt:
+            result?.story?.updated_at || new Date().toISOString(),
+          markAsSynced: true,
+          isLocalEdit: true,
+        });
+        setSyncStatus("synced");
+        console.log("Story saved to server and local cache");
+      } else {
+        // Server save failed - save locally as pending
+        const { saveLocalStory } = await import("@/app/misc/localStoryManager");
+        await saveLocalStory(storyDbId, trimmedData, null, {
+          isLocalEdit: true,
+        });
+        setSyncStatus("pending");
+        console.warn("Server save failed, saved to local cache as pending");
+      }
     } catch (error) {
       console.error("Error saving progress:", error);
       addNotification(
@@ -3773,78 +3878,80 @@ function StoryPageContent() {
                 };
               }
 
-            setChoices({ choices: newChoices });
-            setStoryData({ ...storyData });
-            choicesComplete = true;
-            checkBothComplete();
+              setChoices({ choices: newChoices });
+              setStoryData({ ...storyData });
+              choicesComplete = true;
+              checkBothComplete();
 
-            logger.ai_response("Choices complete", {
-              choicesCount: newChoices.length,
-              usage,
-            });
-          },
-          onComplete: (result) => {
-            // Update token balance
-            if (result.meta.balance !== undefined) {
-              setTokenBalance(result.meta.balance);
-            }
-
-            // Check for chapter completion
-            if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
-              const currentChapter = storyData.chapters.length;
-              if (
-                !storyData.earnedPointsFromChapters.includes(currentChapter)
-              ) {
-                storyData.earnedPointsFromChapters.push(currentChapter);
-                storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
-                addNotification(
-                  `✨ Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
-                  "success"
-                );
+              logger.ai_response("Choices complete", {
+                choicesCount: newChoices.length,
+                usage,
+              });
+            },
+            onComplete: (result) => {
+              // Update token balance
+              if (result.meta.balance !== undefined) {
+                setTokenBalance(result.meta.balance);
               }
-            }
 
-            setCanRetry(true);
-            setCanUndo(true);
-            setLoadingStage(null);
+              // Check for chapter completion
+              if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
+                const currentChapter = storyData.chapters.length;
+                if (
+                  !storyData.earnedPointsFromChapters.includes(currentChapter)
+                ) {
+                  storyData.earnedPointsFromChapters.push(currentChapter);
+                  storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
+                  addNotification(
+                    `✨ Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                    "success"
+                  );
+                }
+              }
 
-            // Clear command responses after successful generation
-            setPendingCommandResponses([]);
+              setCanRetry(true);
+              setCanUndo(true);
+              setLoadingStage(null);
 
-            setStoryData({ ...storyData });
+              // Clear command responses after successful generation
+              setPendingCommandResponses([]);
 
-            // Save progress
-            const lastPartForSave =
-              storyData.scene.parts[storyData.scene.parts.length - 1];
-            console.log(
-              "Saving story - last part choices:",
-              lastPartForSave.choices?.length || 0,
-              "choices"
-            );
-            saveProgress(storyData, true);
+              setStoryData({ ...storyData });
 
-            logger.ai_response("Generation complete (choice)", {
-              totalTokenCost: result.meta.totalTokenCost,
-            });
+              // Save progress
+              const lastPartForSave =
+                storyData.scene.parts[storyData.scene.parts.length - 1];
+              console.log(
+                "Saving story - last part choices:",
+                lastPartForSave.choices?.length || 0,
+                "choices"
+              );
+              saveProgress(storyData, true);
+
+              logger.ai_response("Generation complete (choice)", {
+                totalTokenCost: result.meta.totalTokenCost,
+              });
+            },
+            onError: (error) => {
+              addNotification(`Error: ${error.message}`, "failure");
+              setLoading(false);
+              setLoadingStage(null);
+              setCanRetry(true);
+              setChoices({
+                choices:
+                  storyData.scene.parts[storyData.scene.parts.length - 1]
+                    ?.choices || [],
+              });
+
+              logger.error("Generation error (choice)", {
+                message: error.message,
+              });
+            },
           },
-          onError: (error) => {
-            addNotification(`Error: ${error.message}`, "failure");
-            setLoading(false);
-            setLoadingStage(null);
-            setCanRetry(true);
-            setChoices({
-              choices:
-                storyData.scene.parts[storyData.scene.parts.length - 1]
-                  ?.choices || [],
-            });
-
-            logger.error("Generation error (choice)", {
-              message: error.message,
-            });
-          },
-        },
-        pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined
-      ),
+          pendingCommandResponses.length > 0
+            ? pendingCommandResponses
+            : undefined
+        ),
         diceAnimationPromise, // Wait for dice animation to complete too
       ]);
     } catch (error: any) {
@@ -4461,13 +4568,29 @@ function StoryPageContent() {
                           })),
                         };
 
+                        // Encrypt before saving
+                        const password = getEncryptionPassword();
+                        const email = user?.email;
+                        if (!password || !email) {
+                          addNotification(
+                            "Please sign out and sign back in to save encrypted stories",
+                            "warning"
+                          );
+                          return;
+                        }
+                        const encryptedData = await encryptStoryData(
+                          resetStoryData,
+                          email,
+                          password
+                        );
+
                         await fetch(`/api/stories/${storyDbId}`, {
                           method: "PATCH",
                           headers: {
                             "Content-Type": "application/json",
                             Authorization: `Bearer ${session.access_token}`,
                           },
-                          body: JSON.stringify({ storyData: resetStoryData }),
+                          body: JSON.stringify({ storyData: encryptedData }),
                         });
 
                         addNotification(
@@ -4565,13 +4688,29 @@ function StoryPageContent() {
                           newGamePlusMode: true,
                         };
 
+                        // Encrypt before saving
+                        const password = getEncryptionPassword();
+                        const email = user?.email;
+                        if (!password || !email) {
+                          addNotification(
+                            "Please sign out and sign back in to save encrypted stories",
+                            "warning"
+                          );
+                          return;
+                        }
+                        const encryptedData = await encryptStoryData(
+                          ngPlusStoryData,
+                          email,
+                          password
+                        );
+
                         await fetch(`/api/stories/${storyDbId}`, {
                           method: "PATCH",
                           headers: {
                             "Content-Type": "application/json",
                             Authorization: `Bearer ${session.access_token}`,
                           },
-                          body: JSON.stringify({ storyData: ngPlusStoryData }),
+                          body: JSON.stringify({ storyData: encryptedData }),
                         });
 
                         addNotification(
@@ -4865,6 +5004,7 @@ function StoryPageContent() {
             onNavigateLeft={handleNavigateLeft}
             onNavigateRight={handleNavigateRight}
             onResetToCurrentPart={resetToCurrentPart}
+            syncStatus={syncStatus}
           />
         )}
         {currentState === StoryState.STATS && <StatsPage {...storyData} />}
@@ -4900,6 +5040,56 @@ function StoryPageContent() {
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
       />
+
+      {/* Sync Conflict Modal */}
+      {storyData && (
+        <SyncConflictModal
+          isOpen={syncConflict.isOpen}
+          onClose={() => setSyncConflict({ ...syncConflict, isOpen: false })}
+          storyName={storyData.story_name}
+          localUpdatedAt={new Date()}
+          serverUpdatedAt={syncConflict.serverUpdatedAt}
+          localPartCount={syncConflict.localPartCount}
+          serverPartCount={syncConflict.serverPartCount}
+          onKeepLocal={async () => {
+            // Keep local version - push to server
+            setSyncConflict({ ...syncConflict, isOpen: false });
+            setSyncStatus("pending");
+            if (storyDbId && storyData) {
+              await performSave(storyData);
+            }
+            addNotification(
+              "Local version kept, syncing to cloud...",
+              "success"
+            );
+          }}
+          onKeepServer={async () => {
+            // Keep server version - update local
+            if (syncConflict.serverData && storyDbId) {
+              const { saveLocalStory } = await import(
+                "@/app/misc/localStoryManager"
+              );
+              await saveLocalStory(storyDbId, syncConflict.serverData, null, {
+                serverUpdatedAt: syncConflict.serverUpdatedAt,
+                markAsSynced: true,
+              });
+              setStoryData(syncConflict.serverData);
+              // Setup UI from server data
+              const lastPart =
+                syncConflict.serverData.scene.parts[
+                  syncConflict.serverData.scene.parts.length - 1
+                ];
+              if (lastPart) {
+                setStoryText(lastPart.content);
+                setChoices({ choices: lastPart.choices || [] });
+              }
+              setSyncStatus("synced");
+              addNotification("Cloud version restored", "success");
+            }
+            setSyncConflict({ ...syncConflict, isOpen: false });
+          }}
+        />
+      )}
 
       {/* YZE: Stress Dice Selection UI */}
       {yzeAwaitingStressChoice && yzePendingChoice && storyData && (

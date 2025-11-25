@@ -5,6 +5,8 @@ import ReactMarkdown from "react-markdown";
 import TTSControls from "../components/TTSControls";
 import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
+import SyncIndicator from "../components/SyncIndicator";
+import type { SyncStatus } from "../misc/localStoryManager";
 
 interface StoryProps {
   storyData: StoryData;
@@ -27,6 +29,7 @@ interface StoryProps {
   onNavigateLeft?: () => void;
   onNavigateRight?: () => void;
   onResetToCurrentPart?: () => void;
+  syncStatus?: SyncStatus;
 }
 
 export default function Story({
@@ -50,6 +53,7 @@ export default function Story({
   onNavigateLeft,
   onNavigateRight,
   onResetToCurrentPart,
+  syncStatus,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
@@ -89,7 +93,14 @@ export default function Story({
   return (
     <div className="w-full max-w-3xl mx-auto">
       {/* Main Story Card */}
-      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-purple-900/50 overflow-hidden">
+      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-purple-900/50 overflow-hidden relative">
+        {/* Sync Status Indicator - top right corner */}
+        {syncStatus && syncStatus !== "local-only" && (
+          <div className="absolute top-3 right-3 z-10">
+            <SyncIndicator status={syncStatus} />
+          </div>
+        )}
+
         {/* Story Navigation Header */}
         {uniqueStoryParts.length > 1 && (
           <div className="flex items-center justify-center gap-3 py-3 px-4 bg-gray-50 dark:bg-blue-900/30 border-b border-gray-200 dark:border-purple-900/50">

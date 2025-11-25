@@ -371,6 +371,17 @@ function CreateCharacterContent() {
         if (!response.ok) {
           throw new Error("Failed to save character");
         }
+
+        // Parse response to get server timestamp
+        const result = await response.json().catch(() => null);
+
+        // Also save to local cache for offline-first loading
+        const { saveLocalStory } = await import("@/app/misc/localStoryManager");
+        await saveLocalStory(storyId, updatedStoryData, null, {
+          serverUpdatedAt: result?.story?.updated_at || new Date().toISOString(),
+          markAsSynced: true,
+          isLocalEdit: true,
+        });
       }
 
       addNotification("Character created! 🎉", "success");
