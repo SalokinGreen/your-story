@@ -1784,6 +1784,566 @@ export function executeCommandWithResponse(
     };
   }
 
+  // === MYTHIC GME COMMANDS ===
+
+  // /add_thread: description
+  const addThreadMatch = trimmed.match(/^\/add_thread:\s*(.+)$/i);
+  if (addThreadMatch) {
+    const description = addThreadMatch[1].trim();
+
+    if (!storyData.mythicState) {
+      storyData.mythicState = {
+        chaosFactor: 5,
+        threads: [],
+        characters: [],
+        sceneCount: 0,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+      };
+    }
+
+    // Check for duplicate
+    const exists = storyData.mythicState.threads.some(
+      (t) => t.description.toLowerCase() === description.toLowerCase()
+    );
+    if (exists) {
+      return {
+        command: trimmed,
+        success: "partial",
+        message: `Thread "${description}" already exists`,
+        timestamp,
+      };
+    }
+
+    storyData.mythicState.threads.push({
+      id: crypto.randomUUID(),
+      description,
+      status: "active",
+      createdAt: Date.now(),
+    });
+
+    logger.action("Thread added via command response", { description });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Added thread: "${description}"`,
+      timestamp,
+    };
+  }
+
+  // /update_thread: old description → new description
+  const updateThreadMatch = trimmed.match(
+    /^\/update_thread:\s*(.+?)\s*→\s*(.+)$/i
+  );
+  if (updateThreadMatch) {
+    const oldDesc = updateThreadMatch[1].trim();
+    const newDesc = updateThreadMatch[2].trim();
+
+    if (!storyData.mythicState) {
+      return {
+        command: trimmed,
+        success: false,
+        message: "Mythic GME not enabled",
+        timestamp,
+      };
+    }
+
+    const thread = storyData.mythicState.threads.find(
+      (t) => t.description.toLowerCase() === oldDesc.toLowerCase()
+    );
+    if (!thread) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Thread "${oldDesc}" not found`,
+        timestamp,
+      };
+    }
+
+    thread.description = newDesc;
+
+    logger.action("Thread updated via command response", { oldDesc, newDesc });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Updated thread: "${oldDesc}" → "${newDesc}"`,
+      timestamp,
+    };
+  }
+
+  // /resolve_thread: description
+  const resolveThreadMatch = trimmed.match(/^\/resolve_thread:\s*(.+)$/i);
+  if (resolveThreadMatch) {
+    const description = resolveThreadMatch[1].trim();
+
+    if (!storyData.mythicState) {
+      return {
+        command: trimmed,
+        success: false,
+        message: "Mythic GME not enabled",
+        timestamp,
+      };
+    }
+
+    const thread = storyData.mythicState.threads.find(
+      (t) => t.description.toLowerCase() === description.toLowerCase()
+    );
+    if (!thread) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Thread "${description}" not found`,
+        timestamp,
+      };
+    }
+
+    if (thread.status === "closed") {
+      return {
+        command: trimmed,
+        success: "partial",
+        message: `Thread "${description}" was already closed`,
+        timestamp,
+      };
+    }
+
+    thread.status = "closed";
+
+    logger.action("Thread resolved via command response", { description });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Resolved thread: "${description}"`,
+      timestamp,
+    };
+  }
+
+  // /close_thread: threadId (from tool executor)
+  const closeThreadMatch = trimmed.match(/^\/close_thread:\s*(.+)$/i);
+  if (closeThreadMatch) {
+    const threadId = closeThreadMatch[1].trim();
+
+    if (!storyData.mythicState) {
+      return {
+        command: trimmed,
+        success: false,
+        message: "Mythic GME not enabled",
+        timestamp,
+      };
+    }
+
+    // Try to find by ID first, then by description
+    let thread = storyData.mythicState.threads.find((t) => t.id === threadId);
+    if (!thread) {
+      thread = storyData.mythicState.threads.find(
+        (t) => t.description.toLowerCase() === threadId.toLowerCase()
+      );
+    }
+
+    if (!thread) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Thread "${threadId}" not found`,
+        timestamp,
+      };
+    }
+
+    if (thread.status === "closed") {
+      return {
+        command: trimmed,
+        success: "partial",
+        message: `Thread "${thread.description}" was already closed`,
+        timestamp,
+      };
+    }
+
+    thread.status = "closed";
+
+    logger.action("Thread closed via command response", {
+      id: thread.id,
+      description: thread.description,
+    });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Closed thread: "${thread.description}"`,
+      timestamp,
+    };
+  }
+
+  // /reopen_thread: description (from tool executor)
+  const reopenThreadMatch = trimmed.match(/^\/reopen_thread:\s*(.+)$/i);
+  if (reopenThreadMatch) {
+    const description = reopenThreadMatch[1].trim();
+
+    if (!storyData.mythicState) {
+      return {
+        command: trimmed,
+        success: false,
+        message: "Mythic GME not enabled",
+        timestamp,
+      };
+    }
+
+    const thread = storyData.mythicState.threads.find(
+      (t) => t.description.toLowerCase() === description.toLowerCase()
+    );
+    if (!thread) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Thread "${description}" not found`,
+        timestamp,
+      };
+    }
+
+    if (thread.status === "active") {
+      return {
+        command: trimmed,
+        success: "partial",
+        message: `Thread "${description}" was already active`,
+        timestamp,
+      };
+    }
+
+    thread.status = "active";
+
+    logger.action("Thread reopened via command response", { description });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Reopened thread: "${description}"`,
+      timestamp,
+    };
+  }
+
+  // /add_character: name (role)
+  const addCharacterMatch = trimmed.match(
+    /^\/add_character:\s*(.+?)\s*\((.+)\)$/i
+  );
+  if (addCharacterMatch) {
+    const name = addCharacterMatch[1].trim();
+    const role = addCharacterMatch[2].trim();
+
+    if (!storyData.mythicState) {
+      storyData.mythicState = {
+        chaosFactor: 5,
+        threads: [],
+        characters: [],
+        sceneCount: 0,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+      };
+    }
+
+    // Check for duplicate
+    const exists = storyData.mythicState.characters.some(
+      (c) => c.name.toLowerCase() === name.toLowerCase()
+    );
+    if (exists) {
+      return {
+        command: trimmed,
+        success: "partial",
+        message: `Character "${name}" already exists`,
+        timestamp,
+      };
+    }
+
+    storyData.mythicState.characters.push({
+      id: crypto.randomUUID(),
+      name,
+      role,
+      status: "active",
+      createdAt: Date.now(),
+    });
+
+    logger.action("Character added via command response", { name, role });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Added character: ${name} - ${role}`,
+      timestamp,
+    };
+  }
+
+  // /update_character: id | name | role (from tool executor format)
+  // Also handle simpler format: /update_character: old_name → new_name | new_role
+  const updateCharacterMatch = trimmed.match(
+    /^\/update_character:\s*(.+?)\s*→\s*(.+?)\s*\|\s*(.+)$/i
+  );
+  if (updateCharacterMatch) {
+    const oldName = updateCharacterMatch[1].trim();
+    const newName = updateCharacterMatch[2].trim();
+    const newRole = updateCharacterMatch[3].trim();
+
+    if (!storyData.mythicState) {
+      return {
+        command: trimmed,
+        success: false,
+        message: "Mythic GME not enabled",
+        timestamp,
+      };
+    }
+
+    const character = storyData.mythicState.characters.find(
+      (c) => c.name.toLowerCase() === oldName.toLowerCase()
+    );
+    if (!character) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Character "${oldName}" not found`,
+        timestamp,
+      };
+    }
+
+    const changes: string[] = [];
+    if (newName && newName !== character.name) {
+      character.name = newName;
+      changes.push(`name → "${newName}"`);
+    }
+    if (newRole && newRole !== character.role) {
+      character.role = newRole;
+      changes.push(`role → "${newRole}"`);
+    }
+
+    if (changes.length === 0) {
+      return {
+        command: trimmed,
+        success: "partial",
+        message: `No changes made to character "${oldName}"`,
+        timestamp,
+      };
+    }
+
+    logger.action("Character updated via command response", {
+      oldName,
+      newName,
+      newRole,
+    });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Updated character "${oldName}": ${changes.join(", ")}`,
+      timestamp,
+    };
+  }
+
+  // /remove_character: name
+  const removeCharacterMatch = trimmed.match(/^\/remove_character:\s*(.+)$/i);
+  if (removeCharacterMatch) {
+    const name = removeCharacterMatch[1].trim();
+
+    if (!storyData.mythicState) {
+      return {
+        command: trimmed,
+        success: false,
+        message: "Mythic GME not enabled",
+        timestamp,
+      };
+    }
+
+    const characterIndex = storyData.mythicState.characters.findIndex(
+      (c) => c.name.toLowerCase() === name.toLowerCase()
+    );
+    if (characterIndex === -1) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Character "${name}" not found`,
+        timestamp,
+      };
+    }
+
+    const removed = storyData.mythicState.characters.splice(
+      characterIndex,
+      1
+    )[0];
+
+    logger.action("Character removed via command response", {
+      name: removed.name,
+    });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Removed character: "${removed.name}"`,
+      timestamp,
+    };
+  }
+
+  // /adjust_chaos: delta
+  const adjustChaosMatch = trimmed.match(/^\/adjust_chaos:\s*([+-]?\d+)$/i);
+  if (adjustChaosMatch) {
+    const delta = parseInt(adjustChaosMatch[1], 10);
+
+    if (!storyData.mythicState) {
+      return {
+        command: trimmed,
+        success: false,
+        message: "Mythic GME not enabled",
+        timestamp,
+      };
+    }
+
+    const oldValue = storyData.mythicState.chaosFactor;
+    storyData.mythicState.chaosFactor = Math.max(
+      1,
+      Math.min(9, oldValue + delta)
+    );
+
+    logger.action("Chaos factor adjusted via command response", {
+      oldValue,
+      newValue: storyData.mythicState.chaosFactor,
+      delta,
+    });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Chaos factor: ${oldValue} → ${storyData.mythicState.chaosFactor}`,
+      timestamp,
+    };
+  }
+
+  // /update_character_status: name oldStatus → newStatus
+  const updateCharStatusMatch = trimmed.match(
+    /^\/update_character_status:\s*(.+?)\s+(\w+)\s*→\s*(\w+)$/i
+  );
+  if (updateCharStatusMatch) {
+    const name = updateCharStatusMatch[1].trim();
+    const newStatus = updateCharStatusMatch[3].trim().toLowerCase() as
+      | "active"
+      | "deceased"
+      | "departed";
+
+    if (!["active", "deceased", "departed"].includes(newStatus)) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Invalid status "${newStatus}" - must be active, deceased, or departed`,
+        timestamp,
+      };
+    }
+
+    if (!storyData.mythicState) {
+      return {
+        command: trimmed,
+        success: false,
+        message: "Mythic GME not enabled",
+        timestamp,
+      };
+    }
+
+    // Find character by name or ID
+    let character = storyData.mythicState.characters.find(
+      (c) => c.name.toLowerCase() === name.toLowerCase()
+    );
+    if (!character) {
+      character = storyData.mythicState.characters.find((c) => c.id === name);
+    }
+
+    if (!character) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Character "${name}" not found`,
+        timestamp,
+      };
+    }
+
+    const oldStatus = character.status;
+    character.status = newStatus;
+
+    logger.action("Character status updated via command response", {
+      name: character.name,
+      oldStatus,
+      newStatus,
+    });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `${character.name} status: ${oldStatus} → ${newStatus}`,
+      timestamp,
+    };
+  }
+
+  // /increment_scene: (with optional new value)
+  const incrementSceneMatch = trimmed.match(
+    /^\/increment_scene:\s*(\d+)\s*→\s*(\d+)$/i
+  );
+  if (incrementSceneMatch) {
+    const newValue = parseInt(incrementSceneMatch[2], 10);
+
+    if (!storyData.mythicState) {
+      storyData.mythicState = {
+        chaosFactor: 5,
+        threads: [],
+        characters: [],
+        sceneCount: 0,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+      };
+    }
+
+    const oldValue = storyData.mythicState.sceneCount || 0;
+    storyData.mythicState.sceneCount = newValue;
+
+    logger.action("Scene count updated via command response", {
+      oldValue,
+      newValue,
+    });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Scene count: ${oldValue} → ${newValue}`,
+      timestamp,
+    };
+  }
+
+  // Simple /increment_scene command
+  const simpleIncrementSceneMatch = trimmed.match(/^\/increment_scene$/i);
+  if (simpleIncrementSceneMatch) {
+    if (!storyData.mythicState) {
+      storyData.mythicState = {
+        chaosFactor: 5,
+        threads: [],
+        characters: [],
+        sceneCount: 0,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+      };
+    }
+
+    const oldValue = storyData.mythicState.sceneCount || 0;
+    storyData.mythicState.sceneCount = oldValue + 1;
+
+    logger.action("Scene count incremented via command response", {
+      oldValue,
+      newValue: storyData.mythicState.sceneCount,
+    });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Scene count: ${oldValue} → ${storyData.mythicState.sceneCount}`,
+      timestamp,
+    };
+  }
+
   // Command not recognized
   return null;
 }
