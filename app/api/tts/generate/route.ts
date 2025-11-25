@@ -64,9 +64,9 @@ export async function POST(req: NextRequest) {
     let apiKeyToUse = SPEECHIFY_API_KEY;
 
     if (isSubscriber && byokEnabled && speechifyKey) {
-        shouldUseTokens = false;
-        apiKeyToUse = speechifyKey;
-        console.log(`User ${userId} using BYOK (Speechify)`);
+      shouldUseTokens = false;
+      apiKeyToUse = speechifyKey;
+      console.log(`User ${userId} using BYOK (Speechify)`);
     }
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
@@ -93,11 +93,51 @@ export async function POST(req: NextRequest) {
     });
 
     // Generate speech using SDK
-    const response = await speechify.audioGenerate({
-      input: cleanText,
-      voiceId: voiceId,
-      audioFormat: "mp3",
-    });
+    let response;
+    try {
+      response = await speechify.audioGenerate({
+        input: cleanText,
+        voiceId: voiceId,
+        audioFormat: "mp3",
+      });
+    } catch (speechifyError: any) {
+      console.error("Speechify API error:", speechifyError);
+
+      // Handle specific Speechify errors
+      const statusCode = speechifyError.statusCode || 500;
+
+      if (statusCode === 503) {
+        return NextResponse.json(
+          {
+            error:
+              "Speechify service is temporarily unavailable. Please try again in a few moments.",
+          },
+          { status: 503 }
+        );
+      }
+
+      if (statusCode === 429) {
+        return NextResponse.json(
+          {
+            error:
+              "TTS rate limit reached. Please wait a moment before trying again.",
+          },
+          { status: 429 }
+        );
+      }
+
+      if (statusCode === 401 || statusCode === 403) {
+        return NextResponse.json(
+          { error: "TTS authentication failed. Please check your API key." },
+          { status: statusCode }
+        );
+      }
+
+      return NextResponse.json(
+        { error: speechifyError.message || "Failed to generate speech" },
+        { status: statusCode }
+      );
+    }
 
     // Get the audio data from the response
     if (!response.audioData) {
@@ -110,15 +150,15 @@ export async function POST(req: NextRequest) {
 
     // Deduct tokens after successful generation IF using tokens
     if (shouldUseTokens) {
-        try {
+      try {
         await deductTokens(userId, TTS_COST, supabase);
-        } catch (deductError: any) {
+      } catch (deductError: any) {
         console.error("Failed to deduct tokens:", deductError);
         // Still return the audio since generation succeeded
         // Log this for manual correction if needed
-        }
+      }
     } else {
-        console.log(`BYOK used, no tokens deducted for user ${userId}`);
+      console.log(`BYOK used, no tokens deducted for user ${userId}`);
     }
 
     // Get updated balance

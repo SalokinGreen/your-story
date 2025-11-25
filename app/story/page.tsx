@@ -2183,6 +2183,21 @@ function StoryPageContent() {
     };
 
     try {
+      const maxToolLoops =
+        typeof window !== "undefined"
+          ? parseInt(localStorage.getItem("maxToolLoops") || "1", 10)
+          : 1;
+
+      // Track parallel completion of tools and choices
+      let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
+      let choicesComplete = false;
+
+      const checkBothComplete = () => {
+        if (toolsComplete && choicesComplete) {
+          setLoadingStage(null);
+        }
+      };
+
       await generateStoryTurn(
         storyData,
         "", // Custom input already in storyData.scene.parts
@@ -2191,7 +2206,7 @@ function StoryPageContent() {
           toolsModel,
           choicesModel,
           enableTools: toolCallingEnabled,
-          maxToolLoops: 3,
+          maxToolLoops,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -2218,7 +2233,7 @@ function StoryPageContent() {
             });
           },
           onToolsStart: () => {
-            setLoadingStage("tools");
+            // Keep showing tools stage while either is running
           },
           onToolsComplete: (toolCalls, toolResponses, usage) => {
             // Update the last part with tool data
@@ -2234,8 +2249,9 @@ function StoryPageContent() {
             // Store tool responses for AI feedback in next turn
             setPendingCommandResponses(toolResponses);
 
-            setLoadingStage("choices");
             setStoryData({ ...storyData });
+            toolsComplete = true;
+            checkBothComplete();
 
             logger.ai_response("Tools complete (custom input)", {
               toolCallsCount: toolCalls.length,
@@ -2244,7 +2260,7 @@ function StoryPageContent() {
             });
           },
           onChoicesStart: () => {
-            setLoadingStage("choices");
+            // Keep showing tools stage while either is running
           },
           onChoicesComplete: (newChoices, usage) => {
             // Update the last part with choices
@@ -2258,7 +2274,8 @@ function StoryPageContent() {
 
             setChoices({ choices: newChoices });
             setStoryData({ ...storyData });
-            setLoadingStage(null);
+            choicesComplete = true;
+            checkBothComplete();
 
             logger.ai_response("Choices complete (custom input)", {
               choicesCount: newChoices.length,
@@ -3657,6 +3674,21 @@ function StoryPageContent() {
       choices: [],
     };
 
+    const maxToolLoops =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("maxToolLoops") || "1", 10)
+        : 1;
+
+    // Track parallel completion of tools and choices
+    let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
+    let choicesComplete = false;
+
+    const checkBothComplete = () => {
+      if (toolsComplete && choicesComplete) {
+        setLoadingStage(null);
+      }
+    };
+
     try {
       await generateStoryTurn(
         storyData,
@@ -3666,7 +3698,7 @@ function StoryPageContent() {
           toolsModel,
           choicesModel,
           enableTools: toolCallingEnabled,
-          maxToolLoops: 3,
+          maxToolLoops,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -3693,7 +3725,7 @@ function StoryPageContent() {
             });
           },
           onToolsStart: () => {
-            setLoadingStage("tools");
+            // Keep showing tools stage while either is running
           },
           onToolsComplete: (toolCalls, toolResponses, usage) => {
             // Update the last part with tool data
@@ -3709,8 +3741,9 @@ function StoryPageContent() {
             // Store tool responses for AI feedback in next turn
             setPendingCommandResponses(toolResponses);
 
-            setLoadingStage("choices");
             setStoryData({ ...storyData });
+            toolsComplete = true;
+            checkBothComplete();
 
             logger.ai_response("Tools complete", {
               toolCallsCount: toolCalls.length,
@@ -3719,7 +3752,7 @@ function StoryPageContent() {
             });
           },
           onChoicesStart: () => {
-            setLoadingStage("choices");
+            // Keep showing tools stage while either is running
           },
           onChoicesComplete: (newChoices, usage) => {
             // Update the last part with choices
@@ -3733,7 +3766,8 @@ function StoryPageContent() {
 
             setChoices({ choices: newChoices });
             setStoryData({ ...storyData });
-            setLoadingStage(null);
+            choicesComplete = true;
+            checkBothComplete();
 
             logger.ai_response("Choices complete", {
               choicesCount: newChoices.length,
@@ -3883,6 +3917,21 @@ function StoryPageContent() {
       choices: [],
     };
 
+    const maxToolLoops =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("maxToolLoops") || "1", 10)
+        : 1;
+
+    // Track parallel completion of tools and choices
+    let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
+    let choicesComplete = false;
+
+    const checkBothComplete = () => {
+      if (toolsComplete && choicesComplete) {
+        setLoadingStage(null);
+      }
+    };
+
     try {
       await generateStoryTurn(
         storyData,
@@ -3892,7 +3941,7 @@ function StoryPageContent() {
           toolsModel,
           choicesModel,
           enableTools: toolCallingEnabled,
-          maxToolLoops: 3,
+          maxToolLoops,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -3919,7 +3968,7 @@ function StoryPageContent() {
             });
           },
           onToolsStart: () => {
-            setLoadingStage("tools");
+            // Keep showing tools stage while either is running
           },
           onToolsComplete: (toolCalls, toolResponses, usage) => {
             // Update the last part with tool data
@@ -3935,8 +3984,9 @@ function StoryPageContent() {
             // Store tool responses for AI feedback in next turn
             setPendingCommandResponses(toolResponses);
 
-            setLoadingStage("choices");
             setStoryData({ ...storyData });
+            toolsComplete = true;
+            checkBothComplete();
 
             logger.ai_response("Tools complete (retry)", {
               toolCallsCount: toolCalls.length,
@@ -3945,7 +3995,7 @@ function StoryPageContent() {
             });
           },
           onChoicesStart: () => {
-            setLoadingStage("choices");
+            // Keep showing tools stage while either is running
           },
           onChoicesComplete: (newChoices, usage) => {
             // Update the last part with choices
@@ -3959,7 +4009,8 @@ function StoryPageContent() {
 
             setChoices({ choices: newChoices });
             setStoryData({ ...storyData });
-            setLoadingStage(null);
+            choicesComplete = true;
+            checkBothComplete();
 
             logger.ai_response("Choices complete (retry)", {
               choicesCount: newChoices.length,

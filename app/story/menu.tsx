@@ -62,6 +62,12 @@ function AIModelSelector({
     }
     return true;
   });
+  const [maxToolLoops, setMaxToolLoops] = useState(() => {
+    if (typeof window !== "undefined") {
+      return parseInt(localStorage.getItem("maxToolLoops") || "1", 10);
+    }
+    return 1;
+  });
 
   // Model configuration for custom preset
   const [showModelConfig, setShowModelConfig] = useState(false);
@@ -438,6 +444,51 @@ function AIModelSelector({
                 />
               </button>
             </div>
+
+            {/* Max Tool Calls Setting */}
+            {toolCallingEnabled && (
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Max Tool Rounds
+                  </span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Higher = more state changes but slower generation
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const newValue = Math.max(1, maxToolLoops - 1);
+                      setMaxToolLoops(newValue);
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("maxToolLoops", String(newValue));
+                      }
+                    }}
+                    disabled={maxToolLoops <= 1}
+                    className="w-8 h-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    -
+                  </button>
+                  <span className="w-8 text-center font-medium text-gray-900 dark:text-white">
+                    {maxToolLoops}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const newValue = Math.min(5, maxToolLoops + 1);
+                      setMaxToolLoops(newValue);
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("maxToolLoops", String(newValue));
+                      }
+                    }}
+                    disabled={maxToolLoops >= 5}
+                    className="w-8 h-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Custom Preset Model Configuration */}
             {currentPreset === "custom" && (

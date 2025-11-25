@@ -332,13 +332,17 @@ export async function generateStoryTurn(
     logger.action("Stage 1 complete", { contentLength: storyContent.length });
 
     // ========================================
-    // STAGE 2: Tool Execution (if enabled)
+    // STAGE 2 & 3: Tools + Choices (in parallel)
     // ========================================
-    if (options.enableTools) {
-      callbacks.onToolsStart?.();
-      logger.action("Stage 2: Building tool prompt");
 
-      const maxToolLoops = options.maxToolLoops || 3;
+    // Helper function for tools generation
+    const runToolGeneration = async (): Promise<void> => {
+      if (!options.enableTools) return;
+
+      callbacks.onToolsStart?.();
+      logger.action("Stage 2: Building tool prompt (parallel)");
+
+      const maxToolLoops = options.maxToolLoops || 1;
       let toolLoopCount = 0;
 
       while (toolLoopCount < maxToolLoops) {
@@ -420,68 +424,71 @@ export async function generateStoryTurn(
         toolCalls: allToolCalls.length,
         responses: allToolResponses.length,
       });
-    }
+    };
 
-    // ========================================
-    // STAGE 3: Choices Generation
-    // ========================================
-    callbacks.onChoicesStart?.();
-    logger.action("Stage 3: Building choices prompt");
+    // Helper function for choices generation
+    const runChoicesGeneration = async (): Promise<void> => {
+      callbacks.onChoicesStart?.();
+      logger.action("Stage 3: Building choices prompt (parallel)");
 
-    const choicesPrompt = buildChoicesPrompt({
-      storyData,
-      storyContent,
-    });
+      const choicesPrompt = buildChoicesPrompt({
+        storyData,
+        storyContent,
+      });
 
-    const choicesResponse = await fetch("/api/generate-stream", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        messages: choicesPrompt.messages,
-        model: options.choicesModel,
-        maxTokens: 1500,
-        temperature: 0.7,
-      }),
-    });
+      const choicesResponse = await fetch("/api/generate-stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          messages: choicesPrompt.messages,
+          model: options.choicesModel,
+          maxTokens: 1500,
+          temperature: 0.7,
+        }),
+      });
 
-    if (!choicesResponse.ok) {
-      const errorText = await choicesResponse.text().catch(() => "");
-      throw new Error(
-        `Choices generation failed: ${choicesResponse.status} - ${errorText}`
+      if (!choicesResponse.ok) {
+        const errorText = await choicesResponse.text().catch(() => "");
+        throw new Error(
+          `Choices generation failed: ${choicesResponse.status} - ${errorText}`
+        );
+      }
+
+      let choicesContent = "";
+
+      for await (const event of parseSSEStream(choicesResponse)) {
+        if (event.type === "error") {
+          throw new Error(event.error || "Choices generation failed");
+        }
+        if (event.type === "content" && event.content) {
+          choicesContent += event.content;
+        }
+        if (event.type === "done" && event.meta) {
+          choicesMeta = event.meta;
+          totalTokenCost += event.meta.tokenCost;
+          finalBalance = event.meta.balance;
+        }
+      }
+
+      // Parse choices
+      choices = parseChoices(choicesContent, storyData);
+
+      callbacks.onChoicesComplete?.(
+        choices,
+        choicesMeta?.usage || {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        }
       );
-    }
+      logger.action("Stage 3 complete", { choicesCount: choices.length });
+    };
 
-    let choicesContent = "";
-
-    for await (const event of parseSSEStream(choicesResponse)) {
-      if (event.type === "error") {
-        throw new Error(event.error || "Choices generation failed");
-      }
-      if (event.type === "content" && event.content) {
-        choicesContent += event.content;
-      }
-      if (event.type === "done" && event.meta) {
-        choicesMeta = event.meta;
-        totalTokenCost += event.meta.tokenCost;
-        finalBalance = event.meta.balance;
-      }
-    }
-
-    // Parse choices
-    choices = parseChoices(choicesContent, storyData);
-
-    callbacks.onChoicesComplete?.(
-      choices,
-      choicesMeta?.usage || {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-      }
-    );
-    logger.action("Stage 3 complete", { choicesCount: choices.length });
+    // Run tools and choices in parallel
+    await Promise.all([runToolGeneration(), runChoicesGeneration()]);
 
     // ========================================
     // BUILD SCENE PART
