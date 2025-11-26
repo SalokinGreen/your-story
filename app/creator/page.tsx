@@ -976,7 +976,7 @@ function AdventureCreatorContent() {
       name: "",
       value: 0,
       description: "",
-      symbol: "🤝",
+      symbol: "??",
     }
   );
   const [draggedRelationshipIndex, setDraggedRelationshipIndex] = useState<
@@ -1945,14 +1945,14 @@ function AdventureCreatorContent() {
 
   // Helper function to get relationship symbol based on value
   const getRelationshipSymbol = (value: number): string => {
-    if (value >= 75) return "💚"; // Strong ally
-    if (value >= 50) return "💙"; // Ally
-    if (value >= 25) return "😊"; // Friendly
-    if (value >= 0) return "🤝"; // Neutral/Acquaintance
-    if (value >= -25) return "😐"; // Distant
-    if (value >= -50) return "😠"; // Unfriendly
-    if (value >= -75) return "💔"; // Hostile
-    return "⚔️"; // Enemy
+    if (value >= 75) return "??"; // Strong ally
+    if (value >= 50) return "??"; // Ally
+    if (value >= 25) return "??"; // Friendly
+    if (value >= 0) return "??"; // Neutral/Acquaintance
+    if (value >= -25) return "??"; // Distant
+    if (value >= -50) return "??"; // Unfriendly
+    if (value >= -75) return "??"; // Hostile
+    return "??"; // Enemy
   };
 
   const addRelationship = () => {
@@ -1970,7 +1970,7 @@ function AdventureCreatorContent() {
         name: "",
         value: 0,
         description: "",
-        symbol: "🤝",
+        symbol: "??",
       });
     }
   };
@@ -2103,7 +2103,7 @@ function AdventureCreatorContent() {
       await saveLocalAdventure(localId, adventureTemplate);
 
       addNotification(
-        "Adventure saved locally! 🎮 You can find it in your library.",
+        "Adventure saved locally! ?? You can find it in your library.",
         "success"
       );
 
@@ -2518,7 +2518,7 @@ function AdventureCreatorContent() {
         return (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Adventure Title *
               </label>
               <input
@@ -2526,13 +2526,13 @@ function AdventureCreatorContent() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., The Dragon's Quest"
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                 maxLength={100}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Short Description *
               </label>
               <input
@@ -2540,16 +2540,16 @@ function AdventureCreatorContent() {
                 value={shortDescription}
                 onChange={(e) => setShortDescription(e.target.value)}
                 placeholder="A brief one-line summary"
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                 maxLength={150}
               />
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-xs text-blue-300/60 mt-1">
                 {shortDescription.length}/150 characters
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Full Description
               </label>
               <textarea
@@ -2557,16 +2557,16 @@ function AdventureCreatorContent() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Write a compelling description of your adventure..."
                 rows={5}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
+                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
                 maxLength={1000}
               />
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-xs text-blue-300/60 mt-1">
                 {description.length}/1000 characters
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Difficulty
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -2577,7 +2577,7 @@ function AdventureCreatorContent() {
                     className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
                       difficulty === diff
                         ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                     }`}
                   >
                     {diff}
@@ -2587,10 +2587,10 @@ function AdventureCreatorContent() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 RPG Dice System
               </label>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+              <p className="text-xs text-blue-300/60 mb-3">
                 <strong>3d6 (Bell Curve):</strong> Rolls 3d6 (3-18),
                 predictable. <strong>1d20 (D&D):</strong> Rolls 1d20 (1-20),
                 swingy. <strong>1d100:</strong> Rolls 1d100 (1-100), granular.{" "}
@@ -2605,7 +2605,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
                     rpgSystem === "3d6"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                   }`}
                 >
                   <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
@@ -2619,7 +2619,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
                     rpgSystem === "1d20"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                   }`}
                 >
                   <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
@@ -2633,7 +2633,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
                     rpgSystem === "1d100"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                   }`}
                 >
                   <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
@@ -2647,7 +2647,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
                     rpgSystem === "percentile"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                   }`}
                 >
                   <DynamicIcon
@@ -2664,7 +2664,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
                     rpgSystem === "pbta"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                   }`}
                 >
                   <DynamicIcon name="Zap" className="w-5 h-5 inline mr-2" />
@@ -2678,7 +2678,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
                     rpgSystem === "fate"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                   }`}
                 >
                   <DynamicIcon name="Scale" className="w-5 h-5 inline mr-2" />
@@ -2692,7 +2692,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
                     rpgSystem === "yze"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                   }`}
                 >
                   <DynamicIcon name="Skull" className="w-5 h-5 inline mr-2" />
@@ -2706,13 +2706,13 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
                     rpgSystem === "explosive"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                   }`}
                 >
                   <DynamicIcon name="Flame" className="w-5 h-5 inline mr-2" />
                   Exploding Dice
                   <div className="text-xs opacity-75 mt-1">
-                    Stat → die size (d4-d20), max rolls explode and add!
+                    Stat ? die size (d4-d20), max rolls explode and add!
                   </div>
                 </button>
                 <button
@@ -2720,7 +2720,7 @@ function AdventureCreatorContent() {
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
                     rpgSystem === "narrative"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                   }`}
                 >
                   <DynamicIcon
@@ -2736,10 +2736,10 @@ function AdventureCreatorContent() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Visibility
               </label>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+              <p className="text-xs text-blue-300/60 mb-3">
                 <strong>Public:</strong> Everyone can see and play.{" "}
                 <strong>Hidden:</strong> Only accessible via direct link.{" "}
                 <strong>Private:</strong> Only you can see.
@@ -2752,7 +2752,7 @@ function AdventureCreatorContent() {
                     className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all capitalize ${
                       visibility === vis
                         ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                     }`}
                   >
                     {vis === "public" ? (
@@ -2794,13 +2794,13 @@ function AdventureCreatorContent() {
                     onChange={(e) => setNsfw(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
+                  <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
                 </div>
                 <div>
-                  <span className="block text-sm font-bold text-gray-900 dark:text-white">
+                  <span className="block text-sm font-semibold text-blue-200">
                     NSFW Content
                   </span>
-                  <span className="block text-xs text-gray-600 dark:text-gray-400">
+                  <span className="block text-xs text-blue-300/60">
                     Mark this adventure as containing Not Safe For Work content
                     (18+)
                   </span>
@@ -2809,7 +2809,7 @@ function AdventureCreatorContent() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Tags
               </label>
               <div className="flex gap-2 mb-3">
@@ -2821,7 +2821,7 @@ function AdventureCreatorContent() {
                     e.key === "Enter" && (e.preventDefault(), addTag())
                   }
                   placeholder="Add a tag..."
-                  className="flex-1 px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 transition-colors"
+                  className="flex-1 px-4 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 transition-colors"
                 />
                 <button
                   onClick={addTag}
@@ -2832,7 +2832,7 @@ function AdventureCreatorContent() {
               </div>
 
               <div className="mb-3">
-                <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                <p className="text-xs text-blue-300/60 mb-2">
                   Quick add:
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -2843,7 +2843,7 @@ function AdventureCreatorContent() {
                       <button
                         key={tag}
                         onClick={() => setTags([...tags, tag])}
-                        className="px-3 py-1 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                        className="px-3 py-1 bg-blue-900/30 text-blue-200 rounded-full text-sm hover:bg-purple-900/30 transition-colors"
                       >
                         + {tag}
                       </button>
@@ -2855,12 +2855,12 @@ function AdventureCreatorContent() {
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm font-semibold flex items-center gap-2"
+                    className="px-3 py-1 bg-purple-900/30 text-purple-300 rounded-full text-sm font-semibold flex items-center gap-2"
                   >
                     {tag}
                     <button
                       onClick={() => removeTag(tag)}
-                      className="hover:text-purple-900 dark:hover:text-purple-100"
+                      className="hover:text-purple-100"
                     >
                       <DynamicIcon name="X" className="w-3 h-3" />
                     </button>
@@ -2871,11 +2871,11 @@ function AdventureCreatorContent() {
 
             {/* Thumbnail Upload */}
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Thumbnail Image
               </label>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                Recommended: 400×300px (or 320×180px), max 5MB
+              <p className="text-xs text-blue-300/60 mb-3">
+                Recommended: 400�300px (or 320�180px), max 5MB
               </p>
               <div className="flex items-start gap-4">
                 {thumbnailUrl && (
@@ -2883,7 +2883,7 @@ function AdventureCreatorContent() {
                     <img
                       src={thumbnailUrl}
                       alt="Thumbnail preview"
-                      className="w-32 h-24 object-cover rounded-lg border-2 border-gray-300 dark:border-gray-600"
+                      className="w-32 h-24 object-cover rounded-lg border border-blue-700/40"
                     />
                     <button
                       onClick={() => setThumbnailUrl("")}
@@ -2928,11 +2928,11 @@ function AdventureCreatorContent() {
 
             {/* Banner Upload */}
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Banner Image
               </label>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                Recommended: 1200×400px, max 5MB
+              <p className="text-xs text-blue-300/60 mb-3">
+                Recommended: 1200�400px, max 5MB
               </p>
               <div className="flex items-start gap-4">
                 {bannerUrl && (
@@ -2940,7 +2940,7 @@ function AdventureCreatorContent() {
                     <img
                       src={bannerUrl}
                       alt="Banner preview"
-                      className="w-48 h-16 object-cover rounded-lg border-2 border-gray-300 dark:border-gray-600"
+                      className="w-48 h-16 object-cover rounded-lg border border-blue-700/40"
                     />
                     <button
                       onClick={() => setBannerUrl("")}
@@ -2988,12 +2988,12 @@ function AdventureCreatorContent() {
       case "preset":
         return (
           <div className="space-y-6">
-            <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-lg p-4 mb-6">
-              <h3 className="text-lg font-bold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+            <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-4 mb-6">
+              <h3 className="text-lg font-bold text-blue-200 mb-2 flex items-center gap-2">
                 <DynamicIcon name="Users" className="w-5 h-5" />
                 Character Presets
               </h3>
-              <p className="text-sm text-blue-800 dark:text-blue-200">
+              <p className="text-sm text-blue-300">
                 Create custom character presets for your adventure. Players can
                 choose these when starting your adventure to customize their
                 character's stats, items, and resources.
@@ -3002,7 +3002,7 @@ function AdventureCreatorContent() {
 
             {/* Create New Preset Button */}
             <div className="flex justify-between items-center mb-4">
-              <h4 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h4 className="text-lg font-bold text-white">
                 Your Presets
               </h4>
               <button
@@ -3021,14 +3021,14 @@ function AdventureCreatorContent() {
 
             {/* Preset Form */}
             {showPresetForm && (
-              <div className="bg-gray-50 dark:bg-gray-900/50 border-2 border-gray-300 dark:border-gray-600 rounded-lg p-6 mb-6">
-                <h5 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+              <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-6 mb-6">
+                <h5 className="text-lg font-bold text-white mb-4">
                   {editingPresetId ? "Edit Preset" : "Create New Preset"}
                 </h5>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                    <label className="block text-sm font-semibold text-blue-200 mb-2">
                       Preset Name *
                     </label>
                     <input
@@ -3036,12 +3036,12 @@ function AdventureCreatorContent() {
                       value={newPresetName}
                       onChange={(e) => setNewPresetName(e.target.value)}
                       placeholder="e.g., Battle Mage"
-                      className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 transition-colors"
+                      className="w-full px-4 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 transition-colors"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                    <label className="block text-sm font-semibold text-blue-200 mb-2">
                       Description *
                     </label>
                     <textarea
@@ -3049,12 +3049,12 @@ function AdventureCreatorContent() {
                       onChange={(e) => setNewPresetDescription(e.target.value)}
                       placeholder="Describe this character archetype..."
                       rows={2}
-                      className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 transition-colors resize-none"
+                      className="w-full px-4 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 transition-colors resize-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                    <label className="block text-sm font-semibold text-blue-200 mb-2">
                       Icon *
                     </label>
                     <IconPicker
@@ -3063,11 +3063,11 @@ function AdventureCreatorContent() {
                     />
                   </div>
 
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-3">
-                    <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                  <div className="bg-yellow-900/20 border border-yellow-800/50 rounded-lg p-3">
+                    <p className="text-xs text-yellow-300">
                       <DynamicIcon
                         name="Lightbulb"
-                        className="w-4 h-4 inline mr-2"
+                        className="w-4 h-4 inline mr-2 text-yellow-400"
                       />{" "}
                       <strong>Tip:</strong> The preset will copy your current
                       Player Name, Player Summary, Intro, Stats, Resources,
@@ -3174,8 +3174,8 @@ function AdventureCreatorContent() {
                     key={preset.id}
                     className={`relative p-5 rounded-xl border-2 transition-all ${
                       isSelected
-                        ? "bg-purple-100 dark:bg-purple-900/30 border-purple-500 dark:border-purple-400 ring-4 ring-purple-300 dark:ring-purple-700"
-                        : "bg-white dark:bg-blue-950 border-gray-300 dark:border-gray-600"
+                        ? "bg-purple-900/30 border-purple-500 ring-2 ring-purple-500/50"
+                        : "bg-blue-900/20 border-blue-700/40"
                     }`}
                   >
                     <button
@@ -3216,22 +3216,22 @@ function AdventureCreatorContent() {
                           />
                         </div>
                         {isSelected && (
-                          <div className="text-purple-600 dark:text-purple-400 text-xl">
+                          <div className="text-purple-400 text-xl">
                             <DynamicIcon name="Check" className="w-6 h-6" />
                           </div>
                         )}
                       </div>
 
-                      <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                      <h4 className="text-lg font-bold text-white mb-2">
                         {preset.name}
                       </h4>
 
-                      <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                      <p className="text-sm text-blue-300 mb-3">
                         {preset.description}
                       </p>
 
                       {preset.id !== "custom" && (
-                        <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                        <div className="text-xs text-blue-300/60 space-y-1">
                           <div className="flex items-center gap-1">
                             <DynamicIcon name="BarChart2" className="w-3 h-3" />{" "}
                             {preset.stats?.length || 0} stats
@@ -3250,7 +3250,7 @@ function AdventureCreatorContent() {
 
                     {/* Edit/Delete buttons for custom presets */}
                     {preset.id !== "custom" && (
-                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-blue-700/40">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -3302,12 +3302,12 @@ function AdventureCreatorContent() {
             </div>
 
             {selectedPreset && selectedPreset !== "custom" && (
-              <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700 rounded-lg p-4">
-                <h4 className="text-sm font-bold text-green-900 dark:text-green-100 mb-2 flex items-center gap-2">
-                  <DynamicIcon name="Sparkles" className="w-4 h-4" /> Preset
+              <div className="bg-green-900/20 border border-green-800/50 rounded-lg p-4">
+                <h4 className="text-sm font-bold text-green-300 mb-2 flex items-center gap-2">
+                  <DynamicIcon name="Sparkles" className="w-4 h-4 text-green-400" /> Preset
                   Applied
                 </h4>
-                <p className="text-xs text-green-800 dark:text-green-200">
+                <p className="text-xs text-green-400/80">
                   Your character's stats, items, and resources have been
                   pre-configured. You can review and customize them in the
                   following steps.
@@ -3321,7 +3321,7 @@ function AdventureCreatorContent() {
         return (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Player Character Name
               </label>
               <input
@@ -3329,12 +3329,12 @@ function AdventureCreatorContent() {
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 placeholder="e.g., Aria"
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Player Character Summary
               </label>
               <textarea
@@ -3342,12 +3342,12 @@ function AdventureCreatorContent() {
                 onChange={(e) => setPlayerSummary(e.target.value)}
                 placeholder="A brief description of who the player character is..."
                 rows={3}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
+                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Story Premise *
               </label>
               <textarea
@@ -3355,12 +3355,12 @@ function AdventureCreatorContent() {
                 onChange={(e) => setPremise(e.target.value)}
                 placeholder="A one-paragraph summary of the story's main conflict or goal..."
                 rows={4}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
+                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Intro *
               </label>
               <textarea
@@ -3368,12 +3368,12 @@ function AdventureCreatorContent() {
                 onChange={(e) => setIntro(e.target.value)}
                 placeholder="The opening text that players will see when they start the adventure..."
                 rows={6}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
+                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Author Notes (Optional)
               </label>
               <textarea
@@ -3381,15 +3381,15 @@ function AdventureCreatorContent() {
                 onChange={(e) => setAuthorNotes(e.target.value)}
                 placeholder="Notes for yourself about the story direction, themes, etc..."
                 rows={4}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors resize-none"
+                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
               />
             </div>
 
-            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+            <div className="bg-purple-900/20 border border-purple-800/50 rounded-lg p-4">
+              <p className="text-sm text-purple-300 flex items-start gap-2">
                 <DynamicIcon
                   name="Lightbulb"
-                  className="w-4 h-4 mt-0.5 shrink-0"
+                  className="w-4 h-4 mt-0.5 shrink-0 text-purple-400"
                 />
                 <span>
                   <strong>Tip:</strong> Story Points let players upgrade their
@@ -3401,7 +3401,7 @@ function AdventureCreatorContent() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                <label className="block text-sm font-semibold text-blue-200 mb-2">
                   Starting Points
                 </label>
                 <input
@@ -3409,15 +3409,15 @@ function AdventureCreatorContent() {
                   min="0"
                   value={points}
                   onChange={(e) => setPoints(parseInt(e.target.value) || 0)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                  className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                 />
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-xs text-blue-300/60 mt-1">
                   Points players start with
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                <label className="block text-sm font-semibold text-blue-200 mb-2">
                   Starting Momentum
                 </label>
                 <input
@@ -3430,15 +3430,15 @@ function AdventureCreatorContent() {
                       Math.min(parseInt(e.target.value) || 0, maxMomentum)
                     )
                   }
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                  className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                 />
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-xs text-blue-300/60 mt-1">
                   Current momentum value
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                <label className="block text-sm font-semibold text-blue-200 mb-2">
                   Max Momentum
                 </label>
                 <input
@@ -3448,9 +3448,9 @@ function AdventureCreatorContent() {
                   onChange={(e) =>
                     setMaxMomentum(Math.max(1, parseInt(e.target.value) || 5))
                   }
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                  className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                 />
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-xs text-blue-300/60 mt-1">
                   Maximum momentum capacity
                 </p>
               </div>
@@ -3461,8 +3461,8 @@ function AdventureCreatorContent() {
       case "starting-choices":
         return (
           <div className="space-y-6">
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+            <div className="bg-green-900/20 border border-green-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
                 <DynamicIcon
                   name="Lightbulb"
                   className="w-5 h-5 text-green-600 shrink-0 mt-0.5"
@@ -3477,13 +3477,13 @@ function AdventureCreatorContent() {
             </div>
 
             {/* Add New Starting Choice */}
-            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
                 Add Starting Choice
               </h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Choice Text *
                   </label>
                   <input
@@ -3496,11 +3496,11 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Sneak in through the back"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Intro Override (optional)
                   </label>
                   <textarea
@@ -3513,16 +3513,16 @@ function AdventureCreatorContent() {
                     }
                     placeholder="Different intro text for this path (leave empty to use default intro)"
                     rows={3}
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-blue-300/50 mt-1">
                     If set, this intro will be shown instead of the main intro
                     when this choice is selected.
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-semibold text-blue-200 mb-1">
                       Skill Check (optional)
                     </label>
                     <select
@@ -3536,7 +3536,7 @@ function AdventureCreatorContent() {
                             : undefined,
                         })
                       }
-                      className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                     >
                       <option value="">No skill check</option>
                       {stats.map((stat) => (
@@ -3548,7 +3548,7 @@ function AdventureCreatorContent() {
                   </div>
                   {newStartingChoice.skill_used && (
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-sm font-semibold text-blue-200 mb-1">
                         DC (Difficulty)
                       </label>
                       <input
@@ -3562,14 +3562,14 @@ function AdventureCreatorContent() {
                             skill_dc: parseInt(e.target.value) || 50,
                           })
                         }
-                        className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                        className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                       />
                     </div>
                   )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-semibold text-blue-200 mb-1">
                       Requires Item (optional)
                     </label>
                     <select
@@ -3580,7 +3580,7 @@ function AdventureCreatorContent() {
                           item_used: e.target.value || undefined,
                         })
                       }
-                      className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                     >
                       <option value="">No item required</option>
                       {inventory.map((item) => (
@@ -3590,7 +3590,7 @@ function AdventureCreatorContent() {
                       ))}
                     </select>
                     {newStartingChoice.item_used && (
-                      <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 dark:text-gray-300">
+                      <label className="flex items-center gap-2 mt-2 text-sm text-blue-300">
                         <input
                           type="checkbox"
                           checked={newStartingChoice.item_loss || false}
@@ -3607,7 +3607,7 @@ function AdventureCreatorContent() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-semibold text-blue-200 mb-1">
                       Resource Cost (optional)
                     </label>
                     <select
@@ -3618,7 +3618,7 @@ function AdventureCreatorContent() {
                           resource_used: e.target.value || undefined,
                         })
                       }
-                      className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                     >
                       <option value="">No resource cost</option>
                       {resources.map((res) => (
@@ -3631,14 +3631,14 @@ function AdventureCreatorContent() {
                 </div>
                 {/* Mythic GME Section */}
                 {mythicEnabled && (
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-                    <h4 className="text-sm font-bold text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
+                  <div className="border-t border-blue-800/30 pt-4 mt-4">
+                    <h4 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
                       <DynamicIcon name="Sparkles" className="w-4 h-4" />
                       Mythic GME Options
                     </h4>
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                        <label className="block text-sm font-semibold text-blue-200 mb-1">
                           Fate Check Question (optional)
                         </label>
                         <input
@@ -3651,9 +3651,9 @@ function AdventureCreatorContent() {
                             })
                           }
                           placeholder="e.g., Is the door locked? (Likely)"
-                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                         />
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <p className="text-xs text-blue-300/50 mt-1">
                           Format: &quot;Question (Likelihood)&quot; -
                           Likelihoods: Certain, Nearly Certain, Very Likely,
                           Likely, 50/50, Unlikely, Very Unlikely, Nearly
@@ -3662,7 +3662,7 @@ function AdventureCreatorContent() {
                       </div>
                       {newStartingChoice.mythic_check &&
                         newStartingChoice.skill_used && (
-                          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                          <label className="flex items-center gap-2 text-sm text-blue-300">
                             <input
                               type="checkbox"
                               checked={
@@ -3682,7 +3682,7 @@ function AdventureCreatorContent() {
                         )}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-sm font-semibold text-blue-200 mb-1">
                             Mythic Table Roll (optional)
                           </label>
                           <select
@@ -3693,7 +3693,7 @@ function AdventureCreatorContent() {
                                 mythic_table: e.target.value || undefined,
                               })
                             }
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                           >
                             <option value="">No Mythic table</option>
                             <option value="action">Action</option>
@@ -3725,7 +3725,7 @@ function AdventureCreatorContent() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-sm font-semibold text-blue-200 mb-1">
                             Custom Table Roll (optional)
                           </label>
                           <select
@@ -3736,7 +3736,7 @@ function AdventureCreatorContent() {
                                 custom_table: e.target.value || undefined,
                               })
                             }
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                           >
                             <option value="">No custom table</option>
                             {customTables.map((table) => (
@@ -3804,16 +3804,16 @@ function AdventureCreatorContent() {
 
             {/* Existing Starting Choices */}
             <div className="space-y-3">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-bold text-white">
                 Starting Choices ({startingChoices.length})
               </h3>
               {startingChoices.length === 0 ? (
-                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 text-center">
+                <div className="bg-blue-900/20 rounded-lg p-6 text-center">
                   <DynamicIcon
                     name="Play"
                     className="w-12 h-12 mx-auto mb-3 text-gray-400"
                   />
-                  <p className="text-gray-600 dark:text-gray-400">
+                  <p className="text-blue-300/60">
                     No custom starting choices. Players will see the default
                     &quot;Start Story&quot; button.
                   </p>
@@ -3824,15 +3824,15 @@ function AdventureCreatorContent() {
                     // Edit mode
                     <div
                       key={index}
-                      className="p-4 bg-green-100 dark:bg-green-900/40 rounded-lg border-2 border-green-400 dark:border-green-600"
+                      className="p-4 bg-green-900/40 rounded-lg border-2 border-green-600"
                     >
                       <div className="space-y-4">
-                        <h4 className="text-md font-bold text-green-900 dark:text-green-100 flex items-center gap-2">
+                        <h4 className="text-md font-bold text-green-300 flex items-center gap-2">
                           <DynamicIcon name="Edit2" className="w-4 h-4" />{" "}
                           Editing Starting Choice
                         </h4>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-sm font-semibold text-blue-200 mb-1">
                             Choice Text *
                           </label>
                           <input
@@ -3844,11 +3844,11 @@ function AdventureCreatorContent() {
                                 text: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-sm font-semibold text-blue-200 mb-1">
                             Intro Override
                           </label>
                           <textarea
@@ -3860,12 +3860,12 @@ function AdventureCreatorContent() {
                               })
                             }
                             rows={3}
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                           />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-semibold text-blue-200 mb-1">
                               Skill Check
                             </label>
                             <select
@@ -3879,7 +3879,7 @@ function AdventureCreatorContent() {
                                     : undefined,
                                 })
                               }
-                              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                             >
                               <option value="">No skill check</option>
                               {stats.map((stat) => (
@@ -3891,7 +3891,7 @@ function AdventureCreatorContent() {
                           </div>
                           {editStartingChoice.skill_used && (
                             <div>
-                              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                              <label className="block text-sm font-semibold text-blue-200 mb-1">
                                 DC
                               </label>
                               <input
@@ -3905,14 +3905,14 @@ function AdventureCreatorContent() {
                                     skill_dc: parseInt(e.target.value) || 50,
                                   })
                                 }
-                                className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                               />
                             </div>
                           )}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-semibold text-blue-200 mb-1">
                               Requires Item
                             </label>
                             <select
@@ -3923,7 +3923,7 @@ function AdventureCreatorContent() {
                                   item_used: e.target.value || undefined,
                                 })
                               }
-                              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                             >
                               <option value="">No item required</option>
                               {inventory.map((item) => (
@@ -3933,7 +3933,7 @@ function AdventureCreatorContent() {
                               ))}
                             </select>
                             {editStartingChoice.item_used && (
-                              <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 dark:text-gray-300">
+                              <label className="flex items-center gap-2 mt-2 text-sm text-blue-300">
                                 <input
                                   type="checkbox"
                                   checked={
@@ -3952,7 +3952,7 @@ function AdventureCreatorContent() {
                             )}
                           </div>
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-semibold text-blue-200 mb-1">
                               Resource Cost
                             </label>
                             <select
@@ -3963,7 +3963,7 @@ function AdventureCreatorContent() {
                                   resource_used: e.target.value || undefined,
                                 })
                               }
-                              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                             >
                               <option value="">No resource cost</option>
                               {resources.map((res) => (
@@ -3976,8 +3976,8 @@ function AdventureCreatorContent() {
                         </div>
                         {/* Mythic GME Section in Edit */}
                         {mythicEnabled && (
-                          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-                            <h4 className="text-sm font-bold text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
+                          <div className="border-t border-blue-800/30 pt-4 mt-4">
+                            <h4 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
                               <DynamicIcon
                                 name="Sparkles"
                                 className="w-4 h-4"
@@ -3986,7 +3986,7 @@ function AdventureCreatorContent() {
                             </h4>
                             <div className="space-y-4">
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                <label className="block text-sm font-semibold text-blue-200 mb-1">
                                   Fate Check Question
                                 </label>
                                 <input
@@ -3999,12 +3999,12 @@ function AdventureCreatorContent() {
                                     })
                                   }
                                   placeholder="e.g., Is the door locked? (Likely)"
-                                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                  className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                 />
                               </div>
                               {editStartingChoice.mythic_check &&
                                 editStartingChoice.skill_used && (
-                                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                  <label className="flex items-center gap-2 text-sm text-blue-300">
                                     <input
                                       type="checkbox"
                                       checked={
@@ -4024,7 +4024,7 @@ function AdventureCreatorContent() {
                                 )}
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                                     Mythic Table Roll
                                   </label>
                                   <select
@@ -4038,7 +4038,7 @@ function AdventureCreatorContent() {
                                           e.target.value || undefined,
                                       })
                                     }
-                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                   >
                                     <option value="">No Mythic table</option>
                                     <option value="action">Action</option>
@@ -4072,7 +4072,7 @@ function AdventureCreatorContent() {
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                                     Custom Table Roll
                                   </label>
                                   <select
@@ -4086,7 +4086,7 @@ function AdventureCreatorContent() {
                                           e.target.value || undefined,
                                       })
                                     }
-                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                   >
                                     <option value="">No custom table</option>
                                     {customTables.map((table) => (
@@ -4173,18 +4173,18 @@ function AdventureCreatorContent() {
                     // View mode
                     <div
                       key={index}
-                      className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800"
+                      className="p-4 bg-green-900/20 rounded-lg border border-green-800/50"
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
-                            <span className="text-green-600 dark:text-green-400">
+                          <div className="font-bold text-white flex items-center gap-2 flex-wrap">
+                            <span className="text-green-400">
                               {index + 1}.
                             </span>
                             <span>{choice.text}</span>
                           </div>
                           {choice.intro_override && (
-                            <p className="text-sm text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                            <p className="text-sm text-blue-400 mt-1 flex items-center gap-1">
                               <DynamicIcon
                                 name="FileText"
                                 className="w-3 h-3"
@@ -4194,7 +4194,7 @@ function AdventureCreatorContent() {
                           )}
                           <div className="flex flex-wrap gap-2 mt-2">
                             {choice.skill_used && (
-                              <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 rounded text-xs">
+                              <span className="px-2 py-0.5 bg-purple-900/30 text-purple-200 rounded text-xs">
                                 <DynamicIcon
                                   name="Dices"
                                   className="w-3 h-3 inline mr-1"
@@ -4203,7 +4203,7 @@ function AdventureCreatorContent() {
                               </span>
                             )}
                             {choice.item_used && (
-                              <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 rounded text-xs">
+                              <span className="px-2 py-0.5 bg-amber-900/30 text-amber-200 rounded text-xs">
                                 <DynamicIcon
                                   name="Package"
                                   className="w-3 h-3 inline mr-1"
@@ -4213,7 +4213,7 @@ function AdventureCreatorContent() {
                               </span>
                             )}
                             {choice.resource_used && (
-                              <span className="px-2 py-0.5 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 rounded text-xs">
+                              <span className="px-2 py-0.5 bg-cyan-900/30 text-cyan-200 rounded text-xs">
                                 <DynamicIcon
                                   name="Gem"
                                   className="w-3 h-3 inline mr-1"
@@ -4222,7 +4222,7 @@ function AdventureCreatorContent() {
                               </span>
                             )}
                             {choice.mythic_check && (
-                              <span className="px-2 py-0.5 bg-pink-100 dark:bg-pink-900/30 text-pink-800 dark:text-pink-200 rounded text-xs">
+                              <span className="px-2 py-0.5 bg-pink-900/30 text-pink-200 rounded text-xs">
                                 <DynamicIcon
                                   name="Sparkles"
                                   className="w-3 h-3 inline mr-1"
@@ -4231,7 +4231,7 @@ function AdventureCreatorContent() {
                               </span>
                             )}
                             {choice.mythic_table && (
-                              <span className="px-2 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-200 rounded text-xs">
+                              <span className="px-2 py-0.5 bg-violet-900/30 text-violet-200 rounded text-xs">
                                 <DynamicIcon
                                   name="TableProperties"
                                   className="w-3 h-3 inline mr-1"
@@ -4240,7 +4240,7 @@ function AdventureCreatorContent() {
                               </span>
                             )}
                             {choice.custom_table && (
-                              <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 rounded text-xs">
+                              <span className="px-2 py-0.5 bg-indigo-900/30 text-indigo-200 rounded text-xs">
                                 <DynamicIcon
                                   name="List"
                                   className="w-3 h-3 inline mr-1"
@@ -4289,8 +4289,8 @@ function AdventureCreatorContent() {
       case "stats":
         return (
           <div className="space-y-6">
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
                 <DynamicIcon
                   name="Lightbulb"
                   className="w-4 h-4 mt-0.5 shrink-0"
@@ -4303,13 +4303,13 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
                 Add New Stat
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Name *
                   </label>
                   <input
@@ -4319,11 +4319,11 @@ function AdventureCreatorContent() {
                       setNewStat({ ...newStat, name: e.target.value })
                     }
                     placeholder="e.g., Strength"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Icon
                   </label>
                   <IconPicker
@@ -4334,7 +4334,7 @@ function AdventureCreatorContent() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Starting Value (0-100)
                   </label>
                   <input
@@ -4348,11 +4348,11 @@ function AdventureCreatorContent() {
                         value: parseInt(e.target.value) || 0,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Description *
                   </label>
                   <input
@@ -4362,7 +4362,7 @@ function AdventureCreatorContent() {
                       setNewStat({ ...newStat, description: e.target.value })
                     }
                     placeholder="e.g., Physical power and combat prowess"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
               </div>
@@ -4376,11 +4376,11 @@ function AdventureCreatorContent() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-bold text-white">
                 Stats ({stats.length})
               </h3>
               {stats.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                <p className="text-blue-300/60 text-sm">
                   No stats added yet
                 </p>
               ) : (
@@ -4389,11 +4389,11 @@ function AdventureCreatorContent() {
                     // Edit mode
                     <div
                       key={index}
-                      className="p-4 bg-blue-100 dark:bg-blue-900/40 rounded-lg border-2 border-blue-400 dark:border-blue-600"
+                      className="p-4 bg-blue-900/40 rounded-lg border-2 border-blue-600"
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Name *
                           </label>
                           <input
@@ -4402,11 +4402,11 @@ function AdventureCreatorContent() {
                             onChange={(e) =>
                               setEditStat({ ...editStat, name: e.target.value })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Icon
                           </label>
                           <IconPicker
@@ -4420,7 +4420,7 @@ function AdventureCreatorContent() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Value (0-100)
                           </label>
                           <input
@@ -4434,11 +4434,11 @@ function AdventureCreatorContent() {
                                 value: parseInt(e.target.value) || 0,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Description *
                           </label>
                           <input
@@ -4450,7 +4450,7 @@ function AdventureCreatorContent() {
                                 description: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                       </div>
@@ -4482,23 +4482,23 @@ function AdventureCreatorContent() {
                       onDragStart={() => handleStatDragStart(index)}
                       onDragOver={(e) => handleStatDragOver(e, index)}
                       onDragEnd={handleStatDragEnd}
-                      className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 cursor-move hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                      className="flex items-center gap-3 p-4 bg-blue-900/20 rounded-lg border border-blue-800/50 cursor-move hover:bg-blue-800/30 transition-colors"
                       style={{ opacity: draggedStatIndex === index ? 0.5 : 1 }}
                     >
-                      <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
+                      <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
                         <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
                       <div className="text-2xl">
                         <DynamicIcon name={stat.symbol} className="w-8 h-8" />
                       </div>
                       <div className="flex-1">
-                        <div className="font-bold text-gray-900 dark:text-white">
+                        <div className="font-bold text-white">
                           {stat.name}
                         </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <div className="text-sm text-blue-300/60">
                           {stat.description}
                         </div>
-                        <div className="text-sm text-blue-600 dark:text-blue-400 font-semibold">
+                        <div className="text-sm text-blue-400 font-semibold">
                           Value: {stat.value}
                         </div>
                       </div>
@@ -4551,8 +4551,8 @@ function AdventureCreatorContent() {
       case "resources":
         return (
           <div className="space-y-6">
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+            <div className="bg-green-900/20 border border-green-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
                 <DynamicIcon
                   name="Lightbulb"
                   className="w-4 h-4 mt-0.5 shrink-0"
@@ -4565,13 +4565,13 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
                 Add New Resource
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Name *
                   </label>
                   <input
@@ -4581,11 +4581,11 @@ function AdventureCreatorContent() {
                       setNewResource({ ...newResource, name: e.target.value })
                     }
                     placeholder="e.g., Health"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Icon
                   </label>
                   <IconPicker
@@ -4596,7 +4596,7 @@ function AdventureCreatorContent() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Starting Value
                   </label>
                   <input
@@ -4609,11 +4609,11 @@ function AdventureCreatorContent() {
                         value: parseInt(e.target.value) || 0,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Max Value
                   </label>
                   <input
@@ -4626,11 +4626,11 @@ function AdventureCreatorContent() {
                         maxValue: parseInt(e.target.value) || 100,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Description *
                   </label>
                   <input
@@ -4643,7 +4643,7 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Your life force"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
               </div>
@@ -4657,11 +4657,11 @@ function AdventureCreatorContent() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-bold text-white">
                 Resources ({resources.length})
               </h3>
               {resources.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                <p className="text-blue-300/60 text-sm">
                   No resources added yet
                 </p>
               ) : (
@@ -4670,11 +4670,11 @@ function AdventureCreatorContent() {
                     // Edit mode
                     <div
                       key={index}
-                      className="p-4 bg-green-100 dark:bg-green-900/40 rounded-lg border-2 border-green-400 dark:border-green-600"
+                      className="p-4 bg-green-900/40 rounded-lg border-2 border-green-600"
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Name *
                           </label>
                           <input
@@ -4686,11 +4686,11 @@ function AdventureCreatorContent() {
                                 name: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Icon
                           </label>
                           <IconPicker
@@ -4704,7 +4704,7 @@ function AdventureCreatorContent() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Starting Value
                           </label>
                           <input
@@ -4717,11 +4717,11 @@ function AdventureCreatorContent() {
                                 value: parseInt(e.target.value) || 0,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Max Value
                           </label>
                           <input
@@ -4734,11 +4734,11 @@ function AdventureCreatorContent() {
                                 maxValue: parseInt(e.target.value) || 1,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Description *
                           </label>
                           <input
@@ -4750,7 +4750,7 @@ function AdventureCreatorContent() {
                                 description: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                       </div>
@@ -4784,12 +4784,12 @@ function AdventureCreatorContent() {
                       onDragStart={() => handleResourceDragStart(index)}
                       onDragOver={(e) => handleResourceDragOver(e, index)}
                       onDragEnd={handleResourceDragEnd}
-                      className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800 cursor-move hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                      className="flex items-center gap-3 p-4 bg-green-900/20 rounded-lg border border-green-800/50 cursor-move hover:bg-green-800/30 transition-colors"
                       style={{
                         opacity: draggedResourceIndex === index ? 0.5 : 1,
                       }}
                     >
-                      <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
+                      <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
                         <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
                       <div className="text-2xl">
@@ -4799,13 +4799,13 @@ function AdventureCreatorContent() {
                         />
                       </div>
                       <div className="flex-1">
-                        <div className="font-bold text-gray-900 dark:text-white">
+                        <div className="font-bold text-white">
                           {resource.name}
                         </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <div className="text-sm text-blue-300/60">
                           {resource.description}
                         </div>
-                        <div className="text-sm text-green-600 dark:text-green-400 font-semibold">
+                        <div className="text-sm text-green-400 font-semibold">
                           {resource.value}/{resource.maxValue}
                         </div>
                       </div>
@@ -4857,8 +4857,8 @@ function AdventureCreatorContent() {
       case "inventory":
         return (
           <div className="space-y-6">
-            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+            <div className="bg-purple-900/20 border border-purple-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
                 <DynamicIcon
                   name="Lightbulb"
                   className="w-4 h-4 mt-0.5 shrink-0"
@@ -4870,13 +4870,13 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
                 Add Starting Item
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Name *
                   </label>
                   <input
@@ -4886,11 +4886,11 @@ function AdventureCreatorContent() {
                       setNewItem({ ...newItem, name: e.target.value })
                     }
                     placeholder="e.g., Rusty Sword"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Icon
                   </label>
                   <IconPicker
@@ -4901,7 +4901,7 @@ function AdventureCreatorContent() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Quantity
                   </label>
                   <input
@@ -4914,11 +4914,11 @@ function AdventureCreatorContent() {
                         quantity: parseInt(e.target.value) || 1,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Type
                   </label>
                   <select
@@ -4933,7 +4933,7 @@ function AdventureCreatorContent() {
                           | "misc",
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   >
                     <option value="normal">Normal Item</option>
                     <option value="consumable">Consumable</option>
@@ -4942,7 +4942,7 @@ function AdventureCreatorContent() {
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Description
                   </label>
                   <input
@@ -4952,7 +4952,7 @@ function AdventureCreatorContent() {
                       setNewItem({ ...newItem, description: e.target.value })
                     }
                     placeholder="e.g., A worn but reliable blade"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
               </div>
@@ -4966,11 +4966,11 @@ function AdventureCreatorContent() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-bold text-white">
                 Starting Inventory ({inventory.length})
               </h3>
               {inventory.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                <p className="text-blue-300/60 text-sm">
                   No items added yet
                 </p>
               ) : (
@@ -4979,11 +4979,11 @@ function AdventureCreatorContent() {
                     // Edit mode
                     <div
                       key={index}
-                      className="p-4 bg-purple-100 dark:bg-purple-900/40 rounded-lg border-2 border-purple-400 dark:border-purple-600"
+                      className="p-4 bg-purple-900/40 rounded-lg border-2 border-purple-600"
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Name *
                           </label>
                           <input
@@ -4995,11 +4995,11 @@ function AdventureCreatorContent() {
                                 name: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Icon
                           </label>
                           <IconPicker
@@ -5013,7 +5013,7 @@ function AdventureCreatorContent() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Quantity
                           </label>
                           <input
@@ -5026,11 +5026,11 @@ function AdventureCreatorContent() {
                                 quantity: parseInt(e.target.value) || 1,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Type
                           </label>
                           <select
@@ -5041,7 +5041,7 @@ function AdventureCreatorContent() {
                                 type: e.target.value as any,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           >
                             <option value="weapon">Weapon</option>
                             <option value="armor">Armor</option>
@@ -5050,7 +5050,7 @@ function AdventureCreatorContent() {
                           </select>
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Description
                           </label>
                           <input
@@ -5062,7 +5062,7 @@ function AdventureCreatorContent() {
                                 description: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                       </div>
@@ -5094,27 +5094,27 @@ function AdventureCreatorContent() {
                       onDragStart={() => handleInventoryDragStart(index)}
                       onDragOver={(e) => handleInventoryDragOver(e, index)}
                       onDragEnd={handleInventoryDragEnd}
-                      className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800 cursor-move hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                      className="flex items-center gap-3 p-4 bg-purple-900/20 rounded-lg border border-purple-800/50 cursor-move hover:bg-purple-800/30 transition-colors"
                       style={{
                         opacity: draggedInventoryIndex === index ? 0.5 : 1,
                       }}
                     >
-                      <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
+                      <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
                         <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
                       <div className="text-2xl">
                         <DynamicIcon name={item.symbol} className="w-8 h-8" />
                       </div>
                       <div className="flex-1">
-                        <div className="font-bold text-gray-900 dark:text-white">
-                          {item.name} ×{item.quantity}
+                        <div className="font-bold text-white">
+                          {item.name} �{item.quantity}
                         </div>
                         {item.description && (
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                          <div className="text-sm text-blue-300/60">
                             {item.description}
                           </div>
                         )}
-                        <div className="text-xs text-purple-600 dark:text-purple-400">
+                        <div className="text-xs text-purple-400">
                           {item.type}
                         </div>
                       </div>
@@ -5166,8 +5166,8 @@ function AdventureCreatorContent() {
       case "lore":
         return (
           <div className="space-y-6">
-            <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+            <div className="bg-indigo-900/20 border border-indigo-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
                 <DynamicIcon
                   name="Lightbulb"
                   className="w-4 h-4 mt-0.5 shrink-0"
@@ -5181,13 +5181,13 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
                 Add Lore Entry
               </h3>
               <div className="space-y-4 mb-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Title *
                   </label>
                   <input
@@ -5197,11 +5197,11 @@ function AdventureCreatorContent() {
                       setNewLore({ ...newLore, title: e.target.value })
                     }
                     placeholder="e.g., The Ancient Prophecy"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Content *
                   </label>
                   <textarea
@@ -5211,7 +5211,7 @@ function AdventureCreatorContent() {
                     }
                     placeholder="Write the lore entry content..."
                     rows={5}
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                   />
                 </div>
                 <div className="flex items-center gap-4">
@@ -5227,7 +5227,7 @@ function AdventureCreatorContent() {
                     />
                     <label
                       htmlFor="loreSecret"
-                      className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1"
+                      className="text-sm text-blue-300 flex items-center gap-1"
                     >
                       <DynamicIcon name="Lock" className="w-3 h-3" /> Hidden
                       (only revealed when triggered by keys)
@@ -5245,7 +5245,7 @@ function AdventureCreatorContent() {
                     />
                     <label
                       htmlFor="loreOn"
-                      className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1"
+                      className="text-sm text-blue-300 flex items-center gap-1"
                     >
                       <DynamicIcon name="Check" className="w-3 h-3" /> Enabled
                     </label>
@@ -5262,7 +5262,7 @@ function AdventureCreatorContent() {
                     />
                     <label
                       htmlFor="loreAlwaysOn"
-                      className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1"
+                      className="text-sm text-blue-300 flex items-center gap-1"
                     >
                       <DynamicIcon name="Globe" className="w-3 h-3" /> Always On
                       (ignores all triggers)
@@ -5270,7 +5270,7 @@ function AdventureCreatorContent() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Thumbnail (optional)
                   </label>
                   <div className="flex items-start gap-3">
@@ -5287,11 +5287,11 @@ function AdventureCreatorContent() {
                           }
                           className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs"
                         >
-                          ×
+                          �
                         </button>
                       </div>
                     ) : (
-                      <div className="w-24 h-24 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
+                      <div className="w-24 h-24 rounded border-2 border-dashed border-blue-700/40 flex items-center justify-center text-xs text-blue-300/50">
                         No Preview
                       </div>
                     )}
@@ -5364,7 +5364,7 @@ function AdventureCreatorContent() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                  <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
                     <DynamicIcon
                       name="CheckCircle"
                       className="w-4 h-4 text-green-600"
@@ -5381,7 +5381,7 @@ function AdventureCreatorContent() {
                         (e.preventDefault(), addLoreOnTrigger())
                       }
                       placeholder="e.g., 'Ancient Map'"
-                      className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                     />
                     <button
                       onClick={addLoreOnTrigger}
@@ -5394,7 +5394,7 @@ function AdventureCreatorContent() {
                     {(newLore.on_triggers || []).map((trigger) => (
                       <span
                         key={trigger}
-                        className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm flex items-center gap-1"
+                        className="px-2 py-1 bg-green-900/30 text-green-300 rounded-full text-sm flex items-center gap-1"
                       >
                         <DynamicIcon name="Check" className="w-3 h-3" />{" "}
                         {trigger}
@@ -5407,16 +5407,16 @@ function AdventureCreatorContent() {
                               ),
                             })
                           }
-                          className="hover:text-green-900 dark:hover:text-green-100"
+                          className="hover:text-green-100"
                         >
-                          ×
+                          �
                         </button>
                       </span>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                  <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
                     <DynamicIcon
                       name="XCircle"
                       className="w-4 h-4 text-red-600"
@@ -5433,7 +5433,7 @@ function AdventureCreatorContent() {
                         (e.preventDefault(), addLoreOffTrigger())
                       }
                       placeholder="e.g., 'Destroyed the Map'"
-                      className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                     />
                     <button
                       onClick={addLoreOffTrigger}
@@ -5446,7 +5446,7 @@ function AdventureCreatorContent() {
                     {(newLore.off_triggers || []).map((trigger) => (
                       <span
                         key={trigger}
-                        className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-sm flex items-center gap-1"
+                        className="px-2 py-1 bg-red-900/30 text-red-300 rounded-full text-sm flex items-center gap-1"
                       >
                         <DynamicIcon name="X" className="w-3 h-3" /> {trigger}
                         <button
@@ -5458,9 +5458,9 @@ function AdventureCreatorContent() {
                               ),
                             })
                           }
-                          className="hover:text-red-900 dark:hover:text-red-100"
+                          className="hover:text-red-100"
                         >
-                          ×
+                          �
                         </button>
                       </span>
                     ))}
@@ -5468,18 +5468,18 @@ function AdventureCreatorContent() {
                 </div>
 
                 {/* Advanced Triggers Section (Expandable) */}
-                <div className="border border-gray-300 dark:border-gray-600 rounded-lg">
+                <div className="border border-blue-700/40 rounded-lg">
                   <button
                     onClick={() =>
                       setNewLoreAdvancedExpanded(!newLoreAdvancedExpanded)
                     }
-                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    className="w-full px-4 py-3 flex items-center justify-between bg-blue-900/20 hover:bg-blue-800/30 rounded-lg transition-colors"
                   >
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                    <span className="text-sm font-semibold text-blue-200 flex items-center gap-2">
                       <DynamicIcon name="Settings" className="w-4 h-4" />{" "}
                       Advanced Section
                     </span>
-                    <span className="text-gray-500 dark:text-gray-400">
+                    <span className="text-blue-300/50">
                       <DynamicIcon
                         name={
                           newLoreAdvancedExpanded ? "ChevronUp" : "ChevronDown"
@@ -5494,23 +5494,23 @@ function AdventureCreatorContent() {
                       {/* Lore-based Triggers */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                          <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
                             <DynamicIcon
                               name="CheckCircle"
                               className="w-4 h-4 text-green-600"
                             />{" "}
                             Lores that turn this ON
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
                             {lore.length === 0 ? (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                              <p className="text-xs text-blue-300/50 italic">
                                 No other lore entries yet.
                               </p>
                             ) : (
                               lore.map((loreEntry, loreIndex) => (
                                 <label
                                   key={loreIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -5531,7 +5531,7 @@ function AdventureCreatorContent() {
                                     }}
                                     className="w-4 h-4 text-green-600 rounded"
                                   />
-                                  <span className="text-xs text-gray-900 dark:text-white">
+                                  <span className="text-xs text-white">
                                     {loreEntry.title}
                                   </span>
                                 </label>
@@ -5540,23 +5540,23 @@ function AdventureCreatorContent() {
                           </div>
                         </div>
                         <div>
-                          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                          <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
                             <DynamicIcon
                               name="XCircle"
                               className="w-4 h-4 text-red-600"
                             />{" "}
                             Lores that turn this OFF
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
                             {lore.length === 0 ? (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                              <p className="text-xs text-blue-300/50 italic">
                                 No other lore entries yet.
                               </p>
                             ) : (
                               lore.map((loreEntry, loreIndex) => (
                                 <label
                                   key={loreIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -5577,7 +5577,7 @@ function AdventureCreatorContent() {
                                     }}
                                     className="w-4 h-4 text-red-600 rounded"
                                   />
-                                  <span className="text-xs text-gray-900 dark:text-white">
+                                  <span className="text-xs text-white">
                                     {loreEntry.title}
                                   </span>
                                 </label>
@@ -5589,7 +5589,7 @@ function AdventureCreatorContent() {
 
                       {newLore.secrtet && (
                         <div>
-                          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                          <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
                             <DynamicIcon name="Key" className="w-4 h-4" />{" "}
                             Trigger Keys (Words that reveal this lore)
                           </label>
@@ -5603,7 +5603,7 @@ function AdventureCreatorContent() {
                                 (e.preventDefault(), addLoreKey())
                               }
                               placeholder="e.g., 'Dragon Defeated' or 'Ancient Ruins'"
-                              className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                              className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                             />
                             <button
                               onClick={addLoreKey}
@@ -5616,7 +5616,7 @@ function AdventureCreatorContent() {
                             {(newLore.keys || []).map((key) => (
                               <span
                                 key={key}
-                                className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-sm flex items-center gap-1"
+                                className="px-2 py-1 bg-yellow-900/30 text-yellow-300 rounded-full text-sm flex items-center gap-1"
                               >
                                 <DynamicIcon name="Key" className="w-3 h-3" />{" "}
                                 {key}
@@ -5629,9 +5629,9 @@ function AdventureCreatorContent() {
                                       ),
                                     })
                                   }
-                                  className="hover:text-yellow-900 dark:hover:text-yellow-100"
+                                  className="hover:text-yellow-100"
                                 >
-                                  ×
+                                  �
                                 </button>
                               </span>
                             ))}
@@ -5641,16 +5641,16 @@ function AdventureCreatorContent() {
                       {/* Plot Beat Triggers */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                          <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
                             <DynamicIcon
                               name="CheckCircle"
                               className="w-4 h-4 text-green-600"
                             />{" "}
                             Beats that turn this lore ON
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
                             {plotBeats.length === 0 ? (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                              <p className="text-xs text-blue-300/50 italic">
                                 No plot beats yet. Add them in the Plot Beats
                                 step.
                               </p>
@@ -5658,7 +5658,7 @@ function AdventureCreatorContent() {
                               plotBeats.map((beat, beatIndex) => (
                                 <label
                                   key={beatIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -5679,7 +5679,7 @@ function AdventureCreatorContent() {
                                     }}
                                     className="w-4 h-4 text-green-600 rounded"
                                   />
-                                  <span className="text-xs text-gray-900 dark:text-white">
+                                  <span className="text-xs text-white">
                                     {beat.title || `Beat ${beatIndex + 1}`}
                                   </span>
                                 </label>
@@ -5688,16 +5688,16 @@ function AdventureCreatorContent() {
                           </div>
                         </div>
                         <div>
-                          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                          <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
                             <DynamicIcon
                               name="XCircle"
                               className="w-4 h-4 text-red-600"
                             />{" "}
                             Beats that turn this lore OFF
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
                             {plotBeats.length === 0 ? (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                              <p className="text-xs text-blue-300/50 italic">
                                 No plot beats yet. Add them in the Plot Beats
                                 step.
                               </p>
@@ -5705,7 +5705,7 @@ function AdventureCreatorContent() {
                               plotBeats.map((beat, beatIndex) => (
                                 <label
                                   key={beatIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -5726,7 +5726,7 @@ function AdventureCreatorContent() {
                                     }}
                                     className="w-4 h-4 text-red-600 rounded"
                                   />
-                                  <span className="text-xs text-gray-900 dark:text-white">
+                                  <span className="text-xs text-white">
                                     {beat.title || `Beat ${beatIndex + 1}`}
                                   </span>
                                 </label>
@@ -5750,7 +5750,7 @@ function AdventureCreatorContent() {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                <h3 className="text-lg font-bold text-white">
                   Lore Entries ({lore.length})
                 </h3>
                 <div className="relative">
@@ -5762,7 +5762,7 @@ function AdventureCreatorContent() {
                       setLorePage(1);
                     }}
                     placeholder="Search lore..."
-                    className="pl-8 pr-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                    className="pl-8 pr-3 py-1 text-sm border border-blue-700/40 rounded-lg bg-blue-900/20 text-white focus:ring-2 focus:ring-indigo-500"
                   />
                   <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">
                     <DynamicIcon name="Search" className="w-4 h-4" />
@@ -5771,7 +5771,7 @@ function AdventureCreatorContent() {
               </div>
 
               {lore.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                <p className="text-blue-300/60 text-sm">
                   No lore entries added yet
                 </p>
               ) : (
@@ -5799,7 +5799,7 @@ function AdventureCreatorContent() {
 
                   if (filteredLore.length === 0 && lore.length > 0) {
                     return (
-                      <p className="text-gray-500 dark:text-gray-400 text-sm italic">
+                      <p className="text-blue-300/50 text-sm italic">
                         No lore entries match your search.
                       </p>
                     );
@@ -5811,17 +5811,17 @@ function AdventureCreatorContent() {
                         <div
                           key={index}
                           draggable={false}
-                          className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800"
+                          className="p-4 bg-indigo-900/20 rounded-lg border border-indigo-800/50"
                         >
                           {editingLoreIndex === index ? (
                             // Edit mode
                             <div className="space-y-4">
-                              <h4 className="text-md font-bold text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
+                              <h4 className="text-md font-bold text-indigo-100 flex items-center gap-2">
                                 <DynamicIcon name="Edit2" className="w-4 h-4" />{" "}
                                 Editing Lore Entry
                               </h4>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                <label className="block text-sm font-semibold text-blue-200 mb-1">
                                   Title *
                                 </label>
                                 <input
@@ -5833,11 +5833,11 @@ function AdventureCreatorContent() {
                                       title: e.target.value,
                                     })
                                   }
-                                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                  className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                 />
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                <label className="block text-sm font-semibold text-blue-200 mb-1">
                                   Content *
                                 </label>
                                 <textarea
@@ -5849,7 +5849,7 @@ function AdventureCreatorContent() {
                                     })
                                   }
                                   rows={5}
-                                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                                  className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                                 />
                               </div>
                               <div className="flex items-center gap-4">
@@ -5868,7 +5868,7 @@ function AdventureCreatorContent() {
                                   />
                                   <label
                                     htmlFor={`edit-lore-secret-${index}`}
-                                    className="text-sm text-gray-700 dark:text-gray-300"
+                                    className="text-sm text-blue-300"
                                   >
                                     Secret
                                   </label>
@@ -5888,7 +5888,7 @@ function AdventureCreatorContent() {
                                   />
                                   <label
                                     htmlFor={`edit-lore-on-${index}`}
-                                    className="text-sm text-gray-700 dark:text-gray-300"
+                                    className="text-sm text-blue-300"
                                   >
                                     Enabled
                                   </label>
@@ -5908,7 +5908,7 @@ function AdventureCreatorContent() {
                                   />
                                   <label
                                     htmlFor={`edit-lore-alwaysOn-${index}`}
-                                    className="text-sm text-gray-700 dark:text-gray-300"
+                                    className="text-sm text-blue-300"
                                   >
                                     <DynamicIcon
                                       name="Circle"
@@ -5919,7 +5919,7 @@ function AdventureCreatorContent() {
                                 </div>
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                <label className="block text-sm font-semibold text-blue-200 mb-1">
                                   Thumbnail
                                 </label>
                                 <div className="flex items-start gap-3">
@@ -5939,11 +5939,11 @@ function AdventureCreatorContent() {
                                         }
                                         className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs"
                                       >
-                                        ×
+                                        �
                                       </button>
                                     </div>
                                   ) : (
-                                    <div className="w-24 h-24 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
+                                    <div className="w-24 h-24 rounded border-2 border-dashed border-blue-700/40 flex items-center justify-center text-xs text-blue-300/50">
                                       No Preview
                                     </div>
                                   )}
@@ -6028,7 +6028,7 @@ function AdventureCreatorContent() {
                               </div>
 
                               <div>
-                                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                                <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
                                   <DynamicIcon
                                     name="CheckCircle"
                                     className="w-4 h-4 text-green-600"
@@ -6048,7 +6048,7 @@ function AdventureCreatorContent() {
                                       addEditLoreOnTrigger())
                                     }
                                     placeholder="e.g., 'Ancient Map'"
-                                    className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                    className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                   />
                                   <button
                                     onClick={addEditLoreOnTrigger}
@@ -6062,7 +6062,7 @@ function AdventureCreatorContent() {
                                     (trigger) => (
                                       <span
                                         key={trigger}
-                                        className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm flex items-center gap-1"
+                                        className="px-2 py-1 bg-green-900/30 text-green-300 rounded-full text-sm flex items-center gap-1"
                                       >
                                         <DynamicIcon
                                           name="Check"
@@ -6078,9 +6078,9 @@ function AdventureCreatorContent() {
                                               ).filter((t) => t !== trigger),
                                             })
                                           }
-                                          className="hover:text-green-900 dark:hover:text-green-100"
+                                          className="hover:text-green-100"
                                         >
-                                          ×
+                                          �
                                         </button>
                                       </span>
                                     )
@@ -6088,7 +6088,7 @@ function AdventureCreatorContent() {
                                 </div>
                               </div>
                               <div>
-                                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                                <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
                                   <DynamicIcon
                                     name="XCircle"
                                     className="w-4 h-4 text-red-600"
@@ -6108,7 +6108,7 @@ function AdventureCreatorContent() {
                                       addEditLoreOffTrigger())
                                     }
                                     placeholder="e.g., 'Destroyed the Map'"
-                                    className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                    className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                   />
                                   <button
                                     onClick={addEditLoreOffTrigger}
@@ -6122,7 +6122,7 @@ function AdventureCreatorContent() {
                                     (trigger) => (
                                       <span
                                         key={trigger}
-                                        className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-sm flex items-center gap-1"
+                                        className="px-2 py-1 bg-red-900/30 text-red-300 rounded-full text-sm flex items-center gap-1"
                                       >
                                         <DynamicIcon
                                           name="X"
@@ -6138,9 +6138,9 @@ function AdventureCreatorContent() {
                                               ).filter((t) => t !== trigger),
                                             })
                                           }
-                                          className="hover:text-red-900 dark:hover:text-red-100"
+                                          className="hover:text-red-100"
                                         >
-                                          ×
+                                          �
                                         </button>
                                       </span>
                                     )
@@ -6149,23 +6149,23 @@ function AdventureCreatorContent() {
                               </div>
 
                               {/* Advanced Triggers Section (Expandable) */}
-                              <div className="border border-gray-300 dark:border-gray-600 rounded-lg">
+                              <div className="border border-blue-700/40 rounded-lg">
                                 <button
                                   onClick={() =>
                                     setEditLoreAdvancedExpanded(
                                       !editLoreAdvancedExpanded
                                     )
                                   }
-                                  className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                  className="w-full px-4 py-3 flex items-center justify-between bg-blue-900/20 hover:bg-blue-800/30 rounded-lg transition-colors"
                                 >
-                                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-blue-200 flex items-center gap-2">
                                     <DynamicIcon
                                       name="Settings"
                                       className="w-4 h-4"
                                     />{" "}
                                     Advanced Section
                                   </span>
-                                  <span className="text-gray-500 dark:text-gray-400">
+                                  <span className="text-blue-300/50">
                                     <DynamicIcon
                                       name={
                                         editLoreAdvancedExpanded
@@ -6182,17 +6182,17 @@ function AdventureCreatorContent() {
                                     {/* Lore-based Triggers */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                       <div>
-                                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                                        <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
                                           <DynamicIcon
                                             name="CheckCircle"
                                             className="w-4 h-4 text-green-600"
                                           />{" "}
                                           Lores that turn this ON
                                         </label>
-                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                                        <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
                                           {lore.filter((_, i) => i !== index)
                                             .length === 0 ? (
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                            <p className="text-xs text-blue-300/50 italic">
                                               No other lore entries yet.
                                             </p>
                                           ) : (
@@ -6201,7 +6201,7 @@ function AdventureCreatorContent() {
                                               .map((loreEntry, loreIndex) => (
                                                 <label
                                                   key={loreIndex}
-                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
                                                 >
                                                   <input
                                                     type="checkbox"
@@ -6230,7 +6230,7 @@ function AdventureCreatorContent() {
                                                     }}
                                                     className="w-4 h-4 text-green-600 rounded"
                                                   />
-                                                  <span className="text-xs text-gray-900 dark:text-white">
+                                                  <span className="text-xs text-white">
                                                     {loreEntry.title}
                                                   </span>
                                                 </label>
@@ -6239,17 +6239,17 @@ function AdventureCreatorContent() {
                                         </div>
                                       </div>
                                       <div>
-                                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                                        <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
                                           <DynamicIcon
                                             name="XCircle"
                                             className="w-4 h-4 text-red-600"
                                           />{" "}
                                           Lores that turn this OFF
                                         </label>
-                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                                        <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
                                           {lore.filter((_, i) => i !== index)
                                             .length === 0 ? (
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                            <p className="text-xs text-blue-300/50 italic">
                                               No other lore entries yet.
                                             </p>
                                           ) : (
@@ -6258,7 +6258,7 @@ function AdventureCreatorContent() {
                                               .map((loreEntry, loreIndex) => (
                                                 <label
                                                   key={loreIndex}
-                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
                                                 >
                                                   <input
                                                     type="checkbox"
@@ -6287,7 +6287,7 @@ function AdventureCreatorContent() {
                                                     }}
                                                     className="w-4 h-4 text-red-600 rounded"
                                                   />
-                                                  <span className="text-xs text-gray-900 dark:text-white">
+                                                  <span className="text-xs text-white">
                                                     {loreEntry.title}
                                                   </span>
                                                 </label>
@@ -6299,7 +6299,7 @@ function AdventureCreatorContent() {
 
                                     {editLore.secrtet && (
                                       <div>
-                                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                                        <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
                                           <DynamicIcon
                                             name="Key"
                                             className="w-4 h-4"
@@ -6319,7 +6319,7 @@ function AdventureCreatorContent() {
                                               addEditLoreKey())
                                             }
                                             placeholder="e.g., 'Dragon Defeated'"
-                                            className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                            className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                           />
                                           <button
                                             onClick={addEditLoreKey}
@@ -6332,7 +6332,7 @@ function AdventureCreatorContent() {
                                           {(editLore.keys || []).map((key) => (
                                             <span
                                               key={key}
-                                              className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-sm flex items-center gap-1"
+                                              className="px-2 py-1 bg-yellow-900/30 text-yellow-300 rounded-full text-sm flex items-center gap-1"
                                             >
                                               <DynamicIcon
                                                 name="Key"
@@ -6348,9 +6348,9 @@ function AdventureCreatorContent() {
                                                     ).filter((k) => k !== key),
                                                   })
                                                 }
-                                                className="hover:text-yellow-900 dark:hover:text-yellow-100"
+                                                className="hover:text-yellow-100"
                                               >
-                                                ×
+                                                �
                                               </button>
                                             </span>
                                           ))}
@@ -6360,16 +6360,16 @@ function AdventureCreatorContent() {
                                     {/* Plot Beat Triggers */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                       <div>
-                                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                                        <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
                                           <DynamicIcon
                                             name="CheckCircle"
                                             className="w-4 h-4 text-green-600"
                                           />{" "}
                                           Beats that turn this lore ON
                                         </label>
-                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                                        <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
                                           {plotBeats.length === 0 ? (
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                            <p className="text-xs text-blue-300/50 italic">
                                               No plot beats yet. Add them in the
                                               Plot Beats step.
                                             </p>
@@ -6377,7 +6377,7 @@ function AdventureCreatorContent() {
                                             plotBeats.map((beat, beatIndex) => (
                                               <label
                                                 key={beatIndex}
-                                                className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                                className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
                                               >
                                                 <input
                                                   type="checkbox"
@@ -6404,7 +6404,7 @@ function AdventureCreatorContent() {
                                                   }}
                                                   className="w-4 h-4 text-green-600 rounded"
                                                 />
-                                                <span className="text-xs text-gray-900 dark:text-white">
+                                                <span className="text-xs text-white">
                                                   {beat.title ||
                                                     `Beat ${beatIndex + 1}`}
                                                 </span>
@@ -6414,16 +6414,16 @@ function AdventureCreatorContent() {
                                         </div>
                                       </div>
                                       <div>
-                                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
+                                        <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
                                           <DynamicIcon
                                             name="XCircle"
                                             className="w-4 h-4 text-red-600"
                                           />{" "}
                                           Beats that turn this lore OFF
                                         </label>
-                                        <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                                        <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
                                           {plotBeats.length === 0 ? (
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                            <p className="text-xs text-blue-300/50 italic">
                                               No plot beats yet. Add them in the
                                               Plot Beats step.
                                             </p>
@@ -6431,7 +6431,7 @@ function AdventureCreatorContent() {
                                             plotBeats.map((beat, beatIndex) => (
                                               <label
                                                 key={beatIndex}
-                                                className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                                className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
                                               >
                                                 <input
                                                   type="checkbox"
@@ -6459,7 +6459,7 @@ function AdventureCreatorContent() {
                                                   }}
                                                   className="w-4 h-4 text-red-600 rounded"
                                                 />
-                                                <span className="text-xs text-gray-900 dark:text-white">
+                                                <span className="text-xs text-white">
                                                   {beat.title ||
                                                     `Beat ${beatIndex + 1}`}
                                                 </span>
@@ -6497,7 +6497,7 @@ function AdventureCreatorContent() {
                           ) : (
                             // View mode with drag-and-drop
                             <div className="flex items-start justify-between">
-                              <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing mr-3 mt-1">
+                              <div className="text-blue-400/50 cursor-grab active:cursor-grabbing mr-3 mt-1">
                                 <DynamicIcon
                                   name="GripVertical"
                                   className="w-5 h-5"
@@ -6505,11 +6505,11 @@ function AdventureCreatorContent() {
                               </div>
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <div className="font-bold text-gray-900 dark:text-white">
+                                  <div className="font-bold text-white">
                                     {entry.title}
                                   </div>
                                   {entry.secrtet && (
-                                    <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">
+                                    <span className="text-xs px-2 py-0.5 bg-yellow-900/30 text-yellow-300 rounded-full">
                                       <DynamicIcon
                                         name="Lock"
                                         className="inline-block w-3 h-3 mr-1"
@@ -6549,12 +6549,12 @@ function AdventureCreatorContent() {
                                     className="w-24 h-24 object-cover rounded border mb-2"
                                   />
                                 )}
-                                <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                <div className="text-sm text-blue-300/60 mb-2">
                                   {entry.content}
                                 </div>
                                 {entry.on_triggers &&
                                   entry.on_triggers.length > 0 && (
-                                    <div className="text-xs text-green-700 dark:text-green-400 mb-1">
+                                    <div className="text-xs text-green-400 mb-1">
                                       <strong>
                                         <DynamicIcon
                                           name="CheckCircle"
@@ -6567,7 +6567,7 @@ function AdventureCreatorContent() {
                                   )}
                                 {entry.off_triggers &&
                                   entry.off_triggers.length > 0 && (
-                                    <div className="text-xs text-red-700 dark:text-red-400 mb-1">
+                                    <div className="text-xs text-red-400 mb-1">
                                       <strong>
                                         <DynamicIcon
                                           name="XCircle"
@@ -6579,14 +6579,14 @@ function AdventureCreatorContent() {
                                     </div>
                                   )}
                                 {entry.secrtet && entry.keys.length > 0 && (
-                                  <div className="text-xs text-yellow-700 dark:text-yellow-400">
+                                  <div className="text-xs text-yellow-400">
                                     <strong>Triggers:</strong>{" "}
                                     {entry.keys.join(", ")}
                                   </div>
                                 )}
                                 {entry.beats_trigger &&
                                   entry.beats_trigger.length > 0 && (
-                                    <div className="text-xs text-green-700 dark:text-green-400 mb-1">
+                                    <div className="text-xs text-green-400 mb-1">
                                       <strong>
                                         <DynamicIcon
                                           name="CheckCircle"
@@ -6605,7 +6605,7 @@ function AdventureCreatorContent() {
                                   )}
                                 {entry.beats_untrigger &&
                                   entry.beats_untrigger.length > 0 && (
-                                    <div className="text-xs text-red-700 dark:text-red-400 mb-1">
+                                    <div className="text-xs text-red-400 mb-1">
                                       <strong>
                                         <DynamicIcon
                                           name="XCircle"
@@ -6657,11 +6657,11 @@ function AdventureCreatorContent() {
                               setLorePage((p) => Math.max(1, p - 1))
                             }
                             disabled={lorePage === 1}
-                            className="px-3 py-1 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 rounded disabled:opacity-50 text-sm"
+                            className="px-3 py-1 bg-blue-900/30 hover:bg-blue-800/40 rounded disabled:opacity-50 text-sm"
                           >
                             Previous
                           </button>
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                          <span className="text-sm text-blue-300">
                             Page {lorePage} of {totalPages}
                           </span>
                           <button
@@ -6669,7 +6669,7 @@ function AdventureCreatorContent() {
                               setLorePage((p) => Math.min(totalPages, p + 1))
                             }
                             disabled={lorePage === totalPages}
-                            className="px-3 py-1 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 rounded disabled:opacity-50 text-sm"
+                            className="px-3 py-1 bg-blue-900/30 hover:bg-blue-800/40 rounded disabled:opacity-50 text-sm"
                           >
                             Next
                           </button>
@@ -6686,8 +6686,8 @@ function AdventureCreatorContent() {
       case "relationships":
         return (
           <div className="space-y-6">
-            <div className="bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+            <div className="bg-pink-900/20 border border-pink-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
                 <DynamicIcon
                   name="Lightbulb"
                   className="w-4 h-4 mt-0.5 shrink-0"
@@ -6701,13 +6701,13 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
                 Add Relationship
               </h3>
               <div className="space-y-4 mb-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Name * (Character/Faction/Organization)
                   </label>
                   <input
@@ -6720,11 +6720,11 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., King's Guard, The Shadow Syndicate"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
+                  <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center justify-between">
                     <span>
                       Relationship Value * ({newRelationship.value ?? 0})
                     </span>
@@ -6743,7 +6743,7 @@ function AdventureCreatorContent() {
                         value: parseInt(e.target.value),
                       })
                     }
-                    className="w-full h-2 bg-gray-200 dark:bg-gray-900 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 bg-blue-900/30 rounded-lg appearance-none cursor-pointer"
                     style={{
                       background: `linear-gradient(to right, 
                         #ef4444 0%, 
@@ -6753,14 +6753,14 @@ function AdventureCreatorContent() {
                         #06b6d4 100%)`,
                     }}
                   />
-                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    <span>⚔️ -100 (Enemy)</span>
-                    <span>🤝 0 (Neutral)</span>
-                    <span>💚 +100 (Ally)</span>
+                  <div className="flex justify-between text-xs text-blue-300/60 mt-1">
+                    <span>?? -100 (Enemy)</span>
+                    <span>?? 0 (Neutral)</span>
+                    <span>?? +100 (Ally)</span>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Description *
                   </label>
                   <textarea
@@ -6773,7 +6773,7 @@ function AdventureCreatorContent() {
                     }
                     placeholder="Describe the current state of this relationship..."
                     rows={3}
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                   />
                 </div>
               </div>
@@ -6788,7 +6788,7 @@ function AdventureCreatorContent() {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                <h3 className="text-lg font-bold text-white">
                   Relationships ({relationships.length})
                 </h3>
                 <div className="relative">
@@ -6800,7 +6800,7 @@ function AdventureCreatorContent() {
                       setRelationshipPage(1);
                     }}
                     placeholder="Search relationships..."
-                    className="pl-8 pr-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-pink-500"
+                    className="pl-8 pr-3 py-1 text-sm border border-blue-700/40 rounded-lg bg-blue-900/20 text-white focus:ring-2 focus:ring-pink-500"
                   />
                   <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">
                     <DynamicIcon name="Search" className="w-4 h-4" />
@@ -6809,7 +6809,7 @@ function AdventureCreatorContent() {
               </div>
 
               {relationships.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                <p className="text-blue-300/60 text-sm">
                   No relationships added yet
                 </p>
               ) : (
@@ -6840,7 +6840,7 @@ function AdventureCreatorContent() {
                     relationships.length > 0
                   ) {
                     return (
-                      <p className="text-gray-500 dark:text-gray-400 text-sm italic">
+                      <p className="text-blue-300/50 text-sm italic">
                         No relationships match your search.
                       </p>
                     );
@@ -6853,12 +6853,12 @@ function AdventureCreatorContent() {
                           <div
                             key={index}
                             draggable={false}
-                            className="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-lg border border-pink-200 dark:border-pink-800"
+                            className="p-4 bg-pink-900/20 rounded-lg border border-pink-800/50"
                           >
                             {editingRelationshipIndex === index ? (
                               // Edit mode
                               <div className="space-y-4">
-                                <h4 className="text-md font-bold text-pink-900 dark:text-pink-100 flex items-center gap-2">
+                                <h4 className="text-md font-bold text-pink-100 flex items-center gap-2">
                                   <DynamicIcon
                                     name="Edit2"
                                     className="w-4 h-4"
@@ -6866,7 +6866,7 @@ function AdventureCreatorContent() {
                                   Editing Relationship
                                 </h4>
                                 <div>
-                                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                                     Name *
                                   </label>
                                   <input
@@ -6878,11 +6878,11 @@ function AdventureCreatorContent() {
                                         name: e.target.value,
                                       })
                                     }
-                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
+                                  <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center justify-between">
                                     <span>
                                       Relationship Value (
                                       {editRelationship.value ?? 0})
@@ -6904,7 +6904,7 @@ function AdventureCreatorContent() {
                                         value: parseInt(e.target.value),
                                       })
                                     }
-                                    className="w-full h-2 bg-gray-200 dark:bg-gray-900 rounded-lg appearance-none cursor-pointer"
+                                    className="w-full h-2 bg-blue-900/30 rounded-lg appearance-none cursor-pointer"
                                     style={{
                                       background: `linear-gradient(to right, 
                                       #ef4444 0%, 
@@ -6914,14 +6914,14 @@ function AdventureCreatorContent() {
                                       #06b6d4 100%)`,
                                     }}
                                   />
-                                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                    <span>⚔️ -100 (Enemy)</span>
-                                    <span>🤝 0 (Neutral)</span>
-                                    <span>💚 +100 (Ally)</span>
+                                  <div className="flex justify-between text-xs text-blue-300/60 mt-1">
+                                    <span>?? -100 (Enemy)</span>
+                                    <span>?? 0 (Neutral)</span>
+                                    <span>?? +100 (Ally)</span>
                                   </div>
                                 </div>
                                 <div>
-                                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                                     Description *
                                   </label>
                                   <textarea
@@ -6933,7 +6933,7 @@ function AdventureCreatorContent() {
                                       })
                                     }
                                     rows={3}
-                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                                   />
                                 </div>
                                 <div className="flex gap-2">
@@ -6966,24 +6966,24 @@ function AdventureCreatorContent() {
                                   {rel.symbol}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
+                                  <div className="font-bold text-white flex items-center gap-2 flex-wrap">
                                     <span>{rel.name}</span>
                                     <span
                                       className={`text-sm px-2 py-0.5 rounded-full ${
                                         rel.value >= 50
-                                          ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
+                                          ? "bg-green-900/30 text-green-200"
                                           : rel.value >= 0
-                                          ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
+                                          ? "bg-blue-900/30 text-blue-200"
                                           : rel.value >= -50
-                                          ? "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200"
-                                          : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200"
+                                          ? "bg-orange-900/30 text-orange-200"
+                                          : "bg-red-900/30 text-red-200"
                                       }`}
                                     >
                                       {rel.value > 0 ? "+" : ""}
                                       {rel.value}
                                     </span>
                                   </div>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                  <p className="text-sm text-blue-300/60 mt-1">
                                     {rel.description}
                                   </p>
                                 </div>
@@ -7031,7 +7031,7 @@ function AdventureCreatorContent() {
                               className="w-4 h-4"
                             />
                           </button>
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                          <span className="text-sm text-blue-300">
                             Page {relationshipPage} of {totalPages}
                           </span>
                           <button
@@ -7061,8 +7061,8 @@ function AdventureCreatorContent() {
       case "achievements":
         return (
           <div className="space-y-6">
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
+            <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300">
                 <DynamicIcon
                   name="Lightbulb"
                   className="inline-block w-4 h-4 mr-1 text-amber-600"
@@ -7072,13 +7072,13 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
                 Add Achievement
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Title *
                   </label>
                   <input
@@ -7091,11 +7091,11 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Dragon Slayer"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Icon
                   </label>
                   <IconPicker
@@ -7106,7 +7106,7 @@ function AdventureCreatorContent() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Points
                   </label>
                   <input
@@ -7119,11 +7119,11 @@ function AdventureCreatorContent() {
                         points: parseInt(e.target.value) || 10,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Description *{" "}
                     <span className="text-xs text-gray-500">
                       (shown to players)
@@ -7139,11 +7139,11 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Defeat your first dragon"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     AI Hint{" "}
                     <span className="text-xs text-gray-500">
                       (optional, for precise triggering)
@@ -7159,9 +7159,9 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Trigger when player defeats the red dragon in the mountain lair"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-blue-300/50 mt-1">
                     <DynamicIcon
                       name="Lightbulb"
                       className="inline-block w-3 h-3 mr-1 text-amber-600"
@@ -7183,7 +7183,7 @@ function AdventureCreatorContent() {
                       }
                       className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
                     />
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <span className="text-sm font-semibold text-blue-200">
                       <DynamicIcon
                         name="Lock"
                         className="inline-block w-3 h-3 mr-1"
@@ -7191,7 +7191,7 @@ function AdventureCreatorContent() {
                       Hidden Achievement
                     </span>
                   </label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
+                  <p className="text-xs text-blue-300/50 mt-1 ml-6">
                     Hidden from player but visible to AI for triggering. Players
                     discover these through gameplay.
                   </p>
@@ -7207,11 +7207,11 @@ function AdventureCreatorContent() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-bold text-white">
                 Achievements ({achievements.length})
               </h3>
               {achievements.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                <p className="text-blue-300/60 text-sm">
                   No achievements added yet
                 </p>
               ) : (
@@ -7220,11 +7220,11 @@ function AdventureCreatorContent() {
                     // Edit mode
                     <div
                       key={index}
-                      className="p-4 bg-amber-100 dark:bg-amber-900/40 rounded-lg border-2 border-amber-400 dark:border-amber-600"
+                      className="p-4 bg-amber-900/40 rounded-lg border-2 border-amber-600"
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Title *
                           </label>
                           <input
@@ -7236,11 +7236,11 @@ function AdventureCreatorContent() {
                                 title: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Icon
                           </label>
                           <IconPicker
@@ -7254,7 +7254,7 @@ function AdventureCreatorContent() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Points
                           </label>
                           <input
@@ -7267,11 +7267,11 @@ function AdventureCreatorContent() {
                                 points: parseInt(e.target.value) || 10,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Description *{" "}
                             <span className="text-xs text-gray-500">
                               (shown to players)
@@ -7286,11 +7286,11 @@ function AdventureCreatorContent() {
                                 description: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             AI Hint{" "}
                             <span className="text-xs text-gray-500">
                               (optional)
@@ -7306,7 +7306,7 @@ function AdventureCreatorContent() {
                               })
                             }
                             placeholder="Precise trigger conditions for AI"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -7322,7 +7322,7 @@ function AdventureCreatorContent() {
                               }
                               className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
                             />
-                            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                            <span className="text-xs font-semibold text-blue-300">
                               <DynamicIcon
                                 name="Lock"
                                 className="inline-block w-3 h-3 mr-1"
@@ -7363,36 +7363,36 @@ function AdventureCreatorContent() {
                       onDragStart={() => handleAchievementDragStart(index)}
                       onDragOver={(e) => handleAchievementDragOver(e, index)}
                       onDragEnd={handleAchievementDragEnd}
-                      className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800 cursor-move hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                      className="flex items-center gap-3 p-4 bg-amber-900/20 rounded-lg border border-amber-800/50 cursor-move hover:bg-amber-800/30 transition-colors"
                       style={{
                         opacity: draggedAchievementIndex === index ? 0.5 : 1,
                       }}
                     >
-                      <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
+                      <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
                         <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
-                      <div className="p-2 bg-white dark:bg-blue-950 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <div className="p-2 bg-blue-900/20 rounded-lg border border-blue-800/30">
                         <DynamicIcon
                           name={achievement.symbol || "Trophy"}
-                          className="w-8 h-8 text-amber-600 dark:text-amber-400"
+                          className="w-8 h-8 text-amber-400"
                         />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <div className="font-bold text-gray-900 dark:text-white">
+                          <div className="font-bold text-white">
                             {achievement.title}
                           </div>
                           {achievement.hidden && (
-                            <span className="px-2 py-0.5 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full text-xs font-bold flex items-center gap-1">
+                            <span className="px-2 py-0.5 bg-purple-800/50 text-purple-200 rounded-full text-xs font-bold flex items-center gap-1">
                               <DynamicIcon name="Lock" className="w-3 h-3" />{" "}
                               Hidden
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <div className="text-sm text-blue-300/60">
                           {achievement.description}
                         </div>
-                        <div className="text-sm text-amber-600 dark:text-amber-400 font-semibold">
+                        <div className="text-sm text-amber-400 font-semibold">
                           {achievement.points} points
                         </div>
                       </div>
@@ -7444,8 +7444,8 @@ function AdventureCreatorContent() {
       case "plot":
         return (
           <div className="space-y-6">
-            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+            <div className="bg-orange-900/20 border border-orange-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
                 <DynamicIcon
                   name="Lightbulb"
                   className="w-5 h-5 text-orange-600 shrink-0 mt-0.5"
@@ -7458,13 +7458,13 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
                 Add Plot Beat
               </h3>
               <div className="space-y-4 mb-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Title *
                   </label>
                   <input
@@ -7474,11 +7474,11 @@ function AdventureCreatorContent() {
                       setNewPlotBeat({ ...newPlotBeat, title: e.target.value })
                     }
                     placeholder="e.g., The Ancient Prophecy"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Content *
                   </label>
                   <textarea
@@ -7491,11 +7491,11 @@ function AdventureCreatorContent() {
                     }
                     placeholder="e.g., The player discovers the truth about the ancient prophecy"
                     rows={3}
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Points Reward (optional)
                   </label>
                   <input
@@ -7511,9 +7511,9 @@ function AdventureCreatorContent() {
                     }
                     placeholder="Default: 25"
                     min="0"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-blue-300/50 mt-1">
                     Leave empty to use default (25 points)
                   </p>
                 </div>
@@ -7528,15 +7528,15 @@ function AdventureCreatorContent() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-bold text-white">
                 Plot Beats ({plotBeats.length})
               </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
+              <p className="text-xs text-blue-300/60 flex items-center gap-1">
                 <DynamicIcon name="Lightbulb" className="w-3 h-3" /> Drag and
                 drop to reorder (or use arrow buttons on mobile)
               </p>
               {plotBeats.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                <p className="text-blue-300/60 text-sm">
                   No plot beats added yet
                 </p>
               ) : (
@@ -7547,7 +7547,7 @@ function AdventureCreatorContent() {
                     onDragStart={() => handlePlotBeatDragStart(index)}
                     onDragOver={(e) => handlePlotBeatDragOver(e, index)}
                     onDragEnd={handlePlotBeatDragEnd}
-                    className={`p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800 transition-opacity ${
+                    className={`p-4 bg-orange-900/20 rounded-lg border border-orange-800/50 transition-opacity ${
                       editingPlotBeatIndex === index ? "" : "cursor-move"
                     } ${
                       draggedPlotBeatIndex === index
@@ -7558,12 +7558,12 @@ function AdventureCreatorContent() {
                     {editingPlotBeatIndex === index ? (
                       // Edit mode
                       <div className="space-y-4">
-                        <h4 className="text-md font-bold text-orange-900 dark:text-orange-100 flex items-center gap-2">
+                        <h4 className="text-md font-bold text-orange-100 flex items-center gap-2">
                           <DynamicIcon name="Edit2" className="w-4 h-4" />{" "}
                           Editing Plot Beat
                         </h4>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-sm font-semibold text-blue-200 mb-1">
                             Title *
                           </label>
                           <input
@@ -7575,11 +7575,11 @@ function AdventureCreatorContent() {
                                 title: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-sm font-semibold text-blue-200 mb-1">
                             Content *
                           </label>
                           <textarea
@@ -7591,11 +7591,11 @@ function AdventureCreatorContent() {
                               })
                             }
                             rows={3}
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-sm font-semibold text-blue-200 mb-1">
                             Points Reward (optional)
                           </label>
                           <input
@@ -7611,9 +7611,9 @@ function AdventureCreatorContent() {
                             }
                             placeholder="Default: 25"
                             min="0"
-                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                           />
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <p className="text-xs text-blue-300/50 mt-1">
                             Leave empty to use default (25 points)
                           </p>
                         </div>
@@ -7640,21 +7640,21 @@ function AdventureCreatorContent() {
                       // View mode
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 flex-1">
-                          <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing select-none mt-1">
+                          <div className="text-blue-400/50 cursor-grab active:cursor-grabbing select-none mt-1">
                             <DynamicIcon
                               name="GripVertical"
                               className="w-5 h-5"
                             />
                           </div>
                           <div className="flex-1">
-                            <div className="font-bold text-gray-900 dark:text-white mb-1">
+                            <div className="font-bold text-white mb-1">
                               {beat.title}
                             </div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                            <div className="text-sm text-blue-300/60">
                               {beat.content}
                             </div>
                             {beat.points !== undefined && (
-                              <div className="text-xs text-orange-600 dark:text-orange-400 mt-1 font-semibold flex items-center gap-1">
+                              <div className="text-xs text-orange-400 mt-1 font-semibold flex items-center gap-1">
                                 <DynamicIcon name="Coins" className="w-3 h-3" />{" "}
                                 {beat.points} points
                               </div>
@@ -7719,8 +7719,8 @@ function AdventureCreatorContent() {
       case "quests":
         return (
           <div className="space-y-6">
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
                 <DynamicIcon
                   name="Lightbulb"
                   className="w-5 h-5 text-blue-600 shrink-0 mt-0.5"
@@ -7733,13 +7733,13 @@ function AdventureCreatorContent() {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
                 Add Quest
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Title *
                   </label>
                   <input
@@ -7752,11 +7752,11 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Find the Lost Artifact"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Short Description *
                   </label>
                   <input
@@ -7769,11 +7769,11 @@ function AdventureCreatorContent() {
                       })
                     }
                     placeholder="e.g., Recover the ancient relic from the temple"
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Full Description *
                   </label>
                   <textarea
@@ -7786,11 +7786,11 @@ function AdventureCreatorContent() {
                     }
                     placeholder="Detailed quest description with context and objectives..."
                     rows={3}
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Points Reward
                   </label>
                   <input
@@ -7803,7 +7803,7 @@ function AdventureCreatorContent() {
                         points: parseInt(e.target.value) || 10,
                       })
                     }
-                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div className="flex items-center gap-4">
@@ -7819,7 +7819,7 @@ function AdventureCreatorContent() {
                       }
                       className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                     />
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <span className="text-sm font-semibold text-blue-200">
                       Active
                     </span>
                   </label>
@@ -7835,7 +7835,7 @@ function AdventureCreatorContent() {
                       }
                       className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500"
                     />
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <span className="text-sm font-semibold text-blue-200">
                       Fulfilled
                     </span>
                   </label>
@@ -7887,11 +7887,11 @@ function AdventureCreatorContent() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-bold text-white">
                 Quests ({quests.length})
               </h3>
               {quests.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                <p className="text-blue-300/60 text-sm">
                   No quests added yet
                 </p>
               ) : (
@@ -7900,11 +7900,11 @@ function AdventureCreatorContent() {
                     // Edit mode
                     <div
                       key={quest.id}
-                      className="p-4 bg-blue-100 dark:bg-blue-900/40 rounded-lg border-2 border-blue-400 dark:border-blue-600"
+                      className="p-4 bg-blue-900/40 rounded-lg border-2 border-blue-600"
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                         <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Title *
                           </label>
                           <input
@@ -7916,11 +7916,11 @@ function AdventureCreatorContent() {
                                 title: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Short Description *
                           </label>
                           <input
@@ -7932,11 +7932,11 @@ function AdventureCreatorContent() {
                                 shortDescription: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Full Description *
                           </label>
                           <textarea
@@ -7948,11 +7948,11 @@ function AdventureCreatorContent() {
                               })
                             }
                             rows={3}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm resize-none"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm resize-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Points
                           </label>
                           <input
@@ -7965,7 +7965,7 @@ function AdventureCreatorContent() {
                                 points: parseInt(e.target.value) || 10,
                               })
                             }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-blue-950 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           />
                         </div>
                         <div className="flex items-center gap-4">
@@ -7981,7 +7981,7 @@ function AdventureCreatorContent() {
                               }
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                             />
-                            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                            <span className="text-xs font-semibold text-blue-300">
                               Active
                             </span>
                           </label>
@@ -7997,7 +7997,7 @@ function AdventureCreatorContent() {
                               }
                               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500"
                             />
-                            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                            <span className="text-xs font-semibold text-blue-300">
                               Fulfilled
                             </span>
                           </label>
@@ -8071,37 +8071,37 @@ function AdventureCreatorContent() {
                         }
                       }}
                       onDragEnd={() => setDraggedQuestIndex(null)}
-                      className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 cursor-move hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                      className="flex items-start gap-3 p-4 bg-blue-900/20 rounded-lg border border-blue-800/50 cursor-move hover:bg-blue-800/30 transition-colors"
                       style={{
                         opacity: draggedQuestIndex === index ? 0.5 : 1,
                       }}
                     >
-                      <div className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">
+                      <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
                         <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className="font-bold text-gray-900 dark:text-white">
+                          <div className="font-bold text-white">
                             {quest.title}
                           </div>
                           {quest.active && (
-                            <span className="px-2 py-0.5 bg-blue-200 dark:bg-blue-800/50 text-blue-800 dark:text-blue-200 rounded-full text-xs font-bold">
+                            <span className="px-2 py-0.5 bg-blue-800/50 text-blue-200 rounded-full text-xs font-bold">
                               Active
                             </span>
                           )}
                           {quest.fulfilled && (
-                            <span className="px-2 py-0.5 bg-green-200 dark:bg-green-800/50 text-green-800 dark:text-green-200 rounded-full text-xs font-bold">
+                            <span className="px-2 py-0.5 bg-green-800/50 text-green-200 rounded-full text-xs font-bold">
                               Fulfilled
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        <div className="text-sm text-blue-300/60 mb-1">
                           {quest.shortDescription}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-500 mb-2">
+                        <div className="text-xs text-blue-300/50 mb-2">
                           {quest.description}
                         </div>
-                        <div className="text-sm text-blue-600 dark:text-blue-400 font-semibold">
+                        <div className="text-sm text-blue-400 font-semibold">
                           {quest.points} points
                         </div>
                       </div>
@@ -8204,7 +8204,7 @@ function AdventureCreatorContent() {
             <div className="flex items-center justify-between p-4 rounded-lg bg-linear-to-r from-purple-500/10 to-transparent border-l-4 border-purple-500">
               <div>
                 <h3 className="text-xl font-bold text-purple-400 flex items-center gap-2">
-                  <span className="text-2xl">🎲</span>
+                  <span className="text-2xl">??</span>
                   Mythic GME Settings
                 </h3>
                 <p className="text-sm text-gray-400 mt-1">
@@ -8218,7 +8218,7 @@ function AdventureCreatorContent() {
                   onChange={(e) => setMythicEnabled(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-14 h-7 bg-gray-700 peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+                <div className="w-14 h-7 bg-gray-700 peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
               </label>
             </div>
 
@@ -8276,7 +8276,7 @@ function AdventureCreatorContent() {
                 <div className="p-6 rounded-lg bg-linear-to-br from-blue-900/20 to-gray-900/50 border border-blue-500/20">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-lg font-bold text-blue-400 flex items-center gap-2">
-                      <span>🧵</span>
+                      <span>??</span>
                       Starting Story Threads
                       {mythicState.threads.length > 0 && (
                         <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-300">
@@ -8351,7 +8351,7 @@ function AdventureCreatorContent() {
                           >
                             {editingThreadId === thread.id ? (
                               <div className="flex gap-3">
-                                <span className="text-2xl">🧵</span>
+                                <span className="text-2xl">??</span>
                                 <input
                                   type="text"
                                   value={editThreadDescription}
@@ -8396,7 +8396,7 @@ function AdventureCreatorContent() {
                               </div>
                             ) : (
                               <div className="flex gap-3">
-                                <span className="text-2xl">🧵</span>
+                                <span className="text-2xl">??</span>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm text-gray-200 leading-relaxed">
                                     {thread.description}
@@ -8453,7 +8453,7 @@ function AdventureCreatorContent() {
                 <div className="p-6 rounded-lg bg-linear-to-br from-green-900/20 to-gray-900/50 border border-green-500/20">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-lg font-bold text-green-400 flex items-center gap-2">
-                      <span>👤</span>
+                      <span>??</span>
                       Starting NPCs
                       {mythicState.characters.length > 0 && (
                         <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-300">
@@ -8548,7 +8548,7 @@ function AdventureCreatorContent() {
                           >
                             {editingCharacterId === char.id ? (
                               <div className="flex gap-3">
-                                <span className="text-2xl">👤</span>
+                                <span className="text-2xl">??</span>
                                 <div className="flex-1 space-y-2">
                                   <input
                                     type="text"
@@ -8608,7 +8608,7 @@ function AdventureCreatorContent() {
                               </div>
                             ) : (
                               <div className="flex gap-3">
-                                <span className="text-2xl">👤</span>
+                                <span className="text-2xl">??</span>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-semibold text-gray-200">
                                     {char.name}
@@ -8680,8 +8680,8 @@ function AdventureCreatorContent() {
       case "upgrades":
         return (
           <div className="space-y-6">
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <p className="text-sm text-blue-900 dark:text-blue-100">
+            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-100">
                 <DynamicIcon
                   name="Lightbulb"
                   className="inline-block w-4 h-4 mr-1 text-blue-600"
@@ -8693,13 +8693,13 @@ function AdventureCreatorContent() {
             </div>
 
             {/* Master Toggle */}
-            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                  <h3 className="text-lg font-bold text-white mb-1">
                     Enable Upgrade System
                   </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-blue-300/60">
                     Allow players to spend points on upgrades
                   </p>
                 </div>
@@ -8715,7 +8715,7 @@ function AdventureCreatorContent() {
                     }
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-4 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                  <div className="w-14 h-7 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-4 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
                 </label>
               </div>
             </div>
@@ -8723,10 +8723,10 @@ function AdventureCreatorContent() {
             {upgradeSettings.enabled && (
               <>
                 {/* Stat Upgrades */}
-                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                      📊 Stat Upgrades
+                    <h3 className="text-lg font-bold text-white">
+                      ?? Stat Upgrades
                     </h3>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -8740,14 +8740,14 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
 
                   {upgradeSettings.allowStatUpgrade && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-blue-200 mb-2">
                           Cost (points)
                         </label>
                         <input
@@ -8763,11 +8763,11 @@ function AdventureCreatorContent() {
                             })
                           }
                           min="1"
-                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-blue-200 mb-2">
                           Increase Amount
                         </label>
                         <input
@@ -8784,7 +8784,7 @@ function AdventureCreatorContent() {
                           }
                           min="1"
                           max="10"
-                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                         />
                       </div>
                     </div>
@@ -8792,10 +8792,10 @@ function AdventureCreatorContent() {
                 </div>
 
                 {/* Resource Upgrades */}
-                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                      ⚡ Resource Upgrades
+                    <h3 className="text-lg font-bold text-white">
+                      ? Resource Upgrades
                     </h3>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -8809,14 +8809,14 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:peer-focus:ring-green-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
+                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
                     </label>
                   </div>
 
                   {upgradeSettings.allowResourceUpgrade && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-blue-200 mb-2">
                           Cost (points)
                         </label>
                         <input
@@ -8832,11 +8832,11 @@ function AdventureCreatorContent() {
                             })
                           }
                           min="1"
-                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-blue-200 mb-2">
                           Max Value Increase
                         </label>
                         <input
@@ -8853,7 +8853,7 @@ function AdventureCreatorContent() {
                           }
                           min="1"
                           max="50"
-                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                         />
                       </div>
                     </div>
@@ -8861,10 +8861,10 @@ function AdventureCreatorContent() {
                 </div>
 
                 {/* Add Item */}
-                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                      🎒 Add Custom Items
+                    <h3 className="text-lg font-bold text-white">
+                      ?? Add Custom Items
                     </h3>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -8878,13 +8878,13 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                     </label>
                   </div>
 
                   {upgradeSettings.allowAddItem && (
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-semibold text-blue-200 mb-2">
                         Cost (points per item)
                       </label>
                       <input
@@ -8900,16 +8900,16 @@ function AdventureCreatorContent() {
                           })
                         }
                         min="1"
-                        className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                        className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                       />
                     </div>
                   )}
                 </div>
 
                 {/* Stat Shop */}
-                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
                       <DynamicIcon name="Store" className="w-5 h-5" /> Stat Shop
                     </h3>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -8924,10 +8924,10 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-300 dark:peer-focus:ring-cyan-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-cyan-600"></div>
+                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
                     </label>
                   </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                  <p className="text-xs text-blue-300/60 mb-4">
                     Allow players to unlock new stats with points
                   </p>
 
@@ -8956,7 +8956,7 @@ function AdventureCreatorContent() {
                       {upgradeSettings.statShop.map((stat, index) => (
                         <div
                           key={index}
-                          className="p-3 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg border border-cyan-200 dark:border-cyan-800"
+                          className="p-3 bg-cyan-900/20 rounded-lg border border-cyan-800/50"
                         >
                           <div className="grid grid-cols-2 gap-2 mb-2">
                             <input
@@ -8971,7 +8971,7 @@ function AdventureCreatorContent() {
                                 });
                               }}
                               placeholder="Name"
-                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                              className="px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
                             />
                             <IconPicker
                               value={stat.symbol}
@@ -8997,11 +8997,11 @@ function AdventureCreatorContent() {
                               });
                             }}
                             placeholder="Description"
-                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-blue-900/20 text-white"
                           />
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className="text-xs text-gray-600 dark:text-gray-400">
+                              <label className="text-xs text-blue-300/60">
                                 Starting Value
                               </label>
                               <input
@@ -9017,12 +9017,12 @@ function AdventureCreatorContent() {
                                     statShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
                                 min="1"
                               />
                             </div>
                             <div>
-                              <label className="text-xs text-gray-600 dark:text-gray-400">
+                              <label className="text-xs text-blue-300/60">
                                 Cost (points)
                               </label>
                               <input
@@ -9038,7 +9038,7 @@ function AdventureCreatorContent() {
                                     statShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
                                 min="1"
                               />
                             </div>
@@ -9064,9 +9064,9 @@ function AdventureCreatorContent() {
                 </div>
 
                 {/* Resource Shop */}
-                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
                       <DynamicIcon name="ShoppingCart" className="w-5 h-5" />{" "}
                       Resource Shop
                     </h3>
@@ -9082,10 +9082,10 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 dark:peer-focus:ring-teal-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-teal-600"></div>
+                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
                     </label>
                   </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                  <p className="text-xs text-blue-300/60 mb-4">
                     Allow players to unlock new resources with points
                   </p>
 
@@ -9118,7 +9118,7 @@ function AdventureCreatorContent() {
                       {upgradeSettings.resourceShop.map((resource, index) => (
                         <div
                           key={index}
-                          className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800"
+                          className="p-3 bg-teal-900/20 rounded-lg border border-teal-800/50"
                         >
                           <div className="grid grid-cols-2 gap-2 mb-2">
                             <input
@@ -9135,7 +9135,7 @@ function AdventureCreatorContent() {
                                 });
                               }}
                               placeholder="Name"
-                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                              className="px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
                             />
                             <IconPicker
                               value={resource.symbol}
@@ -9163,11 +9163,11 @@ function AdventureCreatorContent() {
                               });
                             }}
                             placeholder="Description"
-                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-blue-900/20 text-white"
                           />
                           <div className="grid grid-cols-3 gap-2">
                             <div>
-                              <label className="text-xs text-gray-600 dark:text-gray-400">
+                              <label className="text-xs text-blue-300/60">
                                 Start Value
                               </label>
                               <input
@@ -9185,12 +9185,12 @@ function AdventureCreatorContent() {
                                     resourceShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
                                 min="0"
                               />
                             </div>
                             <div>
-                              <label className="text-xs text-gray-600 dark:text-gray-400">
+                              <label className="text-xs text-blue-300/60">
                                 Max Value
                               </label>
                               <input
@@ -9208,12 +9208,12 @@ function AdventureCreatorContent() {
                                     resourceShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
                                 min="1"
                               />
                             </div>
                             <div>
-                              <label className="text-xs text-gray-600 dark:text-gray-400">
+                              <label className="text-xs text-blue-300/60">
                                 Cost (points)
                               </label>
                               <input
@@ -9231,7 +9231,7 @@ function AdventureCreatorContent() {
                                     resourceShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
                                 min="1"
                               />
                             </div>
@@ -9258,9 +9258,9 @@ function AdventureCreatorContent() {
                 </div>
 
                 {/* Item Shop */}
-                <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
                       <DynamicIcon name="Store" className="w-5 h-5" /> Item Shop
                     </h3>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -9275,10 +9275,10 @@ function AdventureCreatorContent() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 dark:peer-focus:ring-amber-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-amber-600"></div>
+                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
                     </label>
                   </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                  <p className="text-xs text-blue-300/60 mb-4">
                     Provide curated items players can purchase
                   </p>
 
@@ -9308,7 +9308,7 @@ function AdventureCreatorContent() {
                       {upgradeSettings.itemShop.map((item, index) => (
                         <div
                           key={index}
-                          className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800"
+                          className="p-3 bg-amber-900/20 rounded-lg border border-amber-800/50"
                         >
                           <div className="grid grid-cols-2 gap-2 mb-2">
                             <input
@@ -9323,7 +9323,7 @@ function AdventureCreatorContent() {
                                 });
                               }}
                               placeholder="Name"
-                              className="px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                              className="px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
                             />
                             <IconPicker
                               value={item.symbol}
@@ -9349,11 +9349,11 @@ function AdventureCreatorContent() {
                               });
                             }}
                             placeholder="Description"
-                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-blue-900/20 text-white"
                           />
                           <div className="grid grid-cols-3 gap-2">
                             <div>
-                              <label className="text-xs text-gray-600 dark:text-gray-400">
+                              <label className="text-xs text-blue-300/60">
                                 Type
                               </label>
                               <select
@@ -9366,7 +9366,7 @@ function AdventureCreatorContent() {
                                     itemShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
                               >
                                 <option value="normal">Normal</option>
                                 <option value="consumable">Consumable</option>
@@ -9375,7 +9375,7 @@ function AdventureCreatorContent() {
                               </select>
                             </div>
                             <div>
-                              <label className="text-xs text-gray-600 dark:text-gray-400">
+                              <label className="text-xs text-blue-300/60">
                                 Quantity
                               </label>
                               <input
@@ -9391,12 +9391,12 @@ function AdventureCreatorContent() {
                                     itemShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
                                 min="1"
                               />
                             </div>
                             <div>
-                              <label className="text-xs text-gray-600 dark:text-gray-400">
+                              <label className="text-xs text-blue-300/60">
                                 Cost (points)
                               </label>
                               <input
@@ -9412,7 +9412,7 @@ function AdventureCreatorContent() {
                                     itemShop: updated,
                                   });
                                 }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
                                 min="1"
                               />
                             </div>
@@ -9466,97 +9466,97 @@ function AdventureCreatorContent() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+            <div className="bg-blue-900/20 rounded-xl shadow-lg p-6 border border-blue-800/30">
+              <h3 className="text-xl font-bold mb-4 text-white">
                 Summary
               </h3>
               <div className="space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-300/60">
                       Stats:
                     </span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                    <span className="ml-2 font-semibold text-white">
                       {stats.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-300/60">
                       Resources:
                     </span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                    <span className="ml-2 font-semibold text-white">
                       {resources.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-300/60">
                       Starting Items:
                     </span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                    <span className="ml-2 font-semibold text-white">
                       {inventory.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-300/60">
                       Lore Entries:
                     </span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                    <span className="ml-2 font-semibold text-white">
                       {lore.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-300/60">
                       Relationships:
                     </span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                    <span className="ml-2 font-semibold text-white">
                       {relationships.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-300/60">
                       Achievements:
                     </span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                    <span className="ml-2 font-semibold text-white">
                       {achievements.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-300/60">
                       Quests:
                     </span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                    <span className="ml-2 font-semibold text-white">
                       {quests.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-300/60">
                       Plot Beats:
                     </span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                    <span className="ml-2 font-semibold text-white">
                       {plotBeats.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-300/60">
                       Tags:
                     </span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                    <span className="ml-2 font-semibold text-white">
                       {tags.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-300/60">
                       Starting Points:
                     </span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                    <span className="ml-2 font-semibold text-white">
                       {points}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-300/60">
                       Momentum:
                     </span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                    <span className="ml-2 font-semibold text-white">
                       {momentum}/{maxMomentum}
                     </span>
                   </div>
@@ -9565,23 +9565,23 @@ function AdventureCreatorContent() {
             </div>
 
             {intro && (
-              <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-                <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+              <div className="bg-blue-900/20 rounded-xl shadow-lg p-6 border border-blue-800/30">
+                <h3 className="text-xl font-bold mb-4 text-white">
                   Opening Scene
                 </h3>
-                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 border-l-4 border-purple-500">
-                  <p className="text-gray-800 dark:text-gray-200 italic">
+                <div className="bg-blue-900/20 rounded-lg p-6 border-l-4 border-purple-500">
+                  <p className="text-blue-200 italic">
                     "{intro}"
                   </p>
                 </div>
               </div>
             )}
 
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+            <div className="bg-yellow-900/20 border border-yellow-800/50 rounded-lg p-4">
+              <p className="text-sm text-yellow-300 flex items-start gap-2">
                 <DynamicIcon
                   name="AlertTriangle"
-                  className="w-4 h-4 mt-1 shrink-0"
+                  className="w-4 h-4 mt-1 shrink-0 text-yellow-400"
                 />
                 <span>
                   <strong>Note:</strong> Once you publish this adventure,
@@ -9603,51 +9603,70 @@ function AdventureCreatorContent() {
   // Show loading screen when loading adventure data
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[#030712] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400 mx-auto mb-4"></div>
-          <p className="text-gray-900 dark:text-white font-semibold">
-            Loading adventure...
-          </p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-white font-semibold">Loading adventure...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 pt-16">
+    <div className="min-h-screen bg-[#030712] pt-16">
       <div className="max-w-6xl mx-auto p-3 sm:p-6">
-        {/* Compact Header with Action Buttons */}
-        <div className="mb-3 flex items-center justify-end gap-2">
-          <button
-            onClick={() => setIsAIMenuOpen(true)}
-            className="px-3 py-1.5 sm:px-4 sm:py-2 bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2"
-          >
-            <DynamicIcon name="Bot" className="w-5 h-5" />{" "}
-            <span className="hidden sm:inline">AI Assistant</span>
-          </button>
-          <button
-            onClick={handleDiscardChanges}
-            className="px-3 py-1.5 sm:px-4 sm:py-2 bg-red-600 hover:bg-red-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-colors shadow-md"
-          >
-            <DynamicIcon name="Trash2" className="w-5 h-5" />{" "}
-            <span className="hidden sm:inline">Discard</span>
-          </button>
+        {/* Compact Header */}
+        <div className="bg-[#0f1a2e] rounded-xl p-4 border border-blue-800/30 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => router.push("/library")}
+                className="p-2 text-blue-300/60 hover:text-white hover:bg-blue-800/30 rounded-lg transition-colors"
+              >
+                <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-lg font-bold text-white flex items-center gap-2">
+                  <DynamicIcon name="Wand2" className="w-5 h-5 text-purple-400" />
+                  {editAdventureId ? "Edit Adventure" : "Create Adventure"}
+                </h1>
+                <p className="text-xs text-blue-300/50">
+                  {title || "Untitled"} � Step {currentStepIndex + 1}/{steps.length}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsAIMenuOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <DynamicIcon name="Bot" className="w-4 h-4" />
+                <span className="hidden sm:inline">AI</span>
+              </button>
+              <button
+                onClick={handleDiscardChanges}
+                className="flex items-center gap-2 px-3 py-2 bg-red-900/30 hover:bg-red-800/40 text-red-300 text-sm font-medium rounded-lg transition-colors border border-red-800/30"
+              >
+                <DynamicIcon name="Trash2" className="w-4 h-4" />
+                <span className="hidden sm:inline">Discard</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Progress Steps */}
-        <div className="mb-5 bg-white dark:bg-blue-950 rounded-xl shadow-lg p-3 border border-gray-200 dark:border-gray-700">
+        <div className="mb-4 bg-[#0f1a2e] rounded-xl p-3 border border-blue-800/30">
           <DraggableScroll innerClassName="gap-2">
             {steps.map((step, index) => (
               <button
                 key={step.id}
                 onClick={() => setCurrentStep(step.id)}
-                className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap text-sm ${
+                className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all whitespace-nowrap text-sm ${
                   currentStep === step.id
-                    ? "bg-purple-600 text-white"
+                    ? "bg-purple-600 text-white shadow-md"
                     : index < currentStepIndex
-                    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                    : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300"
+                    ? "bg-green-900/30 text-green-400 border border-green-800/30"
+                    : "bg-blue-900/30 text-blue-300 hover:bg-blue-800/40"
                 }`}
               >
                 <DynamicIcon name={step.icon} className="w-4 h-4" />
@@ -9658,27 +9677,28 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Content */}
-        <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-5">
-          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+        <div className="bg-[#0f1a2e] rounded-xl p-4 sm:p-6 border border-blue-800/30 mb-4">
+          <h2 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
+            <DynamicIcon name={steps.find((s) => s.id === currentStep)?.icon || "FileText"} className="w-5 h-5 text-purple-400" />
             {steps.find((s) => s.id === currentStep)?.label}
           </h2>
           {renderStepContent()}
         </div>
 
         {/* Navigation */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-blue-950 rounded-xl shadow-lg p-3 border border-gray-200 dark:border-gray-700 mb-5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#0f1a2e] rounded-xl p-3 border border-blue-800/30 mb-5">
           <button
             onClick={() => {
               const prevIndex = Math.max(0, currentStepIndex - 1);
               setCurrentStep(steps[prevIndex].id);
             }}
             disabled={currentStepIndex === 0}
-            className="px-3 py-2 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
+            className="px-4 py-2.5 bg-blue-800/40 hover:bg-blue-700/50 disabled:opacity-50 disabled:cursor-not-allowed text-blue-200 text-sm font-medium rounded-lg transition-colors border border-blue-700/30"
           >
-            ← Previous
+            ? Previous
           </button>
 
-          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center">
+          <div className="text-xs sm:text-sm text-blue-300/60 text-center">
             Step {currentStepIndex + 1} of {steps.length}
           </div>
 
@@ -9687,7 +9707,7 @@ function AdventureCreatorContent() {
               <button
                 onClick={handleSaveLocally}
                 disabled={saving}
-                className="flex-1 sm:flex-none px-3 py-2 bg-white dark:bg-gray-900 border-2 border-gray-600 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
+                className="flex-1 sm:flex-none px-3 py-2.5 bg-blue-800/40 hover:bg-blue-700/50 text-blue-200 text-sm font-medium rounded-lg transition-all whitespace-nowrap border border-blue-700/30"
                 title="Save to your device without publishing"
               >
                 <DynamicIcon name="Save" className="w-4 h-4 inline mr-2" />
@@ -9697,7 +9717,7 @@ function AdventureCreatorContent() {
                 <button
                   onClick={handleSaveToDatabase}
                   disabled={saving}
-                  className="flex-1 sm:flex-none px-3 py-2 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
+                  className="flex-1 sm:flex-none px-3 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap"
                   title="Upload local adventure to database"
                 >
                   {saving ? (
@@ -9716,7 +9736,7 @@ function AdventureCreatorContent() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 sm:flex-none px-3 py-2 bg-linear-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
+                className="flex-1 sm:flex-none px-3 py-2.5 bg-green-600 hover:bg-green-500 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap"
                 title={
                   isLocal ? "Save changes locally" : "Publish to the community"
                 }
@@ -9747,9 +9767,9 @@ function AdventureCreatorContent() {
                 );
                 setCurrentStep(steps[nextIndex].id);
               }}
-              className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors"
+              className="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
             >
-              Next →
+              Next ?
             </button>
           )}
         </div>
@@ -9806,8 +9826,8 @@ export default function AdventureCreatorPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
+        <div className="min-h-screen bg-linear-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
         </div>
       }
     >

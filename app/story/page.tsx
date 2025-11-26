@@ -4693,9 +4693,9 @@ function StoryPageContent() {
                   syncStatus === "synced"
                     ? "bg-green-500"
                     : syncStatus === "pending"
-                    ? "bg-yellow-500"
-                    : syncStatus === "syncing"
-                    ? "bg-blue-500 animate-pulse"
+                    ? "bg-yellow-500 animate-pulse"
+                    : syncStatus === "local-only"
+                    ? "bg-blue-500"
                     : "bg-red-500"
                 }`}
                 title={`Sync: ${syncStatus}`}

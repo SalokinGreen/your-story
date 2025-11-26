@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   StoryData,
@@ -310,8 +310,8 @@ function AIModelSelector({
   };
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden">
-      <label className="p-4 pb-3 text-sm font-semibold text-gray-700 dark:text-gray-300 flex justify-between items-center">
+    <div className="bg-blue-900/20 rounded-lg overflow-hidden">
+      <label className="p-4 pb-3 text-sm font-semibold text-blue-200 flex justify-between items-center">
         <span className="flex items-center gap-2">
           <DynamicIcon name="Bot" className="w-4 h-4" /> AI Model Selection
         </span>
@@ -358,7 +358,7 @@ function AIModelSelector({
         <select
           value={currentPreset}
           onChange={(e) => handlePresetChange(e.target.value)}
-          className="w-full px-4 py-3 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-3 bg-blue-950/50 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
           {Object.entries(MODEL_PRESETS).map(([key, presetConfig]) => (
             <option key={key} value={key}>
@@ -378,7 +378,7 @@ function AIModelSelector({
 
             {/* Enable BYOK Toggle */}
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-sm font-medium text-blue-200">
                 Enable BYOK
               </span>
               <button
@@ -397,7 +397,7 @@ function AIModelSelector({
 
             {/* Subscription Status (Mock Toggle for now) */}
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-sm font-medium text-blue-200">
                 Subscription Status (Mock)
               </span>
               <button
@@ -417,10 +417,10 @@ function AIModelSelector({
             {/* Tool Calling Toggle */}
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span className="text-sm font-medium text-blue-200">
                   Enable Tool Calling
                 </span>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                <p className="text-xs text-blue-300/50 mt-0.5">
                   Allow AI to modify stats, inventory, and story state
                 </p>
               </div>
@@ -451,10 +451,10 @@ function AIModelSelector({
             {toolCallingEnabled && (
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span className="text-sm font-medium text-blue-200">
                     Max Tool Rounds
                   </span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  <p className="text-xs text-blue-300/50 mt-0.5">
                     Higher = more state changes but slower generation
                   </p>
                 </div>
@@ -468,11 +468,11 @@ function AIModelSelector({
                       }
                     }}
                     disabled={maxToolLoops <= 1}
-                    className="w-8 h-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-8 h-8 flex items-center justify-center rounded bg-blue-800/50 text-blue-200 hover:bg-blue-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     -
                   </button>
-                  <span className="w-8 text-center font-medium text-gray-900 dark:text-white">
+                  <span className="w-8 text-center font-medium text-white">
                     {maxToolLoops}
                   </span>
                   <button
@@ -484,7 +484,7 @@ function AIModelSelector({
                       }
                     }}
                     disabled={maxToolLoops >= 5}
-                    className="w-8 h-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-8 h-8 flex items-center justify-center rounded bg-blue-800/50 text-blue-200 hover:bg-blue-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     +
                   </button>
@@ -494,12 +494,12 @@ function AIModelSelector({
 
             {/* Custom Preset Model Configuration */}
             {currentPreset === "custom" && (
-              <div className="space-y-3 border-t border-gray-200 dark:border-gray-600 pt-3">
+              <div className="space-y-3 border-t border-blue-700/40 pt-3">
                 <button
                   onClick={() => setShowModelConfig(!showModelConfig)}
                   className="flex items-center justify-between w-full text-left"
                 >
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <h4 className="text-sm font-medium text-blue-200">
                     Configure Custom Models
                   </h4>
                   <DynamicIcon
@@ -510,7 +510,7 @@ function AIModelSelector({
 
                 {showModelConfig && (
                   <div className="space-y-4 pl-2">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-blue-300/50">
                       Choose models for each generation stage
                     </p>
 
@@ -530,7 +530,7 @@ function AIModelSelector({
                             );
                           }
                         }}
-                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
@@ -571,7 +571,7 @@ function AIModelSelector({
                             );
                           }
                         }}
-                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
@@ -612,7 +612,7 @@ function AIModelSelector({
                             );
                           }
                         }}
-                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
                         {Object.entries(AI_MODELS).map(([key, config]) => (
                           <option key={key} value={key}>
@@ -644,7 +644,7 @@ function AIModelSelector({
             {/* API Keys */}
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <h4 className="text-sm font-medium text-blue-200">
                   API Keys
                 </h4>
                 <button
@@ -667,7 +667,7 @@ function AIModelSelector({
                   value={openRouterKey}
                   onChange={(e) => setOpenRouterKey(e.target.value)}
                   placeholder="sk-or-..."
-                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono"
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm font-mono"
                 />
               </div>
               <div>
@@ -679,14 +679,14 @@ function AIModelSelector({
                   value={speechifyKey}
                   onChange={(e) => setSpeechifyKey(e.target.value)}
                   placeholder="speechify-..."
-                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono"
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm font-mono"
                 />
               </div>
             </div>
 
             {/* Custom Model Config */}
             <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+              <h4 className="text-sm font-bold text-white">
                 Custom Models
               </h4>
 
@@ -696,36 +696,36 @@ function AIModelSelector({
                   {customModels.map((model) => (
                     <div
                       key={model.id}
-                      className="p-2 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-600"
+                      className="p-2 bg-blue-900/20 rounded border border-gray-200 dark:border-gray-600"
                     >
                       {editingModelId === model.id ? (
                         // Edit Mode
                         <div className="space-y-2">
                           <div>
-                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-xs font-medium text-blue-200 mb-1">
                               Model ID
                             </label>
                             <input
                               type="text"
                               value={newModelId}
                               onChange={(e) => setNewModelId(e.target.value)}
-                              className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                              className="w-full px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-xs font-medium text-blue-200 mb-1">
                               Display Name
                             </label>
                             <input
                               type="text"
                               value={newModelName}
                               onChange={(e) => setNewModelName(e.target.value)}
-                              className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                              className="w-full px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                             />
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              <label className="block text-xs font-medium text-blue-200 mb-1">
                                 Context
                               </label>
                               <input
@@ -736,11 +736,11 @@ function AIModelSelector({
                                     parseInt(e.target.value) || 4096
                                   )
                                 }
-                                className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                                className="w-full px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              <label className="block text-xs font-medium text-blue-200 mb-1">
                                 Max Output
                               </label>
                               <input
@@ -751,13 +751,13 @@ function AIModelSelector({
                                     parseInt(e.target.value) || 1000
                                   )
                                 }
-                                className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                                className="w-full px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                               />
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              <label className="block text-xs font-medium text-blue-200 mb-1">
                                 Input Price
                               </label>
                               <input
@@ -769,11 +769,11 @@ function AIModelSelector({
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
-                                className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                                className="w-full px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              <label className="block text-xs font-medium text-blue-200 mb-1">
                                 Output Price
                               </label>
                               <input
@@ -785,7 +785,7 @@ function AIModelSelector({
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
-                                className="w-full px-2 py-1 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                                className="w-full px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                               />
                             </div>
                           </div>
@@ -808,14 +808,14 @@ function AIModelSelector({
                         // View Mode
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            <p className="text-sm font-medium text-white">
                               {model.name}
                             </p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                              {model.modelId} • {model.contextSize} tokens
+                            <p className="text-xs text-blue-200/60">
+                              {model.modelId} � {model.contextSize} tokens
                               {(model.inputPrice || model.outputPrice) && (
                                 <span className="ml-1">
-                                  • ${model.inputPrice || 0}/
+                                  � ${model.inputPrice || 0}/
                                   {model.outputPrice || 0} per M
                                 </span>
                               )}
@@ -849,7 +849,7 @@ function AIModelSelector({
                     Add New Model
                   </p>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-xs font-medium text-blue-200 mb-1">
                       Model ID
                     </label>
                     <input
@@ -857,14 +857,14 @@ function AIModelSelector({
                       value={newModelId}
                       onChange={(e) => setNewModelId(e.target.value)}
                       placeholder="anthropic/claude-3-opus"
-                      className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                      className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-blue-300/50 mt-1">
                       The API model identifier (e.g., anthropic/claude-3-opus)
                     </p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-xs font-medium text-blue-200 mb-1">
                       Display Name
                     </label>
                     <input
@@ -872,15 +872,15 @@ function AIModelSelector({
                       value={newModelName}
                       onChange={(e) => setNewModelName(e.target.value)}
                       placeholder="Claude 3 Opus"
-                      className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                      className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-blue-300/50 mt-1">
                       Human-readable name shown in the model selector
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-xs font-medium text-blue-200 mb-1">
                         Context Size
                       </label>
                       <input
@@ -890,14 +890,14 @@ function AIModelSelector({
                           setNewContextSize(parseInt(e.target.value) || 4096)
                         }
                         placeholder="4096"
-                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <p className="text-xs text-blue-300/50 mt-1">
                         Max input tokens
                       </p>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-xs font-medium text-blue-200 mb-1">
                         Max Output
                       </label>
                       <input
@@ -907,16 +907,16 @@ function AIModelSelector({
                           setNewMaxOutput(parseInt(e.target.value) || 1000)
                         }
                         placeholder="1000"
-                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <p className="text-xs text-blue-300/50 mt-1">
                         Max output tokens
                       </p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-xs font-medium text-blue-200 mb-1">
                         Input Price
                       </label>
                       <input
@@ -927,14 +927,14 @@ function AIModelSelector({
                           setNewInputPrice(parseFloat(e.target.value) || 0)
                         }
                         placeholder="0.00"
-                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <p className="text-xs text-blue-300/50 mt-1">
                         $/M input tokens
                       </p>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-xs font-medium text-blue-200 mb-1">
                         Output Price
                       </label>
                       <input
@@ -945,9 +945,9 @@ function AIModelSelector({
                           setNewOutputPrice(parseFloat(e.target.value) || 0)
                         }
                         placeholder="0.00"
-                        className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm"
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <p className="text-xs text-blue-300/50 mt-1">
                         $/M output tokens
                       </p>
                     </div>
@@ -972,7 +972,7 @@ function AIModelSelector({
           </div>
         )}
 
-        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+        <p className="text-xs text-blue-200/60 mt-2">
           Select the AI model used for story generation. Different models have
           unique strengths and context sizes.
         </p>
@@ -1013,29 +1013,29 @@ function BasicSettings({
   return (
     <div className="space-y-5">
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-semibold text-blue-200 mb-2">
           Story Name
         </label>
         <input
           type="text"
           value={form.story_name}
           onChange={(e) => onChange({ ...form, story_name: e.target.value })}
-          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-semibold text-blue-200 mb-2">
           Player/Character Name
         </label>
         <input
           type="text"
           value={form.player_name}
           onChange={(e) => onChange({ ...form, player_name: e.target.value })}
-          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-semibold text-blue-200 mb-2">
           Character Description
         </label>
         <textarea
@@ -1043,21 +1043,21 @@ function BasicSettings({
           onChange={(e) =>
             onChange({ ...form, player_summary: e.target.value })
           }
-          className="w-full h-32 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+          className="w-full h-32 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-semibold text-blue-200 mb-2">
           Story Premise
         </label>
         <textarea
           value={form.premise}
           onChange={(e) => onChange({ ...form, premise: e.target.value })}
-          className="w-full h-24 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+          className="w-full h-24 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-semibold text-blue-200 mb-2">
           Max Chapters
         </label>
         <input
@@ -1066,12 +1066,12 @@ function BasicSettings({
           onChange={(e) =>
             onChange({ ...form, max_chapters: parseInt(e.target.value) || 0 })
           }
-          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+          <label className="block text-sm font-semibold text-blue-200 mb-2">
             Starting Points
           </label>
           <input
@@ -1081,11 +1081,11 @@ function BasicSettings({
             onChange={(e) =>
               onChange({ ...form, points: parseInt(e.target.value) || 0 })
             }
-            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+          <label className="block text-sm font-semibold text-blue-200 mb-2">
             Starting Momentum
           </label>
           <input
@@ -1095,11 +1095,11 @@ function BasicSettings({
             onChange={(e) =>
               onChange({ ...form, momentum: parseInt(e.target.value) || 0 })
             }
-            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+          <label className="block text-sm font-semibold text-blue-200 mb-2">
             Max Momentum
           </label>
           <input
@@ -1109,17 +1109,17 @@ function BasicSettings({
             onChange={(e) =>
               onChange({ ...form, maxMomentum: parseInt(e.target.value) || 1 })
             }
-            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
       </div>
 
       {/* RPG System Selection */}
       <div>
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-semibold text-blue-200 mb-2">
           RPG Dice System
         </label>
-        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+        <p className="text-xs text-blue-200/60 mb-3">
           Change the core dice mechanics. Affects DCs, upgrade values, and
           resource scaling.
         </p>
@@ -1173,7 +1173,7 @@ function BasicSettings({
             {
               id: "explosive" as const,
               name: "Exploding Dice",
-              desc: "Stat→die size (d4-d20), max rolls explode!",
+              desc: "Stat?die size (d4-d20), max rolls explode!",
               icon: "Flame",
               fullWidth: true,
             },
@@ -1193,7 +1193,7 @@ function BasicSettings({
               } ${
                 form.rpgSystem === sys.id
                   ? "bg-purple-600 text-white border-purple-600"
-                  : "bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-500 hover:border-purple-400"
+                  : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:border-purple-400"
               }`}
             >
               <div className="flex items-center gap-2 mb-1">
@@ -1499,7 +1499,7 @@ function StatsResourcesEditor({
       {/* Stats Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <h4 className="text-lg font-bold text-white flex items-center gap-2">
             <DynamicIcon name="BarChart2" className="w-6 h-6" /> Stats
           </h4>
           <button
@@ -1510,7 +1510,7 @@ function StatsResourcesEditor({
           </button>
         </div>
         <div className="space-y-3">
-          <p className="text-xs text-gray-600 dark:text-gray-400">
+          <p className="text-xs text-blue-200/60">
             <DynamicIcon name="Lightbulb" className="w-3 h-3 inline mr-1" />{" "}
             Drag and drop to reorder (or use arrow buttons on mobile)
           </p>
@@ -1521,7 +1521,7 @@ function StatsResourcesEditor({
                 key={index}
                 className="p-4 bg-blue-100 dark:bg-blue-900/40 rounded-lg border-2 border-blue-400"
               >
-                <h5 className="text-sm font-bold mb-3 text-gray-900 dark:text-white">
+                <h5 className="text-sm font-bold mb-3 text-white">
                   <DynamicIcon name="Edit" className="w-4 h-4" /> Editing Stat
                 </h5>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
@@ -1532,7 +1532,7 @@ function StatsResourcesEditor({
                       setEditStat({ ...editStat, name: e.target.value })
                     }
                     placeholder="Stat name"
-                    className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                   <div className="relative z-50">
                     <IconPicker
@@ -1552,7 +1552,7 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="Value"
-                    className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                 </div>
                 <textarea
@@ -1561,7 +1561,7 @@ function StatsResourcesEditor({
                     setEditStat({ ...editStat, description: e.target.value })
                   }
                   placeholder="Description"
-                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white mb-3"
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white mb-3"
                   rows={2}
                 />
                 <div className="flex gap-2">
@@ -1589,7 +1589,7 @@ function StatsResourcesEditor({
                 onDragStart={() => handleStatDragStart(index)}
                 onDragOver={(e) => handleStatDragOver(e, index)}
                 onDragEnd={handleStatDragEnd}
-                className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move"
+                className="p-4 bg-blue-900/20 rounded-lg cursor-move"
                 style={{ opacity: draggedStatIndex === index ? 0.5 : 1 }}
               >
                 <div className="flex items-start gap-3">
@@ -1603,10 +1603,10 @@ function StatsResourcesEditor({
                         className="w-8 h-8 text-blue-600 dark:text-blue-400"
                       />
                       <div>
-                        <div className="font-bold text-gray-900 dark:text-white">
+                        <div className="font-bold text-white">
                           {stat.name}
                         </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <div className="text-sm text-blue-200/60">
                           {stat.description}
                         </div>
                         <div className="text-sm text-blue-600 dark:text-blue-400 font-semibold">
@@ -1653,7 +1653,7 @@ function StatsResourcesEditor({
       {/* Resources Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <h4 className="text-lg font-bold text-white flex items-center gap-2">
             <DynamicIcon name="Gem" className="w-6 h-6" /> Resources
           </h4>
           <button
@@ -1678,7 +1678,7 @@ function StatsResourcesEditor({
                       setEditResource({ ...editResource, name: e.target.value })
                     }
                     placeholder="Resource name"
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                   <div className="relative z-50">
                     <IconPicker
@@ -1699,7 +1699,7 @@ function StatsResourcesEditor({
                         })
                       }
                       placeholder="Current"
-                      className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                      className="px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                     />
                     <input
                       type="number"
@@ -1711,7 +1711,7 @@ function StatsResourcesEditor({
                         })
                       }
                       placeholder="Max"
-                      className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                      className="px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                     />
                   </div>
                   <textarea
@@ -1723,7 +1723,7 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="Description"
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                     rows={3}
                   />
                   <div className="flex gap-2">
@@ -1749,7 +1749,7 @@ function StatsResourcesEditor({
                 onDragStart={() => handleResourceDragStart(index)}
                 onDragOver={(e) => handleResourceDragOver(e, index)}
                 onDragEnd={handleResourceDragEnd}
-                className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move flex items-center gap-3 ${
+                className={`p-4 bg-blue-900/20 rounded-lg cursor-move flex items-center gap-3 ${
                   draggedResourceIndex === index ? "opacity-50" : ""
                 }`}
               >
@@ -1757,7 +1757,7 @@ function StatsResourcesEditor({
                   <DynamicIcon name="GripVertical" className="w-5 h-5" />
                 </span>
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                  <div className="font-medium text-white flex items-center gap-2">
                     <DynamicIcon
                       name={resource.symbol}
                       className="w-5 h-5 text-blue-600 dark:text-blue-400"
@@ -1766,7 +1766,7 @@ function StatsResourcesEditor({
                       {resource.name}: {resource.value}/{resource.maxValue}
                     </span>
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-sm text-blue-200/60">
                     {resource.description}
                   </div>
                 </div>
@@ -1809,7 +1809,7 @@ function StatsResourcesEditor({
       {/* Achievements Editor */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <h4 className="text-lg font-bold text-white flex items-center gap-2">
             <DynamicIcon name="Trophy" className="w-6 h-6" /> Achievements
           </h4>
           <button
@@ -1837,7 +1837,7 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="Title"
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                   <div className="relative z-50">
                     <IconPicker
@@ -1857,7 +1857,7 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="Points"
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                   <textarea
                     value={editAchievement.description || ""}
@@ -1868,7 +1868,7 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="Description (shown to players)"
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                     rows={3}
                   />
                   <input
@@ -1881,9 +1881,9 @@ function StatsResourcesEditor({
                       })
                     }
                     placeholder="AI Hint (optional precise trigger conditions)"
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
-                  <label className="flex items-center gap-2 text-gray-900 dark:text-white">
+                  <label className="flex items-center gap-2 text-white">
                     <input
                       type="checkbox"
                       checked={!!editAchievement.hidden}
@@ -1903,7 +1903,7 @@ function StatsResourcesEditor({
                       Hidden Achievement
                     </span>
                   </label>
-                  <label className="flex items-center gap-2 text-gray-900 dark:text-white">
+                  <label className="flex items-center gap-2 text-white">
                     <input
                       type="checkbox"
                       checked={!!editAchievement.dateAchieved}
@@ -1940,7 +1940,7 @@ function StatsResourcesEditor({
                 onDragStart={() => handleAchievementDragStart(index)}
                 onDragOver={(e) => handleAchievementDragOver(e, index)}
                 onDragEnd={handleAchievementDragEnd}
-                className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move flex items-center gap-3 ${
+                className={`p-4 bg-blue-900/20 rounded-lg cursor-move flex items-center gap-3 ${
                   draggedAchievementIndex === index ? "opacity-50" : ""
                 }`}
               >
@@ -1948,7 +1948,7 @@ function StatsResourcesEditor({
                   <DynamicIcon name="GripVertical" className="w-5 h-5" />
                 </span>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 font-medium text-gray-900 dark:text-white">
+                  <div className="flex items-center gap-2 font-medium text-white">
                     <div className="flex items-center gap-2">
                       <DynamicIcon
                         name={achievement.symbol}
@@ -1976,7 +1976,7 @@ function StatsResourcesEditor({
                       </span>
                     )}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-sm text-blue-200/60">
                     {achievement.description}
                   </div>
                 </div>
@@ -2014,7 +2014,7 @@ function StatsResourcesEditor({
             )
           )}
           {localAchievements.length === 0 && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-blue-200/60">
               No achievements yet.
             </p>
           )}
@@ -2131,7 +2131,7 @@ function QuestEditor({
       {/* Quests Editor */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <h4 className="text-lg font-bold text-white flex items-center gap-2">
             <DynamicIcon name="Scroll" className="w-6 h-6" /> Quests
           </h4>
           <button
@@ -2156,7 +2156,7 @@ function QuestEditor({
                       setEditQuest({ ...editQuest!, title: e.target.value })
                     }
                     placeholder="Quest Title"
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                   <input
                     type="text"
@@ -2168,7 +2168,7 @@ function QuestEditor({
                       })
                     }
                     placeholder="Short Description"
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                   <textarea
                     value={editQuest?.description || ""}
@@ -2179,7 +2179,7 @@ function QuestEditor({
                       })
                     }
                     placeholder="Full Description"
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                     rows={4}
                   />
                   <input
@@ -2192,10 +2192,10 @@ function QuestEditor({
                       })
                     }
                     placeholder="Points"
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                   <div className="flex gap-4">
-                    <label className="flex items-center gap-2 text-gray-900 dark:text-white">
+                    <label className="flex items-center gap-2 text-white">
                       <input
                         type="checkbox"
                         checked={!!editQuest?.active}
@@ -2209,7 +2209,7 @@ function QuestEditor({
                       />
                       <span>Active</span>
                     </label>
-                    <label className="flex items-center gap-2 text-gray-900 dark:text-white">
+                    <label className="flex items-center gap-2 text-white">
                       <input
                         type="checkbox"
                         checked={!!editQuest?.fulfilled}
@@ -2247,7 +2247,7 @@ function QuestEditor({
                 onDragStart={() => handleQuestDragStart(index)}
                 onDragOver={(e) => handleQuestDragOver(e, index)}
                 onDragEnd={handleQuestDragEnd}
-                className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move flex items-center gap-3 ${
+                className={`p-4 bg-blue-900/20 rounded-lg cursor-move flex items-center gap-3 ${
                   draggedQuestIndex === index ? "opacity-50" : ""
                 }`}
               >
@@ -2255,7 +2255,7 @@ function QuestEditor({
                   <DynamicIcon name="GripVertical" className="w-5 h-5" />
                 </span>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 font-medium text-gray-900 dark:text-white">
+                  <div className="flex items-center gap-2 font-medium text-white">
                     <span className="flex items-center gap-2">
                       <DynamicIcon
                         name="Scroll"
@@ -2277,12 +2277,12 @@ function QuestEditor({
                       </span>
                     )}
                     {!quest.active && !quest.fulfilled && (
-                      <span className="px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full text-xs font-bold">
+                      <span className="px-2 py-0.5 bg-blue-800/30 text-blue-300/60 rounded-full text-xs font-bold">
                         Inactive
                       </span>
                     )}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-sm text-blue-200/60">
                     {quest.shortDescription}
                   </div>
                 </div>
@@ -2320,7 +2320,7 @@ function QuestEditor({
             )
           )}
           {localQuests.length === 0 && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-blue-200/60">
               No quests yet.
             </p>
           )}
@@ -2443,7 +2443,7 @@ function InventoryEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+        <h4 className="text-lg font-bold text-white flex items-center gap-2">
           <DynamicIcon name="Backpack" className="w-6 h-6" /> Inventory (
           {localInventory.length} items)
         </h4>
@@ -2472,7 +2472,7 @@ function InventoryEditor({
                     })
                   }
                   placeholder="Item name"
-                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                 />
                 <div className="relative z-50">
                   <IconPicker
@@ -2496,7 +2496,7 @@ function InventoryEditor({
                       })
                     }
                     placeholder="Quantity"
-                    className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                   <input
                     type="text"
@@ -2512,7 +2512,7 @@ function InventoryEditor({
                       })
                     }
                     placeholder="Type"
-                    className="px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                 </div>
                 <textarea
@@ -2524,7 +2524,7 @@ function InventoryEditor({
                     })
                   }
                   placeholder="Description"
-                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   rows={3}
                 />
                 <div className="flex gap-2">
@@ -2550,7 +2550,7 @@ function InventoryEditor({
               onDragStart={() => handleInventoryDragStart(index)}
               onDragOver={(e) => handleInventoryDragOver(e, index)}
               onDragEnd={handleInventoryDragEnd}
-              className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move flex items-center gap-3 ${
+              className={`p-4 bg-blue-900/20 rounded-lg cursor-move flex items-center gap-3 ${
                 draggedInventoryIndex === index ? "opacity-50" : ""
               }`}
             >
@@ -2558,16 +2558,16 @@ function InventoryEditor({
                 <DynamicIcon name="GripVertical" className="w-5 h-5" />
               </span>
               <div className="flex-1">
-                <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                <div className="font-medium text-white flex items-center gap-2">
                   <DynamicIcon
                     name={item.symbol}
-                    className="w-5 h-5 text-gray-600 dark:text-gray-400"
+                    className="w-5 h-5 text-blue-200/60"
                   />
                   <span>
                     {item.name} x{item.quantity} {item.type && `(${item.type})`}
                   </span>
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="text-sm text-blue-200/60">
                   {item.description}
                 </div>
               </div>
@@ -2769,7 +2769,7 @@ function LoreEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+        <h4 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
           <DynamicIcon name="Book" className="w-6 h-6" /> Lore Entries (
           {localLore.length})
         </h4>
@@ -2795,7 +2795,7 @@ function LoreEditor({
                     setEditLore({ ...editLore, title: e.target.value })
                   }
                   placeholder="Lore title"
-                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white font-semibold"
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white font-semibold"
                 />
                 <textarea
                   value={editLore.content || ""}
@@ -2803,11 +2803,11 @@ function LoreEditor({
                     setEditLore({ ...editLore, content: e.target.value })
                   }
                   placeholder="Lore content (supports Markdown)"
-                  className="w-full h-32 px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
+                  className="w-full h-32 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-semibold text-blue-200 mb-2">
                       Thumbnail URL (optional)
                     </label>
                     <input
@@ -2820,11 +2820,11 @@ function LoreEditor({
                         })
                       }
                       placeholder="https://..."
-                      className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                     />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs text-blue-300/50">
                       Shown in lore list and detail if provided (ideal
-                      ~320×180px, max 5MB).
+                      ~320�180px, max 5MB).
                     </p>
                     <div className="mt-2 flex items-center gap-2">
                       <input
@@ -2864,17 +2864,17 @@ function LoreEditor({
                       <img
                         src={editLore.thumbnailUrl}
                         alt={editLore.title || ""}
-                        className="w-24 h-24 object-cover rounded border border-gray-300 dark:border-gray-600"
+                        className="w-24 h-24 object-cover rounded border border-blue-700/40"
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
+                      <div className="w-24 h-24 rounded border-2 border-dashed border-blue-700/40 flex items-center justify-center text-xs text-blue-300/50">
                         No Preview
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <label className="flex items-center gap-2 text-sm text-blue-200">
                     <input
                       type="checkbox"
                       checked={editLore.secrtet ?? false}
@@ -2891,7 +2891,7 @@ function LoreEditor({
                       Secret Lore (hidden until discovered)
                     </span>
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <label className="flex items-center gap-2 text-sm text-blue-200">
                     <input
                       type="checkbox"
                       checked={editLore.on !== false}
@@ -2908,7 +2908,7 @@ function LoreEditor({
                       Enabled
                     </span>
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <label className="flex items-center gap-2 text-sm text-blue-200">
                     <input
                       type="checkbox"
                       checked={!!editLore.alwaysOn}
@@ -2930,7 +2930,7 @@ function LoreEditor({
                 {/* ON/OFF Trigger Words */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-semibold text-blue-200 mb-2">
                       <DynamicIcon
                         name="CheckCircle"
                         className="inline-block w-4 h-4 mr-1 text-green-600"
@@ -2942,7 +2942,7 @@ function LoreEditor({
                         <input
                           type="text"
                           placeholder="e.g., 'Found the Ancient Map'"
-                          className="flex-1 px-3 py-2 text-sm bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                          className="flex-1 px-3 py-2 text-sm bg-blue-950/50 border border-blue-700/40 rounded text-white"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               const input = e.currentTarget;
@@ -2986,7 +2986,7 @@ function LoreEditor({
                               }
                               className="hover:text-green-900 dark:hover:text-green-100"
                             >
-                              ×
+                              �
                             </button>
                           </span>
                         ))}
@@ -2995,7 +2995,7 @@ function LoreEditor({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-semibold text-blue-200 mb-2">
                       <DynamicIcon
                         name="XCircle"
                         className="inline-block w-4 h-4 mr-1 text-red-600"
@@ -3007,7 +3007,7 @@ function LoreEditor({
                         <input
                           type="text"
                           placeholder="e.g., 'Destroyed the Map'"
-                          className="flex-1 px-3 py-2 text-sm bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                          className="flex-1 px-3 py-2 text-sm bg-blue-950/50 border border-blue-700/40 rounded text-white"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               const input = e.currentTarget;
@@ -3048,7 +3048,7 @@ function LoreEditor({
                               }
                               className="hover:text-red-900 dark:hover:text-red-100"
                             >
-                              ×
+                              �
                             </button>
                           </span>
                         ))}
@@ -3058,21 +3058,21 @@ function LoreEditor({
                 </div>
 
                 {/* Advanced Triggers Section (Expandable) */}
-                <div className="border border-gray-300 dark:border-gray-600 rounded-lg">
+                <div className="border border-blue-700/40 rounded-lg">
                   <button
                     onClick={() =>
                       setEditLoreAdvancedExpanded(!editLoreAdvancedExpanded)
                     }
-                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    className="w-full px-4 py-3 flex items-center justify-between bg-blue-900/20 hover:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
                   >
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <span className="text-sm font-semibold text-blue-200">
                       <DynamicIcon
                         name="Settings"
                         className="inline-block w-4 h-4 mr-1"
                       />
                       Advanced Section
                     </span>
-                    <span className="text-gray-500 dark:text-gray-400">
+                    <span className="text-blue-300/50">
                       {editLoreAdvancedExpanded ? (
                         <DynamicIcon name="ChevronDown" className="w-4 h-4" />
                       ) : (
@@ -3086,17 +3086,17 @@ function LoreEditor({
                       {/* Lore-based Triggers */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                          <label className="block text-sm font-semibold text-blue-200 mb-2">
                             <DynamicIcon
                               name="CheckCircle"
                               className="inline-block w-4 h-4 mr-1 text-green-600"
                             />
                             Lores that turn this ON
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/30">
                             {localLore.filter((_, i) => i !== index).length ===
                             0 ? (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                              <p className="text-xs text-blue-300/50 italic">
                                 No other lore entries.
                               </p>
                             ) : (
@@ -3105,7 +3105,7 @@ function LoreEditor({
                                 .map((loreEntry, loreIdx) => (
                                   <label
                                     key={loreIdx}
-                                    className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/50 rounded cursor-pointer"
                                   >
                                     <input
                                       type="checkbox"
@@ -3126,7 +3126,7 @@ function LoreEditor({
                                       }}
                                       className="w-4 h-4 text-green-600 rounded"
                                     />
-                                    <span className="text-xs text-gray-900 dark:text-white">
+                                    <span className="text-xs text-white">
                                       {loreEntry.title}
                                     </span>
                                   </label>
@@ -3135,17 +3135,17 @@ function LoreEditor({
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                          <label className="block text-sm font-semibold text-blue-200 mb-2">
                             <DynamicIcon
                               name="XCircle"
                               className="inline-block w-4 h-4 mr-1 text-red-600"
                             />
                             Lores that turn this OFF
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/30">
                             {localLore.filter((_, i) => i !== index).length ===
                             0 ? (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                              <p className="text-xs text-blue-300/50 italic">
                                 No other lore entries.
                               </p>
                             ) : (
@@ -3154,7 +3154,7 @@ function LoreEditor({
                                 .map((loreEntry, loreIdx) => (
                                   <label
                                     key={loreIdx}
-                                    className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/50 rounded cursor-pointer"
                                   >
                                     <input
                                       type="checkbox"
@@ -3175,7 +3175,7 @@ function LoreEditor({
                                       }}
                                       className="w-4 h-4 text-red-600 rounded"
                                     />
-                                    <span className="text-xs text-gray-900 dark:text-white">
+                                    <span className="text-xs text-white">
                                       {loreEntry.title}
                                     </span>
                                   </label>
@@ -3188,23 +3188,23 @@ function LoreEditor({
                       {/* Plot Beat Triggers */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                          <label className="block text-sm font-semibold text-blue-200 mb-2">
                             <DynamicIcon
                               name="CheckCircle"
                               className="inline-block w-4 h-4 mr-1 text-green-600"
                             />
                             Beats that turn this lore ON
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/30">
                             {plotBeats.length === 0 ? (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                              <p className="text-xs text-blue-300/50 italic">
                                 No plot beats yet.
                               </p>
                             ) : (
                               plotBeats.map((beat, beatIndex) => (
                                 <label
                                   key={beatIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/50 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -3225,7 +3225,7 @@ function LoreEditor({
                                     }}
                                     className="w-4 h-4 text-green-600 rounded"
                                   />
-                                  <span className="text-xs text-gray-900 dark:text-white">
+                                  <span className="text-xs text-white">
                                     {beat.title || `Beat ${beatIndex + 1}`}
                                   </span>
                                 </label>
@@ -3234,23 +3234,23 @@ function LoreEditor({
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                          <label className="block text-sm font-semibold text-blue-200 mb-2">
                             <DynamicIcon
                               name="XCircle"
                               className="inline-block w-4 h-4 mr-1 text-red-600"
                             />
                             Beats that turn this lore OFF
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-900">
+                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/30">
                             {plotBeats.length === 0 ? (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                              <p className="text-xs text-blue-300/50 italic">
                                 No plot beats yet.
                               </p>
                             ) : (
                               plotBeats.map((beat, beatIndex) => (
                                 <label
                                   key={beatIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800 dark:hover:bg-gray-600 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/50 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -3271,7 +3271,7 @@ function LoreEditor({
                                     }}
                                     className="w-4 h-4 text-red-600 rounded"
                                   />
-                                  <span className="text-xs text-gray-900 dark:text-white">
+                                  <span className="text-xs text-white">
                                     {beat.title || `Beat ${beatIndex + 1}`}
                                   </span>
                                 </label>
@@ -3307,7 +3307,7 @@ function LoreEditor({
               onDragStart={() => handleLoreDragStart(index)}
               onDragOver={(e) => handleLoreDragOver(e, index)}
               onDragEnd={handleLoreDragEnd}
-              className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-move flex items-center gap-3 ${
+              className={`p-4 bg-blue-900/20 rounded-lg cursor-move flex items-center gap-3 ${
                 draggedLoreIndex === index ? "opacity-50" : ""
               }`}
             >
@@ -3315,7 +3315,7 @@ function LoreEditor({
                 <DynamicIcon name="GripVertical" className="w-5 h-5" />
               </span>
               <div className="flex-1">
-                <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                <div className="font-medium text-white flex items-center gap-2">
                   {loreItem.secrtet && (
                     <DynamicIcon
                       name="Lock"
@@ -3346,10 +3346,10 @@ function LoreEditor({
                   <img
                     src={loreItem.thumbnailUrl}
                     alt={loreItem.title}
-                    className="mt-2 w-20 h-20 object-cover rounded border border-gray-300 dark:border-gray-600"
+                    className="mt-2 w-20 h-20 object-cover rounded border border-blue-700/40"
                   />
                 )}
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                <div className="text-sm text-blue-200/60 mt-1 line-clamp-2">
                   {loreItem.content}
                 </div>
                 {loreItem.on_triggers && loreItem.on_triggers.length > 0 && (
@@ -3452,14 +3452,14 @@ function RelationshipsEditor({
 
   // Helper function to get relationship symbol based on value
   const getRelationshipSymbol = (value: number): string => {
-    if (value >= 75) return "💚"; // Strong ally
-    if (value >= 50) return "💙"; // Ally
-    if (value >= 25) return "😊"; // Friendly
-    if (value >= 0) return "🤝"; // Neutral/Acquaintance
-    if (value >= -25) return "😐"; // Distant
-    if (value >= -50) return "😠"; // Unfriendly
-    if (value >= -75) return "💔"; // Hostile
-    return "⚔️"; // Enemy
+    if (value >= 75) return "??"; // Strong ally
+    if (value >= 50) return "??"; // Ally
+    if (value >= 25) return "??"; // Friendly
+    if (value >= 0) return "??"; // Neutral/Acquaintance
+    if (value >= -25) return "??"; // Distant
+    if (value >= -50) return "??"; // Unfriendly
+    if (value >= -75) return "??"; // Hostile
+    return "??"; // Enemy
   };
 
   const addRelationship = () => {
@@ -3467,7 +3467,7 @@ function RelationshipsEditor({
       name: "New Relationship",
       value: 0,
       description: "Describe this relationship...",
-      symbol: "🤝",
+      symbol: "??",
     };
     const updated = [...localRelationships, newRel];
     setLocalRelationships(updated);
@@ -3514,7 +3514,7 @@ function RelationshipsEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+        <h4 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
           <DynamicIcon name="Users" className="w-6 h-6" /> Relationships (
           {localRelationships.length})
         </h4>
@@ -3543,10 +3543,10 @@ function RelationshipsEditor({
                     })
                   }
                   placeholder="Character/Faction/Organization Name"
-                  className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white font-semibold"
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white font-semibold"
                 />
                 <div>
-                  <label className="flex text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 items-center justify-between">
+                  <label className="flex text-sm font-semibold text-blue-200 mb-2 items-center justify-between">
                     <span>
                       Relationship Value: {editRelationship.value ?? 0}
                     </span>
@@ -3565,7 +3565,7 @@ function RelationshipsEditor({
                         value: parseInt(e.target.value),
                       })
                     }
-                    className="w-full h-2 bg-gray-200 dark:bg-gray-900 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 bg-blue-900/30 rounded-lg appearance-none cursor-pointer"
                     style={{
                       background: `linear-gradient(to right, 
                         #ef4444 0%, 
@@ -3575,10 +3575,10 @@ function RelationshipsEditor({
                         #06b6d4 100%)`,
                     }}
                   />
-                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    <span>⚔️ -100 (Enemy)</span>
-                    <span>🤝 0 (Neutral)</span>
-                    <span>💚 +100 (Ally)</span>
+                  <div className="flex justify-between text-xs text-blue-200/60 mt-1">
+                    <span>?? -100 (Enemy)</span>
+                    <span>?? 0 (Neutral)</span>
+                    <span>?? +100 (Ally)</span>
                   </div>
                 </div>
                 <textarea
@@ -3590,7 +3590,7 @@ function RelationshipsEditor({
                     })
                   }
                   placeholder="Describe the relationship..."
-                  className="w-full h-24 px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
+                  className="w-full h-24 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
                 />
                 <div className="flex gap-2">
                   <button
@@ -3624,7 +3624,7 @@ function RelationshipsEditor({
                 <DynamicIcon name={rel.symbol} className="w-8 h-8" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2 flex-wrap mb-1">
+                <div className="font-bold text-white flex items-center gap-2 flex-wrap mb-1">
                   <span>{rel.name}</span>
                   <span
                     className={`text-sm px-2 py-0.5 rounded-full ${
@@ -3641,7 +3641,7 @@ function RelationshipsEditor({
                     {rel.value}
                   </span>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-blue-200/60">
                   {rel.description}
                 </p>
               </div>
@@ -3663,8 +3663,8 @@ function RelationshipsEditor({
           )
         )}
         {localRelationships.length === 0 && (
-          <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-900/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="p-8 text-center rounded-lg bg-blue-900/30 border-2 border-dashed border-blue-700/40">
+            <p className="text-sm text-blue-300/50">
               No relationships yet. Add relationships to track your standing
               with characters, factions, and organizations.
             </p>
@@ -3803,7 +3803,7 @@ function StoryMetaEditor({
       {/* Plot Beats */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <h4 className="text-lg font-bold text-white flex items-center gap-2">
             <DynamicIcon name="BookOpen" className="w-6 h-6" /> Plot Beats
           </h4>
           <button
@@ -3813,7 +3813,7 @@ function StoryMetaEditor({
             + Add Beat
           </button>
         </div>
-        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+        <p className="text-xs text-blue-200/60 mb-3">
           <DynamicIcon name="Lightbulb" className="w-3 h-3 inline mr-1" /> Drag
           and drop to reorder (or use arrow buttons on mobile)
         </p>
@@ -3825,7 +3825,7 @@ function StoryMetaEditor({
               onDragStart={() => handlePlotBeatDragStart(index)}
               onDragOver={(e) => handlePlotBeatDragOver(e, index)}
               onDragEnd={handlePlotBeatDragEnd}
-              className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg transition-opacity ${
+              className={`p-4 bg-blue-900/20 rounded-lg transition-opacity ${
                 editingPlotBeatIndex === index ? "" : "cursor-move"
               } ${
                 draggedPlotBeatIndex === index ? "opacity-50" : "opacity-100"
@@ -3834,7 +3834,7 @@ function StoryMetaEditor({
               {editingPlotBeatIndex === index ? (
                 // Edit mode
                 <div className="space-y-3">
-                  <h5 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <h5 className="text-sm font-bold text-white flex items-center gap-2">
                     <DynamicIcon name="Edit" className="w-4 h-4" /> Editing Plot
                     Beat
                   </h5>
@@ -3848,7 +3848,7 @@ function StoryMetaEditor({
                       })
                     }
                     placeholder="Title"
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                   <textarea
                     value={editPlotBeat.content || ""}
@@ -3860,7 +3860,7 @@ function StoryMetaEditor({
                     }
                     placeholder="Content"
                     rows={3}
-                    className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white resize-none"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
                   />
                   <div>
                     <input
@@ -3876,9 +3876,9 @@ function StoryMetaEditor({
                       }
                       placeholder="Points (default: 25)"
                       min="0"
-                      className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                    <p className="text-xs text-blue-300/50 mt-1 flex items-center gap-1">
                       <DynamicIcon name="Coins" className="w-3 h-3" /> Custom
                       points reward
                     </p>
@@ -3910,7 +3910,7 @@ function StoryMetaEditor({
                     <DynamicIcon name="GripVertical" className="w-5 h-5" />
                   </div>
                   <div className="flex-1">
-                    <div className="font-bold text-gray-900 dark:text-white mb-1">
+                    <div className="font-bold text-white mb-1">
                       {beat.title}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">
@@ -3922,7 +3922,7 @@ function StoryMetaEditor({
                         {beat.points} points
                       </div>
                     )}
-                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <label className="flex items-center gap-2 text-sm text-blue-200">
                       <input
                         type="checkbox"
                         checked={beat.fulfilled || false}
@@ -3981,7 +3981,7 @@ function StoryMetaEditor({
 
       {/* Author Notes */}
       <div>
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+        <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <DynamicIcon name="Edit3" className="w-6 h-6" /> Author Notes
         </h4>
         <textarea
@@ -3991,9 +3991,9 @@ function StoryMetaEditor({
             onUpdate({ author_notes: e.target.value });
           }}
           placeholder="Add notes for the adventure creator or AI storyteller (these notes guide the narrative direction)..."
-          className="w-full h-32 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+          className="w-full h-32 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
         />
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-2 text-xs text-blue-300/50">
           <DynamicIcon name="Lightbulb" className="w-3 h-3 inline mr-1" /> These
           notes help guide the AI in maintaining story consistency and tone
         </p>
@@ -4001,7 +4001,7 @@ function StoryMetaEditor({
 
       {/* Memory Entries (Editable) */}
       <div>
-        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+        <h4 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
           <DynamicIcon name="Brain" className="w-6 h-6" /> Memory Entries (
           {localMemory.length})
         </h4>
@@ -4012,7 +4012,7 @@ function StoryMetaEditor({
               placeholder="Add new memory entry..."
               value={newMemoryEntry}
               onChange={(e) => setNewMemoryEntry(e.target.value)}
-              className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+              className="flex-1 px-3 py-2 bg-blue-900/20 border border-blue-700/40 rounded text-white"
             />
             <button
               onClick={() => {
@@ -4032,7 +4032,7 @@ function StoryMetaEditor({
             {localMemory.map((entry, index) => (
               <div
                 key={index}
-                className="p-3 bg-gray-50 dark:bg-gray-900 rounded text-sm text-gray-700 dark:text-gray-300 flex justify-between items-center"
+                className="p-3 bg-blue-900/20 rounded text-sm text-blue-200 flex justify-between items-center"
               >
                 <span className="pr-2 flex-1">{entry}</span>
                 <button
@@ -4048,7 +4048,7 @@ function StoryMetaEditor({
               </div>
             ))}
             {localMemory.length === 0 && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+              <p className="text-xs text-blue-300/50 italic">
                 No memory entries yet.
               </p>
             )}
@@ -4294,342 +4294,135 @@ export default function MenuPage({
 
   return (
     <div className="w-full space-y-4">
-      {/* Story Info Card */}
-      <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 sm:p-5 border border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
-          <DynamicIcon name="Settings" className="w-6 h-6" /> Story Menu
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Manage your adventure progress and settings
-        </p>
-      </div>
-
-      {/* Actions Card */}
-      <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-          <DynamicIcon name="Gamepad2" className="w-5 h-5" /> Actions
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Settings */}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+      {/* Compact Header with Quick Stats */}
+      <div className="bg-[#0f1a2e] rounded-xl p-4 border border-blue-800/30">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <DynamicIcon name="Settings" className="w-5 h-5 text-purple-400" /> Story Menu
+          </h2>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-blue-300/60">{stats.progress}% complete</span>
+            <div className="w-20 h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-linear-to-r from-purple-500 to-pink-500"
+                style={{ width: `${stats.progress}%` }}
               />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-            <span>Story Settings</span>
-          </button>
-
-          {/* View Logs */}
-          {onViewLogs && (
-            <button
-              onClick={onViewLogs}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
-            >
-              <DynamicIcon name="ClipboardList" className="w-4 h-4" />
-              <span>View Debug Logs</span>
-            </button>
-          )}
-
-          {/* View Context */}
-          {onViewContext && (
-            <button
-              onClick={onViewContext}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
-            >
-              <DynamicIcon name="Eye" className="w-4 h-4" />
-              <span>View AI Context</span>
-            </button>
-          )}
-
-          {/* Save Progress */}
-          <button
-            onClick={handleSaveProgress}
-            disabled={saving || !storyDbId}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
-          >
-            {saving ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Saving...</span>
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                  />
-                </svg>
-                <span>Save Progress</span>
-              </>
-            )}
-          </button>
-
-          {/* Export Story */}
-          <button
-            onClick={handleExportStory}
-            disabled={exporting}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
-          >
-            {exporting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Exporting...</span>
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <span>Export Story</span>
-              </>
-            )}
-          </button>
-
-          {/* Return to Explorer */}
-          <button
-            onClick={handleReturnToExplorer}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-            <span>Return to Explorer</span>
-          </button>
-
-          {/* Delete Story */}
-          <button
-            onClick={() => {
-              setConfirmDialog({
-                isOpen: true,
-                title: "Delete Story?",
-                message:
-                  "Are you sure you want to permanently delete this story? This action cannot be undone.",
-                icon: "AlertTriangle",
-                confirmText: "Delete Forever",
-                confirmButtonClass: "bg-red-600 hover:bg-red-700",
-                onConfirm: async () => {
-                  setConfirmDialog({ ...confirmDialog, isOpen: false });
-                  if (!storyDbId) return;
-
-                  setDeleting(true);
-                  try {
-                    // Check if this is a local story
-                    if (storyDbId.startsWith("local_")) {
-                      const { deleteLocalStory } = await import(
-                        "../misc/localStoryManager"
-                      );
-                      await deleteLocalStory(storyDbId);
-                      addNotification("Story deleted", "info");
-                      router.push("/library");
-                      return;
-                    }
-
-                    // Online story - use API
-                    const {
-                      data: { session },
-                    } = await supabase.auth.getSession();
-                    if (!session) {
-                      throw new Error("Not authenticated");
-                    }
-
-                    const response = await fetch(`/api/stories/${storyDbId}`, {
-                      method: "DELETE",
-                      headers: {
-                        Authorization: `Bearer ${session.access_token}`,
-                      },
-                    });
-
-                    if (!response.ok) {
-                      throw new Error("Failed to delete story");
-                    }
-
-                    addNotification("Story deleted", "info");
-                    router.push("/explorer");
-                  } catch (error: any) {
-                    addNotification(
-                      error.message || "Failed to delete story",
-                      "failure"
-                    );
-                    setDeleting(false);
-                  }
-                },
-              });
-            }}
-            disabled={deleting || !storyDbId}
-            className="flex items-center justify-center gap-3 px-6 py-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-            <span>Delete Story</span>
-          </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Quick Stats Row */}
+        <div className="grid grid-cols-4 gap-2 text-center">
+          <div className="bg-blue-900/30 rounded-lg py-2 px-1">
+            <p className="text-lg font-bold text-blue-400">{stats.totalParts}</p>
+            <p className="text-[10px] text-blue-300/50">Parts</p>
+          </div>
+          <div className="bg-purple-900/30 rounded-lg py-2 px-1">
+            <p className="text-lg font-bold text-purple-400">{stats.fulfilledBeats}/{stats.totalBeats}</p>
+            <p className="text-[10px] text-purple-300/50">Beats</p>
+          </div>
+          <div className="bg-yellow-900/30 rounded-lg py-2 px-1">
+            <p className="text-lg font-bold text-yellow-400">{availablePoints}</p>
+            <p className="text-[10px] text-yellow-300/50">Points</p>
+          </div>
+          <div className="bg-cyan-900/30 rounded-lg py-2 px-1">
+            <p className="text-lg font-bold text-cyan-400">{storyData.momentum}/{storyData.maxMomentum}</p>
+            <p className="text-[10px] text-cyan-300/50">Momentum</p>
+          </div>
         </div>
       </div>
 
-      {/* Story Progress Card */}
-      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <DynamicIcon name="BarChart2" className="w-6 h-6" /> Story Progress
-        </h3>
+      {/* Primary Actions - 2x2 Grid */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => setShowSettings(true)}
+          className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors text-sm"
+        >
+          <DynamicIcon name="Settings" className="w-4 h-4" />
+          <span>Story Editor</span>
+        </button>
+        
+        <button
+          onClick={handleSaveProgress}
+          disabled={saving || !storyDbId}
+          className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-500 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white font-medium rounded-lg transition-colors text-sm"
+        >
+          {saving ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+          ) : (
+            <DynamicIcon name="Save" className="w-4 h-4" />
+          )}
+          <span>{saving ? "Saving..." : "Save"}</span>
+        </button>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-              {stats.totalParts}
-            </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              Story Parts
-            </p>
-          </div>
-          <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-            <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-              {stats.fulfilledBeats}/{stats.totalBeats}
-            </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              Plot Beats
-            </p>
-          </div>
-          <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-            <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-              {stats.achievementCount}
-            </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              Achievements
-            </p>
-          </div>
-          <div className="text-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-            <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-              {stats.progress}%
-            </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              Completion
-            </p>
-          </div>
-        </div>
+        {onViewContext && (
+          <button
+            onClick={onViewContext}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-700/50 hover:bg-blue-600/50 text-white font-medium rounded-lg transition-colors text-sm"
+          >
+            <DynamicIcon name="Eye" className="w-4 h-4" />
+            <span>AI Context</span>
+          </button>
+        )}
 
-        {/* Progress Bar */}
-        <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-3 overflow-hidden">
-          <div
-            className="bg-linear-to-r from-purple-500 to-pink-500 h-3 transition-all duration-500"
-            style={{ width: `${stats.progress}%` }}
+        {onViewLogs && (
+          <button
+            onClick={onViewLogs}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-700/50 hover:bg-blue-600/50 text-white font-medium rounded-lg transition-colors text-sm"
+          >
+            <DynamicIcon name="Terminal" className="w-4 h-4" />
+            <span>Debug Logs</span>
+          </button>
+        )}
+      </div>
+
+      {/* Secondary Actions Row */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={handleExportStory}
+          disabled={exporting}
+          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-800/40 hover:bg-blue-700/50 text-blue-200 font-medium rounded-lg transition-colors text-sm border border-blue-700/30"
+        >
+          {exporting ? (
+            <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-blue-300 border-t-transparent" />
+          ) : (
+            <DynamicIcon name="Download" className="w-3.5 h-3.5" />
+          )}
+          <span>{exporting ? "Exporting..." : "Export"}</span>
+        </button>
+
+        <button
+          onClick={handleReturnToExplorer}
+          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-800/40 hover:bg-blue-700/50 text-blue-200 font-medium rounded-lg transition-colors text-sm border border-blue-700/30"
+        >
+          <DynamicIcon name="ArrowLeft" className="w-3.5 h-3.5" />
+          <span>Explorer</span>
+        </button>
+      </div>
+
+      {/* Player Notes - Collapsible */}
+      <div className="bg-[#0f1a2e] rounded-xl border border-blue-800/30 overflow-hidden">
+        <button
+          onClick={() => setEditingNotes(!editingNotes)}
+          className="w-full flex items-center justify-between p-3 hover:bg-blue-900/20 transition-colors"
+        >
+          <span className="text-sm font-medium text-white flex items-center gap-2">
+            <DynamicIcon name="StickyNote" className="w-4 h-4 text-yellow-400" />
+            Player Notes
+          </span>
+          <DynamicIcon 
+            name={editingNotes ? "ChevronUp" : "ChevronDown"} 
+            className="w-4 h-4 text-blue-300/60" 
           />
-        </div>
-
-        {/* Points & Momentum Summary */}
-        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-center">
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-              Available Points
-            </p>
-            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {availablePoints}
-            </p>
-          </div>
-          <div className="p-4 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-center">
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-              Total Earned
-            </p>
-            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-              {totalEarnedPoints}
-            </p>
-          </div>
-          <div className="p-4 rounded-lg bg-pink-50 dark:bg-pink-900/20 text-center">
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-              Spent / Used
-            </p>
-            <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">
-              {Math.max(totalEarnedPoints - availablePoints, 0)}
-            </p>
-          </div>
-          <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-center">
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-              Momentum
-            </p>
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {storyData.momentum}/{storyData.maxMomentum}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Player Notes Card */}
-      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <DynamicIcon name="FileText" className="w-6 h-6" /> Player Notes
-          </h3>
-          <button
-            onClick={() => setEditingNotes(!editingNotes)}
-            className="px-3 py-1 text-sm bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 rounded-lg transition-colors"
-          >
-            {editingNotes ? "Cancel" : "Edit"}
-          </button>
-        </div>
-
-        {editingNotes ? (
-          <div className="space-y-3">
+        </button>
+        
+        {editingNotes && (
+          <div className="p-3 pt-0 space-y-2">
             <textarea
               value={playerNotes}
               onChange={(e) => setPlayerNotes(e.target.value)}
-              placeholder="Write your notes, strategies, or thoughts about the story..."
-              className="w-full h-40 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+              placeholder="Write your notes, strategies, or thoughts..."
+              className="w-full h-24 px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-1 focus:ring-purple-500 resize-none"
             />
             <div className="flex gap-2 justify-end">
               <button
@@ -4637,60 +4430,51 @@ export default function MenuPage({
                   setPlayerNotes(storyData.player_notes || "");
                   setEditingNotes(false);
                 }}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                className="px-3 py-1.5 text-xs bg-blue-800/50 text-blue-200 rounded-lg hover:bg-blue-700/50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveNotes}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded-lg"
               >
-                Save Notes
+                Save
               </button>
             </div>
           </div>
-        ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            {playerNotes ? (
-              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                {playerNotes}
-              </p>
-            ) : (
-              <p className="text-gray-400 dark:text-gray-500 italic">
-                No notes yet. Click Edit to add your thoughts!
-              </p>
-            )}
+        )}
+        
+        {!editingNotes && playerNotes && (
+          <div className="px-3 pb-3">
+            <p className="text-xs text-blue-200/70 whitespace-pre-wrap line-clamp-2">
+              {playerNotes}
+            </p>
           </div>
         )}
       </div>
 
-      {/* Replay & Restart Card */}
-      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <DynamicIcon name="RefreshCw" className="w-6 h-6" /> Replay & Restart
-        </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Start your adventure anew with different options
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Restart Story (Full Reset) */}
+      {/* Danger Zone - Compact */}
+      <div className="bg-[#0f1a2e] rounded-xl border border-red-900/30 overflow-hidden">
+        <div className="p-3 border-b border-red-900/20">
+          <span className="text-sm font-medium text-red-400 flex items-center gap-2">
+            <DynamicIcon name="AlertTriangle" className="w-4 h-4" />
+            Danger Zone
+          </span>
+        </div>
+        <div className="p-3 grid grid-cols-2 gap-2">
           <button
             onClick={() => {
               setConfirmDialog({
                 isOpen: true,
                 title: "Restart Story",
-                message:
-                  "Are you sure you want to restart this story? All progress will be lost!",
+                message: "All progress will be lost. Are you sure?",
                 icon: "RefreshCw",
                 confirmText: "Restart",
-                confirmButtonClass: "bg-blue-600 hover:bg-blue-700",
+                confirmButtonClass: "bg-orange-600 hover:bg-orange-700",
                 onConfirm: async () => {
                   setConfirmDialog({ ...confirmDialog, isOpen: false });
                   if (!storyDbId) return;
-
                   try {
-                    // Full reset - clear everything
                     const resetStoryData = {
                       ...storyData,
                       scene: { parts: [] },
@@ -4702,280 +4486,136 @@ export default function MenuPage({
                       earnedPointsFromBeats: [],
                       earnedPointsFromChapters: [],
                       earnedPointsFromQuests: [],
-                      plot_beats: storyData.plot_beats.map((b) => ({
-                        ...b,
-                        fulfilled: false,
-                      })),
-                      achievements: storyData.achievements.map((a) => ({
-                        ...a,
-                        dateAchieved: null,
-                      })),
-                      quests:
-                        storyData.quests?.map((q) => ({
-                          ...q,
-                          fulfilled: false,
-                          active: false,
-                        })) || [],
-                      lore: storyData.lore.map((l) => ({
-                        ...l,
-                        on:
-                          l.on_triggers && l.on_triggers.length > 0
-                            ? false
-                            : true,
-                      })),
+                      plot_beats: storyData.plot_beats.map((b) => ({ ...b, fulfilled: false })),
+                      achievements: storyData.achievements.map((a) => ({ ...a, dateAchieved: null })),
+                      quests: storyData.quests?.map((q) => ({ ...q, fulfilled: false, active: false })) || [],
+                      lore: storyData.lore.map((l) => ({ ...l, on: l.on_triggers && l.on_triggers.length > 0 ? false : true })),
                       newGamePlusMode: false,
                     };
-
-                    // Check if this is a local story
                     if (storyDbId.startsWith("local_")) {
-                      const { saveLocalStory } = await import(
-                        "@/app/misc/localStoryManager"
-                      );
+                      const { saveLocalStory } = await import("@/app/misc/localStoryManager");
                       await saveLocalStory(storyDbId, resetStoryData);
                     } else {
-                      const {
-                        data: { session },
-                      } = await supabase.auth.getSession();
-                      if (!session) {
-                        addNotification("Please sign in to restart", "warning");
-                        return;
-                      }
-
-                      // Encrypt before saving
+                      const { data: { session } } = await supabase.auth.getSession();
+                      if (!session) { addNotification("Please sign in", "warning"); return; }
                       const password = getEncryptionPassword();
                       const email = user?.email;
-                      if (!password || !email) {
-                        addNotification(
-                          "Please sign out and sign back in to save encrypted stories",
-                          "warning"
-                        );
-                        return;
-                      }
-                      const encryptedData = await encryptStoryData(
-                        resetStoryData,
-                        email,
-                        password
-                      );
-
+                      if (!password || !email) { addNotification("Please sign in again", "warning"); return; }
+                      const encryptedData = await encryptStoryData(resetStoryData, email, password);
                       await fetch(`/api/stories/${storyDbId}`, {
                         method: "PATCH",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${session.access_token}`,
-                        },
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
                         body: JSON.stringify({ storyData: encryptedData }),
                       });
                     }
-
-                    addNotification("Story restarted! Reloading...", "success");
+                    addNotification("Story restarted!", "success");
                     window.location.reload();
                   } catch (error) {
-                    console.error("Error restarting story:", error);
-                    addNotification("Failed to restart story", "failure");
+                    addNotification("Failed to restart", "failure");
                   }
                 },
               });
             }}
-            className="flex flex-col items-center justify-center gap-2 px-6 py-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+            className="flex items-center justify-center gap-2 px-3 py-2.5 bg-orange-900/30 hover:bg-orange-800/40 text-orange-300 font-medium rounded-lg transition-colors text-sm border border-orange-800/30"
           >
-            <DynamicIcon name="RefreshCw" className="w-8 h-8" />
-            <div className="text-center">
-              <div className="font-bold">Restart Story</div>
-              <div className="text-xs opacity-80 mt-1">
-                Fresh start, lose all progress
-              </div>
-            </div>
+            <DynamicIcon name="RefreshCw" className="w-3.5 h-3.5" />
+            <span>Restart</span>
           </button>
 
-          {/* New Game Plus */}
           <button
             onClick={() => {
               setConfirmDialog({
                 isOpen: true,
-                title: "New Game Plus",
-                message:
-                  "Start New Game Plus? You'll keep achievements, stats, resources, and items, plus get bonus rewards!",
-                icon: "Star",
-                confirmText: "Start NG+",
-                confirmButtonClass:
-                  "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700",
+                title: "Delete Story?",
+                message: "This action cannot be undone.",
+                icon: "AlertTriangle",
+                confirmText: "Delete",
+                confirmButtonClass: "bg-red-600 hover:bg-red-700",
                 onConfirm: async () => {
                   setConfirmDialog({ ...confirmDialog, isOpen: false });
                   if (!storyDbId) return;
-
+                  setDeleting(true);
                   try {
-                    const ngPlusCount = (storyData.newGamePlusCount || 0) + 1;
-                    const bonusPoints = ngPlusCount * 50;
-                    const bonusMomentum = Math.min(ngPlusCount, 3);
-
-                    // Reset with NG+ bonuses
-                    const ngPlusStoryData = {
-                      ...storyData,
-                      scene: { parts: [] },
-                      memory: [],
-                      currentChapter: 0,
-                      chapters: [],
-                      momentum: storyData.momentum,
-                      maxMomentum: storyData.maxMomentum + bonusMomentum,
-                      points: bonusPoints,
-                      earnedPointsFromBeats: [],
-                      earnedPointsFromChapters: [],
-                      earnedPointsFromQuests: [],
-                      plot_beats: storyData.plot_beats.map((b) => ({
-                        ...b,
-                        fulfilled: false,
-                      })),
-                      // Keep achievements, stats, resources, and inventory!
-                      achievements: storyData.achievements,
-                      stats: storyData.stats, // Keep stats
-                      resources: storyData.resources, // Keep resources
-                      inventory: storyData.inventory, // Keep inventory
-                      quests:
-                        storyData.quests?.map((q) => ({
-                          ...q,
-                          fulfilled: false,
-                          active: false,
-                        })) || [],
-                      lore: storyData.lore.map((l) => ({
-                        ...l,
-                        on:
-                          l.on_triggers && l.on_triggers.length > 0
-                            ? false
-                            : true,
-                      })),
-                      newGamePlusCount: ngPlusCount,
-                      newGamePlusMode: true,
-                    };
-
-                    // Check if this is a local story
                     if (storyDbId.startsWith("local_")) {
-                      const { saveLocalStory } = await import(
-                        "@/app/misc/localStoryManager"
-                      );
-                      await saveLocalStory(storyDbId, ngPlusStoryData);
-                    } else {
-                      const {
-                        data: { session },
-                      } = await supabase.auth.getSession();
-                      if (!session) {
-                        addNotification(
-                          "Please sign in for New Game Plus",
-                          "warning"
-                        );
-                        return;
-                      }
-
-                      // Encrypt before saving
-                      const password = getEncryptionPassword();
-                      const email = user?.email;
-                      if (!password || !email) {
-                        addNotification(
-                          "Please sign out and sign back in to save encrypted stories",
-                          "warning"
-                        );
-                        return;
-                      }
-                      const encryptedData = await encryptStoryData(
-                        ngPlusStoryData,
-                        email,
-                        password
-                      );
-
-                      await fetch(`/api/stories/${storyDbId}`, {
-                        method: "PATCH",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${session.access_token}`,
-                        },
-                        body: JSON.stringify({ storyData: encryptedData }),
-                      });
+                      const { deleteLocalStory } = await import("../misc/localStoryManager");
+                      await deleteLocalStory(storyDbId);
+                      addNotification("Story deleted", "success");
+                      router.push("/library");
+                      return;
                     }
-
-                    addNotification(
-                      `New Game Plus ${ngPlusCount} activated! +${bonusPoints} points, +${bonusMomentum} max momentum`,
-                      "success"
-                    );
-                    window.location.reload();
-                  } catch (error) {
-                    console.error("Error starting NG+:", error);
-                    addNotification("Failed to start New Game Plus", "failure");
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (!session) throw new Error("Not authenticated");
+                    const response = await fetch(`/api/stories/${storyDbId}`, {
+                      method: "DELETE",
+                      headers: { Authorization: `Bearer ${session.access_token}` },
+                    });
+                    if (!response.ok) throw new Error("Failed to delete");
+                    addNotification("Story deleted", "success");
+                    router.push("/explorer");
+                  } catch (error: any) {
+                    addNotification(error.message || "Failed to delete", "failure");
+                    setDeleting(false);
                   }
                 },
               });
             }}
-            className="flex flex-col items-center justify-center gap-2 px-6 py-6 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+            disabled={deleting || !storyDbId}
+            className="flex items-center justify-center gap-2 px-3 py-2.5 bg-red-900/30 hover:bg-red-800/40 disabled:bg-blue-900/20 disabled:text-blue-300/30 text-red-300 font-medium rounded-lg transition-colors text-sm border border-red-800/30"
           >
-            <DynamicIcon name="Star" className="w-8 h-8" />
-            <div className="text-center">
-              <div className="font-bold">New Game Plus</div>
-              <div className="text-xs opacity-80 mt-1">
-                Keep achievements + bonus rewards
-              </div>
-            </div>
+            {deleting ? (
+              <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-red-300 border-t-transparent" />
+            ) : (
+              <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
+            )}
+            <span>{deleting ? "Deleting..." : "Delete"}</span>
           </button>
         </div>
-
-        {/* NG+ Status Badge */}
-        {storyData.newGamePlusCount && storyData.newGamePlusCount > 0 && (
-          <div className="mt-4 p-3 bg-linear-to-r from-amber-50 to-purple-50 dark:from-amber-900/20 dark:to-purple-900/20 rounded-lg border border-amber-200 dark:border-amber-800 text-center">
-            <div className="font-bold text-sm text-amber-900 dark:text-amber-200">
-              <DynamicIcon name="Star" className="inline-block w-4 h-4 mr-1" />
-              Current Run: New Game Plus #{storyData.newGamePlusCount}
-            </div>
-            <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-              {storyData.newGamePlusMode
-                ? "Active NG+ bonuses"
-                : "Completed playthroughs"}
-              : {storyData.newGamePlusCount}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Story Info Card */}
-      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+      <div className="bg-blue-950/50 rounded-2xl shadow-xl p-6 border border-blue-800/30">
+        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <DynamicIcon name="Info" className="w-6 h-6" /> Story Information
         </h3>
 
         <div className="space-y-3 text-sm">
-          <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-            <span className="text-gray-600 dark:text-gray-400">
+          <div className="flex justify-between py-2 border-b border-blue-800/30">
+            <span className="text-blue-200/60">
               Story Name:
             </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
+            <span className="font-semibold text-white">
               {storyData.story_name}
             </span>
           </div>
-          <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-            <span className="text-gray-600 dark:text-gray-400">
+          <div className="flex justify-between py-2 border-b border-blue-800/30">
+            <span className="text-blue-200/60">
               Player Name:
             </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
+            <span className="font-semibold text-white">
               {storyData.player_name}
             </span>
           </div>
-          <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-            <span className="text-gray-600 dark:text-gray-400">
+          <div className="flex justify-between py-2 border-b border-blue-800/30">
+            <span className="text-blue-200/60">
               Total Memory Entries:
             </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
+            <span className="font-semibold text-white">
               {storyData.memory.length}
             </span>
           </div>
-          <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-            <span className="text-gray-600 dark:text-gray-400">
+          <div className="flex justify-between py-2 border-b border-blue-800/30">
+            <span className="text-blue-200/60">
               Inventory Items:
             </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
+            <span className="font-semibold text-white">
               {storyData.inventory.length}
             </span>
           </div>
           <div className="flex justify-between py-2">
-            <span className="text-gray-600 dark:text-gray-400">
+            <span className="text-blue-200/60">
               Lore Entries:
             </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
+            <span className="font-semibold text-white">
               {storyData.lore.length}
             </span>
           </div>
@@ -4986,15 +4626,15 @@ export default function MenuPage({
       {showSettings && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           {/* Added min-h to stabilize modal height across tab switches */}
-          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-2xl max-w-6xl w-full border border-gray-200 dark:border-gray-700 h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-[#0a1628] rounded-2xl shadow-2xl max-w-6xl w-full border border-blue-800/30 h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <div className="flex items-center justify-between p-6 border-b border-blue-800/30">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
                 <DynamicIcon name="Settings" className="w-6 h-6" /> Story Editor
               </h3>
               <button
                 onClick={() => setShowSettings(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                className="text-blue-300/60 hover:text-white"
               >
                 <svg
                   className="w-6 h-6"
@@ -5014,7 +4654,7 @@ export default function MenuPage({
 
             {/* Tabs - Made sticky with background to prevent content overlap */}
             <DraggableScroll
-              className="sticky top-0 z-10 bg-white dark:bg-blue-950 px-6 py-4 border-b border-gray-200 dark:border-gray-700 scrollbar-thin"
+              className="sticky top-0 z-10 bg-[#0a1628] px-6 py-4 border-b border-blue-800/30 scrollbar-thin"
               innerClassName="gap-3"
             >
               {[
@@ -5041,7 +4681,7 @@ export default function MenuPage({
                   className={`shrink-0 h-14 px-6 text-base font-semibold rounded-xl transition-colors whitespace-nowrap flex items-center gap-3 overflow-visible ${
                     activeTab === tab.id
                       ? "bg-purple-600 text-white shadow-md"
-                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                      : "bg-blue-900/30 text-blue-200 hover:bg-blue-800/40"
                   }`}
                 >
                   <DynamicIcon name={tab.icon} className="w-5 h-5 shrink-0" />
@@ -5127,7 +4767,7 @@ export default function MenuPage({
               {activeTab === "threads" && storyData.mythicState && (
                 <div className="mt-4 space-y-6">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <h4 className="text-lg font-bold text-white flex items-center gap-2">
                       <DynamicIcon name="ListTodo" className="w-6 h-6" />
                       Story Threads
                     </h4>
@@ -5157,7 +4797,7 @@ export default function MenuPage({
                   </div>
 
                   <div className="space-y-3">
-                    <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <h5 className="text-sm font-semibold text-blue-200">
                       Active Threads (
                       {
                         storyData.mythicState.threads.filter(
@@ -5189,10 +4829,10 @@ export default function MenuPage({
                               });
                             }}
                             placeholder="Thread description..."
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                             rows={2}
                           />
-                          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center justify-between text-xs text-blue-300/50">
                             <span>
                               Created{" "}
                               {new Date(thread.createdAt).toLocaleDateString()}
@@ -5258,14 +4898,14 @@ export default function MenuPage({
                     {storyData.mythicState.threads.filter(
                       (t) => t.status === "active"
                     ).length === 0 && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 italic">
+                      <p className="text-sm text-blue-200/60 italic">
                         No active threads. Click "New Thread" to add one.
                       </p>
                     )}
                   </div>
 
-                  <details className="border border-gray-300 dark:border-gray-600 rounded-lg">
-                    <summary className="px-4 py-3 cursor-pointer font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                  <details className="border border-blue-700/40 rounded-lg">
+                    <summary className="px-4 py-3 cursor-pointer font-semibold text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
                       Closed Threads (
                       {
                         storyData.mythicState.threads.filter(
@@ -5280,9 +4920,9 @@ export default function MenuPage({
                         .map((thread) => (
                           <div
                             key={thread.id}
-                            className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                            className="p-3 bg-blue-900/20 rounded-lg border border-blue-800/30"
                           >
-                            <p className="text-sm text-gray-700 dark:text-gray-300 line-through">
+                            <p className="text-sm text-blue-200 line-through">
                               {thread.description}
                             </p>
                             <div className="flex justify-end gap-2 mt-2">
@@ -5329,7 +4969,7 @@ export default function MenuPage({
                       {storyData.mythicState.threads.filter(
                         (t) => t.status === "closed"
                       ).length === 0 && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 italic py-2">
+                        <p className="text-sm text-blue-200/60 italic py-2">
                           No closed threads yet.
                         </p>
                       )}
@@ -5341,7 +4981,7 @@ export default function MenuPage({
               {activeTab === "characters" && storyData.mythicState && (
                 <div className="mt-4 space-y-6">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <h4 className="text-lg font-bold text-white flex items-center gap-2">
                       <DynamicIcon name="Users" className="w-6 h-6" />
                       NPCs
                     </h4>
@@ -5377,10 +5017,10 @@ export default function MenuPage({
                         key={char.id}
                         className={`p-4 rounded-lg border space-y-3 ${
                           char.status === "active"
-                            ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
+                            ? "bg-purple-900/30 border-purple-700/40"
                             : char.status === "deceased"
-                            ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 opacity-75"
-                            : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-75"
+                            ? "bg-red-900/30 border-red-700/40 opacity-75"
+                            : "bg-blue-900/20 border-blue-800/30 opacity-75"
                         }`}
                       >
                         <div className="flex gap-3">
@@ -5401,7 +5041,7 @@ export default function MenuPage({
                               });
                             }}
                             placeholder="Character name..."
-                            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-semibold"
+                            className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white font-semibold"
                           />
                           <select
                             value={char.status}
@@ -5421,7 +5061,7 @@ export default function MenuPage({
                                 },
                               });
                             }}
-                            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            className="px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                           >
                             <option value="active">Active</option>
                             <option value="deceased">Deceased</option>
@@ -5444,10 +5084,10 @@ export default function MenuPage({
                             });
                           }}
                           placeholder="Role/description..."
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                           rows={2}
                         />
-                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center justify-between text-xs text-blue-300/50">
                           <span>
                             Introduced{" "}
                             {new Date(char.createdAt).toLocaleDateString()}
@@ -5490,7 +5130,7 @@ export default function MenuPage({
                       </div>
                     ))}
                     {storyData.mythicState.characters.length === 0 && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 italic">
+                      <p className="text-sm text-blue-200/60 italic">
                         No NPCs added yet. Click "New NPC" to add one.
                       </p>
                     )}
@@ -5500,19 +5140,19 @@ export default function MenuPage({
 
               {activeTab === "mythic" && (
                 <div className="mt-4 space-y-6">
-                  <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <h4 className="text-lg font-bold text-white flex items-center gap-2">
                     <DynamicIcon name="Sparkles" className="w-6 h-6" />
                     Mythic GME Settings
                   </h4>
 
                   {/* Enable/Disable Mythic GME */}
-                  <div className="p-6 bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+                  <div className="p-6 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
                     <div className="flex items-center justify-between">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                        <label className="block text-sm font-semibold text-blue-200 mb-1">
                           Enable Mythic GME
                         </label>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                        <p className="text-xs text-blue-200/60">
                           Use Mythic Game Master Emulator for dynamic story
                           generation
                         </p>
@@ -5544,7 +5184,7 @@ export default function MenuPage({
                           }}
                           className="sr-only peer"
                         />
-                        <div className="w-14 h-7 bg-gray-300 dark:bg-gray-700 peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+                        <div className="w-14 h-7 bg-blue-800/50 peer-focus:ring-4 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
                       </label>
                     </div>
                   </div>
@@ -5552,8 +5192,8 @@ export default function MenuPage({
                   {storyData.mythicState && (
                     <>
                       {/* Chaos Factor */}
-                      <div className="p-6 bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600">
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                      <div className="p-6 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
+                        <label className="block text-sm font-semibold text-blue-200 mb-3">
                           Chaos Factor: {storyData.mythicState.chaosFactor}
                         </label>
                         <input
@@ -5569,9 +5209,9 @@ export default function MenuPage({
                               },
                             });
                           }}
-                          className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                          className="w-full h-3 bg-blue-900/30 rounded-lg appearance-none cursor-pointer"
                         />
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                        <p className="text-sm text-blue-200/60 mt-2">
                           {storyData.mythicState.chaosFactor <= 3 &&
                             "Very Ordered - Things go as expected"}
                           {storyData.mythicState.chaosFactor > 3 &&
@@ -5586,8 +5226,8 @@ export default function MenuPage({
                       </div>
 
                       {/* Scene Count */}
-                      <div className="p-6 bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600">
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                      <div className="p-6 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
+                        <label className="block text-sm font-semibold text-blue-200 mb-3">
                           Scene Count: {storyData.mythicState.sceneCount}
                         </label>
                         <div className="flex gap-2">
@@ -5640,7 +5280,7 @@ export default function MenuPage({
                       {/* Performance Tracking */}
                       {storyData.mythicState && (
                         <div className="p-6 bg-gradient to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 rounded-lg border-2 border-gray-300 dark:border-gray-700">
-                          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+                          <h4 className="text-sm font-semibold text-blue-200 mb-4 flex items-center gap-2">
                             <DynamicIcon
                               name="TrendingUp"
                               className="w-4 h-4"
@@ -5651,7 +5291,7 @@ export default function MenuPage({
                           {/* Current Streak */}
                           <div className="mb-4">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-gray-600 dark:text-gray-400">
+                              <span className="text-xs text-blue-200/60">
                                 Current Streak
                               </span>
                               <span
@@ -5667,10 +5307,10 @@ export default function MenuPage({
                                 {storyData.mythicState.currentStreak || 0}
                                 {Math.abs(
                                   storyData.mythicState.currentStreak
-                                ) >= 3 && " 🔥"}
+                                ) >= 3 && " ??"}
                               </span>
                             </div>
-                            <div className="h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div className="h-2 bg-blue-900/30 rounded-full overflow-hidden">
                               <div
                                 className={`h-full transition-all ${
                                   storyData.mythicState.currentStreak > 0
@@ -5693,7 +5333,7 @@ export default function MenuPage({
                           {storyData.mythicState.skillCheckHistory.length >
                             0 && (
                             <div>
-                              <span className="text-xs text-gray-600 dark:text-gray-400 block mb-2">
+                              <span className="text-xs text-blue-200/60 block mb-2">
                                 Last{" "}
                                 {storyData.mythicState.skillCheckHistory.length}{" "}
                                 Checks
@@ -5739,7 +5379,7 @@ export default function MenuPage({
                           )}
 
                           {/* Next Adjustment Info */}
-                          <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400">
+                          <div className="mt-4 pt-4 border-t border-blue-700/40 text-xs text-blue-300/50">
                             {storyData.mythicState.sceneCount -
                               storyData.mythicState.lastChaosAdjustment <
                             2 ? (
@@ -5778,7 +5418,7 @@ export default function MenuPage({
                               ).length
                             }
                           </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                          <div className="text-sm text-blue-200/60">
                             Active Threads
                           </div>
                         </div>
@@ -5790,27 +5430,27 @@ export default function MenuPage({
                               ).length
                             }
                           </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                          <div className="text-sm text-blue-200/60">
                             Active NPCs
                           </div>
                         </div>
-                        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                          <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                        <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
+                          <div className="text-2xl font-bold text-blue-200/60">
                             {
                               storyData.mythicState.threads.filter(
                                 (t) => t.status === "closed"
                               ).length
                             }
                           </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                          <div className="text-sm text-blue-200/60">
                             Closed Threads
                           </div>
                         </div>
-                        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                          <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                        <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
+                          <div className="text-2xl font-bold text-blue-200/60">
                             {storyData.mythicState.characters.length}
                           </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                          <div className="text-sm text-blue-200/60">
                             Total NPCs
                           </div>
                         </div>
@@ -5833,7 +5473,7 @@ export default function MenuPage({
 
               {activeTab === "tts" && (
                 <div className="space-y-6 mt-4">
-                  <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                  <h4 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
                     <DynamicIcon name="Bot" className="w-6 h-6" /> AI
                     Configuration
                   </h4>
@@ -5843,7 +5483,7 @@ export default function MenuPage({
                     <AIModelSelector addNotification={addNotification} />
 
                     {/* Raw Context Toggle */}
-                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
+                    <label className="flex items-center gap-3 p-4 bg-blue-900/20 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
                       <input
                         type="checkbox"
                         checked={
@@ -5867,10 +5507,10 @@ export default function MenuPage({
                         className="w-5 h-5 rounded text-purple-600"
                       />
                       <div>
-                        <span className="font-semibold text-gray-900 dark:text-white">
+                        <span className="font-semibold text-white">
                           Use Raw AI Output in Context
                         </span>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-blue-200/60">
                           Send complete AI responses back to the model instead
                           of parsed content. Helps some AIs maintain
                           consistency.
@@ -5878,7 +5518,7 @@ export default function MenuPage({
                       </div>
                     </label>
 
-                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
+                    <label className="flex items-center gap-3 p-4 bg-blue-900/20 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
                       <input
                         type="checkbox"
                         checked={
@@ -5902,16 +5542,16 @@ export default function MenuPage({
                         className="w-5 h-5 rounded text-blue-600"
                       />
                       <div>
-                        <span className="font-semibold text-gray-900 dark:text-white">
+                        <span className="font-semibold text-white">
                           Enable Text-to-Speech
                         </span>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-blue-200/60">
                           Show TTS controls for story narration
                         </p>
                       </div>
                     </label>
 
-                    <label className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
+                    <label className="flex items-center gap-3 p-4 bg-blue-900/20 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
                       <input
                         type="checkbox"
                         checked={
@@ -5935,18 +5575,18 @@ export default function MenuPage({
                         className="w-5 h-5 rounded text-blue-600"
                       />
                       <div>
-                        <span className="font-semibold text-gray-900 dark:text-white">
+                        <span className="font-semibold text-white">
                           Auto-Generate Narration
                         </span>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-blue-200/60">
                           Automatically generate audio when new story content
                           appears
                         </p>
                       </div>
                     </label>
 
-                    <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                      <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                    <div className="p-4 bg-blue-900/20 rounded-lg">
+                      <h5 className="text-sm font-semibold text-blue-200 mb-3">
                         <DynamicIcon
                           name="Volume2"
                           className="inline-block w-4 h-4 mr-1"
@@ -5956,7 +5596,7 @@ export default function MenuPage({
 
                       {/* Voice Selector */}
                       <div className="mb-4">
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-blue-200 mb-2">
                           <DynamicIcon
                             name="Mic"
                             className="inline-block w-4 h-4 mr-1"
@@ -5983,7 +5623,7 @@ export default function MenuPage({
                               );
                             }
                           }}
-                          className="w-full px-3 py-2 bg-white dark:bg-blue-950 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                         >
                           <option value="henry">Henry (British)</option>
                           <option value="snoop">Snoop</option>
@@ -6013,7 +5653,7 @@ export default function MenuPage({
 
                       <CustomVoiceManager addNotification={addNotification} />
 
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 mt-4">
+                      <label className="block text-sm font-semibold text-blue-200 mb-2 mt-4">
                         Default Volume:{" "}
                         {Math.round(
                           (typeof window !== "undefined"
@@ -6043,9 +5683,9 @@ export default function MenuPage({
                             )}%`;
                           }
                         }}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-900"
+                        className="w-full h-2 bg-blue-900/30 rounded-lg appearance-none cursor-pointer"
                       />
-                      <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex justify-between mt-2 text-xs text-blue-300/50">
                         <span>
                           <DynamicIcon
                             name="VolumeX"
@@ -6063,23 +5703,23 @@ export default function MenuPage({
                       </div>
                     </div>
 
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <h5 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">
+                    <div className="p-4 bg-blue-900/30 rounded-lg">
+                      <h5 className="font-semibold text-blue-200 mb-2">
                         <DynamicIcon
                           name="Info"
                           className="inline-block w-4 h-4 mr-1"
                         />
                         How TTS Works
                       </h5>
-                      <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
+                      <ul className="text-sm text-blue-300 space-y-1">
                         <li>
-                          • Press Play button in the story view to hear
+                          � Press Play button in the story view to hear
                           narration
                         </li>
-                        <li>• Audio is generated once and saved for replay</li>
-                        <li>• Voice and volume settings are saved locally</li>
+                        <li>� Audio is generated once and saved for replay</li>
+                        <li>� Voice and volume settings are saved locally</li>
                         <li>
-                          • New story content generates new audio automatically
+                          � New story content generates new audio automatically
                           if enabled
                         </li>
                       </ul>
@@ -6090,7 +5730,7 @@ export default function MenuPage({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex gap-3 p-6 border-t border-blue-800/30">
               <button
                 onClick={() => {
                   setSettingsForm({
@@ -6106,7 +5746,7 @@ export default function MenuPage({
                   });
                   setShowSettings(false);
                 }}
-                className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
+                className="flex-1 px-4 py-3 bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 font-semibold rounded-lg transition-colors"
               >
                 Cancel
               </button>
