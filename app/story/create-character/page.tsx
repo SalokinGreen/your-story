@@ -910,11 +910,11 @@ function CreateCharacterContent() {
               </div>
 
               {/* Character Summary */}
-              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 sm:p-6 border border-purple-200 dark:border-purple-800">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                   {characterName}
                 </h3>
-                <p className="text-gray-700 dark:text-gray-300 mb-4">
+                <p className="text-gray-700 dark:text-gray-300 mb-4 text-sm sm:text-base">
                   {characterDescription}
                 </p>
 
@@ -923,50 +923,50 @@ function CreateCharacterContent() {
                     <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
                       Stats:
                     </h4>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
                       {stats.map((stat, index) => (
                         <div
                           key={index}
-                          className="flex justify-between text-sm"
+                          className="flex items-center gap-1 text-sm"
                         >
-                          <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                            <DynamicIcon
-                              name={stat.symbol}
-                              className="w-4 h-4"
-                            />
+                          <DynamicIcon
+                            name={stat.symbol}
+                            className="w-4 h-4 shrink-0"
+                          />
+                          <span className="text-gray-700 dark:text-gray-300">
                             {stat.name}:
                           </span>
                           <span className="font-bold text-gray-900 dark:text-white">
                             {stat.value}
-                            {stat.value >
-                              (storyData.stats?.[index]?.value || 0) && (
-                              <span className="text-green-600 dark:text-green-400 ml-1">
-                                (+
-                                {stat.value -
-                                  (storyData.stats?.[index]?.value || 0)}
-                                )
-                              </span>
-                            )}
                           </span>
+                          {stat.value >
+                            (storyData.stats?.[index]?.value || 0) && (
+                            <span className="text-green-600 dark:text-green-400 text-xs">
+                              (+
+                              {stat.value -
+                                (storyData.stats?.[index]?.value || 0)}
+                              )
+                            </span>
+                          )}
                         </div>
                       ))}
                       {purchasedStats.map((stat, index) => (
                         <div
                           key={`purchased-${index}`}
-                          className="flex justify-between text-sm"
+                          className="flex items-center gap-1 text-sm"
                         >
-                          <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                            <DynamicIcon
-                              name={stat.symbol}
-                              className="w-4 h-4"
-                            />
+                          <DynamicIcon
+                            name={stat.symbol}
+                            className="w-4 h-4 shrink-0"
+                          />
+                          <span className="text-gray-700 dark:text-gray-300">
                             {stat.name}:
                           </span>
                           <span className="font-bold text-gray-900 dark:text-white">
                             {stat.value}
-                            <span className="text-purple-600 dark:text-purple-400 ml-1">
-                              ✨
-                            </span>
+                          </span>
+                          <span className="text-purple-600 dark:text-purple-400">
+                            ✨
                           </span>
                         </div>
                       ))}
@@ -979,53 +979,53 @@ function CreateCharacterContent() {
                     <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
                       Resources:
                     </h4>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
                       {resources.map((resource, index) => (
                         <div
                           key={index}
-                          className="flex justify-between text-sm"
+                          className="flex items-center gap-1 text-sm"
                         >
-                          <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                            <DynamicIcon
-                              name={resource.symbol}
-                              className="w-4 h-4"
-                            />
+                          <DynamicIcon
+                            name={resource.symbol}
+                            className="w-4 h-4 shrink-0"
+                          />
+                          <span className="text-gray-700 dark:text-gray-300">
                             {resource.name}:
                           </span>
-                          <span className="font-bold text-gray-900 dark:text-white">
+                          <span className="font-bold text-gray-900 dark:text-white whitespace-nowrap">
                             {resource.value} / {resource.maxValue}
-                            {(resource.value >
-                              (storyData.resources?.[index]?.value || 0) ||
-                              resource.maxValue >
-                                (storyData.resources?.[index]?.maxValue ||
-                                  0)) && (
-                              <span className="text-green-600 dark:text-green-400 ml-1">
-                                (+
-                                {resource.maxValue -
-                                  (storyData.resources?.[index]?.maxValue || 0)}
-                                )
-                              </span>
-                            )}
                           </span>
+                          {(resource.value >
+                            (storyData.resources?.[index]?.value || 0) ||
+                            resource.maxValue >
+                              (storyData.resources?.[index]?.maxValue ||
+                                0)) && (
+                            <span className="text-green-600 dark:text-green-400 text-xs">
+                              (+
+                              {resource.maxValue -
+                                (storyData.resources?.[index]?.maxValue || 0)}
+                              )
+                            </span>
+                          )}
                         </div>
                       ))}
                       {purchasedResources.map((resource, index) => (
                         <div
                           key={`purchased-${index}`}
-                          className="flex justify-between text-sm"
+                          className="flex items-center gap-1 text-sm"
                         >
-                          <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                            <DynamicIcon
-                              name={resource.symbol}
-                              className="w-4 h-4"
-                            />
+                          <DynamicIcon
+                            name={resource.symbol}
+                            className="w-4 h-4 shrink-0"
+                          />
+                          <span className="text-gray-700 dark:text-gray-300">
                             {resource.name}:
                           </span>
-                          <span className="font-bold text-gray-900 dark:text-white">
+                          <span className="font-bold text-gray-900 dark:text-white whitespace-nowrap">
                             {resource.value} / {resource.maxValue}
-                            <span className="text-purple-600 dark:text-purple-400 ml-1">
-                              ✨
-                            </span>
+                          </span>
+                          <span className="text-purple-600 dark:text-purple-400">
+                            ✨
                           </span>
                         </div>
                       ))}
@@ -1033,20 +1033,39 @@ function CreateCharacterContent() {
                   </div>
                 )}
 
-                {purchasedItems.length > 0 && (
+                {(inventory.length > 0 || purchasedItems.length > 0) && (
                   <div className="mb-4">
                     <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                      Purchased Items:
+                      Inventory:
                     </h4>
-                    <div className="space-y-1">
-                      {purchasedItems.map((item, index) => (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {inventory.map((item, index) => (
                         <div
                           key={index}
-                          className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2"
+                          className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300"
                         >
-                          <DynamicIcon name={item.symbol} className="w-4 h-4" />
-                          {item.name} x{item.quantity}
-                          <span className="text-purple-600 dark:text-purple-400 ml-1">
+                          <DynamicIcon
+                            name={item.symbol}
+                            className="w-4 h-4 shrink-0"
+                          />
+                          <span>
+                            {item.name} x{item.quantity}
+                          </span>
+                        </div>
+                      ))}
+                      {purchasedItems.map((item, index) => (
+                        <div
+                          key={`purchased-${index}`}
+                          className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300"
+                        >
+                          <DynamicIcon
+                            name={item.symbol}
+                            className="w-4 h-4 shrink-0"
+                          />
+                          <span>
+                            {item.name} x{item.quantity}
+                          </span>
+                          <span className="text-purple-600 dark:text-purple-400">
                             ✨
                           </span>
                         </div>
@@ -1065,17 +1084,17 @@ function CreateCharacterContent() {
                 )}
               </div>
 
-              <div className="flex justify-between pt-4">
+              <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 pt-4">
                 <button
                   onClick={() => setCurrentStep("points")}
-                  className="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors flex items-center gap-2"
+                  className="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
                 >
                   <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
                   Back
                 </button>
                 <button
                   onClick={handleBeginStory}
-                  className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-bold text-lg rounded-lg transition-colors shadow-lg flex items-center gap-2"
+                  className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-bold text-lg rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
                 >
                   <DynamicIcon name="Play" className="w-6 h-6" />
                   Begin Adventure
