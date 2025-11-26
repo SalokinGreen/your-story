@@ -533,25 +533,44 @@ export default function LibraryPage() {
                   throw new Error(`Failed to delete story ${storyId}`);
                 }
               }
+              return storyId;
             }
           );
 
-          await Promise.all(deletePromises);
+          // Use allSettled to continue even if some deletions fail
+          const results = await Promise.allSettled(deletePromises);
 
-          // Update state
-          setStories(stories.filter((s) => !selectedStories.has(s.id)));
-          setLocalStories(
-            localStories.filter((s) => !selectedStories.has(s.id))
-          );
+          // Separate successful and failed deletions
+          const deletedIds = new Set<string>();
+          const failedCount = results.filter((r, index) => {
+            if (r.status === "fulfilled") {
+              deletedIds.add(r.value);
+              return false;
+            }
+            return true;
+          }).length;
+
+          // Update state for successfully deleted stories
+          setStories(stories.filter((s) => !deletedIds.has(s.id)));
+          setLocalStories(localStories.filter((s) => !deletedIds.has(s.id)));
           setSelectedStories(new Set());
           setSelectionMode(false);
 
-          addNotification(
-            `${selectedStories.size} ${
-              selectedStories.size === 1 ? "story" : "stories"
-            } deleted successfully`,
-            "success"
-          );
+          if (failedCount > 0) {
+            addNotification(
+              `Deleted ${deletedIds.size} ${
+                deletedIds.size === 1 ? "story" : "stories"
+              }, ${failedCount} failed`,
+              "warning"
+            );
+          } else {
+            addNotification(
+              `${deletedIds.size} ${
+                deletedIds.size === 1 ? "story" : "stories"
+              } deleted successfully`,
+              "success"
+            );
+          }
         } catch (error: any) {
           console.error("Error deleting stories:", error);
           addNotification(
@@ -594,20 +613,32 @@ export default function LibraryPage() {
                 throw new Error(`Failed to move story ${storyId}`);
               }
             }
+            return storyId;
           }
         );
 
-        await Promise.all(movePromises);
+        // Use allSettled to continue even if some moves fail
+        const results = await Promise.allSettled(movePromises);
 
-        // Update state
+        // Separate successful and failed moves
+        const movedIds = new Set<string>();
+        const failedCount = results.filter((r) => {
+          if (r.status === "fulfilled") {
+            movedIds.add(r.value);
+            return false;
+          }
+          return true;
+        }).length;
+
+        // Update state for successfully moved stories
         setStories(
           stories.map((s) =>
-            selectedStories.has(s.id) ? { ...s, folder_id: folderId } : s
+            movedIds.has(s.id) ? { ...s, folder_id: folderId } : s
           )
         );
         setLocalStories(
           localStories.map((s) =>
-            selectedStories.has(s.id) ? { ...s, folder_id: folderId } : s
+            movedIds.has(s.id) ? { ...s, folder_id: folderId } : s
           )
         );
         setSelectedStories(new Set());
@@ -616,12 +647,22 @@ export default function LibraryPage() {
         const folderName = folderId
           ? folders.find((f) => f.id === folderId)?.name || "folder"
           : "Uncategorized";
-        addNotification(
-          `${selectedStories.size} ${
-            selectedStories.size === 1 ? "story" : "stories"
-          } moved to ${folderName}`,
-          "success"
-        );
+
+        if (failedCount > 0) {
+          addNotification(
+            `Moved ${movedIds.size} ${
+              movedIds.size === 1 ? "story" : "stories"
+            } to ${folderName}, ${failedCount} failed`,
+            "warning"
+          );
+        } else {
+          addNotification(
+            `${movedIds.size} ${
+              movedIds.size === 1 ? "story" : "stories"
+            } moved to ${folderName}`,
+            "success"
+          );
+        }
       } catch (error: any) {
         console.error("Error moving stories:", error);
         addNotification(
