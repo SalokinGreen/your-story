@@ -584,7 +584,7 @@ export default function Home() {
         {/* Footer */}
         <footer className="text-center pt-4 border-t border-blue-800/20">
           <p className="text-xs text-blue-200/30">
-            © 2024 Your Story • AI-powered interactive fiction
+            © 2025 Your Story • AI-powered interactive fiction
           </p>
         </footer>
       </main>
