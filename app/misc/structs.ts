@@ -206,7 +206,8 @@ export interface StoryData {
     | "pbta"
     | "fate"
     | "yze"
-    | "explosive"; // RPG dice system
+    | "explosive"
+    | "narrative"; // RPG dice system
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)
   mythicState?: MythicState; // Mythic GME state (chaos factor, threads, characters)

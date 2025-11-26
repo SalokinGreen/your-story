@@ -133,6 +133,7 @@ function AdventureCreatorContent() {
     | "fate"
     | "yze"
     | "explosive"
+    | "narrative"
   >("3d6");
   const [visibility, setVisibility] = useState<"public" | "hidden" | "private">(
     "private"
@@ -2617,6 +2618,20 @@ function AdventureCreatorContent() {
                   Exploding Dice
                   <div className="text-xs opacity-75 mt-1">
                     Stat → die size (d4-d20), max rolls explode and add!
+                  </div>
+                </button>
+                <button
+                  onClick={() => setRpgSystem("narrative")}
+                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
+                    rpgSystem === "narrative"
+                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
+                  }`}
+                >
+                  <DynamicIcon name="BookHeart" className="w-5 h-5 inline mr-2" />
+                  Narrative (No Dice)
+                  <div className="text-xs opacity-75 mt-1">
+                    Pure storytelling, outcomes from dramatic logic
                   </div>
                 </button>
               </div>

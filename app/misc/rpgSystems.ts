@@ -21,7 +21,8 @@ export type RPGSystemType =
   | "pbta"
   | "fate"
   | "yze"
-  | "explosive";
+  | "explosive"
+  | "narrative";
 
 export interface RPGSystem {
   id: RPGSystemType;
@@ -43,6 +44,7 @@ export interface RPGSystem {
   hasStressDice?: boolean; // If true, system uses stress dice (YZE-style)
   hasPushMechanic?: boolean; // If true, system supports pushing rolls (YZE-style)
   hasExplodingDice?: boolean; // If true, dice explode on max values and reroll (Kids on Bikes style)
+  noDice?: boolean; // If true, no dice rolls at all - pure narrative (Narrative system)
   stressDiceMax?: number; // Maximum stress dice that can be added per roll
   panicTable?: PanicEntry[]; // Panic table for stress dice systems
 
@@ -1049,6 +1051,117 @@ export const SYSTEM_EXPLOSIVE: RPGSystem = {
 };
 
 /**
+ * Narrative System - Pure storytelling, no dice
+ * Focus entirely on collaborative storytelling without mechanical resolution
+ * Perfect for character-driven drama, introspective scenes, or beginners
+ */
+export const SYSTEM_NARRATIVE: RPGSystem = {
+  id: "narrative",
+  name: "Narrative (No Dice)",
+  description:
+    "Pure collaborative storytelling with no dice rolls. Focus on character choices and dramatic narrative.",
+
+  noDice: true,
+
+  dice: {
+    count: 0,
+    sides: 0,
+    min: 0,
+    max: 0,
+  },
+
+  // Stats can still exist for character definition but don't affect rolls
+  statToModifier: (stat: number) => 0,
+
+  success: {
+    formula: "No dice - outcomes determined by narrative logic",
+  },
+
+  dc: {
+    trivial: 0,
+    easy: 0,
+    medium: 0,
+    hard: 0,
+    veryHard: 0,
+    impossible: 0,
+    description:
+      "No difficulty classes - outcomes flow from character choices and story logic",
+  },
+
+  resources: {
+    requiredDivisor: 0,
+    penaltyDivisor: 0,
+    recoverDivisor: 0,
+    lossDivisor: 0,
+    minRequired: 0,
+    minPenalty: 0,
+    minRecover: 0,
+    minLoss: 0,
+  },
+
+  upgrades: {
+    statUpgradeAmount: 5,
+    resourceUpgradeAmount: 10,
+    shopStatStartingValue: 50,
+  },
+
+  aiInstructions: {
+    diceSystem:
+      "This adventure uses a NARRATIVE system with NO DICE ROLLS. Do not include skill checks, DCs, or mechanical resolution. All outcomes are determined by character choices, dramatic logic, and collaborative storytelling.",
+    dcGuidance:
+      "⚠️ DO NOT USE DICE OR DCS! This is a pure narrative system. Never ask for rolls. Determine outcomes based on: character abilities, dramatic appropriateness, story momentum, and player choices.",
+    challengeGuidance: `NARRATIVE SYSTEM - NO DICE ROLLS:
+
+This system emphasizes **collaborative storytelling** over mechanical resolution.
+
+**DETERMINING OUTCOMES:**
+- Character competence: A skilled character succeeds at things within their expertise
+- Dramatic logic: What makes the best story? Success, failure, or complication?
+- Player agency: Honor bold choices with meaningful consequences
+- Stakes: Low-stakes actions usually succeed; high-stakes moments create tension through consequences, not dice
+
+**CREATING TENSION WITHOUT DICE:**
+- Present dilemmas with no perfect answer
+- Offer success at a cost
+- Use time pressure and competing priorities
+- Create moral complexity
+- Let failure lead to interesting complications, not dead ends
+
+**WHEN TO SUCCEED:**
+- Action is within character's established competence
+- Success creates interesting story developments
+- Player made thoughtful, creative choices
+
+**WHEN TO COMPLICATE:**
+- Success would be too easy/boring
+- Character is attempting something risky
+- Drama calls for tension
+- Add "Yes, but..." or "No, and..." outcomes
+
+**WHEN TO FAIL:**
+- Failure creates more interesting story than success
+- Character is clearly outmatched
+- Player took unreasonable risks
+- Always make failure interesting, never a dead end
+
+**RESOURCES & STATS:**
+Stats and resources exist for character definition but don't mechanically affect outcomes. Use them as narrative guides:
+- High stat = character is competent in this area
+- Low resource = character is strained, desperate
+- Use /modify_resource for dramatic effect, not mechanical penalty
+
+**EXAMPLE CHOICES:**
+- "You slip through the shadows toward the guard..." (no roll needed - describe outcome based on character skill and situation)
+- "The locked door stands before you. Your lockpicking skills are modest - this will take time and make noise, or you could try another approach."
+- "Your words hang in the air. The king's expression is unreadable. What do you say next?"`,
+    choiceSyntax:
+      "- ...Prose <use_skill: none; use_resource: none; use_item: item name or none; mythic_check: question (likelihood) or none; mythic_table: category or none; custom_table: table name or none>\n\nNARRATIVE SYSTEM - No skill checks! Outcomes flow from character choices and story logic:\nExample:\n- You slip through the shadows, using your training to avoid detection. <use_skill: none; use_resource: none; use_item: none; mythic_check: none; mythic_table: none; custom_table: none>\n- You confront the villain with the evidence you've gathered. <use_skill: none; use_resource: none; use_item: Evidence Folder; mythic_check: Does he try to flee? (Likely); mythic_table: none; custom_table: none>",
+    dcGuidelines:
+      "⚠️ NO DICE ROLLS IN NARRATIVE SYSTEM:\n- NEVER include use_skill with any skill name\n- NEVER specify DC values\n- Outcomes are determined by dramatic logic and character choices\n- Stats exist for character definition only, not mechanical resolution\n- Focus on meaningful choices, not random chance\n- Use Mythic checks for world-building questions, not character actions",
+  },
+};
+
+/**
  * Registry of all available RPG systems
  */
 export const RPG_SYSTEMS: Record<RPGSystemType, RPGSystem> = {
@@ -1060,6 +1173,7 @@ export const RPG_SYSTEMS: Record<RPGSystemType, RPGSystem> = {
   fate: SYSTEM_FATE,
   yze: SYSTEM_YZE,
   explosive: SYSTEM_EXPLOSIVE,
+  narrative: SYSTEM_NARRATIVE,
 };
 
 /**
@@ -1144,7 +1258,13 @@ export function checkSuccess(
   stressRelief?: boolean; // YZE: strong success reduces stress
   total: number;
   successes?: number; // YZE: count of 6s rolled
+  narrative?: boolean; // Narrative: no dice rolled
 } {
+  // Narrative system: no dice, always "succeeds" (outcome determined narratively)
+  if (system.noDice) {
+    return { success: true, critical: false, total: 0, narrative: true };
+  }
+
   if (system.hasStressDice) {
     // Year Zero Engine: count 6s as successes
     if (!rolls || rolls.length === 0) {

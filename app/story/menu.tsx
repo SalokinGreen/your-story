@@ -998,7 +998,8 @@ interface BasicSettingsForm {
     | "pbta"
     | "fate"
     | "yze"
-    | "explosive";
+    | "explosive"
+    | "narrative";
 }
 
 function BasicSettings({
@@ -1173,6 +1174,13 @@ function BasicSettings({
               name: "Exploding Dice",
               desc: "Stat→die size (d4-d20), max rolls explode!",
               icon: "Flame",
+              fullWidth: true,
+            },
+            {
+              id: "narrative" as const,
+              name: "Narrative (No Dice)",
+              desc: "Pure storytelling, outcomes from dramatic logic",
+              icon: "BookHeart",
               fullWidth: true,
             },
           ].map((sys) => (

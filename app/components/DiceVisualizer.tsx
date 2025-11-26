@@ -31,7 +31,8 @@ interface DiceVisualizerProps {
     | "pbta"
     | "fate"
     | "yze"
-    | "explosive"; // RPG system type
+    | "explosive"
+    | "narrative"; // RPG system type
   // YZE-specific
   baseDice?: number[]; // Base dice from stat
   stressDice?: number[]; // Stress dice added

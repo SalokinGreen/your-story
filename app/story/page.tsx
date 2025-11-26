@@ -1342,7 +1342,8 @@ function StoryPageContent() {
       | "pbta"
       | "fate"
       | "yze"
-      | "explosive"; // RPG system type
+      | "explosive"
+      | "narrative"; // RPG system type
     baseDice?: number[]; // YZE: base dice rolls
     stressDice?: number[]; // YZE: stress dice rolls
     successes?: number; // YZE: count of 6s
