@@ -27,7 +27,7 @@ function InfoTabs() {
   return (
     <div className="w-full max-w-5xl mb-12">
       {/* Tab Navigation */}
-      <div className="flex justify-center mb-8 px-2">
+      <div className="flex justify-center mb-6 px-2">
         <div className="inline-flex flex-wrap justify-center bg-white dark:bg-blue-950 rounded-xl shadow-lg p-1 border border-gray-200 dark:border-gray-700 gap-1">
           <button
             onClick={() => setActiveTab("models")}
@@ -68,15 +68,15 @@ function InfoTabs() {
       <div className="animate-fadeIn">
         {activeTab === "models" && (
           <div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white flex items-center justify-center gap-2">
-              <DynamicIcon name="Bot" className="w-8 h-8" /> AI Models
+            <h2 className="text-2xl sm:text-3xl font-bold text-center mb-3 text-gray-900 dark:text-white flex items-center justify-center gap-2">
+              <DynamicIcon name="Bot" className="w-7 h-7" /> AI Models
             </h2>
-            <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
+            <p className="text-center text-gray-600 dark:text-gray-400 mb-4 max-w-2xl mx-auto">
               Choose from our curated selection of AI models, each with unique
               strengths and characteristics for your storytelling needs.
             </p>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(AI_MODELS).map(([key, model]) => (
                 <div
                   key={key}
@@ -171,10 +171,10 @@ function InfoTabs() {
 
         {activeTab === "coins" && (
           <div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white flex items-center justify-center gap-2">
-              <DynamicIcon name="Coins" className="w-8 h-8" /> Coins Packages
+            <h2 className="text-2xl sm:text-3xl font-bold text-center mb-3 text-gray-900 dark:text-white flex items-center justify-center gap-2">
+              <DynamicIcon name="Coins" className="w-7 h-7" /> Coins Packages
             </h2>
-            <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
+            <p className="text-center text-gray-600 dark:text-gray-400 mb-4 max-w-2xl mx-auto">
               Purchase coins to generate AI-powered story continuations. Each
               generation costs 1 coin. Bigger packages offer better value with
               bonus coins included!
@@ -341,11 +341,11 @@ function InfoTabs() {
 
         {activeTab === "byok" && (
           <div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white flex items-center justify-center gap-2">
-              <DynamicIcon name="Key" className="w-8 h-8" /> Bring Your Own Key
+            <h2 className="text-2xl sm:text-3xl font-bold text-center mb-3 text-gray-900 dark:text-white flex items-center justify-center gap-2">
+              <DynamicIcon name="Key" className="w-7 h-7" /> Bring Your Own Key
               (BYOK)
             </h2>
-            <p className="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
+            <p className="text-center text-gray-600 dark:text-gray-400 mb-4 max-w-2xl mx-auto">
               Take full control of your AI experience. Use your own API keys
               with unlimited flexibility and customize every aspect of content
               generation.
@@ -571,22 +571,22 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans">
-      <main className="flex w-full max-w-6xl flex-col items-center justify-center py-8 px-4 sm:py-12 sm:px-8">
+      <main className="flex w-full max-w-6xl flex-col items-center justify-center py-4 px-4 sm:py-6 sm:px-6">
         {/* Hero Section */}
-        <div className="text-center mb-8 sm:mb-12">
-          <div className="mb-6 flex justify-center"></div>
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="mb-4 flex justify-center"></div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-4 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
             Your Story Awaits
           </h1>
 
-          <p className="max-w-2xl mx-auto text-lg sm:text-xl text-gray-700 dark:text-gray-300 mb-6">
+          <p className="max-w-2xl mx-auto text-base sm:text-lg text-gray-700 dark:text-gray-300 mb-4">
             Dive into AI-powered interactive storytelling where every choice
             shapes your unique adventure. Create, explore, and experience
             stories that adapt to you.
           </p>
 
-          <div className="flex flex-wrap justify-center gap-4 mb-8">
+          <div className="flex flex-wrap justify-center gap-3 mb-6">
             <div className="px-6 py-3 bg-white dark:bg-blue-950 rounded-lg shadow-md flex items-center gap-2">
               <div className="text-blue-600 dark:text-blue-400">
                 <DynamicIcon name="BookOpen" className="w-6 h-6" />
@@ -616,16 +616,16 @@ export default function Home() {
 
         {/* Auth Section */}
         {!loading && (
-          <div className="w-full max-w-md mb-12">
-            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
+          <div className="w-full max-w-md mb-8">
+            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
               {user ? <UserProfile /> : <AuthForm />}
             </div>
           </div>
         )}
 
         {/* Popular Today Section */}
-        <div className="w-full max-w-5xl mb-12">
-          <div className="flex items-center justify-between mb-6">
+        <div className="w-full max-w-5xl mb-8">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <DynamicIcon name="Flame" className="w-8 h-8 text-orange-500" />{" "}
               Popular Today
@@ -762,7 +762,7 @@ export default function Home() {
           <div className="mt-8 flex justify-center md:hidden">
             <button
               onClick={() => router.push("/explorer")}
-              className="w-full max-w-md px-6 py-4 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all text-lg"
+              className="w-full max-w-md px-6 py-4 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all duration-150 text-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
             >
               Browse All Adventures →
             </button>
@@ -773,9 +773,9 @@ export default function Home() {
         <InfoTabs />
 
         {/* Roadmap Carousel Section */}
-        <div className="w-full max-w-5xl mt-12">
-          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-8 text-gray-900 dark:text-white flex items-center justify-center gap-2">
-            <DynamicIcon name="Map" className="w-8 h-8" /> Project Roadmap
+        <div className="w-full max-w-5xl mt-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-6 text-gray-900 dark:text-white flex items-center justify-center gap-2">
+            <DynamicIcon name="Map" className="w-7 h-7" /> Project Roadmap
           </h2>
 
           <div className="relative">

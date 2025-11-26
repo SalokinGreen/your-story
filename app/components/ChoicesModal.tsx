@@ -202,7 +202,7 @@ export default function ChoicesModal({
         </div>
 
         {/* Choices List */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {choices?.choices.map((choice, index) => {
             const isSelected = selectedChoice?.text === choice.text;
             const details = getChoiceDetails(choice);
@@ -211,7 +211,7 @@ export default function ChoicesModal({
               <button
                 key={index}
                 onClick={() => onSelectChoice(choice)}
-                className={`w-full text-left p-4 rounded-xl transition-all border-2 ${
+                className={`w-full text-left p-3 rounded-xl transition-all border-2 ${
                   isSelected
                     ? "bg-purple-900/50 border-purple-500 shadow-lg shadow-purple-500/20"
                     : "bg-blue-900/30 border-purple-900/50 hover:border-purple-400 hover:bg-blue-900/50"
@@ -235,7 +235,9 @@ export default function ChoicesModal({
                   <div className="flex-1 min-w-0">
                     <p className="text-white font-medium">{choice.text}</p>
                     {details.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-3">{details}</div>
+                      <div className="mt-1.5 flex flex-wrap gap-2">
+                        {details}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -246,7 +248,7 @@ export default function ChoicesModal({
           {/* Custom Input Toggle */}
           <button
             onClick={() => setShowCustomInput(!showCustomInput)}
-            className={`w-full text-left p-4 rounded-xl transition-all border-2 border-dashed ${
+            className={`w-full text-left p-3 rounded-xl transition-all border-2 border-dashed ${
               showCustomInput
                 ? "bg-purple-900/30 border-purple-500"
                 : "bg-blue-900/20 border-purple-900/50 hover:border-purple-400"
@@ -273,13 +275,13 @@ export default function ChoicesModal({
 
           {/* Custom Input Area */}
           {showCustomInput && (
-            <div className="bg-blue-900/30 rounded-xl p-4 border border-purple-900/50 space-y-3">
+            <div className="bg-blue-900/30 rounded-xl p-3 border border-purple-900/50 space-y-2">
               <textarea
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
                 placeholder="Describe your action, dialogue, or narration..."
                 rows={3}
-                className="w-full px-4 py-3 bg-blue-950 border border-purple-800 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                className="w-full px-3 py-2 bg-blue-950 border border-purple-800 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none text-sm"
               />
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500">
@@ -288,7 +290,7 @@ export default function ChoicesModal({
                 <button
                   onClick={handleSubmitCustom}
                   disabled={submittingCustom || loading || !customInput.trim()}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-sm ${
                     submittingCustom || loading || !customInput.trim()
                       ? "bg-purple-900/50 text-gray-400 cursor-not-allowed"
                       : "bg-purple-600 hover:bg-purple-700 text-white"
@@ -302,7 +304,7 @@ export default function ChoicesModal({
         </div>
 
         {/* Footer with Momentum & Confirm */}
-        <div className="p-5 border-t border-purple-900/50 bg-blue-900/30 space-y-4">
+        <div className="p-4 border-t border-purple-900/50 bg-blue-900/30 space-y-3">
           {/* Momentum Controls */}
           {selectedChoice && hasSkillCheck && (
             <div className="flex items-center justify-between">
@@ -370,10 +372,10 @@ export default function ChoicesModal({
               onClose();
             }}
             disabled={!selectedChoice || loading}
-            className={`w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 ${
+            className={`w-full py-3 rounded-xl font-bold text-lg transition-all duration-150 flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 ${
               !selectedChoice || loading
                 ? "bg-purple-900/50 text-gray-400 cursor-not-allowed"
-                : "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg hover:shadow-xl"
+                : "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-md hover:shadow-lg active:scale-[0.98]"
             }`}
           >
             {loading ? (

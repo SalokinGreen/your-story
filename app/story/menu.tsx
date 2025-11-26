@@ -4293,11 +4293,11 @@ export default function MenuPage({
   const availablePoints = storyData.points;
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-4">
       {/* Story Info Card */}
-      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-          <DynamicIcon name="Settings" className="w-8 h-8" /> Story Menu
+      <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 sm:p-5 border border-gray-200 dark:border-gray-700">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+          <DynamicIcon name="Settings" className="w-6 h-6" /> Story Menu
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
           Manage your adventure progress and settings
@@ -4305,19 +4305,19 @@ export default function MenuPage({
       </div>
 
       {/* Actions Card */}
-      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <DynamicIcon name="Gamepad2" className="w-6 h-6" /> Actions
+      <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+          <DynamicIcon name="Gamepad2" className="w-5 h-5" /> Actions
         </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Settings */}
           <button
             onClick={() => setShowSettings(true)}
-            className="flex items-center justify-center gap-3 px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
           >
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -4342,9 +4342,9 @@ export default function MenuPage({
           {onViewLogs && (
             <button
               onClick={onViewLogs}
-              className="flex items-center justify-center gap-3 px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
             >
-              <DynamicIcon name="ClipboardList" className="w-5 h-5" />
+              <DynamicIcon name="ClipboardList" className="w-4 h-4" />
               <span>View Debug Logs</span>
             </button>
           )}
@@ -4353,9 +4353,9 @@ export default function MenuPage({
           {onViewContext && (
             <button
               onClick={onViewContext}
-              className="flex items-center justify-center gap-3 px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
             >
-              <DynamicIcon name="Eye" className="w-5 h-5" />
+              <DynamicIcon name="Eye" className="w-4 h-4" />
               <span>View AI Context</span>
             </button>
           )}
@@ -4364,17 +4364,17 @@ export default function MenuPage({
           <button
             onClick={handleSaveProgress}
             disabled={saving || !storyDbId}
-            className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
           >
             {saving ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 <span>Saving...</span>
               </>
             ) : (
               <>
                 <svg
-                  className="w-5 h-5"
+                  className="w-4 h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -4395,17 +4395,17 @@ export default function MenuPage({
           <button
             onClick={handleExportStory}
             disabled={exporting}
-            className="flex items-center justify-center gap-3 px-6 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
           >
             {exporting ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 <span>Exporting...</span>
               </>
             ) : (
               <>
                 <svg
-                  className="w-5 h-5"
+                  className="w-4 h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -4425,10 +4425,10 @@ export default function MenuPage({
           {/* Return to Explorer */}
           <button
             onClick={handleReturnToExplorer}
-            className="flex items-center justify-center gap-3 px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md text-sm"
           >
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -5013,7 +5013,10 @@ export default function MenuPage({
             </div>
 
             {/* Tabs - Made sticky with background to prevent content overlap */}
-            <DraggableScroll className="sticky top-0 z-10 bg-white dark:bg-blue-950 px-6 py-4 border-b border-gray-200 dark:border-gray-700 scrollbar-thin" innerClassName="gap-3">
+            <DraggableScroll
+              className="sticky top-0 z-10 bg-white dark:bg-blue-950 px-6 py-4 border-b border-gray-200 dark:border-gray-700 scrollbar-thin"
+              innerClassName="gap-3"
+            >
               {[
                 { id: "basic", label: "Basic", icon: "FileText" },
                 { id: "stats", label: "Stats & Resources", icon: "BarChart2" },

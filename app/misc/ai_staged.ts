@@ -522,6 +522,27 @@ When referencing skills, resources, or items in choices, you MUST use the EXACT 
 - Do NOT paraphrase, abbreviate, or modify names
 - Only use stats and resources that the player owns
 
+📋 AVAILABLE STATS FOR SKILL CHECKS (use ONLY these exact names):
+${
+  storyData.stats.length > 0
+    ? storyData.stats.map((s) => `• ${s.name}`).join("\n")
+    : "• (No stats defined - do not use skill checks)"
+}
+
+📦 AVAILABLE RESOURCES (use ONLY these exact names):
+${
+  storyData.resources.length > 0
+    ? storyData.resources.map((r) => `• ${r.name}`).join("\n")
+    : "• (No resources defined - do not use resources)"
+}
+
+🎒 AVAILABLE ITEMS (use ONLY these exact names):
+${
+  storyData.inventory.length > 0
+    ? storyData.inventory.map((i) => `• ${i.name} [${i.type}]`).join("\n")
+    : "• (No items in inventory)"
+}
+
 Resource System:
 - When a choice uses a resource (use_resource), that resource is AUTOMATICALLY at risk if the skill check fails
 - Choose resources that thematically fit the action: use Stamina for running/escaping, Health for combat/dangerous situations, Mana for spellcasting, etc.

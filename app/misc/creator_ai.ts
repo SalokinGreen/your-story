@@ -552,7 +552,11 @@ ${
 - Title: ${adventureMetadata.title || "(not set)"}
 - Short Description: ${adventureMetadata.shortDescription || "(not set)"}
 - Description: ${adventureMetadata.description || "(not set)"}
-- Starting Choices: ${adventureMetadata.startingChoices?.length ? JSON.stringify(adventureMetadata.startingChoices, null, 2) : "(none - using default Start Story button)"}
+- Starting Choices: ${
+        adventureMetadata.startingChoices?.length
+          ? JSON.stringify(adventureMetadata.startingChoices, null, 2)
+          : "(none - using default Start Story button)"
+      }
 
 `
     : ""

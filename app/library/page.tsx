@@ -811,23 +811,23 @@ export default function LibraryPage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 pt-16">
-      <div className="max-w-7xl mx-auto p-4 sm:p-8">
+      <div className="max-w-7xl mx-auto p-3 sm:p-6">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-3">
-            <DynamicIcon name="BookOpen" className="w-10 h-10" />
+        <div className="mb-5">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-3">
+            <DynamicIcon name="BookOpen" className="w-8 h-8" />
             My Library
           </h1>
-          <p className="text-gray-700 dark:text-gray-300 text-lg">
+          <p className="text-gray-700 dark:text-gray-300">
             Your stories and adventures all in one place
           </p>
         </div>
 
         {/* View Toggle */}
-        <div className="flex gap-2 mb-8">
+        <div className="flex gap-2 mb-5">
           <button
             onClick={() => setView("stories")}
-            className={`px-6 py-3 font-semibold rounded-lg transition-all shadow-md ${
+            className={`px-4 py-2 font-semibold rounded-lg transition-all shadow-md ${
               view === "stories"
                 ? "bg-purple-600 text-white"
                 : "bg-white dark:bg-blue-950 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
@@ -843,7 +843,7 @@ export default function LibraryPage() {
           </button>
           <button
             onClick={() => setView("adventures")}
-            className={`px-6 py-3 font-semibold rounded-lg transition-all shadow-md ${
+            className={`px-4 py-2 font-semibold rounded-lg transition-all shadow-md ${
               view === "adventures"
                 ? "bg-purple-600 text-white"
                 : "bg-white dark:bg-blue-950 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
@@ -870,17 +870,17 @@ export default function LibraryPage() {
             <AdventureGridSkeleton count={6} />
           )
         ) : view === "stories" ? (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             {/* Folders Sidebar */}
             <div className="lg:col-span-1">
-              <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 sticky top-4">
-                <div className="flex items-center justify-between mb-4">
+              <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-3 border border-gray-200 dark:border-gray-700 sticky top-4">
+                <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
                     <DynamicIcon name="Folder" className="w-5 h-5" /> Folders
                   </h3>
                   <button
                     onClick={() => setShowNewFolderDialog(true)}
-                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
+                    className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
                   >
                     <DynamicIcon name="Plus" className="w-4 h-4" />
                   </button>
@@ -968,8 +968,8 @@ export default function LibraryPage() {
               />
 
               {/* Stories Filters */}
-              <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 mb-6 border border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 mb-4 border border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {/* Search */}
                   <div>
                     <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -1055,7 +1055,7 @@ export default function LibraryPage() {
               {/* Mass Operations Toolbar */}
               {(filteredStories.length > 0 ||
                 filteredLocalStories.length > 0) && (
-                <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 mb-6 border border-gray-200 dark:border-gray-700">
+                <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-3 mb-4 border border-gray-200 dark:border-gray-700">
                   {!selectionMode ? (
                     <button
                       onClick={toggleSelectionMode}
@@ -1192,15 +1192,15 @@ export default function LibraryPage() {
                           ? toggleStorySelection(story.id)
                           : router.push(`/story?storyId=${story.id}`)
                       }
-                      className={`rounded-2xl shadow-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                      className={`rounded-xl shadow-md overflow-hidden border-2 transition-all duration-150 cursor-pointer ${
                         selectionMode
                           ? selectedStories.has(story.id)
                             ? "bg-purple-50 dark:bg-purple-900/20 border-purple-500 dark:border-purple-400 shadow-purple-200 dark:shadow-purple-900"
-                            : "bg-white dark:bg-blue-950 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-2xl"
-                          : "bg-white dark:bg-blue-950 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-2xl"
+                            : "bg-white dark:bg-blue-950 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-lg hover:-translate-y-0.5"
+                          : "bg-white dark:bg-blue-950 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-lg hover:-translate-y-0.5"
                       } active:scale-[0.98]`}
                     >
-                      <div className="p-6">
+                      <div className="p-4">
                         <div className="flex flex-col items-start justify-between gap-2">
                           <div className="flex-1 min-w-0 w-full">
                             <div className="flex items-center gap-3 mb-2">
@@ -1324,15 +1324,15 @@ export default function LibraryPage() {
                         ? toggleStorySelection(story.id)
                         : router.push(`/story?storyId=${story.id}`)
                     }
-                    className={`rounded-2xl shadow-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                    className={`rounded-xl shadow-md overflow-hidden border-2 transition-all duration-150 cursor-pointer ${
                       selectionMode
                         ? selectedStories.has(story.id)
                           ? "bg-purple-50 dark:bg-purple-900/20 border-purple-500 dark:border-purple-400 shadow-purple-200 dark:shadow-purple-900"
-                          : "bg-white dark:bg-blue-950 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-2xl"
-                        : "bg-white dark:bg-blue-950 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-2xl"
+                          : "bg-white dark:bg-blue-950 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-lg hover:-translate-y-0.5"
+                        : "bg-white dark:bg-blue-950 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-lg hover:-translate-y-0.5"
                     } active:scale-[0.98]`}
                   >
-                    <div className="p-6">
+                    <div className="p-4">
                       <div className="flex flex-col items-start justify-between gap-2">
                         <div className="flex-1 min-w-0 w-full">
                           <div className="flex items-center gap-3 mb-2">
@@ -1414,8 +1414,8 @@ export default function LibraryPage() {
         ) : (
           <div>
             {/* Adventures Filters */}
-            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 mb-6 border border-gray-200 dark:border-gray-700">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 mb-4 border border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {/* Search */}
                 <div>
                   <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -1530,18 +1530,18 @@ export default function LibraryPage() {
                   {adventures.length === 0 && localAdventures.length === 0 && (
                     <button
                       onClick={() => router.push("/creator")}
-                      className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
                     >
                       Start Creating
                     </button>
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredAdventures.map((adventure) => (
                     <div
                       key={adventure.id}
-                      className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
+                      className="bg-white dark:bg-blue-950 rounded-xl shadow-md overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-150"
                     >
                       {/* Thumbnail */}
                       {adventure.thumbnailUrl ? (
@@ -1649,7 +1649,7 @@ export default function LibraryPage() {
                   {localAdventures.map((adventure) => (
                     <div
                       key={adventure.id}
-                      className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-shadow"
+                      className="bg-white dark:bg-blue-950 rounded-xl shadow-md overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-150"
                     >
                       {/* Thumbnail */}
                       {adventure.adventureData.thumbnailUrl ? (

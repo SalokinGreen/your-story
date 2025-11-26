@@ -60,6 +60,93 @@ export default function Story({
   const [editedText, setEditedText] = React.useState("");
   const [isHovering, setIsHovering] = React.useState(false);
 
+  // Keyboard shortcuts
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs/textareas
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      // Escape to close modal
+      if (e.key === "Escape" && showChoicesModal) {
+        e.preventDefault();
+        setShowChoicesModal(false);
+        return;
+      }
+
+      // Enter/Space to open choices modal (when not loading and modal closed)
+      if (
+        (e.key === "Enter" || e.key === " ") &&
+        !loading &&
+        !loadingStage &&
+        !showChoicesModal &&
+        !editMode
+      ) {
+        e.preventDefault();
+        setShowChoicesModal(true);
+        return;
+      }
+
+      // Ctrl+Z for undo
+      if (
+        e.ctrlKey &&
+        e.key === "z" &&
+        canUndo &&
+        onUndo &&
+        !loading &&
+        !loadingStage
+      ) {
+        e.preventDefault();
+        onUndo();
+        return;
+      }
+
+      // Ctrl+R for retry (prevent browser refresh)
+      if (
+        e.ctrlKey &&
+        e.key === "r" &&
+        canRetry &&
+        onRetry &&
+        !loading &&
+        !loadingStage
+      ) {
+        e.preventDefault();
+        onRetry();
+        return;
+      }
+
+      // Arrow keys for navigation
+      if (e.key === "ArrowLeft" && onNavigateLeft) {
+        e.preventDefault();
+        onNavigateLeft();
+        return;
+      }
+      if (e.key === "ArrowRight" && onNavigateRight) {
+        e.preventDefault();
+        onNavigateRight();
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    showChoicesModal,
+    loading,
+    loadingStage,
+    canUndo,
+    onUndo,
+    canRetry,
+    onRetry,
+    editMode,
+    onNavigateLeft,
+    onNavigateRight,
+  ]);
+
   // Get selected choice from input state
   const selectedChoice = choices?.choices.find((c) => input[c.text]) || null;
 
@@ -103,7 +190,7 @@ export default function Story({
 
         {/* Story Navigation Header */}
         {uniqueStoryParts.length > 1 && (
-          <div className="flex items-center justify-center gap-3 py-3 px-4 bg-gray-50 dark:bg-blue-900/30 border-b border-gray-200 dark:border-purple-900/50">
+          <div className="flex items-center justify-center gap-3 py-2 px-4 bg-gray-50 dark:bg-blue-900/30 border-b border-gray-200 dark:border-purple-900/50">
             <button
               onClick={onNavigateLeft}
               disabled={currentStoryIndex <= 0}
@@ -143,12 +230,12 @@ export default function Story({
 
         {/* Story Content Area */}
         <div
-          className="relative p-6 sm:p-8 min-h-[300px]"
+          className="relative p-4 sm:p-6 min-h-[250px]"
           onMouseEnter={() => setIsHovering(true)}
           onMouseLeave={() => setIsHovering(false)}
         >
           {editMode ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <DynamicIcon name="Pencil" className="w-5 h-5" />
@@ -222,7 +309,7 @@ export default function Story({
 
         {/* Action Buttons Bar */}
         {!editMode && (
-          <div className="flex items-center justify-between px-6 py-4 bg-gray-50 dark:bg-blue-900/30 border-t border-gray-200 dark:border-purple-900/50">
+          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-blue-900/30 border-t border-gray-200 dark:border-purple-900/50">
             {/* Left side: Retry & Undo */}
             <div className="flex items-center gap-2">
               {canUndo && onUndo && (
@@ -259,14 +346,14 @@ export default function Story({
 
         {/* Continue Button */}
         {!editMode && (
-          <div className="p-6 pt-0">
+          <div className="p-4 pt-0">
             <button
               onClick={() => setShowChoicesModal(true)}
               disabled={loading || !!loadingStage}
-              className={`w-full py-4 text-lg font-bold rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+              className={`w-full py-3 text-lg font-bold rounded-xl shadow-md transition-all duration-150 flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 ${
                 loading || loadingStage
                   ? "bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-400 cursor-not-allowed"
-                  : "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white hover:shadow-xl"
+                  : "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white hover:shadow-lg active:scale-[0.98]"
               }`}
             >
               {loading || loadingStage ? (
@@ -307,22 +394,29 @@ export default function Story({
   );
 }
 
-const prettify = (text: string) => {
+const prettify = (text: string, animate: boolean = true) => {
   return (
-    <div className="prose prose-lg prose-zinc dark:prose-invert max-w-none">
+    <div
+      className={`prose prose-lg prose-zinc dark:prose-invert max-w-none ${
+        animate ? "animate-fade-in" : ""
+      }`}
+    >
       <ReactMarkdown
         components={{
           p: ({ node, ...props }) => (
-            <p className="mb-4 leading-relaxed" {...props} />
+            <p className="mb-3 leading-relaxed last:mb-0" {...props} />
           ),
           h1: ({ node, ...props }) => (
-            <h1 className="text-2xl font-bold mb-4 mt-6" {...props} />
+            <h1
+              className="text-2xl font-bold mb-3 mt-4 first:mt-0"
+              {...props}
+            />
           ),
           h2: ({ node, ...props }) => (
-            <h2 className="text-xl font-bold mb-3 mt-5" {...props} />
+            <h2 className="text-xl font-bold mb-2 mt-4 first:mt-0" {...props} />
           ),
           h3: ({ node, ...props }) => (
-            <h3 className="text-lg font-bold mb-2 mt-4" {...props} />
+            <h3 className="text-lg font-bold mb-2 mt-3 first:mt-0" {...props} />
           ),
           strong: ({ node, ...props }) => (
             <strong
@@ -332,17 +426,23 @@ const prettify = (text: string) => {
           ),
           em: ({ node, ...props }) => <em className="italic" {...props} />,
           ul: ({ node, ...props }) => (
-            <ul className="list-disc ml-6 mb-4 space-y-1" {...props} />
+            <ul
+              className="list-disc ml-5 mb-3 space-y-1 last:mb-0"
+              {...props}
+            />
           ),
           ol: ({ node, ...props }) => (
-            <ol className="list-decimal ml-6 mb-4 space-y-1" {...props} />
+            <ol
+              className="list-decimal ml-5 mb-3 space-y-1 last:mb-0"
+              {...props}
+            />
           ),
           li: ({ node, ...props }) => (
             <li className="leading-relaxed" {...props} />
           ),
           blockquote: ({ node, ...props }) => (
             <blockquote
-              className="border-l-4 border-purple-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4"
+              className="border-l-4 border-purple-500 pl-4 italic text-gray-600 dark:text-gray-400 my-3"
               {...props}
             />
           ),

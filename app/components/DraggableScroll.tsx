@@ -13,7 +13,11 @@ interface DraggableScrollProps {
  * Users can click and drag to scroll the content, making navigation easier
  * for long horizontal lists like category selectors.
  */
-export function DraggableScroll({ children, className = "", innerClassName = "" }: DraggableScrollProps) {
+export function DraggableScroll({
+  children,
+  className = "",
+  innerClassName = "",
+}: DraggableScrollProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const startXRef = useRef(0);
@@ -43,11 +47,11 @@ export function DraggableScroll({ children, className = "", innerClassName = "" 
       e.preventDefault();
       const x = e.pageX;
       const walk = (x - startXRef.current) * 1.5; // Scroll speed multiplier
-      
+
       if (Math.abs(walk) > 5) {
         hasMovedRef.current = true;
       }
-      
+
       container.scrollLeft = scrollLeftRef.current - walk;
     };
 
@@ -106,15 +110,13 @@ export function DraggableScroll({ children, className = "", innerClassName = "" 
   return (
     <div
       ref={containerRef}
-      className={`overflow-x-auto overflow-y-hidden ${className}`}
+      className={`overflow-x-auto overflow-y-hidden scrollbar-hide ${className}`}
       onMouseDown={handleMouseDown}
       onClickCapture={handleClick}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
     >
-      <div className={`flex w-max ${innerClassName}`}>
-        {children}
-      </div>
+      <div className={`flex w-max ${innerClassName}`}>{children}</div>
     </div>
   );
 }

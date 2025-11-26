@@ -2723,7 +2723,10 @@ function AdventureCreatorContent() {
                       : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400"
                   }`}
                 >
-                  <DynamicIcon name="BookHeart" className="w-5 h-5 inline mr-2" />
+                  <DynamicIcon
+                    name="BookHeart"
+                    className="w-5 h-5 inline mr-2"
+                  />
                   Narrative (No Dice)
                   <div className="text-xs opacity-75 mt-1">
                     Pure storytelling, outcomes from dramatic logic
@@ -3466,9 +3469,9 @@ function AdventureCreatorContent() {
                 />
                 <span>
                   <strong>Tip:</strong> Starting choices let players choose how
-                  their adventure begins. Leave empty for the default &quot;Start
-                  Story&quot; button. Each choice can have skill checks, item
-                  requirements, or alternate intro text.
+                  their adventure begins. Leave empty for the default
+                  &quot;Start Story&quot; button. Each choice can have skill
+                  checks, item requirements, or alternate intro text.
                 </span>
               </p>
             </div>
@@ -3651,25 +3654,32 @@ function AdventureCreatorContent() {
                           className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                         />
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Format: &quot;Question (Likelihood)&quot; - Likelihoods: Certain, Nearly Certain, Very Likely, Likely, 50/50, Unlikely, Very Unlikely, Nearly Impossible, Impossible
+                          Format: &quot;Question (Likelihood)&quot; -
+                          Likelihoods: Certain, Nearly Certain, Very Likely,
+                          Likely, 50/50, Unlikely, Very Unlikely, Nearly
+                          Impossible, Impossible
                         </p>
                       </div>
-                      {newStartingChoice.mythic_check && newStartingChoice.skill_used && (
-                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                          <input
-                            type="checkbox"
-                            checked={newStartingChoice.mythic_context_only || false}
-                            onChange={(e) =>
-                              setNewStartingChoice({
-                                ...newStartingChoice,
-                                mythic_context_only: e.target.checked,
-                              })
-                            }
-                            className="w-4 h-4 rounded"
-                          />
-                          Mythic provides context only (doesn&apos;t override skill check)
-                        </label>
-                      )}
+                      {newStartingChoice.mythic_check &&
+                        newStartingChoice.skill_used && (
+                          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <input
+                              type="checkbox"
+                              checked={
+                                newStartingChoice.mythic_context_only || false
+                              }
+                              onChange={(e) =>
+                                setNewStartingChoice({
+                                  ...newStartingChoice,
+                                  mythic_context_only: e.target.checked,
+                                })
+                              }
+                              className="w-4 h-4 rounded"
+                            />
+                            Mythic provides context only (doesn&apos;t override
+                            skill check)
+                          </label>
+                        )}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -3688,13 +3698,27 @@ function AdventureCreatorContent() {
                             <option value="">No Mythic table</option>
                             <option value="action">Action</option>
                             <option value="subject">Subject</option>
-                            <option value="action_subject">Action + Subject</option>
-                            <option value="character_descriptors">Character Descriptors</option>
-                            <option value="character_identity">Character Identity</option>
-                            <option value="character_personality">Character Personality</option>
-                            <option value="character_motivations">Character Motivations</option>
-                            <option value="character_skills">Character Skills</option>
-                            <option value="character_flaws">Character Flaws</option>
+                            <option value="action_subject">
+                              Action + Subject
+                            </option>
+                            <option value="character_descriptors">
+                              Character Descriptors
+                            </option>
+                            <option value="character_identity">
+                              Character Identity
+                            </option>
+                            <option value="character_personality">
+                              Character Personality
+                            </option>
+                            <option value="character_motivations">
+                              Character Motivations
+                            </option>
+                            <option value="character_skills">
+                              Character Skills
+                            </option>
+                            <option value="character_flaws">
+                              Character Flaws
+                            </option>
                             <option value="locations">Locations</option>
                             <option value="objects">Objects</option>
                             <option value="plot_twists">Plot Twists</option>
@@ -3735,16 +3759,23 @@ function AdventureCreatorContent() {
                   }
                   const choice: StartingChoice = {
                     text: newStartingChoice.text.trim(),
-                    intro_override: newStartingChoice.intro_override?.trim() || undefined,
+                    intro_override:
+                      newStartingChoice.intro_override?.trim() || undefined,
                     skill_used: newStartingChoice.skill_used || undefined,
                     skill_dc: newStartingChoice.skill_used
                       ? newStartingChoice.skill_dc
                       : undefined,
                     resource_used: newStartingChoice.resource_used || undefined,
                     item_used: newStartingChoice.item_used || undefined,
-                    item_loss: newStartingChoice.item_used ? newStartingChoice.item_loss : undefined,
+                    item_loss: newStartingChoice.item_used
+                      ? newStartingChoice.item_loss
+                      : undefined,
                     mythic_check: newStartingChoice.mythic_check || undefined,
-                    mythic_context_only: newStartingChoice.mythic_check && newStartingChoice.skill_used ? newStartingChoice.mythic_context_only : undefined,
+                    mythic_context_only:
+                      newStartingChoice.mythic_check &&
+                      newStartingChoice.skill_used
+                        ? newStartingChoice.mythic_context_only
+                        : undefined,
                     mythic_table: newStartingChoice.mythic_table || undefined,
                     custom_table: newStartingChoice.custom_table || undefined,
                   };
@@ -3905,7 +3936,9 @@ function AdventureCreatorContent() {
                               <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 dark:text-gray-300">
                                 <input
                                   type="checkbox"
-                                  checked={editStartingChoice.item_loss || false}
+                                  checked={
+                                    editStartingChoice.item_loss || false
+                                  }
                                   onChange={(e) =>
                                     setEditStartingChoice({
                                       ...editStartingChoice,
@@ -3945,7 +3978,10 @@ function AdventureCreatorContent() {
                         {mythicEnabled && (
                           <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
                             <h4 className="text-sm font-bold text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
-                              <DynamicIcon name="Sparkles" className="w-4 h-4" />
+                              <DynamicIcon
+                                name="Sparkles"
+                                className="w-4 h-4"
+                              />
                               Mythic GME Options
                             </h4>
                             <div className="space-y-4">
@@ -3966,33 +4002,40 @@ function AdventureCreatorContent() {
                                   className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                 />
                               </div>
-                              {editStartingChoice.mythic_check && editStartingChoice.skill_used && (
-                                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                  <input
-                                    type="checkbox"
-                                    checked={editStartingChoice.mythic_context_only || false}
-                                    onChange={(e) =>
-                                      setEditStartingChoice({
-                                        ...editStartingChoice,
-                                        mythic_context_only: e.target.checked,
-                                      })
-                                    }
-                                    className="w-4 h-4 rounded"
-                                  />
-                                  Mythic provides context only
-                                </label>
-                              )}
+                              {editStartingChoice.mythic_check &&
+                                editStartingChoice.skill_used && (
+                                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        editStartingChoice.mythic_context_only ||
+                                        false
+                                      }
+                                      onChange={(e) =>
+                                        setEditStartingChoice({
+                                          ...editStartingChoice,
+                                          mythic_context_only: e.target.checked,
+                                        })
+                                      }
+                                      className="w-4 h-4 rounded"
+                                    />
+                                    Mythic provides context only
+                                  </label>
+                                )}
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
                                     Mythic Table Roll
                                   </label>
                                   <select
-                                    value={editStartingChoice.mythic_table || ""}
+                                    value={
+                                      editStartingChoice.mythic_table || ""
+                                    }
                                     onChange={(e) =>
                                       setEditStartingChoice({
                                         ...editStartingChoice,
-                                        mythic_table: e.target.value || undefined,
+                                        mythic_table:
+                                          e.target.value || undefined,
                                       })
                                     }
                                     className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
@@ -4000,16 +4043,32 @@ function AdventureCreatorContent() {
                                     <option value="">No Mythic table</option>
                                     <option value="action">Action</option>
                                     <option value="subject">Subject</option>
-                                    <option value="action_subject">Action + Subject</option>
-                                    <option value="character_descriptors">Character Descriptors</option>
-                                    <option value="character_identity">Character Identity</option>
-                                    <option value="character_personality">Character Personality</option>
-                                    <option value="character_motivations">Character Motivations</option>
-                                    <option value="character_skills">Character Skills</option>
-                                    <option value="character_flaws">Character Flaws</option>
+                                    <option value="action_subject">
+                                      Action + Subject
+                                    </option>
+                                    <option value="character_descriptors">
+                                      Character Descriptors
+                                    </option>
+                                    <option value="character_identity">
+                                      Character Identity
+                                    </option>
+                                    <option value="character_personality">
+                                      Character Personality
+                                    </option>
+                                    <option value="character_motivations">
+                                      Character Motivations
+                                    </option>
+                                    <option value="character_skills">
+                                      Character Skills
+                                    </option>
+                                    <option value="character_flaws">
+                                      Character Flaws
+                                    </option>
                                     <option value="locations">Locations</option>
                                     <option value="objects">Objects</option>
-                                    <option value="plot_twists">Plot Twists</option>
+                                    <option value="plot_twists">
+                                      Plot Twists
+                                    </option>
                                   </select>
                                 </div>
                                 <div>
@@ -4017,11 +4076,14 @@ function AdventureCreatorContent() {
                                     Custom Table Roll
                                   </label>
                                   <select
-                                    value={editStartingChoice.custom_table || ""}
+                                    value={
+                                      editStartingChoice.custom_table || ""
+                                    }
                                     onChange={(e) =>
                                       setEditStartingChoice({
                                         ...editStartingChoice,
-                                        custom_table: e.target.value || undefined,
+                                        custom_table:
+                                          e.target.value || undefined,
                                       })
                                     }
                                     className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
@@ -4069,7 +4131,8 @@ function AdventureCreatorContent() {
                                 mythic_check:
                                   editStartingChoice.mythic_check || undefined,
                                 mythic_context_only:
-                                  editStartingChoice.mythic_check && editStartingChoice.skill_used
+                                  editStartingChoice.mythic_check &&
+                                  editStartingChoice.skill_used
                                     ? editStartingChoice.mythic_context_only
                                     : undefined,
                                 mythic_table:
@@ -4080,7 +4143,10 @@ function AdventureCreatorContent() {
                               setStartingChoices(updated);
                               setEditingStartingChoiceIndex(null);
                               setEditStartingChoice({});
-                              addNotification("Starting choice updated!", "success");
+                              addNotification(
+                                "Starting choice updated!",
+                                "success"
+                              );
                             }}
                             disabled={!editStartingChoice.text?.trim()}
                             className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
@@ -4142,7 +4208,8 @@ function AdventureCreatorContent() {
                                   name="Package"
                                   className="w-3 h-3 inline mr-1"
                                 />
-                                {choice.item_loss ? "Consumes" : "Requires"}: {choice.item_used}
+                                {choice.item_loss ? "Consumes" : "Requires"}:{" "}
+                                {choice.item_used}
                               </span>
                             )}
                             {choice.resource_used && (
@@ -4199,7 +4266,10 @@ function AdventureCreatorContent() {
                               setStartingChoices(
                                 startingChoices.filter((_, i) => i !== index)
                               );
-                              addNotification("Starting choice removed", "success");
+                              addNotification(
+                                "Starting choice removed",
+                                "success"
+                              );
                             }}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
                             title="Delete"
@@ -9546,9 +9616,9 @@ function AdventureCreatorContent() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 pt-16">
-      <div className="max-w-6xl mx-auto p-4 sm:p-8">
+      <div className="max-w-6xl mx-auto p-3 sm:p-6">
         {/* Compact Header with Action Buttons */}
-        <div className="mb-4 flex items-center justify-end gap-2">
+        <div className="mb-3 flex items-center justify-end gap-2">
           <button
             onClick={() => setIsAIMenuOpen(true)}
             className="px-3 py-1.5 sm:px-4 sm:py-2 bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2"
@@ -9566,13 +9636,13 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Progress Steps */}
-        <div className="mb-8 bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700">
+        <div className="mb-5 bg-white dark:bg-blue-950 rounded-xl shadow-lg p-3 border border-gray-200 dark:border-gray-700">
           <DraggableScroll innerClassName="gap-2">
             {steps.map((step, index) => (
               <button
                 key={step.id}
                 onClick={() => setCurrentStep(step.id)}
-                className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap ${
+                className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap text-sm ${
                   currentStep === step.id
                     ? "bg-purple-600 text-white"
                     : index < currentStepIndex
@@ -9580,7 +9650,7 @@ function AdventureCreatorContent() {
                     : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300"
                 }`}
               >
-                <DynamicIcon name={step.icon} className="w-5 h-5" />
+                <DynamicIcon name={step.icon} className="w-4 h-4" />
                 <span className="hidden sm:inline">{step.label}</span>
               </button>
             ))}
@@ -9588,15 +9658,15 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Content */}
-        <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 mb-8">
-          <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
+        <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-5">
+          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
             {steps.find((s) => s.id === currentStep)?.label}
           </h2>
           {renderStepContent()}
         </div>
 
         {/* Navigation */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 mb-8">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-blue-950 rounded-xl shadow-lg p-3 border border-gray-200 dark:border-gray-700 mb-5">
           <button
             onClick={() => {
               const prevIndex = Math.max(0, currentStepIndex - 1);

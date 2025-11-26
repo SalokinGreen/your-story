@@ -127,53 +127,53 @@ export default function ExplorerPage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 pt-16">
-      <div className="max-w-7xl mx-auto p-4 sm:p-8">
+      <div className="max-w-7xl mx-auto p-3 sm:p-6">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-            <h1 className="text-3xl sm:text-4xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               Story Explorer
             </h1>
             <div className="flex gap-2">
               {user && (
                 <button
                   onClick={() => router.push("/library")}
-                  className="px-4 py-2 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
+                  className="px-3 py-1.5 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2 text-sm"
                 >
                   <DynamicIcon name="Library" className="w-4 h-4" /> Library
                 </button>
               )}
               <button
                 onClick={() => router.push("/")}
-                className="px-4 py-2 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
+                className="px-3 py-1.5 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2 text-sm"
               >
                 <DynamicIcon name="ArrowLeft" className="w-4 h-4" /> Home
               </button>
             </div>
           </div>
-          <p className="text-gray-700 dark:text-gray-300 text-lg">
+          <p className="text-gray-700 dark:text-gray-300">
             Discover amazing interactive stories or create your own adventure
           </p>
         </div>
 
         {/* Featured Carousel */}
         {loadingFeatured ? (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
-              <DynamicIcon name="Star" className="w-6 h-6 text-yellow-500" />{" "}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-white flex items-center gap-2">
+              <DynamicIcon name="Star" className="w-5 h-5 text-yellow-500" />{" "}
               Featured Adventures
             </h2>
             <FeaturedCarouselSkeleton />
           </div>
         ) : (
           featuredAdventures.length > 0 && (
-            <div className="mb-12">
-              <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
-                <DynamicIcon name="Star" className="w-6 h-6 text-yellow-500" />{" "}
+            <div className="mb-8">
+              <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-white flex items-center gap-2">
+                <DynamicIcon name="Star" className="w-5 h-5 text-yellow-500" />{" "}
                 Featured Adventures
               </h2>
-              <div className="relative bg-white dark:bg-blue-950 rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
-                <div className="relative h-96 sm:h-80 md:h-96">
+              <div className="relative bg-white dark:bg-blue-950 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                <div className="relative h-80 sm:h-72 md:h-80">
                   {featuredAdventures.map((adventure, index) => (
                     <div
                       key={adventure.id}
@@ -293,14 +293,14 @@ export default function ExplorerPage() {
         )}
 
         {/* Create Your Own Section */}
-        <div className="mb-12">
-          <div className="bg-linear-to-r from-green-400 via-blue-500 to-purple-500 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
+        <div className="mb-8">
+          <div className="bg-linear-to-r from-green-400 via-blue-500 to-purple-500 rounded-xl shadow-lg p-5 border border-gray-200 dark:border-gray-700">
             <div className="max-w-3xl mx-auto text-center">
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 flex items-center justify-center gap-2">
-                <DynamicIcon name="Sparkles" className="w-8 h-8" /> Create Your
+              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 flex items-center justify-center gap-2">
+                <DynamicIcon name="Sparkles" className="w-6 h-6" /> Create Your
                 Own Story
               </h2>
-              <p className="text-white/90 text-lg mb-6">
+              <p className="text-white/90 mb-4">
                 Have an idea for an epic adventure? Bring your imagination to
                 life and share it with the community!
               </p>
@@ -312,7 +312,7 @@ export default function ExplorerPage() {
                     router.push("/creator");
                   }
                 }}
-                className="px-8 py-4 bg-white text-purple-600 font-bold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center gap-2 mx-auto"
+                className="px-6 py-3 bg-white text-purple-600 font-bold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center gap-2 mx-auto"
               >
                 {user ? (
                   <>
@@ -331,8 +331,8 @@ export default function ExplorerPage() {
         </div>
 
         {/* Search and Filters */}
-        <div className="mb-8 bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col gap-4">
+        <div className="mb-5 bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 border border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col gap-3">
             {/* Search Bar */}
             <div className="flex flex-col sm:flex-row gap-3">
               <input
@@ -457,23 +457,23 @@ export default function ExplorerPage() {
 
         {/* Adventures Grid */}
         <div>
-          <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
+          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
             All Adventures {!loading && `(${adventures.length})`}
           </h2>
           {loading ? (
             <AdventureGridSkeleton count={6} />
           ) : adventures.length === 0 ? (
-            <div className="text-center py-12 bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
-              <p className="text-gray-600 dark:text-gray-400 text-lg">
+            <div className="text-center py-8 bg-white dark:bg-blue-950 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+              <p className="text-gray-600 dark:text-gray-400">
                 No adventures found matching your filters
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {adventures.map((adventure) => (
                 <div
                   key={adventure.id}
-                  className="bg-white dark:bg-blue-950 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all hover:scale-105 cursor-pointer"
+                  className="bg-white dark:bg-blue-950 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-150 cursor-pointer"
                   onClick={() => router.push(`/explorer/${adventure.id}`)}
                 >
                   {/* Thumbnail Image or Placeholder */}

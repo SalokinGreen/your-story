@@ -82,28 +82,28 @@ export default function SiteHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white dark:bg-blue-950 border-b-2 border-gray-200 dark:border-gray-700 shadow-md">
+    <header className="sticky top-0 z-50 bg-white/95 dark:bg-blue-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-14">
           {/* Logo/Brand */}
           <button
             onClick={(e) => handleNavClick(e, "/")}
             onMouseUp={(e) => handleMouseUp(e, "/")}
-            className="flex items-center gap-2 text-xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-lg font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent hover:opacity-80 transition-opacity duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 rounded-lg"
           >
-            <DynamicIcon name="BookOpen" className="w-6 h-6 text-purple-600" />{" "}
+            <DynamicIcon name="BookOpen" className="w-5 h-5 text-purple-600" />{" "}
             Your Story
           </button>
 
           {/* Navigation */}
-          <nav className="hidden md:flex items-center gap-2">
+          <nav className="hidden md:flex items-center gap-1">
             <button
               onClick={(e) => handleNavClick(e, "/library")}
               onMouseUp={(e) => handleMouseUp(e, "/library")}
-              className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all duration-150 flex items-center gap-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 ${
                 isActive("/library")
-                  ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
+                  ? "bg-purple-600 text-white shadow-sm"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               <DynamicIcon name="Library" className="w-4 h-4" /> Library
@@ -111,10 +111,10 @@ export default function SiteHeader() {
             <button
               onClick={(e) => handleNavClick(e, "/explorer")}
               onMouseUp={(e) => handleMouseUp(e, "/explorer")}
-              className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all duration-150 flex items-center gap-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 ${
                 isActive("/explorer")
-                  ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
+                  ? "bg-purple-600 text-white shadow-sm"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               <DynamicIcon name="Map" className="w-4 h-4" /> Explorer
@@ -122,10 +122,10 @@ export default function SiteHeader() {
             <button
               onClick={(e) => handleNavClick(e, "/creator")}
               onMouseUp={(e) => handleMouseUp(e, "/creator")}
-              className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all duration-150 flex items-center gap-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 ${
                 isActive("/creator")
-                  ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
+                  ? "bg-purple-600 text-white shadow-sm"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               <DynamicIcon name="Sparkles" className="w-4 h-4" /> Creator
@@ -136,20 +136,20 @@ export default function SiteHeader() {
           <button
             onClick={(e) => handleNavClick(e, `/profile/${user.id}`)}
             onMouseUp={(e) => handleMouseUp(e, `/profile/${user.id}`)}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
           >
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+            <span className="text-sm font-medium text-gray-900 dark:text-white hidden sm:inline">
               {displayName}
             </span>
             {profileData?.avatar_url ? (
               <img
                 src={profileData.avatar_url}
                 alt={`${displayName}'s avatar`}
-                className="w-10 h-10 rounded-full object-cover border-2 border-purple-500"
+                className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center border-2 border-purple-500 shadow-md">
-                <span className="text-lg font-bold text-white">
+              <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center border-2 border-purple-500 shadow-sm">
+                <span className="text-sm font-bold text-white">
                   {displayName[0]?.toUpperCase() || "?"}
                 </span>
               </div>
@@ -164,18 +164,18 @@ export default function SiteHeader() {
                 menu.classList.toggle("hidden");
               }
             }}
-            className="md:hidden p-2 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
           >
             <DynamicIcon
               name="Menu"
-              className="w-6 h-6 text-gray-900 dark:text-white"
+              className="w-5 h-5 text-gray-900 dark:text-white"
             />
           </button>
         </div>
 
         {/* Mobile Menu */}
-        <div id="mobile-menu" className="hidden md:hidden pb-4">
-          <nav className="flex flex-col gap-2">
+        <div id="mobile-menu" className="hidden md:hidden pb-3">
+          <nav className="flex flex-col gap-1">
             <button
               onClick={(e) => {
                 handleNavClick(e, "/library");
@@ -185,10 +185,10 @@ export default function SiteHeader() {
                 handleMouseUp(e, "/library");
                 document.getElementById("mobile-menu")?.classList.add("hidden");
               }}
-              className={`px-4 py-2 rounded-lg font-semibold text-left transition-all flex items-center gap-2 ${
+              className={`px-3 py-2 rounded-lg font-medium text-left transition-all duration-150 flex items-center gap-2 text-sm ${
                 isActive("/library")
-                  ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
+                  ? "bg-purple-600 text-white shadow-sm"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               <DynamicIcon name="Library" className="w-4 h-4" /> Library
@@ -202,10 +202,10 @@ export default function SiteHeader() {
                 handleMouseUp(e, "/explorer");
                 document.getElementById("mobile-menu")?.classList.add("hidden");
               }}
-              className={`px-4 py-2 rounded-lg font-semibold text-left transition-all flex items-center gap-2 ${
+              className={`px-3 py-2 rounded-lg font-medium text-left transition-all duration-150 flex items-center gap-2 text-sm ${
                 isActive("/explorer")
-                  ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
+                  ? "bg-purple-600 text-white shadow-sm"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               <DynamicIcon name="Map" className="w-4 h-4" /> Explorer
@@ -219,10 +219,10 @@ export default function SiteHeader() {
                 handleMouseUp(e, "/creator");
                 document.getElementById("mobile-menu")?.classList.add("hidden");
               }}
-              className={`px-4 py-2 rounded-lg font-semibold text-left transition-all flex items-center gap-2 ${
+              className={`px-3 py-2 rounded-lg font-medium text-left transition-all duration-150 flex items-center gap-2 text-sm ${
                 isActive("/creator")
-                  ? "bg-purple-600 text-white shadow-md"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-800 dark:hover:bg-gray-700"
+                  ? "bg-purple-600 text-white shadow-sm"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               <DynamicIcon name="Sparkles" className="w-4 h-4" /> Creator

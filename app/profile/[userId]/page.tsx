@@ -208,26 +208,26 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 p-4 sm:p-8 pt-20 sm:pt-24">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 p-3 sm:p-6 pt-20 sm:pt-22">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <button
             onClick={() => router.back()}
-            className="px-4 py-2 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
+            className="px-3 py-1.5 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg text-sm"
           >
             ← Back
           </button>
           {isOwnProfile && (
-            <span className="px-4 py-2 bg-linear-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-full shadow-md">
+            <span className="px-3 py-1.5 bg-linear-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-full shadow-md">
               Your Profile
             </span>
           )}
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Header with Avatar and Profile Info */}
-          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-start gap-4 mb-4">
+          <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 sm:p-5 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-start gap-4 mb-3">
               {/* Avatar */}
               <div className="shrink-0">
                 {profileData?.avatar_url ? (
@@ -265,13 +265,13 @@ export default function ProfilePage() {
 
             {/* Profile Details */}
             {profileData && (
-              <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+              <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
                 {profileData.bio && (
-                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                       Bio
                     </p>
-                    <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+                    <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap text-sm">
                       {profileData.bio}
                     </p>
                   </div>
@@ -281,7 +281,7 @@ export default function ProfilePage() {
 
             {/* Edit Profile Button */}
             {isOwnProfile && (
-              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
                 <EditProfile
                   userId={userId}
                   currentProfile={profileData || {}}
@@ -300,9 +300,9 @@ export default function ProfilePage() {
           <div className="flex justify-center">
             <button
               onClick={handleRefresh}
-              className="px-6 py-3 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 font-semibold transition-all rounded-lg shadow-md hover:shadow-lg text-gray-900 dark:text-white flex items-center gap-2"
+              className="px-4 py-2 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 font-semibold transition-all rounded-lg shadow-md hover:shadow-lg text-gray-900 dark:text-white flex items-center gap-2 text-sm"
             >
-              <DynamicIcon name="RefreshCw" className="w-5 h-5" /> Refresh
+              <DynamicIcon name="RefreshCw" className="w-4 h-4" /> Refresh
               Balance
             </button>
           </div>
@@ -316,22 +316,22 @@ export default function ProfilePage() {
           )}
 
           {/* Adventures Section */}
-          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-purple-50 dark:bg-purple-900/30">
-              <h2 className="text-xl font-bold text-purple-600 dark:text-purple-400 flex items-center gap-2">
+          <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3 bg-purple-50 dark:bg-purple-900/30">
+              <h2 className="text-lg font-bold text-purple-600 dark:text-purple-400 flex items-center gap-2">
                 <DynamicIcon name="Gamepad2" className="w-5 h-5" /> Adventures (
                 {adventures.length})
               </h2>
             </div>
 
-            <div className="p-6">
+            <div className="p-4">
               {loadingAdventures ? (
-                <div className="flex justify-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent"></div>
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-10 w-10 border-4 border-purple-600 border-t-transparent"></div>
                 </div>
               ) : adventures.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-600 dark:text-gray-400 text-lg mb-4">
+                <div className="text-center py-8">
+                  <p className="text-gray-600 dark:text-gray-400 mb-3">
                     {isOwnProfile
                       ? "You haven't created any adventures yet."
                       : "This user hasn't created any adventures yet."}
@@ -339,7 +339,7 @@ export default function ProfilePage() {
                   {isOwnProfile && (
                     <button
                       onClick={() => router.push("/creator")}
-                      className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all"
+                      className="px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all text-sm"
                     >
                       Create Your First Adventure
                     </button>
@@ -351,10 +351,10 @@ export default function ProfilePage() {
                     <div
                       key={adventure.id}
                       onClick={() => router.push(`/explorer/${adventure.id}`)}
-                      className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer border border-gray-200 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
+                      className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 cursor-pointer border border-gray-200 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
                     >
-                      <div className="flex items-start justify-between mb-3">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-2 flex-1">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-bold text-gray-900 dark:text-white line-clamp-2 flex-1">
                           {adventure.title}
                         </h3>
                         {adventure.isFeatured && (
@@ -364,12 +364,12 @@ export default function ProfilePage() {
                           />
                         )}
                       </div>
-                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
+                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-2 line-clamp-2">
                         {adventure.shortDescription}
                       </p>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-bold border capitalize ${getDifficultyColor(
+                          className={`px-2 py-0.5 rounded-full text-xs font-bold border capitalize ${getDifficultyColor(
                             adventure.difficulty
                           )}`}
                         >
@@ -385,7 +385,7 @@ export default function ProfilePage() {
                         </span>
                       </div>
                       {!adventure.isPublished && (
-                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
                           <span className="text-xs font-semibold text-orange-600 dark:text-orange-400 flex items-center gap-1">
                             <DynamicIcon name="FileEdit" className="w-3 h-3" />{" "}
                             Draft
