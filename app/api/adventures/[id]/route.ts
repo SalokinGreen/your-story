@@ -91,6 +91,7 @@ export async function GET(
       storyTemplate: data.story_template,
       selectedPreset: data.selected_preset,
       presets: data.presets,
+      startingChoices: data.starting_choices,
     };
 
     return NextResponse.json({ adventure }, { status: 200 });
@@ -229,6 +230,8 @@ export async function PATCH(
     if (body.selectedPreset !== undefined)
       updateData.selected_preset = body.selectedPreset;
     if (body.presets !== undefined) updateData.presets = body.presets;
+    if (body.startingChoices !== undefined)
+      updateData.starting_choices = body.startingChoices;
 
     // Only update author name if the user is the author (admins shouldn't overwrite author name)
     if (existingAdventure.author_id === user.id) {
@@ -276,6 +279,7 @@ export async function PATCH(
       storyTemplate: data.story_template,
       selectedPreset: data.selected_preset,
       presets: data.presets,
+      startingChoices: data.starting_choices,
     };
 
     return NextResponse.json({ adventure }, { status: 200 });

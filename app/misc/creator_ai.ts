@@ -1,4 +1,4 @@
-import { StoryData } from "@/app/misc/structs";
+import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
 
 export interface CreatorAIInput {
@@ -8,6 +8,7 @@ export interface CreatorAIInput {
     title?: string;
     shortDescription?: string;
     description?: string;
+    startingChoices?: StartingChoice[];
   };
 }
 
@@ -221,6 +222,18 @@ You can control how items in arrays are applied using the **_command** field:
   - entries: Array of { text, weight } - possible results when rolling on the table
     - text: The result text that will be shown/used
     - weight: Probability weight (higher numbers = more likely to be selected). Default is 1.
+- startingChoices (Array of { text, intro_override, skill_used, skill_dc, resource_used, item_used, item_loss, mythic_check, mythic_context_only, mythic_table, custom_table }) - Custom starting choices instead of default "Start Story" button
+  - text: The choice text displayed to player (required)
+  - intro_override: Optional alternate intro text for this path (if empty, uses main intro)
+  - skill_used: Optional skill name for skill check on this choice
+  - skill_dc: DC (difficulty) for the skill check (required if skill_used is set)
+  - resource_used: Optional resource name for resource cost
+  - item_used: Optional item name that this choice requires
+  - item_loss: Boolean - whether the item is consumed when used (default false)
+  - mythic_check: Optional Mythic fate check question in format "Question (Likelihood)" e.g., "Is the guard asleep? (Likely)"
+  - mythic_context_only: Boolean - when true with skill_used, mythic provides context only (doesn't override skill check result)
+  - mythic_table: Optional Mythic table to roll on (e.g., "action", "subject", "character_descriptors", "locations", "plot_twists")
+  - custom_table: Optional custom table name to roll on
 
 Notes:
 - All characters should share the same stats and resources, but they may have different values.
@@ -230,6 +243,7 @@ Notes:
 - Mythic GME is enabled by providing a mythicState object. If you want to enable Mythic, simply include mythicState with at least chaosFactor.
 - Mythic chaos factor must be between 1-9, scene count must be >= 0.
 - Thread and character IDs are auto-generated if not provided, so you can omit them for new entries.
+- Starting choices allow players to choose how they begin the adventure. If startingChoices is empty/undefined, players see a default "Start Story" button.
 
 ### Example Responses:
 
@@ -469,6 +483,68 @@ Assistant:
 }
 \`\`\`"
 
+**Example 11 - Starting Choices:**
+User: "Create custom starting choices: one for sneaking in (Stealth check), one for fighting through (Strength check), and one that uses a Disguise item."
+Assistant:
+"I've created three different ways to begin the adventure.
+
+\`\`\`json
+{
+  "startingChoices": [
+    {
+      "text": "Sneak through the shadows",
+      "skill_used": "Stealth",
+      "skill_dc": 60,
+      "intro_override": "You slip into the darkness, your footsteps silent on the cold stone floor..."
+    },
+    {
+      "text": "Fight your way through",
+      "skill_used": "Strength",
+      "skill_dc": 55
+    },
+    {
+      "text": "Use your disguise to blend in",
+      "item_used": "Disguise Kit",
+      "item_loss": true,
+      "intro_override": "Donning the stolen uniform, you walk confidently through the front gates..."
+    }
+  ]
+}
+\`\`\`"
+
+**Example 12 - Starting Choices with Mythic:**
+User: "Add a starting choice that asks fate if there's a secret passage, and rolls on the locations table."
+Assistant:
+"I've added a Mythic-powered starting choice.
+
+\`\`\`json
+{
+  "startingChoices": [
+    {
+      "text": "Search for a hidden entrance",
+      "mythic_check": "Is there a secret passage? (Unlikely)",
+      "mythic_table": "locations"
+    }
+  ]
+}
+\`\`\`"
+
+**Example 13 - Deleting Starting Choices:**
+User: "Remove the sneak option from starting choices."
+Assistant:
+"I've removed that starting choice.
+
+\`\`\`json
+{
+  "startingChoices": [
+    {
+      "text": "Sneak through the shadows",
+      "_command": "delete"
+    }
+  ]
+}
+\`\`\`"
+
 ### Context - Current Adventure State:
 ${
   adventureMetadata
@@ -476,6 +552,7 @@ ${
 - Title: ${adventureMetadata.title || "(not set)"}
 - Short Description: ${adventureMetadata.shortDescription || "(not set)"}
 - Description: ${adventureMetadata.description || "(not set)"}
+- Starting Choices: ${adventureMetadata.startingChoices?.length ? JSON.stringify(adventureMetadata.startingChoices, null, 2) : "(none - using default Start Story button)"}
 
 `
     : ""
@@ -490,6 +567,7 @@ export interface CreatorOutputData extends Partial<StoryData> {
   title?: string;
   shortDescription?: string;
   description?: string;
+  startingChoices?: StartingChoice[];
 }
 
 export function parseCreatorOutput(content: string): {

@@ -212,6 +212,7 @@ export interface StoryData {
   maxStress?: number; // YZE: Maximum stress (default 10)
   mythicState?: MythicState; // Mythic GME state (chaos factor, threads, characters)
   customTables?: CustomTable[]; // Creator-defined random tables
+  starting_choices?: StartingChoice[]; // Optional custom starting choices from adventure
 }
 
 // Mythic GME state tracking
@@ -328,6 +329,21 @@ export const UPGRADE_COSTS = {
   BEAT_REWARD: 25, // Points earned for completing a story beat
 } as const;
 
+// Starting choice for adventure - allows custom intro choices instead of "Start Story"
+export interface StartingChoice {
+  text: string; // The choice text displayed to player
+  intro_override?: string; // Optional: different intro text for this path (if empty, uses main intro)
+  skill_used?: string; // Optional: skill check on this choice
+  skill_dc?: number; // DC for the skill check
+  resource_used?: string; // Optional: resource cost/check
+  item_used?: string; // Optional: requires/uses an item
+  item_loss?: boolean; // Whether the item is consumed when used
+  mythic_check?: string; // Optional: Mythic yes/no question
+  mythic_context_only?: boolean; // When true with skill_used, mythic provides context only
+  mythic_table?: string; // Element category name e.g., "character_descriptors"
+  custom_table?: string; // Name or ID of custom table to roll on
+}
+
 export interface Adventure {
   id: string;
   title: string;
@@ -352,6 +368,7 @@ export interface Adventure {
   storyTemplate: Partial<StoryData>; // The actual story data
   selectedPreset?: string; // ID of the preset used
   presets?: Preset[]; // Adventure-specific character presets
+  startingChoices?: StartingChoice[]; // Optional custom starting choices (if empty, shows "Start Story")
 }
 
 export interface AdventureFilter {

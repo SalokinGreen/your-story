@@ -1890,13 +1890,36 @@ function StoryPageContent() {
       updatedStoryData.inventory = JSON.parse(JSON.stringify(preset.inventory));
     if (preset.authorNotes) updatedStoryData.author_notes = preset.authorNotes;
 
+    // Determine starting choices - use custom ones if available, otherwise default
+    const startingChoices = updatedStoryData.starting_choices?.length
+      ? updatedStoryData.starting_choices.map((sc) => ({
+          text: sc.text,
+          item_used: sc.item_used,
+          item_loss: sc.item_loss,
+          skill_used: sc.skill_used,
+          skill_dc: sc.skill_dc,
+          resource_used: sc.resource_used,
+          mythic_check: sc.mythic_check,
+          mythic_context_only: sc.mythic_context_only,
+          mythic_table: sc.mythic_table,
+          custom_table: sc.custom_table,
+        }))
+      : [{ text: "Start Story" }];
+
+    // Use intro override from first starting choice if available
+    const introContent =
+      updatedStoryData.starting_choices?.length &&
+      updatedStoryData.starting_choices[0].intro_override
+        ? updatedStoryData.starting_choices[0].intro_override
+        : updatedStoryData.intro;
+
     //Addstartingscenepart
     updatedStoryData.scene.parts.push({
-      content: updatedStoryData.intro,
+      content: introContent,
       imageUrl: "",
       user: false,
       role: "assistant",
-      choices: [{ text: "Start Story" }],
+      choices: startingChoices,
     });
 
     //Updatestoryindatabasewithpresetapplied
@@ -1951,8 +1974,8 @@ function StoryPageContent() {
 
     //Updatelocalstate
     setStoryData(updatedStoryData);
-    setStoryText(updatedStoryData.intro);
-    setChoices({ choices: [{ text: "Start Story" }] });
+    setStoryText(introContent);
+    setChoices({ choices: startingChoices });
     setInput({ StartStory: false });
     setStarted(true);
     setShowPresetSelection(false);

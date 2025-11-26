@@ -22,6 +22,7 @@ import {
   MythicThread,
   MythicCharacter,
   CustomTable,
+  StartingChoice,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
@@ -38,6 +39,7 @@ import CreatorAIChat from "@/app/components/CreatorAIChat";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { IconPicker } from "@/app/components/IconPicker";
 import { CustomTablesEditor } from "@/app/components/CustomTablesEditor";
+import { DraggableScroll } from "@/app/components/DraggableScroll";
 import {
   saveLocalAdventure,
   getLocalAdventure,
@@ -47,6 +49,7 @@ type CreatorStep =
   | "basic"
   | "preset"
   | "premise"
+  | "starting-choices"
   | "stats"
   | "resources"
   | "inventory"
@@ -175,14 +178,14 @@ function AdventureCreatorContent() {
 
   // Helper function to apply item changes with command support
   function applyItemChanges<
-    T extends { name?: string; title?: string; id?: string }
+    T extends { name?: string; title?: string; id?: string; text?: string }
   >(
     existingItems: T[],
     newItems: Array<
       Partial<T> & { _command?: "add" | "replace" | "delete" | "merge" }
     >,
     itemType: string,
-    identifierKey: "name" | "title" | "id" = "name"
+    identifierKey: "name" | "title" | "id" | "text" = "name"
   ): T[] {
     let updated = [...existingItems];
 
@@ -383,6 +386,24 @@ function AdventureCreatorContent() {
           }
         });
       }
+    }
+
+    // Check custom table deletions
+    if (data.customTables) {
+      data.customTables.forEach((table: any) => {
+        if (table._command === "delete") {
+          deletions.push(`Custom Table: ${table.name}`);
+        }
+      });
+    }
+
+    // Check starting choice deletions
+    if ((data as any).startingChoices) {
+      (data as any).startingChoices.forEach((choice: any) => {
+        if (choice._command === "delete") {
+          deletions.push(`Starting Choice: ${choice.text}`);
+        }
+      });
     }
 
     // Show confirmation if deletions exist
@@ -588,6 +609,38 @@ function AdventureCreatorContent() {
       setMythicState(newState);
     }
 
+    // Apply custom tables
+    if (data.customTables) {
+      setCustomTables(
+        applyItemChanges(
+          customTables,
+          data.customTables as any,
+          "custom table",
+          "id"
+        ).map((table: any) => {
+          // Auto-generate ID for new tables without one
+          if (!table.id) {
+            table.id = `table-${Date.now()}-${Math.random()
+              .toString(36)
+              .substring(2, 9)}`;
+          }
+          return table;
+        })
+      );
+    }
+
+    // Apply starting choices (adventure-level, not StoryData)
+    if ((data as any).startingChoices) {
+      setStartingChoices(
+        applyItemChanges(
+          startingChoices,
+          (data as any).startingChoices as any,
+          "starting choice",
+          "text"
+        ) as StartingChoice[]
+      );
+    }
+
     addNotification("AI changes applied successfully!", "success");
     setIsAIMenuOpen(false);
   };
@@ -653,6 +706,9 @@ function AdventureCreatorContent() {
         setTags(adventure.tags || []);
         setThumbnailUrl(adventure.thumbnailUrl || "");
         setBannerUrl(adventure.bannerUrl || "");
+
+        // Load starting choices from adventure
+        setStartingChoices(adventure.startingChoices || []);
 
         // Load story template data
         const template = adventure.storyTemplate;
@@ -760,6 +816,8 @@ function AdventureCreatorContent() {
             if (saved.mythicEnabled !== undefined)
               setMythicEnabled(saved.mythicEnabled);
             if (saved.mythicState) setMythicState(saved.mythicState);
+            if (Array.isArray(saved.startingChoices))
+              setStartingChoices(saved.startingChoices);
 
             if (
               typeof saved.currentStep === "string" &&
@@ -992,6 +1050,30 @@ function AdventureCreatorContent() {
   );
   const [editQuest, setEditQuest] = useState<Partial<Quest>>({});
 
+  // Starting Choices
+  const [startingChoices, setStartingChoices] = useState<StartingChoice[]>([]);
+  const [newStartingChoice, setNewStartingChoice] = useState<
+    Partial<StartingChoice>
+  >({
+    text: "",
+    intro_override: "",
+    skill_used: "",
+    skill_dc: undefined,
+    resource_used: "",
+    item_used: "",
+    item_loss: false,
+    mythic_check: "",
+    mythic_context_only: false,
+    mythic_table: "",
+    custom_table: "",
+  });
+  const [editingStartingChoiceIndex, setEditingStartingChoiceIndex] = useState<
+    number | null
+  >(null);
+  const [editStartingChoice, setEditStartingChoice] = useState<
+    Partial<StartingChoice>
+  >({});
+
   // Custom Tables
   const [customTables, setCustomTables] = useState<CustomTable[]>([]);
   const [newTable, setNewTable] = useState<Partial<CustomTable>>({
@@ -1038,6 +1120,7 @@ function AdventureCreatorContent() {
     { id: "basic", label: "Basic Info", icon: "FileText" },
     { id: "preset", label: "Character Preset", icon: "User" },
     { id: "premise", label: "Story Setup", icon: "BookOpen" },
+    { id: "starting-choices", label: "Starting Choices", icon: "Play" },
     { id: "stats", label: "Stats", icon: "BarChart2" },
     { id: "resources", label: "Resources", icon: "Gem" },
     { id: "inventory", label: "Starting Items", icon: "Backpack" },
@@ -1107,6 +1190,8 @@ function AdventureCreatorContent() {
       if (saved.mythicEnabled !== undefined)
         setMythicEnabled(saved.mythicEnabled);
       if (saved.mythicState) setMythicState(saved.mythicState);
+      if (Array.isArray(saved.startingChoices))
+        setStartingChoices(saved.startingChoices);
 
       if (
         typeof saved.currentStep === "string" &&
@@ -1167,6 +1252,7 @@ function AdventureCreatorContent() {
       upgradeSettings,
       mythicEnabled,
       mythicState,
+      startingChoices,
       currentStep,
       updatedAt: Date.now(),
     };
@@ -1213,6 +1299,7 @@ function AdventureCreatorContent() {
     mythicEnabled,
     mythicState,
     upgradeSettings,
+    startingChoices,
     currentStep,
   ]);
 
@@ -2002,6 +2089,8 @@ function AdventureCreatorContent() {
         estimatedDuration: "1-2 hours",
         storyTemplate: storyData,
         presets: presets,
+        startingChoices:
+          startingChoices.length > 0 ? startingChoices : undefined,
       };
 
       // Use existing ID if editing a local adventure, otherwise generate new ID
@@ -2176,6 +2265,8 @@ function AdventureCreatorContent() {
         storyTemplate: storyData,
         selectedPreset: selectedPreset,
         presets: presets,
+        startingChoices:
+          startingChoices.length > 0 ? startingChoices : undefined,
       };
 
       // Check payload size
@@ -2305,6 +2396,8 @@ function AdventureCreatorContent() {
           storyTemplate: storyData,
           selectedPreset: selectedPreset,
           presets: presets,
+          startingChoices:
+            startingChoices.length > 0 ? startingChoices : undefined,
         };
 
         await saveLocalAdventure(editAdventureId!, adventureData);
@@ -2361,6 +2454,8 @@ function AdventureCreatorContent() {
         storyTemplate: storyData,
         selectedPreset: selectedPreset,
         presets: presets,
+        startingChoices:
+          startingChoices.length > 0 ? startingChoices : undefined,
       };
 
       // Check payload size
@@ -3356,6 +3451,767 @@ function AdventureCreatorContent() {
                   Maximum momentum capacity
                 </p>
               </div>
+            </div>
+          </div>
+        );
+
+      case "starting-choices":
+        return (
+          <div className="space-y-6">
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-5 h-5 text-green-600 shrink-0 mt-0.5"
+                />
+                <span>
+                  <strong>Tip:</strong> Starting choices let players choose how
+                  their adventure begins. Leave empty for the default &quot;Start
+                  Story&quot; button. Each choice can have skill checks, item
+                  requirements, or alternate intro text.
+                </span>
+              </p>
+            </div>
+
+            {/* Add New Starting Choice */}
+            <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
+              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+                Add Starting Choice
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Choice Text *
+                  </label>
+                  <input
+                    type="text"
+                    value={newStartingChoice.text || ""}
+                    onChange={(e) =>
+                      setNewStartingChoice({
+                        ...newStartingChoice,
+                        text: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., Sneak in through the back"
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Intro Override (optional)
+                  </label>
+                  <textarea
+                    value={newStartingChoice.intro_override || ""}
+                    onChange={(e) =>
+                      setNewStartingChoice({
+                        ...newStartingChoice,
+                        intro_override: e.target.value,
+                      })
+                    }
+                    placeholder="Different intro text for this path (leave empty to use default intro)"
+                    rows={3}
+                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    If set, this intro will be shown instead of the main intro
+                    when this choice is selected.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Skill Check (optional)
+                    </label>
+                    <select
+                      value={newStartingChoice.skill_used || ""}
+                      onChange={(e) =>
+                        setNewStartingChoice({
+                          ...newStartingChoice,
+                          skill_used: e.target.value || undefined,
+                          skill_dc: e.target.value
+                            ? newStartingChoice.skill_dc || 50
+                            : undefined,
+                        })
+                      }
+                      className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    >
+                      <option value="">No skill check</option>
+                      {stats.map((stat) => (
+                        <option key={stat.name} value={stat.name}>
+                          {stat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {newStartingChoice.skill_used && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                        DC (Difficulty)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={newStartingChoice.skill_dc || 50}
+                        onChange={(e) =>
+                          setNewStartingChoice({
+                            ...newStartingChoice,
+                            skill_dc: parseInt(e.target.value) || 50,
+                          })
+                        }
+                        className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Requires Item (optional)
+                    </label>
+                    <select
+                      value={newStartingChoice.item_used || ""}
+                      onChange={(e) =>
+                        setNewStartingChoice({
+                          ...newStartingChoice,
+                          item_used: e.target.value || undefined,
+                        })
+                      }
+                      className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    >
+                      <option value="">No item required</option>
+                      {inventory.map((item) => (
+                        <option key={item.name} value={item.name}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                    {newStartingChoice.item_used && (
+                      <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={newStartingChoice.item_loss || false}
+                          onChange={(e) =>
+                            setNewStartingChoice({
+                              ...newStartingChoice,
+                              item_loss: e.target.checked,
+                            })
+                          }
+                          className="w-4 h-4 rounded"
+                        />
+                        Consume item on use
+                      </label>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Resource Cost (optional)
+                    </label>
+                    <select
+                      value={newStartingChoice.resource_used || ""}
+                      onChange={(e) =>
+                        setNewStartingChoice({
+                          ...newStartingChoice,
+                          resource_used: e.target.value || undefined,
+                        })
+                      }
+                      className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    >
+                      <option value="">No resource cost</option>
+                      {resources.map((res) => (
+                        <option key={res.name} value={res.name}>
+                          {res.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {/* Mythic GME Section */}
+                {mythicEnabled && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                    <h4 className="text-sm font-bold text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
+                      <DynamicIcon name="Sparkles" className="w-4 h-4" />
+                      Mythic GME Options
+                    </h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          Fate Check Question (optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={newStartingChoice.mythic_check || ""}
+                          onChange={(e) =>
+                            setNewStartingChoice({
+                              ...newStartingChoice,
+                              mythic_check: e.target.value || undefined,
+                            })
+                          }
+                          placeholder="e.g., Is the door locked? (Likely)"
+                          className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Format: &quot;Question (Likelihood)&quot; - Likelihoods: Certain, Nearly Certain, Very Likely, Likely, 50/50, Unlikely, Very Unlikely, Nearly Impossible, Impossible
+                        </p>
+                      </div>
+                      {newStartingChoice.mythic_check && newStartingChoice.skill_used && (
+                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={newStartingChoice.mythic_context_only || false}
+                            onChange={(e) =>
+                              setNewStartingChoice({
+                                ...newStartingChoice,
+                                mythic_context_only: e.target.checked,
+                              })
+                            }
+                            className="w-4 h-4 rounded"
+                          />
+                          Mythic provides context only (doesn&apos;t override skill check)
+                        </label>
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                            Mythic Table Roll (optional)
+                          </label>
+                          <select
+                            value={newStartingChoice.mythic_table || ""}
+                            onChange={(e) =>
+                              setNewStartingChoice({
+                                ...newStartingChoice,
+                                mythic_table: e.target.value || undefined,
+                              })
+                            }
+                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          >
+                            <option value="">No Mythic table</option>
+                            <option value="action">Action</option>
+                            <option value="subject">Subject</option>
+                            <option value="action_subject">Action + Subject</option>
+                            <option value="character_descriptors">Character Descriptors</option>
+                            <option value="character_identity">Character Identity</option>
+                            <option value="character_personality">Character Personality</option>
+                            <option value="character_motivations">Character Motivations</option>
+                            <option value="character_skills">Character Skills</option>
+                            <option value="character_flaws">Character Flaws</option>
+                            <option value="locations">Locations</option>
+                            <option value="objects">Objects</option>
+                            <option value="plot_twists">Plot Twists</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                            Custom Table Roll (optional)
+                          </label>
+                          <select
+                            value={newStartingChoice.custom_table || ""}
+                            onChange={(e) =>
+                              setNewStartingChoice({
+                                ...newStartingChoice,
+                                custom_table: e.target.value || undefined,
+                              })
+                            }
+                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          >
+                            <option value="">No custom table</option>
+                            {customTables.map((table) => (
+                              <option key={table.id} value={table.name}>
+                                {table.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  if (!newStartingChoice.text?.trim()) {
+                    addNotification("Please enter choice text", "warning");
+                    return;
+                  }
+                  const choice: StartingChoice = {
+                    text: newStartingChoice.text.trim(),
+                    intro_override: newStartingChoice.intro_override?.trim() || undefined,
+                    skill_used: newStartingChoice.skill_used || undefined,
+                    skill_dc: newStartingChoice.skill_used
+                      ? newStartingChoice.skill_dc
+                      : undefined,
+                    resource_used: newStartingChoice.resource_used || undefined,
+                    item_used: newStartingChoice.item_used || undefined,
+                    item_loss: newStartingChoice.item_used ? newStartingChoice.item_loss : undefined,
+                    mythic_check: newStartingChoice.mythic_check || undefined,
+                    mythic_context_only: newStartingChoice.mythic_check && newStartingChoice.skill_used ? newStartingChoice.mythic_context_only : undefined,
+                    mythic_table: newStartingChoice.mythic_table || undefined,
+                    custom_table: newStartingChoice.custom_table || undefined,
+                  };
+                  setStartingChoices([...startingChoices, choice]);
+                  setNewStartingChoice({
+                    text: "",
+                    intro_override: "",
+                    skill_used: "",
+                    skill_dc: undefined,
+                    resource_used: "",
+                    item_used: "",
+                    item_loss: false,
+                    mythic_check: "",
+                    mythic_context_only: false,
+                    mythic_table: "",
+                    custom_table: "",
+                  });
+                  addNotification("Starting choice added!", "success");
+                }}
+                disabled={!newStartingChoice.text?.trim()}
+                className="w-full mt-4 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+              >
+                Add Starting Choice
+              </button>
+            </div>
+
+            {/* Existing Starting Choices */}
+            <div className="space-y-3">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Starting Choices ({startingChoices.length})
+              </h3>
+              {startingChoices.length === 0 ? (
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 text-center">
+                  <DynamicIcon
+                    name="Play"
+                    className="w-12 h-12 mx-auto mb-3 text-gray-400"
+                  />
+                  <p className="text-gray-600 dark:text-gray-400">
+                    No custom starting choices. Players will see the default
+                    &quot;Start Story&quot; button.
+                  </p>
+                </div>
+              ) : (
+                startingChoices.map((choice, index) =>
+                  editingStartingChoiceIndex === index ? (
+                    // Edit mode
+                    <div
+                      key={index}
+                      className="p-4 bg-green-100 dark:bg-green-900/40 rounded-lg border-2 border-green-400 dark:border-green-600"
+                    >
+                      <div className="space-y-4">
+                        <h4 className="text-md font-bold text-green-900 dark:text-green-100 flex items-center gap-2">
+                          <DynamicIcon name="Edit2" className="w-4 h-4" />{" "}
+                          Editing Starting Choice
+                        </h4>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                            Choice Text *
+                          </label>
+                          <input
+                            type="text"
+                            value={editStartingChoice.text || ""}
+                            onChange={(e) =>
+                              setEditStartingChoice({
+                                ...editStartingChoice,
+                                text: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                            Intro Override
+                          </label>
+                          <textarea
+                            value={editStartingChoice.intro_override || ""}
+                            onChange={(e) =>
+                              setEditStartingChoice({
+                                ...editStartingChoice,
+                                intro_override: e.target.value,
+                              })
+                            }
+                            rows={3}
+                            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                              Skill Check
+                            </label>
+                            <select
+                              value={editStartingChoice.skill_used || ""}
+                              onChange={(e) =>
+                                setEditStartingChoice({
+                                  ...editStartingChoice,
+                                  skill_used: e.target.value || undefined,
+                                  skill_dc: e.target.value
+                                    ? editStartingChoice.skill_dc || 50
+                                    : undefined,
+                                })
+                              }
+                              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            >
+                              <option value="">No skill check</option>
+                              {stats.map((stat) => (
+                                <option key={stat.name} value={stat.name}>
+                                  {stat.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {editStartingChoice.skill_used && (
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                DC
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="100"
+                                value={editStartingChoice.skill_dc || 50}
+                                onChange={(e) =>
+                                  setEditStartingChoice({
+                                    ...editStartingChoice,
+                                    skill_dc: parseInt(e.target.value) || 50,
+                                  })
+                                }
+                                className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                              Requires Item
+                            </label>
+                            <select
+                              value={editStartingChoice.item_used || ""}
+                              onChange={(e) =>
+                                setEditStartingChoice({
+                                  ...editStartingChoice,
+                                  item_used: e.target.value || undefined,
+                                })
+                              }
+                              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            >
+                              <option value="">No item required</option>
+                              {inventory.map((item) => (
+                                <option key={item.name} value={item.name}>
+                                  {item.name}
+                                </option>
+                              ))}
+                            </select>
+                            {editStartingChoice.item_used && (
+                              <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 dark:text-gray-300">
+                                <input
+                                  type="checkbox"
+                                  checked={editStartingChoice.item_loss || false}
+                                  onChange={(e) =>
+                                    setEditStartingChoice({
+                                      ...editStartingChoice,
+                                      item_loss: e.target.checked,
+                                    })
+                                  }
+                                  className="w-4 h-4 rounded"
+                                />
+                                Consume item on use
+                              </label>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                              Resource Cost
+                            </label>
+                            <select
+                              value={editStartingChoice.resource_used || ""}
+                              onChange={(e) =>
+                                setEditStartingChoice({
+                                  ...editStartingChoice,
+                                  resource_used: e.target.value || undefined,
+                                })
+                              }
+                              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            >
+                              <option value="">No resource cost</option>
+                              {resources.map((res) => (
+                                <option key={res.name} value={res.name}>
+                                  {res.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        {/* Mythic GME Section in Edit */}
+                        {mythicEnabled && (
+                          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                            <h4 className="text-sm font-bold text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
+                              <DynamicIcon name="Sparkles" className="w-4 h-4" />
+                              Mythic GME Options
+                            </h4>
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                  Fate Check Question
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editStartingChoice.mythic_check || ""}
+                                  onChange={(e) =>
+                                    setEditStartingChoice({
+                                      ...editStartingChoice,
+                                      mythic_check: e.target.value || undefined,
+                                    })
+                                  }
+                                  placeholder="e.g., Is the door locked? (Likely)"
+                                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                />
+                              </div>
+                              {editStartingChoice.mythic_check && editStartingChoice.skill_used && (
+                                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={editStartingChoice.mythic_context_only || false}
+                                    onChange={(e) =>
+                                      setEditStartingChoice({
+                                        ...editStartingChoice,
+                                        mythic_context_only: e.target.checked,
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded"
+                                  />
+                                  Mythic provides context only
+                                </label>
+                              )}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                    Mythic Table Roll
+                                  </label>
+                                  <select
+                                    value={editStartingChoice.mythic_table || ""}
+                                    onChange={(e) =>
+                                      setEditStartingChoice({
+                                        ...editStartingChoice,
+                                        mythic_table: e.target.value || undefined,
+                                      })
+                                    }
+                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                  >
+                                    <option value="">No Mythic table</option>
+                                    <option value="action">Action</option>
+                                    <option value="subject">Subject</option>
+                                    <option value="action_subject">Action + Subject</option>
+                                    <option value="character_descriptors">Character Descriptors</option>
+                                    <option value="character_identity">Character Identity</option>
+                                    <option value="character_personality">Character Personality</option>
+                                    <option value="character_motivations">Character Motivations</option>
+                                    <option value="character_skills">Character Skills</option>
+                                    <option value="character_flaws">Character Flaws</option>
+                                    <option value="locations">Locations</option>
+                                    <option value="objects">Objects</option>
+                                    <option value="plot_twists">Plot Twists</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                    Custom Table Roll
+                                  </label>
+                                  <select
+                                    value={editStartingChoice.custom_table || ""}
+                                    onChange={(e) =>
+                                      setEditStartingChoice({
+                                        ...editStartingChoice,
+                                        custom_table: e.target.value || undefined,
+                                      })
+                                    }
+                                    className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                  >
+                                    <option value="">No custom table</option>
+                                    {customTables.map((table) => (
+                                      <option key={table.id} value={table.name}>
+                                        {table.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              if (!editStartingChoice.text?.trim()) {
+                                addNotification(
+                                  "Choice text is required",
+                                  "warning"
+                                );
+                                return;
+                              }
+                              const updated = [...startingChoices];
+                              updated[index] = {
+                                text: editStartingChoice.text!.trim(),
+                                intro_override:
+                                  editStartingChoice.intro_override?.trim() ||
+                                  undefined,
+                                skill_used:
+                                  editStartingChoice.skill_used || undefined,
+                                skill_dc: editStartingChoice.skill_used
+                                  ? editStartingChoice.skill_dc
+                                  : undefined,
+                                resource_used:
+                                  editStartingChoice.resource_used || undefined,
+                                item_used:
+                                  editStartingChoice.item_used || undefined,
+                                item_loss: editStartingChoice.item_used
+                                  ? editStartingChoice.item_loss
+                                  : undefined,
+                                mythic_check:
+                                  editStartingChoice.mythic_check || undefined,
+                                mythic_context_only:
+                                  editStartingChoice.mythic_check && editStartingChoice.skill_used
+                                    ? editStartingChoice.mythic_context_only
+                                    : undefined,
+                                mythic_table:
+                                  editStartingChoice.mythic_table || undefined,
+                                custom_table:
+                                  editStartingChoice.custom_table || undefined,
+                              };
+                              setStartingChoices(updated);
+                              setEditingStartingChoiceIndex(null);
+                              setEditStartingChoice({});
+                              addNotification("Starting choice updated!", "success");
+                            }}
+                            disabled={!editStartingChoice.text?.trim()}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+                          >
+                            <DynamicIcon
+                              name="Save"
+                              className="inline-block w-4 h-4 mr-1"
+                            />
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingStartingChoiceIndex(null);
+                              setEditStartingChoice({});
+                            }}
+                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // View mode
+                    <div
+                      key={index}
+                      className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
+                            <span className="text-green-600 dark:text-green-400">
+                              {index + 1}.
+                            </span>
+                            <span>{choice.text}</span>
+                          </div>
+                          {choice.intro_override && (
+                            <p className="text-sm text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                              <DynamicIcon
+                                name="FileText"
+                                className="w-3 h-3"
+                              />
+                              Custom intro text
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {choice.skill_used && (
+                              <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 rounded text-xs">
+                                <DynamicIcon
+                                  name="Dices"
+                                  className="w-3 h-3 inline mr-1"
+                                />
+                                {choice.skill_used} DC {choice.skill_dc}
+                              </span>
+                            )}
+                            {choice.item_used && (
+                              <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 rounded text-xs">
+                                <DynamicIcon
+                                  name="Package"
+                                  className="w-3 h-3 inline mr-1"
+                                />
+                                {choice.item_loss ? "Consumes" : "Requires"}: {choice.item_used}
+                              </span>
+                            )}
+                            {choice.resource_used && (
+                              <span className="px-2 py-0.5 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 rounded text-xs">
+                                <DynamicIcon
+                                  name="Gem"
+                                  className="w-3 h-3 inline mr-1"
+                                />
+                                Uses: {choice.resource_used}
+                              </span>
+                            )}
+                            {choice.mythic_check && (
+                              <span className="px-2 py-0.5 bg-pink-100 dark:bg-pink-900/30 text-pink-800 dark:text-pink-200 rounded text-xs">
+                                <DynamicIcon
+                                  name="Sparkles"
+                                  className="w-3 h-3 inline mr-1"
+                                />
+                                Fate: {choice.mythic_check}
+                              </span>
+                            )}
+                            {choice.mythic_table && (
+                              <span className="px-2 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-200 rounded text-xs">
+                                <DynamicIcon
+                                  name="TableProperties"
+                                  className="w-3 h-3 inline mr-1"
+                                />
+                                Mythic: {choice.mythic_table}
+                              </span>
+                            )}
+                            {choice.custom_table && (
+                              <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 rounded text-xs">
+                                <DynamicIcon
+                                  name="List"
+                                  className="w-3 h-3 inline mr-1"
+                                />
+                                Table: {choice.custom_table}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditingStartingChoiceIndex(index);
+                              setEditStartingChoice({ ...choice });
+                            }}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                            title="Edit"
+                          >
+                            <DynamicIcon name="Edit2" className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setStartingChoices(
+                                startingChoices.filter((_, i) => i !== index)
+                              );
+                              addNotification("Starting choice removed", "success");
+                            }}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                            title="Delete"
+                          >
+                            <DynamicIcon name="Trash2" className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                )
+              )}
             </div>
           </div>
         );
@@ -8710,13 +9566,13 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Progress Steps */}
-        <div className="mb-8 bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 overflow-x-auto">
-          <div className="flex gap-2 min-w-max">
+        <div className="mb-8 bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700">
+          <DraggableScroll innerClassName="gap-2">
             {steps.map((step, index) => (
               <button
                 key={step.id}
                 onClick={() => setCurrentStep(step.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap ${
+                className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap ${
                   currentStep === step.id
                     ? "bg-purple-600 text-white"
                     : index < currentStepIndex
@@ -8728,7 +9584,7 @@ function AdventureCreatorContent() {
                 <span className="hidden sm:inline">{step.label}</span>
               </button>
             ))}
-          </div>
+          </DraggableScroll>
         </div>
 
         {/* Content */}
@@ -8862,11 +9718,13 @@ function AdventureCreatorContent() {
           presets,
           upgradeSettings,
           mythicState: mythicEnabled ? mythicState : undefined,
+          customTables,
         }}
         adventureMetadata={{
           title: title,
           shortDescription: shortDescription,
           description: description,
+          startingChoices: startingChoices,
         }}
         onApplyChanges={handleApplyAIChanges}
       />

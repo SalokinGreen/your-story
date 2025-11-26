@@ -100,6 +100,7 @@ export default function AdventureDetailPage() {
               localAdventure.adventureData.estimatedDuration || "1-2 hours",
             storyTemplate: localAdventure.adventureData.storyTemplate || {},
             presets: localAdventure.adventureData.presets || [],
+            startingChoices: localAdventure.adventureData.startingChoices,
             rating: 0,
             playCount: 0,
             authorId: user?.id || "",
@@ -293,6 +294,7 @@ export default function AdventureDetailPage() {
           ...adventure.storyTemplate,
           story_name: `${adventure.title} - ${new Date().toLocaleDateString()}`,
           player_name: user.user_metadata?.display_name || "Player",
+          starting_choices: adventure.startingChoices,
         } as unknown as StoryData; // Cast to StoryData as template should be valid
 
         await saveLocalStory(localId, newStoryData);
@@ -321,7 +323,10 @@ export default function AdventureDetailPage() {
           adventureId: adventure.id,
           userId: user.id,
           storyName: `${adventure.title} - ${new Date().toLocaleDateString()}`,
-          storyData: adventure.storyTemplate,
+          storyData: {
+            ...adventure.storyTemplate,
+            starting_choices: adventure.startingChoices,
+          },
           isPublic: false,
         }),
       });

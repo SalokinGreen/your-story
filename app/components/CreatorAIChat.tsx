@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { ChatMessage } from "@/app/misc/ai";
-import { StoryData } from "@/app/misc/structs";
+import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
 import { parseCreatorOutput } from "@/app/misc/creator_ai";
 import { AI_MODELS } from "@/app/misc/ai_prices";
@@ -16,6 +16,7 @@ interface CreatorAIChatProps {
     title?: string;
     shortDescription?: string;
     description?: string;
+    startingChoices?: StartingChoice[];
   };
   adventureId?: string; // Optional adventure ID for chat persistence
   onApplyChanges: (
@@ -23,6 +24,7 @@ interface CreatorAIChatProps {
       title?: string;
       shortDescription?: string;
       description?: string;
+      startingChoices?: StartingChoice[];
     }
   ) => void;
 }

@@ -174,6 +174,7 @@ export async function GET(request: NextRequest) {
       storyTemplate: item.story_template,
       selectedPreset: item.selected_preset,
       presets: item.presets,
+      startingChoices: item.starting_choices,
     }));
 
     return NextResponse.json({ adventures }, { status: 200 });
@@ -236,6 +237,7 @@ export async function POST(request: NextRequest) {
       storyTemplate,
       selectedPreset,
       presets,
+      startingChoices,
     } = body;
 
     // Validate that the authorId matches the authenticated user
@@ -287,6 +289,7 @@ export async function POST(request: NextRequest) {
           mythic_state: storyTemplate?.mythicState || null,
           selected_preset: selectedPreset || null,
           presets: presets || null,
+          starting_choices: startingChoices || null,
           popularity: 0,
           rating: 0,
           play_count: 0,
@@ -325,6 +328,7 @@ export async function POST(request: NextRequest) {
       storyTemplate: data.story_template,
       selectedPreset: data.selected_preset,
       presets: data.presets,
+      startingChoices: data.starting_choices,
     };
 
     return NextResponse.json({ adventure }, { status: 201 });

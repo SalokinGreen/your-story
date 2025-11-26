@@ -33,6 +33,7 @@ import { encryptStoryData } from "../misc/encryption";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { IconPicker } from "../components/IconPicker";
 import { CustomTablesEditor } from "../components/CustomTablesEditor";
+import { DraggableScroll } from "../components/DraggableScroll";
 
 // AI Model Selector Component with state management
 function AIModelSelector({
@@ -5012,7 +5013,7 @@ export default function MenuPage({
             </div>
 
             {/* Tabs - Made sticky with background to prevent content overlap */}
-            <div className="sticky top-0 z-10 bg-white dark:bg-blue-950 flex gap-3 px-6 py-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto overflow-y-hidden scrollbar-thin">
+            <DraggableScroll className="sticky top-0 z-10 bg-white dark:bg-blue-950 px-6 py-4 border-b border-gray-200 dark:border-gray-700 scrollbar-thin" innerClassName="gap-3">
               {[
                 { id: "basic", label: "Basic", icon: "FileText" },
                 { id: "stats", label: "Stats & Resources", icon: "BarChart2" },
@@ -5044,7 +5045,7 @@ export default function MenuPage({
                   <span className="leading-none">{tab.label}</span>
                 </button>
               ))}
-            </div>
+            </DraggableScroll>
 
             {/* Content Area */}
             {/* Ensure consistent inner spacing and prevent layout shift */}
