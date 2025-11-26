@@ -79,55 +79,45 @@ export default function EditDisplayName({
 
   if (!isEditing) {
     return (
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => setIsEditing(true)}
-          className="px-3 py-1 text-sm bg-gray-200 dark:bg-blue-950 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-        >
-          <DynamicIcon name="Edit" className="w-4 h-4" /> Edit Name
-        </button>
-      </div>
+      <button
+        onClick={() => setIsEditing(true)}
+        className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+      >
+        <DynamicIcon name="Edit2" className="w-3 h-3" /> Edit name
+      </button>
     );
   }
 
   return (
-    <div className="border-2 border-blue-600 dark:border-blue-400 p-4 bg-blue-50 dark:bg-blue-950">
-      <h3 className="text-lg font-bold mb-3">Edit Display Name</h3>
-      <form onSubmit={handleSave} className="flex flex-col gap-3">
+    <div className="mt-2 bg-blue-900/30 rounded-lg p-3 border border-blue-800/30">
+      <form onSubmit={handleSave} className="flex gap-2">
         <input
           type="text"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          placeholder="Enter display name"
+          placeholder="Display name"
           maxLength={50}
-          className="border-2 border-blue-600 dark:border-blue-400 p-2 bg-white dark:bg-black"
+          className="flex-1 bg-blue-950/50 border border-blue-800/30 rounded-lg px-3 py-1.5 text-white text-sm placeholder-blue-200/30 focus:border-blue-600 focus:outline-none"
           disabled={loading}
           autoFocus
         />
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={
-              loading ||
-              !displayName.trim() ||
-              displayName === currentDisplayName
-            }
-            className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? "Saving..." : "Save"}
-          </button>
-          <button
-            type="button"
-            onClick={handleCancel}
-            disabled={loading}
-            className="flex-1 px-4 py-2 bg-gray-300 dark:bg-gray-900 font-semibold hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-        <p className="text-xs text-gray-600 dark:text-gray-400">
-          Max 50 characters
-        </p>
+        <button
+          type="submit"
+          disabled={
+            loading || !displayName.trim() || displayName === currentDisplayName
+          }
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
+        >
+          {loading ? "..." : "Save"}
+        </button>
+        <button
+          type="button"
+          onClick={handleCancel}
+          disabled={loading}
+          className="px-3 py-1.5 bg-blue-900/50 text-blue-200 text-sm font-medium rounded-lg hover:bg-blue-900/70 disabled:opacity-50 transition-colors"
+        >
+          Cancel
+        </button>
       </form>
     </div>
   );

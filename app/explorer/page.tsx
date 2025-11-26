@@ -1,81 +1,100 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Adventure } from "@/app/misc/structs";
 import { useAuth } from "@/app/misc/AuthContext";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
+import { DraggableScroll } from "@/app/components/DraggableScroll";
 import {
   AdventureGridSkeleton,
   FeaturedCarouselSkeleton,
 } from "@/app/components/Skeleton";
+
+const GENRES = [
+  "All",
+  "Fantasy",
+  "Sci-Fi",
+  "Mystery",
+  "Horror",
+  "Romance",
+  "Adventure",
+  "Comedy",
+  "Drama",
+  "Historical",
+];
+
+const SORT_OPTIONS = [
+  { value: "popularity", label: "Popular" },
+  { value: "newest", label: "New" },
+  { value: "rating", label: "Top Rated" },
+  { value: "title", label: "A-Z" },
+];
 
 export default function ExplorerPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [adventures, setAdventures] = useState<Adventure[]>([]);
   const [featuredAdventures, setFeaturedAdventures] = useState<Adventure[]>([]);
-  const [allTags, setAllTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingFeatured, setLoadingFeatured] = useState(true);
-  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedDifficulties, setSelectedDifficulties] = useState<
-    ("easy" | "medium" | "hard" | "expert")[]
-  >([]);
+  const [selectedGenre, setSelectedGenre] = useState("All");
   const [sortBy, setSortBy] = useState<
     "popularity" | "newest" | "rating" | "title"
   >("popularity");
-  const [showFilters, setShowFilters] = useState(false);
   const [showNsfw, setShowNsfw] = useState(false);
+  const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);
 
-  // Fetch adventures from database
+  const filtersRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        filtersRef.current &&
+        !filtersRef.current.contains(e.target as Node)
+      ) {
+        setShowFiltersDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Fetch adventures
   useEffect(() => {
     const fetchAdventures = async () => {
       try {
         setLoading(true);
-
-        // Build query params
         const params = new URLSearchParams();
         if (searchQuery) params.append("search", searchQuery);
-        if (selectedTags.length > 0)
-          params.append("tags", selectedTags.join(","));
-        if (selectedDifficulties.length > 0)
-          params.append("difficulty", selectedDifficulties.join(","));
+        if (selectedGenre !== "All") params.append("tags", selectedGenre);
         if (showNsfw) params.append("nsfw", "true");
         params.append("sortBy", sortBy);
 
         const response = await fetch(`/api/adventures?${params}`);
-        if (!response.ok) throw new Error("Failed to fetch adventures");
-
-        const { adventures: fetchedAdventures } = await response.json();
-        setAdventures(fetchedAdventures);
-
-        // Extract unique tags
-        const tags = new Set<string>();
-        fetchedAdventures.forEach((adventure: Adventure) => {
-          adventure.tags.forEach((tag: string) => tags.add(tag));
-        });
-        setAllTags(Array.from(tags).sort());
+        if (!response.ok) throw new Error("Failed to fetch");
+        const { adventures: fetched } = await response.json();
+        setAdventures(fetched);
       } catch (error) {
         console.error("Error fetching adventures:", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchAdventures();
-  }, [searchQuery, selectedTags, selectedDifficulties, sortBy, showNsfw]);
+  }, [searchQuery, selectedGenre, sortBy, showNsfw]);
 
-  // Fetch featured adventures
+  // Fetch featured
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
         setLoadingFeatured(true);
         const response = await fetch("/api/adventures?featured=true");
         if (!response.ok) throw new Error("Failed to fetch featured");
-
         const { adventures: featured } = await response.json();
         setFeaturedAdventures(featured);
       } catch (error) {
@@ -84,492 +103,361 @@ export default function ExplorerPage() {
         setLoadingFeatured(false);
       }
     };
-
     fetchFeatured();
   }, []);
 
-  // Auto-advance carousel
-  useEffect(() => {
-    if (featuredAdventures.length === 0) return;
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % featuredAdventures.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [featuredAdventures.length]);
-
-  const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  };
-
-  const toggleDifficulty = (diff: "easy" | "medium" | "hard" | "expert") => {
-    setSelectedDifficulties((prev) =>
-      prev.includes(diff) ? prev.filter((d) => d !== diff) : [...prev, diff]
-    );
-  };
-
   const getDifficultyColor = (difficulty: string) => {
-    const lower = difficulty.toLowerCase();
-    switch (lower) {
+    switch (difficulty.toLowerCase()) {
       case "easy":
-        return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800";
+        return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
       case "medium":
-        return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800";
+        return "bg-amber-500/20 text-amber-400 border-amber-500/30";
       case "hard":
-        return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800";
+        return "bg-orange-500/20 text-orange-400 border-orange-500/30";
       case "expert":
-        return "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800";
+        return "bg-red-500/20 text-red-400 border-red-500/30";
       default:
-        return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800";
+        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
     }
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 pt-16">
-      <div className="max-w-7xl mx-auto p-3 sm:p-6">
-        {/* Header */}
-        <div className="mb-5">
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
-            <h1 className="text-2xl sm:text-3xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Story Explorer
-            </h1>
-            <div className="flex gap-2">
-              {user && (
-                <button
-                  onClick={() => router.push("/library")}
-                  className="px-3 py-1.5 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2 text-sm"
-                >
-                  <DynamicIcon name="Library" className="w-4 h-4" /> Library
-                </button>
-              )}
-              <button
-                onClick={() => router.push("/")}
-                className="px-3 py-1.5 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2 text-sm"
-              >
-                <DynamicIcon name="ArrowLeft" className="w-4 h-4" /> Home
-              </button>
-            </div>
-          </div>
-          <p className="text-gray-700 dark:text-gray-300">
-            Discover amazing interactive stories or create your own adventure
-          </p>
-        </div>
+    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 text-white">
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-50 bg-blue-950/80 backdrop-blur-xl border-b border-blue-800/30">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex items-center gap-3">
+            {/* Back Button */}
+            <button
+              onClick={() => router.push("/")}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
+            </button>
 
-        {/* Featured Carousel */}
-        {loadingFeatured ? (
-          <div className="mb-8">
-            <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-white flex items-center gap-2">
-              <DynamicIcon name="Star" className="w-5 h-5 text-yellow-500" />{" "}
-              Featured Adventures
-            </h2>
-            <FeaturedCarouselSkeleton />
-          </div>
-        ) : (
-          featuredAdventures.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-white flex items-center gap-2">
-                <DynamicIcon name="Star" className="w-5 h-5 text-yellow-500" />{" "}
-                Featured Adventures
-              </h2>
-              <div className="relative bg-white dark:bg-blue-950 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                <div className="relative h-80 sm:h-72 md:h-80">
-                  {featuredAdventures.map((adventure, index) => (
-                    <div
-                      key={adventure.id}
-                      className={`absolute inset-0 transition-opacity duration-500 ${
-                        index === currentSlide ? "opacity-100" : "opacity-0"
-                      }`}
-                    >
-                      <div
-                        className={`h-full p-6 sm:p-8 md:p-12 flex flex-col justify-end sm:justify-center relative ${
-                          adventure.bannerUrl
-                            ? "bg-cover bg-center"
-                            : "bg-linear-to-r from-purple-600 via-pink-600 to-blue-600"
-                        }`}
-                        style={
-                          adventure.bannerUrl
-                            ? { backgroundImage: `url(${adventure.bannerUrl})` }
-                            : {}
-                        }
-                      >
-                        {adventure.bannerUrl && (
-                          <div className="absolute inset-0 bg-linear-to-t sm:bg-linear-to-r from-black/95 via-black/80 to-black/40 sm:from-black/90 sm:via-black/60 sm:to-transparent z-0"></div>
-                        )}
-                        <div className="max-w-2xl relative z-10">
-                          <div className="flex items-center gap-2 mb-3 flex-wrap">
-                            <span
-                              className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold border-2 ${getDifficultyColor(
-                                adventure.difficulty
-                              )}`}
-                            >
-                              {adventure.difficulty}
-                            </span>
-                            <span className="px-2 sm:px-3 py-1 bg-white/20 text-white rounded-full text-xs sm:text-sm font-semibold flex items-center gap-1">
-                              <DynamicIcon
-                                name="Star"
-                                className="w-3 sm:w-4 h-3 sm:h-4 fill-current"
-                              />{" "}
-                              {adventure.rating?.toFixed(1)}
-                            </span>
-                          </div>
-                          <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4 leading-tight">
-                            {adventure.title}
-                          </h3>
-                          <p className="text-white/90 text-sm sm:text-base md:text-lg mb-4 sm:mb-6 line-clamp-2 sm:line-clamp-3">
-                            {adventure.description}
-                          </p>
-                          <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-6">
-                            {adventure.tags.slice(0, 4).map((tag) => (
-                              <span
-                                key={tag}
-                                className="px-2 sm:px-3 py-1 bg-white/20 text-white rounded-full text-xs sm:text-sm"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                          <button
-                            onClick={() =>
-                              router.push(`/explorer/${adventure.id}`)
-                            }
-                            className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white text-purple-600 font-bold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 text-sm sm:text-base"
-                          >
-                            Start Adventure →
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Carousel Navigation */}
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-20">
-                  {featuredAdventures.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setCurrentSlide(index)}
-                      className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all ${
-                        index === currentSlide
-                          ? "bg-white w-6 sm:w-8"
-                          : "bg-white/50 hover:bg-white/75"
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                {/* Arrow Navigation */}
-                <button
-                  onClick={() =>
-                    setCurrentSlide(
-                      (prev) =>
-                        (prev - 1 + featuredAdventures.length) %
-                        featuredAdventures.length
-                    )
-                  }
-                  className="absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors z-20"
-                >
-                  <DynamicIcon
-                    name="ChevronLeft"
-                    className="w-5 h-5 sm:w-6 sm:h-6"
-                  />
-                </button>
-                <button
-                  onClick={() =>
-                    setCurrentSlide(
-                      (prev) => (prev + 1) % featuredAdventures.length
-                    )
-                  }
-                  className="absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors z-20"
-                >
-                  <DynamicIcon
-                    name="ChevronRight"
-                    className="w-5 h-5 sm:w-6 sm:h-6"
-                  />
-                </button>
-              </div>
-            </div>
-          )
-        )}
-
-        {/* Create Your Own Section */}
-        <div className="mb-8">
-          <div className="bg-linear-to-r from-green-400 via-blue-500 to-purple-500 rounded-xl shadow-lg p-5 border border-gray-200 dark:border-gray-700">
-            <div className="max-w-3xl mx-auto text-center">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 flex items-center justify-center gap-2">
-                <DynamicIcon name="Sparkles" className="w-6 h-6" /> Create Your
-                Own Story
-              </h2>
-              <p className="text-white/90 mb-4">
-                Have an idea for an epic adventure? Bring your imagination to
-                life and share it with the community!
-              </p>
-              <button
-                onClick={() => {
-                  if (!user) {
-                    router.push("/");
-                  } else {
-                    router.push("/creator");
-                  }
-                }}
-                className="px-6 py-3 bg-white text-purple-600 font-bold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center gap-2 mx-auto"
-              >
-                {user ? (
-                  <>
-                    <DynamicIcon name="Palette" className="w-5 h-5" /> Start
-                    Creating
-                  </>
-                ) : (
-                  <>
-                    <DynamicIcon name="Lock" className="w-5 h-5" /> Sign In to
-                    Create
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Search and Filters */}
-        <div className="mb-5 bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 border border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col gap-3">
-            {/* Search Bar */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            {/* Search */}
+            <div className="flex-1 relative">
+              <DynamicIcon
+                name="Search"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400/50"
+              />
               <input
                 type="text"
                 placeholder="Search adventures..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-colors"
+                className="w-full pl-10 pr-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 focus:bg-blue-900/70 transition-all"
               />
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
-              >
-                {showFilters ? "Hide Filters" : "Show Filters"}
-              </button>
             </div>
 
-            {/* Filters Panel */}
-            {showFilters && (
-              <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                {/* Sort By */}
-                <div>
-                  <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
-                    Sort By:
-                  </label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
-                    className="w-full sm:w-auto px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                  >
-                    <option value="popularity">Most Popular</option>
-                    <option value="newest">Newest</option>
-                    <option value="rating">Highest Rated</option>
-                    <option value="title">A-Z</option>
-                  </select>
-                </div>
+            {/* Filter Button */}
+            <div className="relative" ref={filtersRef}>
+              <button
+                onClick={() => setShowFiltersDropdown(!showFiltersDropdown)}
+                className={`p-2.5 rounded-xl border transition-all ${
+                  showFiltersDropdown || showNsfw
+                    ? "bg-purple-500/20 border-purple-500/50 text-purple-400"
+                    : "bg-blue-900/50 border-blue-700/50 hover:bg-blue-800/50"
+                }`}
+              >
+                <DynamicIcon name="SlidersHorizontal" className="w-5 h-5" />
+              </button>
 
-                {/* Difficulty Filter */}
-                <div>
-                  <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
-                    Difficulty:
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {(["easy", "medium", "hard", "expert"] as const).map(
-                      (diff) => (
+              {/* Filters Dropdown */}
+              {showFiltersDropdown && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-blue-950 border border-blue-700/50 rounded-xl shadow-2xl p-4 space-y-4">
+                  {/* Sort */}
+                  <div>
+                    <label className="text-xs font-medium text-blue-300/70 uppercase tracking-wider">
+                      Sort by
+                    </label>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {SORT_OPTIONS.map((option) => (
                         <button
-                          key={diff}
-                          onClick={() => toggleDifficulty(diff)}
-                          className={`px-4 py-2 rounded-lg font-semibold transition-all border-2 ${
-                            selectedDifficulties.includes(diff)
-                              ? getDifficultyColor(diff) +
-                                " ring-2 ring-offset-2"
-                              : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600"
+                          key={option.value}
+                          onClick={() =>
+                            setSortBy(option.value as typeof sortBy)
+                          }
+                          className={`px-3 py-1.5 text-sm rounded-lg transition-all ${
+                            sortBy === option.value
+                              ? "bg-purple-500 text-white"
+                              : "bg-blue-900/50 hover:bg-blue-800/50"
                           }`}
                         >
-                          {diff.charAt(0).toUpperCase() + diff.slice(1)}
+                          {option.label}
                         </button>
-                      )
-                    )}
-                  </div>
-                </div>
-
-                {/* Tags Filter */}
-                <div>
-                  <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
-                    Tags:
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {allTags.map((tag) => (
-                      <button
-                        key={tag}
-                        onClick={() => toggleTag(tag)}
-                        className={`px-4 py-2 rounded-full font-semibold transition-all ${
-                          selectedTags.includes(tag)
-                            ? "bg-purple-600 text-white ring-2 ring-purple-400"
-                            : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* NSFW Toggle */}
-                <div>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <div className="relative">
-                      <input
-                        type="checkbox"
-                        checked={showNsfw}
-                        onChange={(e) => setShowNsfw(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
+                      ))}
                     </div>
-                    <span className="text-sm font-bold text-gray-900 dark:text-white">
-                      Show NSFW Content
-                    </span>
-                  </label>
-                </div>
+                  </div>
 
-                {/* Clear Filters */}
-                {(selectedTags.length > 0 ||
-                  selectedDifficulties.length > 0 ||
-                  searchQuery) && (
-                  <button
-                    onClick={() => {
-                      setSelectedTags([]);
-                      setSelectedDifficulties([]);
-                      setSearchQuery("");
-                    }}
-                    className="px-4 py-2 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
-                  >
-                    Clear All Filters
-                  </button>
-                )}
-              </div>
+                  {/* NSFW Toggle */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Show NSFW</span>
+                    <button
+                      onClick={() => setShowNsfw(!showNsfw)}
+                      className={`w-10 h-6 rounded-full transition-colors ${
+                        showNsfw ? "bg-red-500" : "bg-blue-800/50"
+                      }`}
+                    >
+                      <div
+                        className={`w-4 h-4 bg-white rounded-full transition-transform mx-1 ${
+                          showNsfw ? "translate-x-4" : ""
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Nav Buttons */}
+            {user && (
+              <button
+                onClick={() => router.push("/library")}
+                className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-blue-900/50 border border-blue-700/50 hover:bg-blue-800/50 rounded-xl transition-colors"
+              >
+                <DynamicIcon name="Library" className="w-4 h-4" />
+                <span className="text-sm font-medium">Library</span>
+              </button>
             )}
+            <button
+              onClick={() => router.push(user ? "/creator" : "/")}
+              className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl transition-colors"
+            >
+              <DynamicIcon name="Plus" className="w-4 h-4" />
+              <span className="text-sm font-medium">Create</span>
+            </button>
           </div>
         </div>
+      </header>
 
-        {/* Adventures Grid */}
-        <div>
-          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
-            All Adventures {!loading && `(${adventures.length})`}
-          </h2>
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-8">
+        {/* Genre Pills */}
+        <DraggableScroll className="pb-2" innerClassName="gap-2 px-1">
+          {GENRES.map((genre) => (
+            <button
+              key={genre}
+              onClick={() => setSelectedGenre(genre)}
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                selectedGenre === genre
+                  ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/25"
+                  : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50 hover:text-white"
+              }`}
+            >
+              {genre}
+            </button>
+          ))}
+        </DraggableScroll>
+
+        {/* Featured Section */}
+        {loadingFeatured ? (
+          <section>
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <DynamicIcon
+                name="Sparkles"
+                className="w-5 h-5 text-yellow-500"
+              />
+              Featured
+            </h2>
+            <FeaturedCarouselSkeleton />
+          </section>
+        ) : (
+          featuredAdventures.length > 0 && (
+            <section>
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <DynamicIcon
+                  name="Sparkles"
+                  className="w-5 h-5 text-yellow-500"
+                />
+                Featured
+              </h2>
+              <DraggableScroll className="pb-2" innerClassName="gap-4 px-1">
+                {featuredAdventures.map((adventure) => (
+                  <div
+                    key={adventure.id}
+                    onClick={() => router.push(`/explorer/${adventure.id}`)}
+                    className="group relative w-72 h-44 rounded-2xl overflow-hidden cursor-pointer shrink-0"
+                  >
+                    {/* Background */}
+                    {adventure.bannerUrl ? (
+                      <div
+                        className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
+                        style={{
+                          backgroundImage: `url(${adventure.bannerUrl})`,
+                        }}
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-linear-to-br from-purple-600 via-pink-600 to-blue-600" />
+                    )}
+
+                    {/* Overlay */}
+                    <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/40 to-transparent" />
+
+                    {/* Content */}
+                    <div className="absolute inset-0 p-4 flex flex-col justify-end">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span
+                          className={`px-2 py-0.5 text-xs font-medium rounded border ${getDifficultyColor(
+                            adventure.difficulty
+                          )}`}
+                        >
+                          {adventure.difficulty}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-yellow-400">
+                          <DynamicIcon
+                            name="Star"
+                            className="w-3 h-3 fill-current"
+                          />
+                          {adventure.rating?.toFixed(1)}
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-lg leading-tight line-clamp-2">
+                        {adventure.title}
+                      </h3>
+                      <p className="text-xs text-blue-100/70 mt-1 line-clamp-1">
+                        {adventure.shortDescription}
+                      </p>
+                    </div>
+
+                    {/* Hover Effect */}
+                    <div className="absolute inset-0 border-2 border-white/0 group-hover:border-white/20 rounded-2xl transition-colors" />
+                  </div>
+                ))}
+              </DraggableScroll>
+            </section>
+          )
+        )}
+
+        {/* All Adventures */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">
+              {selectedGenre === "All" ? "All Adventures" : selectedGenre}
+              {!loading && (
+                <span className="text-blue-300/50 font-normal ml-2">
+                  ({adventures.length})
+                </span>
+              )}
+            </h2>
+          </div>
+
           {loading ? (
             <AdventureGridSkeleton count={6} />
           ) : adventures.length === 0 ? (
-            <div className="text-center py-8 bg-white dark:bg-blue-950 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-              <p className="text-gray-600 dark:text-gray-400">
-                No adventures found matching your filters
+            <div className="flex flex-col items-center justify-center py-16 text-blue-300/50">
+              <DynamicIcon
+                name="Search"
+                className="w-12 h-12 mb-4 opacity-50"
+              />
+              <p className="text-lg">No adventures found</p>
+              <p className="text-sm mt-1">
+                Try adjusting your search or filters
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {adventures.map((adventure) => (
-                <div
+                <article
                   key={adventure.id}
-                  className="bg-white dark:bg-blue-950 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-150 cursor-pointer"
                   onClick={() => router.push(`/explorer/${adventure.id}`)}
+                  className="group bg-blue-950/50 hover:bg-blue-900/50 border border-blue-800/30 hover:border-blue-700/50 rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-xl hover:shadow-blue-500/10"
                 >
-                  {/* Thumbnail Image or Placeholder */}
-                  {adventure.thumbnailUrl ? (
-                    <div
-                      className="h-40 bg-cover bg-center"
-                      style={{
-                        backgroundImage: `url(${adventure.thumbnailUrl})`,
-                      }}
-                    />
-                  ) : (
-                    <div className="h-40 bg-linear-to-br from-blue-400 via-purple-500 to-pink-500 flex items-center justify-center text-white">
-                      {adventure.tags[0] === "Fantasy" ? (
-                        <DynamicIcon name="Sword" className="w-16 h-16" />
-                      ) : adventure.tags[0] === "Sci-Fi" ? (
-                        <DynamicIcon name="Rocket" className="w-16 h-16" />
-                      ) : adventure.tags[0] === "Mystery" ? (
-                        <DynamicIcon name="Search" className="w-16 h-16" />
-                      ) : (
-                        <DynamicIcon name="BookOpen" className="w-16 h-16" />
-                      )}
-                    </div>
-                  )}
+                  {/* Thumbnail */}
+                  <div className="relative h-36 overflow-hidden">
+                    {adventure.thumbnailUrl || adventure.bannerUrl ? (
+                      <div
+                        className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
+                        style={{
+                          backgroundImage: `url(${
+                            adventure.thumbnailUrl || adventure.bannerUrl
+                          })`,
+                        }}
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-linear-to-br from-blue-600/50 via-purple-600/50 to-pink-600/50 flex items-center justify-center">
+                        <DynamicIcon
+                          name={
+                            adventure.tags[0] === "Fantasy"
+                              ? "Sword"
+                              : adventure.tags[0] === "Sci-Fi"
+                              ? "Rocket"
+                              : adventure.tags[0] === "Mystery"
+                              ? "Search"
+                              : adventure.tags[0] === "Horror"
+                              ? "Ghost"
+                              : "BookOpen"
+                          }
+                          className="w-10 h-10 text-white/50"
+                        />
+                      </div>
+                    )}
 
-                  <div className="p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white flex-1">
-                        {adventure.title}
-                      </h3>
-                      {adventure.isFeatured && (
-                        <span className="text-yellow-500 ml-2">
-                          <DynamicIcon
-                            name="Star"
-                            className="w-5 h-5 fill-current"
-                          />
+                    {/* Genre Tag */}
+                    <div className="absolute top-3 left-3">
+                      <span className="px-2 py-1 bg-black/60 backdrop-blur-sm text-xs font-medium rounded-lg">
+                        {adventure.tags[0] || "Adventure"}
+                      </span>
+                    </div>
+
+                    {/* NSFW Badge */}
+                    {adventure.nsfw && (
+                      <div className="absolute top-3 right-3">
+                        <span className="px-2 py-1 bg-red-500/80 text-xs font-bold rounded-lg">
+                          18+
                         </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
+                  </div>
 
-                    <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">
+                  {/* Content */}
+                  <div className="p-4">
+                    <h3 className="font-semibold text-white group-hover:text-purple-300 transition-colors line-clamp-1">
+                      {adventure.title}
+                    </h3>
+                    <p className="text-sm text-blue-200/60 mt-1 line-clamp-2 min-h-10">
                       {adventure.shortDescription}
                     </p>
 
-                    <div className="flex items-center gap-2 mb-3">
+                    {/* Meta */}
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-blue-800/30">
+                      <div className="flex items-center gap-3 text-xs text-blue-300/50">
+                        <span className="flex items-center gap-1">
+                          <DynamicIcon
+                            name="Star"
+                            className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500"
+                          />
+                          <span className="text-blue-100">
+                            {adventure.rating?.toFixed(1) || "—"}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <DynamicIcon name="Play" className="w-3.5 h-3.5" />
+                          {adventure.playCount?.toLocaleString() || "0"}
+                        </span>
+                      </div>
                       <span
-                        className={`px-2 py-1 rounded-full text-xs font-bold border capitalize ${getDifficultyColor(
+                        className={`px-2 py-0.5 text-xs font-medium rounded border ${getDifficultyColor(
                           adventure.difficulty
                         )}`}
                       >
                         {adventure.difficulty}
                       </span>
-                      <span className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                        <DynamicIcon name="Clock" className="w-3 h-3" />{" "}
-                        {adventure.estimatedDuration}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1 mb-4">
-                      {adventure.tags.slice(0, 3).map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                        <span className="flex items-center gap-1">
-                          <DynamicIcon
-                            name="Star"
-                            className="w-3 h-3 fill-current"
-                          />{" "}
-                          {adventure.rating?.toFixed(1)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <DynamicIcon name="Users" className="w-3 h-3" />{" "}
-                          {adventure.playCount
-                            ? adventure.playCount.toLocaleString()
-                            : "0"}
-                        </span>
-                      </div>
-                      <span className="text-purple-600 dark:text-purple-400 font-semibold text-sm flex items-center gap-1">
-                        Play{" "}
-                        <DynamicIcon name="ArrowRight" className="w-3 h-3" />
-                      </span>
                     </div>
                   </div>
-                </div>
+                </article>
               ))}
             </div>
           )}
-        </div>
-      </div>
+        </section>
+      </main>
+
+      {/* Mobile FAB for Create */}
+      <button
+        onClick={() => router.push(user ? "/creator" : "/")}
+        className="sm:hidden fixed bottom-6 right-6 w-14 h-14 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center transition-all hover:scale-105 z-50"
+      >
+        <DynamicIcon name="Plus" className="w-6 h-6" />
+      </button>
     </div>
   );
 }

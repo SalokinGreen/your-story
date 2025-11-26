@@ -12,6 +12,7 @@ import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { IconPicker } from "@/app/components/IconPicker";
 import { isEncrypted } from "@/app/misc/encryption";
 import EncryptionMigration from "@/app/components/EncryptionMigration";
+import { DraggableScroll } from "../components/DraggableScroll";
 import {
   LibrarySkeleton,
   StoryGridSkeleton,
@@ -54,6 +55,23 @@ interface StoryFolder {
 type LibraryView = "stories" | "adventures";
 type StorySortBy = "updated" | "created" | "name" | "chapter";
 type AdventureSortBy = "updated" | "created" | "title" | "rating" | "plays";
+
+// Helper for relative time display
+function getRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return date.toLocaleDateString();
+}
 
 export default function LibraryPage() {
   const router = useRouter();
@@ -803,62 +821,83 @@ export default function LibraryPage() {
 
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 pt-16">
-      <div className="max-w-7xl mx-auto p-3 sm:p-6">
-        {/* Header */}
-        <div className="mb-5">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-3">
-            <DynamicIcon name="BookOpen" className="w-8 h-8" />
-            My Library
-          </h1>
-          <p className="text-gray-700 dark:text-gray-300">
-            Your stories and adventures all in one place
-          </p>
+    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 text-white">
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-50 bg-blue-950/80 backdrop-blur-xl border-b border-blue-800/30">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push("/")}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
+            </button>
+            <h1 className="text-lg font-bold">Library</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {view === "stories" &&
+              (filteredStories.length > 0 ||
+                filteredLocalStories.length > 0) && (
+                <button
+                  onClick={toggleSelectionMode}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    selectionMode
+                      ? "bg-purple-600 text-white"
+                      : "hover:bg-white/10"
+                  }`}
+                >
+                  {selectionMode ? "Done" : "Select"}
+                </button>
+              )}
+            <button
+              onClick={() =>
+                router.push(view === "stories" ? "/explorer" : "/creator")
+              }
+              className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl transition-colors text-sm font-medium"
+            >
+              <DynamicIcon name="Plus" className="w-4 h-4" />
+              <span className="hidden sm:inline">
+                {view === "stories" ? "New Story" : "New Adventure"}
+              </span>
+            </button>
+          </div>
         </div>
+      </header>
 
-        {/* View Toggle */}
-        <div className="flex gap-2 mb-5">
+      <main className="max-w-6xl mx-auto px-4 py-6">
+        {/* Tab Pills */}
+        <div className="flex gap-2 mb-6">
           <button
             onClick={() => setView("stories")}
-            className={`px-4 py-2 font-semibold rounded-lg transition-all shadow-md ${
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
               view === "stories"
-                ? "bg-purple-600 text-white"
-                : "bg-white dark:bg-blue-950 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
+                ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/25"
+                : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50 hover:text-white"
             }`}
           >
-            <DynamicIcon name="Book" className="w-5 h-5 inline-block mr-2" />
-            My Stories ({filteredStories.length + filteredLocalStories.length}
-            {stories.length + localStories.length !==
-            filteredStories.length + filteredLocalStories.length
-              ? ` / ${stories.length + localStories.length}`
-              : ""}
-            )
+            <DynamicIcon name="Book" className="w-4 h-4 inline-block mr-2" />
+            Stories ({stories.length + localStories.length})
           </button>
           <button
             onClick={() => setView("adventures")}
-            className={`px-4 py-2 font-semibold rounded-lg transition-all shadow-md ${
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
               view === "adventures"
-                ? "bg-purple-600 text-white"
-                : "bg-white dark:bg-blue-950 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
+                ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/25"
+                : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50 hover:text-white"
             }`}
           >
             <DynamicIcon
               name="Gamepad2"
-              className="w-5 h-5 inline-block mr-2"
+              className="w-4 h-4 inline-block mr-2"
             />
-            My Adventures ({filteredAdventures.length + localAdventures.length}
-            {adventures.length + localAdventures.length !==
-            filteredAdventures.length + localAdventures.length
-              ? ` / ${adventures.length + localAdventures.length}`
-              : ""}
-            )
+            Adventures ({adventures.length + localAdventures.length})
           </button>
         </div>
 
@@ -870,321 +909,245 @@ export default function LibraryPage() {
             <AdventureGridSkeleton count={6} />
           )
         ) : view === "stories" ? (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            {/* Folders Sidebar */}
-            <div className="lg:col-span-1">
-              <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-3 border border-gray-200 dark:border-gray-700 sticky top-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <DynamicIcon name="Folder" className="w-5 h-5" /> Folders
-                  </h3>
-                  <button
-                    onClick={() => setShowNewFolderDialog(true)}
-                    className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
-                  >
-                    <DynamicIcon name="Plus" className="w-4 h-4" />
-                  </button>
-                </div>
+          <div className="space-y-4">
+            {/* Encryption Migration Banner */}
+            <EncryptionMigration
+              stories={stories}
+              onMigrationComplete={fetchLibraryData}
+            />
 
-                {/* All Stories */}
-                <button
-                  onClick={() => setSelectedFolder(null)}
-                  className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors flex items-center gap-2 ${
-                    selectedFolder === null
-                      ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold"
-                      : "hover:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  }`}
+            {/* Search + Folder Dropdown + Sort */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 relative">
+                <DynamicIcon
+                  name="Search"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400/50"
+                />
+                <input
+                  type="text"
+                  value={storySearch}
+                  onChange={(e) => setStorySearch(e.target.value)}
+                  placeholder="Search stories..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 focus:bg-blue-900/70 transition-all"
+                />
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={selectedFolder || "all"}
+                  onChange={(e) =>
+                    setSelectedFolder(
+                      e.target.value === "all" ? null : e.target.value
+                    )
+                  }
+                  className="px-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white focus:outline-none focus:border-purple-500/50 transition-all"
                 >
-                  <DynamicIcon name="Book" className="w-4 h-4" />
-                  All Stories ({stories.length + localStories.length})
-                </button>
-
-                {/* Uncategorized */}
-                <button
-                  onClick={() => setSelectedFolder("uncategorized")}
-                  className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors flex items-center gap-2 ${
-                    selectedFolder === "uncategorized"
-                      ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold"
-                      : "hover:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  }`}
+                  <option value="all">All Stories</option>
+                  <option value="uncategorized">Uncategorized</option>
+                  {folders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={storySortBy}
+                  onChange={(e) =>
+                    setStorySortBy(e.target.value as StorySortBy)
+                  }
+                  className="px-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white focus:outline-none focus:border-purple-500/50 transition-all"
                 >
-                  <DynamicIcon name="FileText" className="w-4 h-4" />
-                  Uncategorized (
-                  {stories.filter((s) => !s.folder_id).length +
-                    localStories.filter((s) => !s.folder_id).length}
-                  )
-                </button>
-
-                {/* User Folders */}
-                {folders.map((folder) => (
-                  <div key={folder.id} className="group relative">
-                    <button
-                      onClick={() => setSelectedFolder(folder.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition-colors flex items-center gap-2 ${
-                        selectedFolder === folder.id
-                          ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold"
-                          : "hover:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                      }`}
-                      style={{ borderLeft: `4px solid ${folder.color}` }}
-                    >
-                      <DynamicIcon name={folder.icon} className="w-4 h-4" />
-                      {folder.name} (
-                      {stories.filter((s) => s.folder_id === folder.id).length +
-                        localStories.filter((s) => s.folder_id === folder.id)
-                          .length}
-                      )
-                    </button>
-                    <div className="absolute right-2 top-2 hidden group-hover:flex gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingFolder(folder);
-                        }}
-                        className="p-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs"
-                      >
-                        <DynamicIcon name="Edit2" className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteFolder(folder.id);
-                        }}
-                        className="p-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
-                      >
-                        <DynamicIcon name="Trash2" className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  <option value="updated">Recent</option>
+                  <option value="created">Created</option>
+                  <option value="name">A-Z</option>
+                  <option value="chapter">Progress</option>
+                </select>
               </div>
             </div>
 
-            {/* Stories Content */}
-            <div className="lg:col-span-3">
-              {/* Encryption Migration Banner */}
-              <EncryptionMigration
-                stories={stories}
-                onMigrationComplete={fetchLibraryData}
-              />
+            {/* Folder Chips */}
+            <DraggableScroll className="pb-2" innerClassName="gap-2 px-1">
+              <button
+                onClick={() => setSelectedFolder(null)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  selectedFolder === null
+                    ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
+                    : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
+                }`}
+              >
+                <DynamicIcon name="Book" className="w-3.5 h-3.5" />
+                All ({stories.length + localStories.length})
+              </button>
+              <button
+                onClick={() => setSelectedFolder("uncategorized")}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  selectedFolder === "uncategorized"
+                    ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
+                    : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
+                }`}
+              >
+                <DynamicIcon name="FileText" className="w-3.5 h-3.5" />
+                Uncategorized (
+                {stories.filter((s) => !s.folder_id).length +
+                  localStories.filter((s) => !s.folder_id).length}
+                )
+              </button>
+              {folders.map((folder) => (
+                <button
+                  key={folder.id}
+                  onClick={() => setSelectedFolder(folder.id)}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                    selectedFolder === folder.id
+                      ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
+                      : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
+                  }`}
+                  style={{ borderLeft: `3px solid ${folder.color}` }}
+                >
+                  <DynamicIcon name={folder.icon} className="w-3.5 h-3.5" />
+                  {folder.name} (
+                  {stories.filter((s) => s.folder_id === folder.id).length +
+                    localStories.filter((s) => s.folder_id === folder.id)
+                      .length}
+                  )
+                </button>
+              ))}
+              <button
+                onClick={() => setShowNewFolderDialog(true)}
+                className="px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap bg-blue-900/30 text-blue-300/70 hover:bg-blue-800/50 transition-all flex items-center gap-1.5 border border-dashed border-blue-700/50"
+              >
+                <DynamicIcon name="Plus" className="w-3.5 h-3.5" />
+                New Folder
+              </button>
+            </DraggableScroll>
 
-              {/* Stories Filters */}
-              <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 mb-4 border border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {/* Search */}
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                      <DynamicIcon name="Search" className="w-4 h-4" />
-                      Search Stories
-                    </label>
-                    <input
-                      type="text"
-                      value={storySearch}
-                      onChange={(e) => setStorySearch(e.target.value)}
-                      placeholder="Search by name..."
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none text-gray-900 dark:text-white"
-                    />
-                  </div>
+            {/* Filter Pills */}
+            <div className="flex gap-2">
+              {["all", "inProgress", "completed"].map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() =>
+                    setStoryFilter(filter as "all" | "completed" | "inProgress")
+                  }
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    storyFilter === filter
+                      ? "bg-purple-600 text-white"
+                      : "bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
+                  }`}
+                >
+                  {filter === "all"
+                    ? "All"
+                    : filter === "inProgress"
+                    ? "In Progress"
+                    : "Completed"}
+                </button>
+              ))}
+            </div>
 
-                  {/* Filter */}
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                      <DynamicIcon
-                        name="SlidersHorizontal"
-                        className="w-4 h-4"
-                      />
-                      Filter
-                    </label>
-                    <select
-                      value={storyFilter}
-                      onChange={(e) =>
-                        setStoryFilter(
-                          e.target.value as "all" | "completed" | "inProgress"
-                        )
-                      }
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none text-gray-900 dark:text-white"
-                    >
-                      <option value="all">All Stories</option>
-                      <option value="inProgress">In Progress</option>
-                      <option value="completed">Completed</option>
-                    </select>
-                  </div>
-
-                  {/* Sort */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      <DynamicIcon
-                        name="RefreshCw"
-                        className="inline-block w-4 h-4 mr-1"
-                      />
-                      Sort By
-                    </label>
-                    <select
-                      value={storySortBy}
-                      onChange={(e) =>
-                        setStorySortBy(e.target.value as StorySortBy)
-                      }
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none text-gray-900 dark:text-white"
-                    >
-                      <option value="updated">Last Updated</option>
-                      <option value="created">Date Created</option>
-                      <option value="name">Name (A-Z)</option>
-                      <option value="chapter">Progress</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Clear Filters */}
-                {(storySearch ||
-                  storyFilter !== "all" ||
-                  storySortBy !== "updated") && (
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      onClick={() => {
-                        setStorySearch("");
-                        setStoryFilter("all");
-                        setStorySortBy("updated");
-                      }}
-                      className="px-4 py-2 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors text-sm"
-                    >
-                      Clear Filters
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Mass Operations Toolbar */}
-              {(filteredStories.length > 0 ||
-                filteredLocalStories.length > 0) && (
-                <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-3 mb-4 border border-gray-200 dark:border-gray-700">
-                  {!selectionMode ? (
-                    <button
-                      onClick={toggleSelectionMode}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <DynamicIcon name="CheckSquare" className="w-4 h-4" />
-                      Select Stories
-                    </button>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        {selectedStories.size} selected
-                      </span>
+            {/* Selection Actions Bar */}
+            {selectionMode && selectedStories.size > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-purple-900/30 border border-purple-700/30 rounded-xl">
+                <span className="text-sm font-medium">
+                  {selectedStories.size} selected
+                </span>
+                <div className="flex-1" />
+                <button
+                  onClick={selectAllStories}
+                  className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
+                >
+                  Select All
+                </button>
+                <div className="relative">
+                  <button
+                    onClick={() =>
+                      setShowMassMoveDropdown(!showMassMoveDropdown)
+                    }
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-sm rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <DynamicIcon name="FolderOpen" className="w-4 h-4" />
+                    Move
+                  </button>
+                  {showMassMoveDropdown && (
+                    <div className="absolute top-full right-0 mt-1 bg-blue-950 border border-blue-800/50 rounded-lg shadow-xl p-2 min-w-[180px] z-50">
                       <button
-                        onClick={selectAllStories}
-                        className="px-3 py-1.5 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
+                        onClick={() => {
+                          handleMassMove(null);
+                          setShowMassMoveDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-blue-900/50 rounded-lg text-sm"
                       >
-                        Select All
+                        Uncategorized
                       </button>
-                      <button
-                        onClick={deselectAllStories}
-                        className="px-3 py-1.5 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
-                      >
-                        Deselect All
-                      </button>
-                      {selectedStories.size > 0 && (
-                        <>
-                          <div className="relative">
-                            <button
-                              onClick={() =>
-                                setShowMassMoveDropdown(!showMassMoveDropdown)
-                              }
-                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
-                            >
-                              <DynamicIcon
-                                name="FolderOpen"
-                                className="w-4 h-4"
-                              />
-                              Move to Folder
-                            </button>
-                            {showMassMoveDropdown && (
-                              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 rounded-lg shadow-xl p-2 min-w-[200px] z-50">
-                                <button
-                                  onClick={() => {
-                                    handleMassMove(null);
-                                    setShowMassMoveDropdown(false);
-                                  }}
-                                  className="w-full text-left px-3 py-2 hover:bg-gray-800 dark:hover:bg-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
-                                >
-                                  <DynamicIcon
-                                    name="FileText"
-                                    className="w-4 h-4 inline mr-2"
-                                  />
-                                  Uncategorized
-                                </button>
-                                {folders.map((folder) => (
-                                  <button
-                                    key={folder.id}
-                                    onClick={() => {
-                                      handleMassMove(folder.id);
-                                      setShowMassMoveDropdown(false);
-                                    }}
-                                    className="w-full text-left px-3 py-2 hover:bg-gray-800 dark:hover:bg-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
-                                    style={{
-                                      borderLeft: `4px solid ${folder.color}`,
-                                    }}
-                                  >
-                                    <DynamicIcon
-                                      name={folder.icon}
-                                      className="w-4 h-4 inline mr-2"
-                                    />
-                                    {folder.name}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <button
-                            onClick={handleMassDelete}
-                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
-                          >
-                            <DynamicIcon name="Trash2" className="w-4 h-4" />
-                            Delete Selected
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={toggleSelectionMode}
-                        className="ml-auto px-3 py-1.5 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm font-semibold rounded-lg transition-colors"
-                      >
-                        Cancel
-                      </button>
+                      {folders.map((folder) => (
+                        <button
+                          key={folder.id}
+                          onClick={() => {
+                            handleMassMove(folder.id);
+                            setShowMassMoveDropdown(false);
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-blue-900/50 rounded-lg text-sm"
+                          style={{ borderLeft: `3px solid ${folder.color}` }}
+                        >
+                          {folder.name}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
-              )}
+                <button
+                  onClick={handleMassDelete}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-sm rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <DynamicIcon name="Trash2" className="w-4 h-4" />
+                  Delete
+                </button>
+                <button
+                  onClick={deselectAllStories}
+                  className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
 
-              {/* Stories List */}
-              <div className="space-y-4">
-                {filteredStories.length === 0 &&
-                filteredLocalStories.length === 0 ? (
-                  <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-700">
-                    <div className="flex justify-center mb-4">
-                      <DynamicIcon
-                        name="BookOpen"
-                        className="w-16 h-16 text-gray-400"
-                      />
-                    </div>
-                    <h3 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
-                      {stories.length === 0
-                        ? "No Stories Yet"
-                        : "No Stories Match Filters"}
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-6">
-                      {stories.length === 0
-                        ? "Start an adventure from the Explorer to create your first story!"
-                        : "Try adjusting your search or filters to find more stories."}
-                    </p>
-                    {stories.length === 0 && (
-                      <button
-                        onClick={() => router.push("/explorer")}
-                        className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
-                      >
-                        Explore Adventures
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  filteredStories.map((story) => (
+            {/* Stories List */}
+            {filteredStories.length === 0 &&
+            filteredLocalStories.length === 0 ? (
+              <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
+                <DynamicIcon
+                  name="BookOpen"
+                  className="w-16 h-16 text-blue-400/30 mx-auto mb-4"
+                />
+                <h3 className="text-xl font-bold mb-2">
+                  {stories.length === 0
+                    ? "No Stories Yet"
+                    : "No Stories Match Filters"}
+                </h3>
+                <p className="text-blue-200/60 mb-6">
+                  {stories.length === 0
+                    ? "Start an adventure from the Explorer to create your first story!"
+                    : "Try adjusting your search or filters."}
+                </p>
+                {stories.length === 0 && (
+                  <button
+                    onClick={() => router.push("/explorer")}
+                    className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 font-semibold rounded-xl transition-colors"
+                  >
+                    Explore Adventures
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Cloud Stories */}
+                {filteredStories.map((story) => {
+                  const chapter = story.story_data?.currentChapter ?? 0;
+                  const totalChapters = story.story_data?.chapters?.length ?? 1;
+                  const progress = Math.min(
+                    100,
+                    Math.round((chapter / Math.max(totalChapters, 1)) * 100)
+                  );
+                  const timeSinceUpdate = getRelativeTime(story.updated_at);
+
+                  return (
                     <div
                       key={story.id}
                       onClick={() =>
@@ -1192,213 +1155,101 @@ export default function LibraryPage() {
                           ? toggleStorySelection(story.id)
                           : router.push(`/story?storyId=${story.id}`)
                       }
-                      className={`rounded-xl shadow-md overflow-hidden border-2 transition-all duration-150 cursor-pointer ${
-                        selectionMode
-                          ? selectedStories.has(story.id)
-                            ? "bg-purple-50 dark:bg-purple-900/20 border-purple-500 dark:border-purple-400 shadow-purple-200 dark:shadow-purple-900"
-                            : "bg-white dark:bg-blue-950 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-lg hover:-translate-y-0.5"
-                          : "bg-white dark:bg-blue-950 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-lg hover:-translate-y-0.5"
-                      } active:scale-[0.98]`}
+                      className={`group relative p-4 rounded-xl border transition-all cursor-pointer ${
+                        selectionMode && selectedStories.has(story.id)
+                          ? "bg-purple-900/30 border-purple-500"
+                          : "bg-blue-950/50 border-blue-800/30 hover:bg-blue-900/50 hover:border-blue-700/50"
+                      }`}
                     >
-                      <div className="p-4">
-                        <div className="flex flex-col items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0 w-full">
-                            <div className="flex items-center gap-3 mb-2">
-                              {selectionMode && (
-                                <div
-                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                                    selectedStories.has(story.id)
-                                      ? "bg-purple-600 border-purple-600"
-                                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-500"
-                                  }`}
-                                >
-                                  {selectedStories.has(story.id) && (
-                                    <DynamicIcon
-                                      name="Check"
-                                      className="w-3 h-3 text-white"
-                                    />
-                                  )}
-                                </div>
-                              )}
-                              <h3 className="text-xl font-bold text-gray-900 dark:text-white truncate">
-                                {story.story_name}
-                              </h3>
-                              {story.is_completed && (
-                                <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-semibold rounded-full flex items-center gap-1">
-                                  <DynamicIcon
-                                    name="Check"
-                                    className="w-3 h-3"
-                                  />{" "}
-                                  Completed
-                                </span>
-                              )}
-                              {story.is_public && (
-                                <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-semibold rounded-full flex items-center gap-1">
-                                  <DynamicIcon
-                                    name="Globe"
-                                    className="w-3 h-3"
-                                  />{" "}
-                                  Public
-                                </span>
-                              )}
-                              {isEncrypted(story.story_data) && (
-                                <span
-                                  className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-semibold rounded-full flex items-center gap-1"
-                                  title="This story is encrypted and private"
-                                >
-                                  <DynamicIcon
-                                    name="Lock"
-                                    className="w-3 h-3"
-                                  />{" "}
-                                  Encrypted
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                              <span>
-                                Created:{" "}
-                                {new Date(
-                                  story.created_at
-                                ).toLocaleDateString()}
-                              </span>
-                              <span>
-                                Updated:{" "}
-                                {new Date(
-                                  story.updated_at
-                                ).toLocaleDateString()}
-                              </span>
-                              {story.story_data?.currentChapter !==
-                                undefined && (
-                                <span>
-                                  Chapter: {story.story_data.currentChapter + 1}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          {!selectionMode && (
-                            <div
-                              className="flex gap-2"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                onClick={() => setMovingStory(story.id)}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center"
-                                title="Move to folder"
-                              >
-                                <DynamicIcon
-                                  name="Folder"
-                                  className="w-5 h-5"
-                                />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteStory(story.id)}
-                                disabled={deleting === story.id}
-                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                              >
-                                {deleting === story.id ? (
-                                  <DynamicIcon
-                                    name="Loader2"
-                                    className="w-5 h-5 animate-spin"
-                                  />
-                                ) : (
-                                  <DynamicIcon
-                                    name="Trash2"
-                                    className="w-5 h-5"
-                                  />
-                                )}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-
-                {/* Local/Offline Stories */}
-                {filteredLocalStories.map((story) => (
-                  <div
-                    key={story.id}
-                    onClick={() =>
-                      selectionMode
-                        ? toggleStorySelection(story.id)
-                        : router.push(`/story?storyId=${story.id}`)
-                    }
-                    className={`rounded-xl shadow-md overflow-hidden border-2 transition-all duration-150 cursor-pointer ${
-                      selectionMode
-                        ? selectedStories.has(story.id)
-                          ? "bg-purple-50 dark:bg-purple-900/20 border-purple-500 dark:border-purple-400 shadow-purple-200 dark:shadow-purple-900"
-                          : "bg-white dark:bg-blue-950 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-lg hover:-translate-y-0.5"
-                        : "bg-white dark:bg-blue-950 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-lg hover:-translate-y-0.5"
-                    } active:scale-[0.98]`}
-                  >
-                    <div className="p-4">
-                      <div className="flex flex-col items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0 w-full">
-                          <div className="flex items-center gap-3 mb-2">
-                            {selectionMode && (
-                              <div
-                                className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                                  selectedStories.has(story.id)
-                                    ? "bg-purple-600 border-purple-600"
-                                    : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-500"
-                                }`}
-                              >
-                                {selectedStories.has(story.id) && (
-                                  <DynamicIcon
-                                    name="Check"
-                                    className="w-3 h-3 text-white"
-                                  />
-                                )}
-                              </div>
+                      <div className="flex items-start gap-3">
+                        {selectionMode && (
+                          <div
+                            className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
+                              selectedStories.has(story.id)
+                                ? "bg-purple-600 border-purple-600"
+                                : "border-blue-600"
+                            }`}
+                          >
+                            {selectedStories.has(story.id) && (
+                              <DynamicIcon name="Check" className="w-3 h-3" />
                             )}
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white truncate">
-                              {story.title}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold truncate">
+                              {story.story_name}
                             </h3>
-                            <span
-                              className="px-3 py-1 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-full flex items-center gap-1"
-                              title="This story is saved offline"
-                            >
-                              <DynamicIcon name="Save" className="w-3 h-3" />{" "}
-                              Offline
+                            {story.is_completed && (
+                              <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">
+                                ✓
+                              </span>
+                            )}
+                            {isEncrypted(story.story_data) && (
+                              <DynamicIcon
+                                name="Lock"
+                                className="w-3 h-3 text-emerald-400"
+                              />
+                            )}
+                            {story.is_public && (
+                              <DynamicIcon
+                                name="Globe"
+                                className="w-3 h-3 text-blue-400"
+                              />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-blue-200/50 mb-2">
+                            <span>{timeSinceUpdate}</span>
+                            <span>Ch. {chapter + 1}</span>
+                          </div>
+                          {/* Progress Bar */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  story.is_completed
+                                    ? "bg-green-500"
+                                    : "bg-linear-to-r from-purple-500 to-blue-500"
+                                }`}
+                                style={{
+                                  width: `${
+                                    story.is_completed ? 100 : progress
+                                  }%`,
+                                }}
+                              />
+                            </div>
+                            <span className="text-xs text-blue-200/40">
+                              {story.is_completed ? "100%" : `${progress}%`}
                             </span>
                           </div>
-                          <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                            <span>
-                              Updated:{" "}
-                              {new Date(story.updatedAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                            {story.preview}
-                          </p>
                         </div>
                         {!selectionMode && (
                           <div
-                            className="flex gap-2"
+                            className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <button
                               onClick={() => setMovingStory(story.id)}
-                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center"
-                              title="Move to folder"
+                              className="p-1.5 hover:bg-blue-800/50 rounded-lg transition-colors"
+                              title="Move"
                             >
-                              <DynamicIcon name="Folder" className="w-5 h-5" />
+                              <DynamicIcon name="Folder" className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleDeleteStory(story.id, true)}
+                              onClick={() => handleDeleteStory(story.id)}
                               disabled={deleting === story.id}
-                              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                              className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                              title="Delete"
                             >
                               {deleting === story.id ? (
                                 <DynamicIcon
                                   name="Loader2"
-                                  className="w-5 h-5 animate-spin"
+                                  className="w-4 h-4 animate-spin"
                                 />
                               ) : (
                                 <DynamicIcon
                                   name="Trash2"
-                                  className="w-5 h-5"
+                                  className="w-4 h-4"
                                 />
                               )}
                             </button>
@@ -1406,371 +1257,412 @@ export default function LibraryPage() {
                         )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
+
+                {/* Local Stories */}
+                {filteredLocalStories.map((story) => {
+                  const chapter = story.storyData?.currentChapter ?? 0;
+                  const timeSinceUpdate = getRelativeTime(story.updatedAt);
+
+                  return (
+                    <div
+                      key={story.id}
+                      onClick={() =>
+                        selectionMode
+                          ? toggleStorySelection(story.id)
+                          : router.push(`/story?storyId=${story.id}`)
+                      }
+                      className={`group relative p-4 rounded-xl border transition-all cursor-pointer ${
+                        selectionMode && selectedStories.has(story.id)
+                          ? "bg-purple-900/30 border-purple-500"
+                          : "bg-blue-950/50 border-blue-800/30 hover:bg-blue-900/50 hover:border-blue-700/50"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {selectionMode && (
+                          <div
+                            className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
+                              selectedStories.has(story.id)
+                                ? "bg-purple-600 border-purple-600"
+                                : "border-blue-600"
+                            }`}
+                          >
+                            {selectedStories.has(story.id) && (
+                              <DynamicIcon name="Check" className="w-3 h-3" />
+                            )}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold truncate">
+                              {story.title}
+                            </h3>
+                            <span className="px-1.5 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded flex items-center gap-1">
+                              <DynamicIcon
+                                name="HardDrive"
+                                className="w-3 h-3"
+                              />{" "}
+                              Local
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-blue-200/50 mb-2">
+                            <span>{timeSinceUpdate}</span>
+                            <span>Ch. {chapter + 1}</span>
+                          </div>
+                          {/* Progress Bar */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gray-500 rounded-full"
+                                style={{ width: "10%" }}
+                              />
+                            </div>
+                            <span className="text-xs text-blue-200/40">
+                              New
+                            </span>
+                          </div>
+                        </div>
+                        {!selectionMode && (
+                          <div
+                            className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={() => setMovingStory(story.id)}
+                              className="p-1.5 hover:bg-blue-800/50 rounded-lg transition-colors"
+                              title="Move"
+                            >
+                              <DynamicIcon name="Folder" className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStory(story.id, true)}
+                              disabled={deleting === story.id}
+                              className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                              title="Delete"
+                            >
+                              {deleting === story.id ? (
+                                <DynamicIcon
+                                  name="Loader2"
+                                  className="w-4 h-4 animate-spin"
+                                />
+                              ) : (
+                                <DynamicIcon
+                                  name="Trash2"
+                                  className="w-4 h-4"
+                                />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            )}
           </div>
         ) : (
-          <div>
-            {/* Adventures Filters */}
-            <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 mb-4 border border-gray-200 dark:border-gray-700">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {/* Search */}
-                <div>
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <DynamicIcon name="Search" className="w-4 h-4" />
-                    Search Adventures
-                  </label>
-                  <input
-                    type="text"
-                    value={adventureSearch}
-                    onChange={(e) => setAdventureSearch(e.target.value)}
-                    placeholder="Search by title or description..."
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none text-gray-900 dark:text-white"
-                  />
-                </div>
-
-                {/* Filter */}
-                <div>
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <DynamicIcon name="SlidersHorizontal" className="w-4 h-4" />
-                    Filter
-                  </label>
-                  <select
-                    value={adventureFilter}
-                    onChange={(e) =>
-                      setAdventureFilter(
-                        e.target.value as "all" | "published" | "draft"
-                      )
-                    }
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none text-gray-900 dark:text-white"
-                  >
-                    <option value="all">All Adventures</option>
-                    <option value="published">Published</option>
-                    <option value="draft">Drafts</option>
-                  </select>
-                </div>
-
-                {/* Sort */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    <DynamicIcon
-                      name="RefreshCw"
-                      className="inline-block w-4 h-4 mr-1"
-                    />
-                    Sort By
-                  </label>
-                  <select
-                    value={adventureSortBy}
-                    onChange={(e) =>
-                      setAdventureSortBy(e.target.value as AdventureSortBy)
-                    }
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none text-gray-900 dark:text-white"
-                  >
-                    <option value="updated">Last Updated</option>
-                    <option value="created">Date Created</option>
-                    <option value="title">Title (A-Z)</option>
-                    <option value="rating">Rating</option>
-                    <option value="plays">Play Count</option>
-                  </select>
-                </div>
+          <div className="space-y-4">
+            {/* Search + Filter Row */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 relative">
+                <DynamicIcon
+                  name="Search"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400/50"
+                />
+                <input
+                  type="text"
+                  value={adventureSearch}
+                  onChange={(e) => setAdventureSearch(e.target.value)}
+                  placeholder="Search adventures..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 focus:bg-blue-900/70 transition-all"
+                />
               </div>
-
-              {/* Clear Filters */}
-              {(adventureSearch ||
-                adventureFilter !== "all" ||
-                adventureSortBy !== "updated") && (
-                <div className="mt-4 flex justify-end">
-                  <button
-                    onClick={() => {
-                      setAdventureSearch("");
-                      setAdventureFilter("all");
-                      setAdventureSortBy("updated");
-                    }}
-                    className="px-4 py-2 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors text-sm"
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              )}
+              <div className="flex gap-2">
+                <select
+                  value={adventureFilter}
+                  onChange={(e) =>
+                    setAdventureFilter(
+                      e.target.value as "all" | "published" | "draft"
+                    )
+                  }
+                  className="px-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white focus:outline-none focus:border-purple-500/50 transition-all"
+                >
+                  <option value="all">All</option>
+                  <option value="published">Published</option>
+                  <option value="draft">Drafts</option>
+                </select>
+                <select
+                  value={adventureSortBy}
+                  onChange={(e) =>
+                    setAdventureSortBy(e.target.value as AdventureSortBy)
+                  }
+                  className="px-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white focus:outline-none focus:border-purple-500/50 transition-all"
+                >
+                  <option value="updated">Recent</option>
+                  <option value="created">Created</option>
+                  <option value="title">A-Z</option>
+                  <option value="rating">Rating</option>
+                  <option value="plays">Plays</option>
+                </select>
+              </div>
             </div>
 
-            {/* Adventures List */}
-            <div className="space-y-4">
-              {/* Adventures View */}
-              <div className="mb-4">
-                <button
-                  onClick={() => router.push("/creator")}
-                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors shadow-md flex items-center gap-2"
-                >
-                  <DynamicIcon name="Plus" className="w-5 h-5" /> Create New
-                  Adventure
-                </button>
+            {/* Adventures Grid */}
+            {filteredAdventures.length === 0 && localAdventures.length === 0 ? (
+              <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
+                <DynamicIcon
+                  name="Gamepad2"
+                  className="w-16 h-16 text-blue-400/30 mx-auto mb-4"
+                />
+                <h3 className="text-xl font-bold mb-2">
+                  {adventures.length === 0 && localAdventures.length === 0
+                    ? "No Adventures Yet"
+                    : "No Adventures Match Filters"}
+                </h3>
+                <p className="text-blue-200/60 mb-6">
+                  {adventures.length === 0 && localAdventures.length === 0
+                    ? "Create your first adventure and share it with the community!"
+                    : "Try adjusting your search or filters."}
+                </p>
+                {adventures.length === 0 && localAdventures.length === 0 && (
+                  <button
+                    onClick={() => router.push("/creator")}
+                    className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 font-semibold rounded-xl transition-colors"
+                  >
+                    Create Adventure
+                  </button>
+                )}
               </div>
-              {filteredAdventures.length === 0 &&
-              localAdventures.length === 0 ? (
-                <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-700">
-                  <div className="flex justify-center mb-4">
-                    <DynamicIcon
-                      name="Gamepad2"
-                      className="w-16 h-16 text-gray-400"
-                    />
-                  </div>
-                  <h3 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
-                    {adventures.length === 0 && localAdventures.length === 0
-                      ? "No Adventures Yet"
-                      : "No Adventures Match Filters"}
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-6">
-                    {adventures.length === 0 && localAdventures.length === 0
-                      ? "Create your first adventure and share it with the community!"
-                      : "Try adjusting your search or filters to find more adventures."}
-                  </p>
-                  {adventures.length === 0 && localAdventures.length === 0 && (
-                    <button
-                      onClick={() => router.push("/creator")}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md"
-                    >
-                      Start Creating
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredAdventures.map((adventure) => (
-                    <div
-                      key={adventure.id}
-                      className="bg-white dark:bg-blue-950 rounded-xl shadow-md overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-150"
-                    >
-                      {/* Thumbnail */}
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Cloud Adventures */}
+                {filteredAdventures.map((adventure) => (
+                  <div
+                    key={adventure.id}
+                    className="group relative bg-blue-950/50 rounded-xl overflow-hidden border border-blue-800/30 hover:border-blue-700/50 transition-all cursor-pointer"
+                    onClick={() => router.push(`/explorer/${adventure.id}`)}
+                  >
+                    {/* Thumbnail */}
+                    <div className="relative h-32">
                       {adventure.thumbnailUrl ? (
                         <div
-                          className="h-40 bg-cover bg-center"
+                          className="absolute inset-0 bg-cover bg-center"
                           style={{
                             backgroundImage: `url(${adventure.thumbnailUrl})`,
                           }}
                         />
                       ) : (
-                        <div className="h-40 bg-linear-to-br from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center">
-                          <DynamicIcon
-                            name="Gamepad2"
-                            className="w-16 h-16 text-white"
-                          />
-                        </div>
+                        <div className="absolute inset-0 bg-linear-to-br from-purple-600 via-pink-600 to-blue-600" />
                       )}
+                      <div className="absolute inset-0 bg-linear-to-t from-gray-900/90 via-transparent to-transparent" />
 
-                      {/* Content */}
-                      <div className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex-1 truncate">
-                            {adventure.title}
-                          </h3>
-                          {adventure.isPublished && (
-                            <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-semibold rounded-full">
-                              Published
-                            </span>
-                          )}
-                          {adventure.isFeatured && (
+                      {/* Badges */}
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        {adventure.isPublished && (
+                          <span className="px-1.5 py-0.5 bg-green-500/20 backdrop-blur text-green-400 text-xs rounded">
+                            Published
+                          </span>
+                        )}
+                        {adventure.isFeatured && (
+                          <span className="px-1.5 py-0.5 bg-yellow-500/20 backdrop-blur text-yellow-400 text-xs rounded flex items-center gap-0.5">
                             <DynamicIcon
                               name="Star"
-                              className="w-5 h-5 text-yellow-500 fill-current"
-                            />
-                          )}
-                        </div>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
-                          {adventure.shortDescription}
-                        </p>
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {adventure.tags.slice(0, 3).map((tag) => (
-                            <span
-                              key={tag}
-                              className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-full"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                          {adventure.tags.length > 3 && (
-                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-full">
-                              +{adventure.tags.length - 3}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex gap-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                          <span className="flex items-center gap-1">
-                            <DynamicIcon
-                              name="Star"
-                              className="w-4 h-4 text-yellow-500"
+                              className="w-3 h-3 fill-current"
                             />{" "}
-                            {adventure.rating?.toFixed(1) || "N/A"}
+                            Featured
                           </span>
-                          <span className="flex items-center gap-1">
-                            <DynamicIcon name="Users" className="w-4 h-4" />{" "}
-                            {adventure.playCount || 0}
-                          </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() =>
-                              router.push(`/explorer/${adventure.id}`)
-                            }
-                            className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() =>
-                              router.push(`/creator?edit=${adventure.id}`)
-                            }
-                            className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors text-sm"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteAdventure(adventure.id)}
-                            disabled={deleting === adventure.id}
-                            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                          >
-                            {deleting === adventure.id ? (
-                              <DynamicIcon
-                                name="Loader2"
-                                className="w-4 h-4 animate-spin"
-                              />
-                            ) : (
-                              <DynamicIcon name="Trash2" className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
+                        )}
                       </div>
                     </div>
-                  ))}
 
-                  {/* Local/Offline Adventures */}
-                  {localAdventures.map((adventure) => (
-                    <div
-                      key={adventure.id}
-                      className="bg-white dark:bg-blue-950 rounded-xl shadow-md overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-150"
-                    >
-                      {/* Thumbnail */}
+                    {/* Content */}
+                    <div className="p-3">
+                      <h3 className="font-semibold truncate mb-1">
+                        {adventure.title}
+                      </h3>
+                      <p className="text-xs text-blue-200/50 line-clamp-2 mb-2">
+                        {adventure.shortDescription}
+                      </p>
+
+                      {/* Tags */}
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {adventure.tags.slice(0, 2).map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                        {adventure.tags.length > 2 && (
+                          <span className="px-1.5 py-0.5 bg-blue-900/50 text-blue-300/50 text-xs rounded">
+                            +{adventure.tags.length - 2}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Stats */}
+                      <div className="flex items-center gap-3 text-xs text-blue-200/40 mb-3">
+                        <span className="flex items-center gap-1">
+                          <DynamicIcon
+                            name="Star"
+                            className="w-3 h-3 text-yellow-500"
+                          />
+                          {adventure.rating?.toFixed(1) || "—"}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <DynamicIcon name="Play" className="w-3 h-3" />
+                          {adventure.playCount || 0}
+                        </span>
+                      </div>
+
+                      {/* Actions */}
+                      <div
+                        className="flex gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() =>
+                            router.push(`/creator?edit=${adventure.id}`)
+                          }
+                          className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-sm rounded-lg transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAdventure(adventure.id)}
+                          disabled={deleting === adventure.id}
+                          className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg transition-colors"
+                        >
+                          {deleting === adventure.id ? (
+                            <DynamicIcon
+                              name="Loader2"
+                              className="w-4 h-4 animate-spin"
+                            />
+                          ) : (
+                            <DynamicIcon name="Trash2" className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Local Adventures */}
+                {localAdventures.map((adventure) => (
+                  <div
+                    key={adventure.id}
+                    className="group relative bg-blue-950/50 rounded-xl overflow-hidden border border-blue-800/30 hover:border-blue-700/50 transition-all cursor-pointer"
+                    onClick={() => router.push(`/explorer/${adventure.id}`)}
+                  >
+                    {/* Thumbnail */}
+                    <div className="relative h-32">
                       {adventure.adventureData.thumbnailUrl ? (
                         <div
-                          className="h-40 bg-cover bg-center"
+                          className="absolute inset-0 bg-cover bg-center"
                           style={{
                             backgroundImage: `url(${adventure.adventureData.thumbnailUrl})`,
                           }}
                         />
                       ) : (
-                        <div className="h-40 bg-linear-to-br from-gray-500 via-gray-600 to-gray-700 flex items-center justify-center">
-                          <DynamicIcon
-                            name="Save"
-                            className="w-16 h-16 text-white"
-                          />
-                        </div>
+                        <div className="absolute inset-0 bg-linear-to-br from-gray-600 via-gray-700 to-gray-800" />
                       )}
+                      <div className="absolute inset-0 bg-linear-to-t from-gray-900/90 via-transparent to-transparent" />
 
-                      {/* Content */}
-                      <div className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex-1 truncate">
-                            {adventure.title}
-                          </h3>
-                          <span
-                            className="px-2 py-1 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-full flex items-center gap-1"
-                            title="This adventure is saved offline"
-                          >
-                            <DynamicIcon name="Save" className="w-3 h-3" />{" "}
-                            Offline
-                          </span>
-                        </div>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
-                          {adventure.description}
-                        </p>
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {adventure.adventureData.tags
-                            ?.slice(0, 3)
-                            .map((tag: string) => (
-                              <span
-                                key={tag}
-                                className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-full"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          {adventure.adventureData.tags &&
-                            adventure.adventureData.tags.length > 3 && (
-                              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-full">
-                                +{adventure.adventureData.tags.length - 3}
-                              </span>
-                            )}
-                        </div>
-                        <div className="flex gap-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                          <span>
-                            Updated:{" "}
-                            {new Date(adventure.updatedAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() =>
-                              router.push(`/explorer/${adventure.id}`)
-                            }
-                            className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() =>
-                              router.push(`/creator?edit=${adventure.id}`)
-                            }
-                            className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors text-sm"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDeleteAdventure(adventure.id, true)
-                            }
-                            disabled={deleting === adventure.id}
-                            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                          >
-                            {deleting === adventure.id ? (
-                              <DynamicIcon
-                                name="Loader2"
-                                className="w-4 h-4 animate-spin"
-                              />
-                            ) : (
-                              <DynamicIcon name="Trash2" className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
+                      {/* Badge */}
+                      <div className="absolute top-2 right-2">
+                        <span className="px-1.5 py-0.5 bg-gray-500/20 backdrop-blur text-gray-300 text-xs rounded flex items-center gap-1">
+                          <DynamicIcon name="HardDrive" className="w-3 h-3" />{" "}
+                          Local
+                        </span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+
+                    {/* Content */}
+                    <div className="p-3">
+                      <h3 className="font-semibold truncate mb-1">
+                        {adventure.title}
+                      </h3>
+                      <p className="text-xs text-blue-200/50 line-clamp-2 mb-2">
+                        {adventure.description}
+                      </p>
+
+                      {/* Tags */}
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {adventure.adventureData.tags
+                          ?.slice(0, 2)
+                          .map((tag: string) => (
+                            <span
+                              key={tag}
+                              className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                      </div>
+
+                      {/* Updated */}
+                      <div className="text-xs text-blue-200/40 mb-3">
+                        {getRelativeTime(adventure.updatedAt)}
+                      </div>
+
+                      {/* Actions */}
+                      <div
+                        className="flex gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() =>
+                            router.push(`/creator?edit=${adventure.id}`)
+                          }
+                          className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-sm rounded-lg transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleDeleteAdventure(adventure.id, true)
+                          }
+                          disabled={deleting === adventure.id}
+                          className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg transition-colors"
+                        >
+                          {deleting === adventure.id ? (
+                            <DynamicIcon
+                              name="Loader2"
+                              className="w-4 h-4 animate-spin"
+                            />
+                          ) : (
+                            <DynamicIcon name="Trash2" className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
-      </div>
+      </main>
 
       {/* Folder Management Dialogs */}
       {showNewFolderDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-blue-950 rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              Create New Folder
-            </h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Create Folder</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Folder Name
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
+                  Name
                 </label>
                 <input
                   type="text"
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500"
                   placeholder="My Folder"
                   autoFocus
                 />
@@ -1783,14 +1675,14 @@ export default function LibraryPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
                   Color
                 </label>
                 <input
                   type="color"
                   value={newFolderColor}
                   onChange={(e) => setNewFolderColor(e.target.value)}
-                  className="w-full h-10 rounded-lg cursor-pointer"
+                  className="w-full h-10 rounded-lg cursor-pointer bg-blue-900/50"
                 />
               </div>
             </div>
@@ -1802,14 +1694,14 @@ export default function LibraryPage() {
                   setNewFolderIcon("Folder");
                   setNewFolderColor("#9333ea");
                 }}
-                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
+                className="flex-1 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateFolder}
                 disabled={!newFolderName.trim()}
-                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 font-semibold rounded-lg transition-colors disabled:opacity-50"
               >
                 Create
               </button>
@@ -1819,15 +1711,13 @@ export default function LibraryPage() {
       )}
 
       {editingFolder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-blue-950 rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              Edit Folder
-            </h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Edit Folder</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Folder Name
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
+                  Name
                 </label>
                 <input
                   type="text"
@@ -1842,7 +1732,7 @@ export default function LibraryPage() {
                       color: newFolderColor,
                     })
                   }
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500"
                   placeholder="My Folder"
                   autoFocus
                 />
@@ -1855,14 +1745,14 @@ export default function LibraryPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
                   Color
                 </label>
                 <input
                   type="color"
                   value={newFolderColor}
                   onChange={(e) => setNewFolderColor(e.target.value)}
-                  className="w-full h-10 rounded-lg cursor-pointer"
+                  className="w-full h-10 rounded-lg cursor-pointer bg-blue-900/50"
                 />
               </div>
             </div>
@@ -1874,7 +1764,7 @@ export default function LibraryPage() {
                   setNewFolderIcon("Folder");
                   setNewFolderColor("#9333ea");
                 }}
-                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
+                className="flex-1 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -1888,7 +1778,7 @@ export default function LibraryPage() {
                   })
                 }
                 disabled={!newFolderName.trim()}
-                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 font-semibold rounded-lg transition-colors disabled:opacity-50"
               >
                 Save
               </button>
@@ -1898,8 +1788,8 @@ export default function LibraryPage() {
       )}
 
       {movingStory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-blue-950 rounded-lg p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Move to Folder
             </h2>

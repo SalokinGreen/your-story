@@ -151,80 +151,106 @@ export default function EditProfile({
     return (
       <button
         onClick={() => setIsEditing(true)}
-        className="px-3 py-1 text-sm bg-gray-200 dark:bg-blue-950 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+        className="p-1.5 bg-blue-950/80 hover:bg-blue-900/80 text-blue-200 rounded-lg border border-blue-800/30 transition-colors"
+        title="Edit Profile"
       >
-        <DynamicIcon name="Edit" className="w-4 h-4" /> Edit Profile
+        <DynamicIcon name="Settings" className="w-4 h-4" />
       </button>
     );
   }
 
   return (
-    <div className="border-2 border-blue-600 dark:border-blue-400 p-4 bg-blue-50 dark:bg-blue-950 space-y-4">
-      <h3 className="text-lg font-bold">Edit Profile</h3>
-      <form onSubmit={handleSave} className="space-y-4">
-        {/* Avatar Upload */}
-        <div>
-          <label className="block font-semibold mb-2">Avatar</label>
-          <div className="flex items-center gap-4">
-            {avatarUrl && (
-              <img
-                src={avatarUrl}
-                alt="Avatar preview"
-                className="w-16 h-16 rounded-full object-cover border-2 border-black dark:border-white"
-              />
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarUpload}
-              disabled={uploading || loading}
-              className="text-sm"
-            />
-          </div>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-            Max 2MB. JPG, PNG, or GIF.
-          </p>
-        </div>
-
-        {/* Bio */}
-        <div>
-          <label htmlFor="bio" className="block font-semibold mb-2">
-            Bio
-          </label>
-          <textarea
-            id="bio"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            placeholder="Tell us about yourself..."
-            maxLength={500}
-            rows={4}
-            className="w-full border-2 border-blue-600 dark:border-blue-400 p-2 bg-white dark:bg-black"
-            disabled={loading}
-          />
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-            {bio.length}/500 characters
-          </p>
-        </div>
-
-        {/* Buttons */}
-        <div className="flex gap-2">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-blue-950 rounded-xl border border-blue-800/30 p-4 w-full max-w-md">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white">Edit Profile</h3>
           <button
-            type="submit"
-            disabled={loading || uploading}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            {loading ? "Saving..." : "Save"}
-          </button>
-          <button
-            type="button"
             onClick={handleCancel}
-            disabled={loading || uploading}
-            className="flex-1 px-4 py-2 bg-gray-300 dark:bg-gray-900 font-semibold hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+            className="p-1 text-blue-200/40 hover:text-blue-200"
           >
-            Cancel
+            <DynamicIcon name="X" className="w-5 h-5" />
           </button>
         </div>
-      </form>
+
+        <form onSubmit={handleSave} className="space-y-4">
+          {/* Avatar Upload */}
+          <div>
+            <label className="block text-sm font-medium text-blue-200/60 mb-2">
+              Avatar
+            </label>
+            <div className="flex items-center gap-3">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Avatar preview"
+                  className="w-14 h-14 rounded-full object-cover border-2 border-blue-600"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-blue-900/50 border-2 border-blue-800/30 flex items-center justify-center">
+                  <DynamicIcon
+                    name="User"
+                    className="w-6 h-6 text-blue-200/40"
+                  />
+                </div>
+              )}
+              <label className="flex-1">
+                <span className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors inline-flex items-center gap-1">
+                  <DynamicIcon name="Upload" className="w-4 h-4" />
+                  {uploading ? "Uploading..." : "Upload"}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  disabled={uploading || loading}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <p className="text-xs text-blue-200/30 mt-1">Max 2MB</p>
+          </div>
+
+          {/* Bio */}
+          <div>
+            <label
+              htmlFor="bio"
+              className="block text-sm font-medium text-blue-200/60 mb-2"
+            >
+              Bio
+            </label>
+            <textarea
+              id="bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Tell us about yourself..."
+              maxLength={500}
+              rows={3}
+              className="w-full bg-blue-900/30 border border-blue-800/30 rounded-lg p-2.5 text-white placeholder-blue-200/30 focus:border-blue-600 focus:outline-none text-sm"
+              disabled={loading}
+            />
+            <p className="text-xs text-blue-200/30 mt-1">{bio.length}/500</p>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={loading || uploading}
+              className="flex-1 px-4 py-2 bg-blue-900/30 text-blue-200 font-medium rounded-lg border border-blue-800/30 hover:bg-blue-900/50 disabled:opacity-50 transition-colors text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || uploading}
+              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg disabled:opacity-50 transition-colors text-sm"
+            >
+              {loading ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

@@ -4,15 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/app/misc/AuthContext";
 import { supabase } from "@/app/misc/supabase";
-import { getUserTokenBalance, TokenBalance } from "@/app/misc/tokens";
-import { isAdmin } from "@/app/misc/auth";
-import TokenBalanceDisplay from "@/app/components/TokenBalanceDisplay";
+import { TokenBalance } from "@/app/misc/tokens";
 import GiftTokenForm from "@/app/components/GiftTokenForm";
 import AdminControls from "@/app/components/AdminControls";
 import EditDisplayName from "@/app/components/EditDisplayName";
 import EditProfile from "@/app/components/EditProfile";
 import UserOptions from "@/app/components/UserOptions";
-import { Adventure, Story } from "@/app/misc/structs";
+import { Adventure } from "@/app/misc/structs";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 
 interface ProfileUser {
@@ -38,6 +36,10 @@ export default function ProfilePage() {
   const [userIsAdmin, setUserIsAdmin] = useState(false);
   const [adventures, setAdventures] = useState<Adventure[]>([]);
   const [loadingAdventures, setLoadingAdventures] = useState(true);
+  const [showGiftForm, setShowGiftForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<"adventures" | "activity">(
+    "adventures"
+  );
 
   const userId = params?.userId as string;
   const isOwnProfile = currentUser?.id === userId;
@@ -165,40 +167,22 @@ export default function ProfilePage() {
     loadAdventures();
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    const lower = difficulty.toLowerCase();
-    switch (lower) {
-      case "easy":
-        return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800";
-      case "medium":
-        return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800";
-      case "hard":
-        return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800";
-      case "expert":
-        return "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800";
-      default:
-        return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800";
-    }
-  };
-
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-400 border-t-transparent"></div>
       </div>
     );
   }
 
   if (!profileUser) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
-        <div className="text-center bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-900 dark:text-white">
-            User Not Found
-          </h1>
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center p-4">
+        <div className="text-center bg-blue-950/50 rounded-xl p-6 border border-blue-800/30">
+          <h1 className="text-xl font-bold text-white mb-3">User Not Found</h1>
           <button
             onClick={() => router.push("/")}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors shadow-md"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
           >
             Go Home
           </button>
@@ -208,208 +192,281 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 p-3 sm:p-6 pt-20 sm:pt-22">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-4 flex items-center justify-between">
+    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between mb-6">
           <button
             onClick={() => router.back()}
-            className="px-3 py-1.5 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg text-sm"
+            className="px-3 py-1.5 bg-blue-950/50 hover:bg-blue-900/50 text-blue-200 text-sm font-medium rounded-lg border border-blue-800/30 transition-colors flex items-center gap-1"
           >
-            ← Back
+            <DynamicIcon name="ArrowLeft" className="w-4 h-4" /> Back
           </button>
           {isOwnProfile && (
-            <span className="px-3 py-1.5 bg-linear-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-full shadow-md">
-              Your Profile
-            </span>
+            <EditProfile
+              userId={userId}
+              currentProfile={profileData || {}}
+              onSuccess={handleRefresh}
+            />
           )}
         </div>
 
-        <div className="space-y-4">
-          {/* Header with Avatar and Profile Info */}
-          <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg p-4 sm:p-5 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-start gap-4 mb-3">
-              {/* Avatar */}
-              <div className="shrink-0">
-                {profileData?.avatar_url ? (
-                  <img
-                    src={profileData.avatar_url}
-                    alt={`${profileUser.display_name || "User"}'s avatar`}
-                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 border-black dark:border-white"
-                  />
-                ) : (
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center border-2 border-white dark:border-gray-700 shadow-lg">
-                    <span className="text-2xl sm:text-3xl font-bold text-white">
-                      {(profileUser.display_name?.[0] || "A").toUpperCase()}
-                    </span>
-                  </div>
+        {/* Profile Header - Compact */}
+        <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 mb-4">
+          <div className="flex items-start gap-4">
+            {/* Avatar */}
+            {profileData?.avatar_url ? (
+              <img
+                src={profileData.avatar_url}
+                alt={`${profileUser.display_name || "User"}'s avatar`}
+                className="w-16 h-16 rounded-full object-cover border-2 border-blue-600"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center border-2 border-blue-600">
+                <span className="text-xl font-bold text-white">
+                  {(profileUser.display_name?.[0] || "A").toUpperCase()}
+                </span>
+              </div>
+            )}
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-xl font-bold text-white truncate">
+                  {profileUser.display_name || "Anonymous"}
+                </h1>
+                {profileUser.role === "admin" && (
+                  <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
+                    Admin
+                  </span>
                 )}
               </div>
-
-              {/* User Info */}
-              <div className="flex-1">
-                <h1 className="text-2xl sm:text-3xl font-bold mb-2 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  {profileUser.display_name || "ANON"}
-                </h1>
-                <p className="text-gray-600 dark:text-gray-400 mb-3">
-                  Member since:{" "}
-                  {new Date(profileUser.created_at).toLocaleDateString()}
+              <p className="text-sm text-blue-200/40 mb-2">
+                Joined{" "}
+                {new Date(profileUser.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  year: "numeric",
+                })}
+                {adventures.length > 0 &&
+                  ` • ${adventures.length} adventure${
+                    adventures.length !== 1 ? "s" : ""
+                  }`}
+              </p>
+              {profileData?.bio && (
+                <p className="text-sm text-blue-200/60 line-clamp-2">
+                  {profileData.bio}
                 </p>
-                {isOwnProfile && (
+              )}
+              {isOwnProfile && (
+                <div className="mt-2">
                   <EditDisplayName
                     currentDisplayName={profileUser.display_name || null}
                     onSuccess={handleRefresh}
                   />
-                )}
-              </div>
-            </div>
-
-            {/* Profile Details */}
-            {profileData && (
-              <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
-                {profileData.bio && (
-                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                      Bio
-                    </p>
-                    <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap text-sm">
-                      {profileData.bio}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Edit Profile Button */}
-            {isOwnProfile && (
-              <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                <EditProfile
-                  userId={userId}
-                  currentProfile={profileData || {}}
-                  onSuccess={handleRefresh}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* User Options (only for own profile) */}
-          {isOwnProfile && <UserOptions />}
-
-          {/* Token Balance */}
-          {balance && <TokenBalanceDisplay balance={balance} loading={false} />}
-          {/* Refresh Button */}
-          <div className="flex justify-center">
-            <button
-              onClick={handleRefresh}
-              className="px-4 py-2 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 font-semibold transition-all rounded-lg shadow-md hover:shadow-lg text-gray-900 dark:text-white flex items-center gap-2 text-sm"
-            >
-              <DynamicIcon name="RefreshCw" className="w-4 h-4" /> Refresh
-              Balance
-            </button>
-          </div>
-          {/* Gift Form (only show if viewing another user's profile) */}
-          {!isOwnProfile && currentUser && (
-            <GiftTokenForm
-              recipientId={profileUser.id}
-              recipientName={profileUser.display_name || "this user"}
-              onSuccess={handleRefresh}
-            />
-          )}
-
-          {/* Adventures Section */}
-          <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3 bg-purple-50 dark:bg-purple-900/30">
-              <h2 className="text-lg font-bold text-purple-600 dark:text-purple-400 flex items-center gap-2">
-                <DynamicIcon name="Gamepad2" className="w-5 h-5" /> Adventures (
-                {adventures.length})
-              </h2>
-            </div>
-
-            <div className="p-4">
-              {loadingAdventures ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-10 w-10 border-4 border-purple-600 border-t-transparent"></div>
-                </div>
-              ) : adventures.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-600 dark:text-gray-400 mb-3">
-                    {isOwnProfile
-                      ? "You haven't created any adventures yet."
-                      : "This user hasn't created any adventures yet."}
-                  </p>
-                  {isOwnProfile && (
-                    <button
-                      onClick={() => router.push("/creator")}
-                      className="px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all text-sm"
-                    >
-                      Create Your First Adventure
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {adventures.map((adventure) => (
-                    <div
-                      key={adventure.id}
-                      onClick={() => router.push(`/explorer/${adventure.id}`)}
-                      className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 cursor-pointer border border-gray-200 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-bold text-gray-900 dark:text-white line-clamp-2 flex-1">
-                          {adventure.title}
-                        </h3>
-                        {adventure.isFeatured && (
-                          <DynamicIcon
-                            name="Star"
-                            className="w-4 h-4 text-yellow-500 ml-2"
-                          />
-                        )}
-                      </div>
-                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-2 line-clamp-2">
-                        {adventure.shortDescription}
-                      </p>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-bold border capitalize ${getDifficultyColor(
-                            adventure.difficulty
-                          )}`}
-                        >
-                          {adventure.difficulty}
-                        </span>
-                        <span className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                          <DynamicIcon name="Star" className="w-3 h-3" />{" "}
-                          {adventure.rating?.toFixed(1) || "N/A"}
-                        </span>
-                        <span className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                          <DynamicIcon name="Gamepad2" className="w-3 h-3" />{" "}
-                          {adventure.playCount} plays
-                        </span>
-                      </div>
-                      {!adventure.isPublished && (
-                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
-                          <span className="text-xs font-semibold text-orange-600 dark:text-orange-400 flex items-center gap-1">
-                            <DynamicIcon name="FileEdit" className="w-3 h-3" />{" "}
-                            Draft
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
                 </div>
               )}
             </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 shrink-0">
+              {!isOwnProfile && currentUser && (
+                <button
+                  onClick={() => setShowGiftForm(!showGiftForm)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
+                    showGiftForm
+                      ? "bg-purple-600 text-white"
+                      : "bg-blue-950/80 text-blue-200 border border-blue-800/30 hover:border-blue-600/50"
+                  }`}
+                >
+                  <DynamicIcon name="Gift" className="w-4 h-4" /> Gift
+                </button>
+              )}
+              <button
+                onClick={handleRefresh}
+                className="p-1.5 bg-blue-950/80 text-blue-200 rounded-lg border border-blue-800/30 hover:border-blue-600/50 transition-colors"
+                title="Refresh"
+              >
+                <DynamicIcon name="RefreshCw" className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          {/* IMPORTANT: Admin Controls must always remain at the very bottom of the page */}
-          {/* Admin Controls */}
-          {userIsAdmin && (
+          {/* Gift Form - Collapsible */}
+          {showGiftForm && !isOwnProfile && currentUser && (
+            <div className="mt-4 pt-4 border-t border-blue-800/30">
+              <GiftTokenForm
+                recipientId={profileUser.id}
+                recipientName={profileUser.display_name || "this user"}
+                onSuccess={() => {
+                  handleRefresh();
+                  setShowGiftForm(false);
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Stats Row */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-3 text-center">
+            <div className="flex items-center justify-center gap-1.5 text-yellow-400 mb-1">
+              <DynamicIcon name="Coins" className="w-4 h-4" />
+              <span className="text-lg font-bold">{balance?.total ?? "—"}</span>
+            </div>
+            <p className="text-xs text-blue-200/40">Coins</p>
+          </div>
+          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-3 text-center">
+            <div className="flex items-center justify-center gap-1.5 text-green-400 mb-1">
+              <DynamicIcon name="Send" className="w-4 h-4" />
+              <span className="text-lg font-bold">
+                {balance?.tradable ?? "—"}
+              </span>
+            </div>
+            <p className="text-xs text-blue-200/40">Tradable</p>
+          </div>
+          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-3 text-center">
+            <div className="flex items-center justify-center gap-1.5 text-purple-400 mb-1">
+              <DynamicIcon name="Map" className="w-4 h-4" />
+              <span className="text-lg font-bold">{adventures.length}</span>
+            </div>
+            <p className="text-xs text-blue-200/40">Adventures</p>
+          </div>
+        </div>
+
+        {/* User Options (only for own profile) */}
+        {isOwnProfile && (
+          <div className="mb-4">
+            <UserOptions />
+          </div>
+        )}
+
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setActiveTab("adventures")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+              activeTab === "adventures"
+                ? "bg-blue-600 text-white"
+                : "bg-blue-950/50 text-blue-200/60 hover:text-blue-200 border border-blue-800/30"
+            }`}
+          >
+            <DynamicIcon name="Map" className="w-4 h-4" /> Adventures
+          </button>
+          <button
+            onClick={() => setActiveTab("activity")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+              activeTab === "activity"
+                ? "bg-blue-600 text-white"
+                : "bg-blue-950/50 text-blue-200/60 hover:text-blue-200 border border-blue-800/30"
+            }`}
+          >
+            <DynamicIcon name="Activity" className="w-4 h-4" /> Activity
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === "adventures" && (
+          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
+            {loadingAdventures ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-400 border-t-transparent"></div>
+              </div>
+            ) : adventures.length === 0 ? (
+              <div className="text-center py-8">
+                <DynamicIcon
+                  name="Map"
+                  className="w-12 h-12 text-blue-200/20 mx-auto mb-3"
+                />
+                <p className="text-blue-200/40 mb-3">
+                  {isOwnProfile
+                    ? "You haven't created any adventures yet."
+                    : "This user hasn't created any public adventures."}
+                </p>
+                {isOwnProfile && (
+                  <button
+                    onClick={() => router.push("/creator")}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors text-sm"
+                  >
+                    Create Adventure
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {adventures.map((adventure) => (
+                  <div
+                    key={adventure.id}
+                    onClick={() => router.push(`/explorer/${adventure.id}`)}
+                    className="bg-blue-900/30 rounded-lg p-3 cursor-pointer hover:bg-blue-900/50 border border-blue-800/20 hover:border-blue-600/50 transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="font-medium text-white text-sm line-clamp-1">
+                        {adventure.title}
+                      </h3>
+                      {!adventure.isPublished && (
+                        <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-300 text-xs rounded shrink-0">
+                          Draft
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-blue-200/40 line-clamp-2 mb-2">
+                      {adventure.shortDescription}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-yellow-400 flex items-center gap-0.5">
+                        <DynamicIcon
+                          name="Star"
+                          className="w-3 h-3 fill-current"
+                        />
+                        {adventure.rating?.toFixed(1) || "—"}
+                      </span>
+                      <span className="text-blue-200/40">
+                        {adventure.playCount} plays
+                      </span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-xs capitalize ${
+                          adventure.difficulty === "easy"
+                            ? "bg-green-500/20 text-green-300"
+                            : adventure.difficulty === "medium"
+                            ? "bg-yellow-500/20 text-yellow-300"
+                            : adventure.difficulty === "hard"
+                            ? "bg-orange-500/20 text-orange-300"
+                            : "bg-red-500/20 text-red-300"
+                        }`}
+                      >
+                        {adventure.difficulty}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "activity" && (
+          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
+            <div className="text-center py-8">
+              <DynamicIcon
+                name="Activity"
+                className="w-12 h-12 text-blue-200/20 mx-auto mb-3"
+              />
+              <p className="text-blue-200/40">Activity feed coming soon</p>
+            </div>
+          </div>
+        )}
+
+        {/* IMPORTANT: Admin Controls must always remain at the very bottom of the page */}
+        {userIsAdmin && (
+          <div className="mt-4">
             <AdminControls
               userId={profileUser.id}
               userName={profileUser.display_name || "this user"}
               currentRole={profileUser.role}
               onSuccess={handleRefresh}
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
