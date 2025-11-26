@@ -33,27 +33,27 @@ export default function LorePage(storyData: StoryData) {
   const secretLore = filteredLore.filter((lore) => lore.secrtet);
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-4">
       {/* Header Section */}
-      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+      <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <DynamicIcon name="Book" className="w-8 h-8 text-purple-600" />{" "}
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <DynamicIcon name="Book" className="w-5 h-5 text-purple-400" />
               Story Lore
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Discover the world, characters, and secrets of your adventure
+            <p className="text-xs text-blue-200/40 mt-0.5">
+              Discover the world, characters, and secrets
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full font-medium">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded font-medium">
               {visibleLore.length} entries
             </span>
             {secretLore.length > 0 && (
-              <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full font-medium flex items-center gap-1">
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded font-medium flex items-center gap-1">
                 {secretLore.length}{" "}
-                <DynamicIcon name="Lock" className="w-4 h-4" /> secrets
+                <DynamicIcon name="Lock" className="w-3 h-3" /> secrets
               </span>
             )}
           </div>
@@ -66,10 +66,10 @@ export default function LorePage(storyData: StoryData) {
             placeholder="Search lore entries..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-3 pl-10 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full px-3 py-2 pl-9 bg-blue-900/50 border border-blue-800/30 rounded-lg text-white text-sm placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <svg
-            className="absolute left-3 top-3.5 h-5 w-5 text-gray-400"
+            className="absolute left-3 top-2.5 h-4 w-4 text-blue-200/40"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -85,64 +85,63 @@ export default function LorePage(storyData: StoryData) {
       </div>
 
       {/* Main Content - Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Lore List */}
-        <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+        <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
+          <h3 className="text-base font-semibold text-white mb-3">
             Discovered Lore
           </h3>
 
           {visibleLore.length === 0 && !searchTerm && (
-            <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400">
-                No lore discovered yet. Continue your adventure to uncover the
-                world's secrets!
+            <div className="text-center py-8">
+              <p className="text-sm text-blue-200/40">
+                No lore discovered yet. Continue your adventure!
               </p>
             </div>
           )}
 
           {visibleLore.length === 0 && searchTerm && (
-            <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400">
+            <div className="text-center py-8">
+              <p className="text-sm text-blue-200/40">
                 No lore entries match your search.
               </p>
             </div>
           )}
 
-          <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
             {visibleLore.map((loreItem, index) => (
               <button
                 key={index}
                 onClick={() => setSelectedLore(loreItem)}
-                className={`w-full text-left p-4 rounded-lg border-2 transition-all flex items-start gap-3 ${
+                className={`w-full text-left p-3 rounded-lg border transition-all flex items-start gap-2.5 ${
                   selectedLore === loreItem
-                    ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                    : "border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600"
+                    ? "border-purple-500/50 bg-purple-500/10"
+                    : "border-blue-800/30 hover:border-purple-500/30"
                 }`}
               >
                 {loreItem.thumbnailUrl && (
                   <img
                     src={loreItem.thumbnailUrl}
                     alt={loreItem.title}
-                    className="w-14 h-14 rounded-md object-cover border border-gray-200 dark:border-gray-600"
+                    className="w-12 h-12 rounded object-cover border border-blue-800/30"
                   />
                 )}
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-1 truncate">
+                  <h4 className="font-medium text-sm text-white mb-0.5 truncate">
                     {loreItem.title}
                   </h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                    {loreItem.content.substring(0, 100)}...
+                  <p className="text-xs text-blue-200/40 line-clamp-2">
+                    {loreItem.content.substring(0, 80)}...
                   </p>
-                  <div className="flex flex-wrap gap-1 mt-2">
+                  <div className="flex flex-wrap gap-1 mt-1.5">
                     {loreItem.relatedCharacters?.length > 0 && (
-                      <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded flex items-center gap-1">
+                      <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded flex items-center gap-0.5">
                         <DynamicIcon name="User" className="w-3 h-3" />{" "}
                         {loreItem.relatedCharacters.length}
                       </span>
                     )}
                     {loreItem.relatedLocations?.length > 0 && (
-                      <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded flex items-center gap-1">
+                      <span className="text-xs px-1.5 py-0.5 bg-green-500/20 text-green-300 rounded flex items-center gap-0.5">
                         <DynamicIcon name="MapPin" className="w-3 h-3" />{" "}
                         {loreItem.relatedLocations.length}
                       </span>
@@ -154,37 +153,38 @@ export default function LorePage(storyData: StoryData) {
 
             {/* Secret Lore Section */}
             {secretLore.length > 0 && (
-              <div className="pt-4 mt-4 border-t border-gray-300 dark:border-gray-600">
-                <h4 className="text-sm font-bold text-amber-700 dark:text-amber-400 mb-3 flex items-center gap-2">
-                  <DynamicIcon name="Lock" className="w-4 h-4" /> Hidden Secrets
+              <div className="pt-3 mt-3 border-t border-blue-800/30">
+                <h4 className="text-sm font-medium text-amber-400 mb-2 flex items-center gap-2">
+                  <DynamicIcon name="Lock" className="w-3.5 h-3.5" /> Hidden
+                  Secrets
                 </h4>
                 {secretLore.map((loreItem, index) => (
                   <button
                     key={`secret-${index}`}
                     onClick={() => setSelectedLore(loreItem)}
-                    className={`w-full text-left p-4 rounded-lg border-2 transition-all mb-3 flex items-start gap-3 ${
+                    className={`w-full text-left p-3 rounded-lg border transition-all mb-2 flex items-start gap-2.5 ${
                       selectedLore === loreItem
-                        ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20"
-                        : "border-amber-200 dark:border-amber-700 hover:border-amber-400 dark:hover:border-amber-500"
+                        ? "border-amber-500/50 bg-amber-500/10"
+                        : "border-amber-500/30 hover:border-amber-500/50"
                     }`}
                   >
                     {loreItem.thumbnailUrl && (
                       <img
                         src={loreItem.thumbnailUrl}
                         alt={loreItem.title}
-                        className="w-14 h-14 rounded-md object-cover border border-amber-200 dark:border-amber-700"
+                        className="w-12 h-12 rounded object-cover border border-amber-500/30"
                       />
                     )}
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2 truncate">
+                      <h4 className="font-medium text-sm text-white mb-0.5 flex items-center gap-1.5 truncate">
                         <DynamicIcon
                           name="Lock"
-                          className="w-4 h-4 text-amber-600"
+                          className="w-3.5 h-3.5 text-amber-400"
                         />{" "}
                         {loreItem.title}
                       </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                        {loreItem.content.substring(0, 100)}...
+                      <p className="text-xs text-blue-200/40 line-clamp-2">
+                        {loreItem.content.substring(0, 80)}...
                       </p>
                     </div>
                   </button>
@@ -195,16 +195,16 @@ export default function LorePage(storyData: StoryData) {
         </div>
 
         {/* Lore Detail */}
-        <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+        <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
+          <h3 className="text-base font-semibold text-white mb-3">
             Lore Details
           </h3>
 
           {!selectedLore ? (
-            <div className="flex items-center justify-center h-[500px] text-center">
+            <div className="flex items-center justify-center h-[400px] text-center">
               <div>
                 <svg
-                  className="mx-auto h-16 w-16 text-gray-400 mb-4"
+                  className="mx-auto h-12 w-12 text-blue-200/20 mb-3"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -216,55 +216,55 @@ export default function LorePage(storyData: StoryData) {
                     d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
                   />
                 </svg>
-                <p className="text-gray-500 dark:text-gray-400">
-                  Select a lore entry to view its details
+                <p className="text-sm text-blue-200/40">
+                  Select a lore entry to view details
                 </p>
               </div>
             </div>
           ) : (
-            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
                   {selectedLore.secrtet && (
                     <DynamicIcon
                       name="Lock"
-                      className="w-6 h-6 text-amber-600"
+                      className="w-4 h-4 text-amber-400"
                     />
                   )}
                   {selectedLore.title}
                 </h2>
                 {selectedLore.secrtet && (
-                  <p className="text-sm text-amber-600 dark:text-amber-400 mb-4 flex items-center gap-2">
-                    <DynamicIcon name="Sparkles" className="w-4 h-4" /> Secret
+                  <p className="text-xs text-amber-400 mb-3 flex items-center gap-1">
+                    <DynamicIcon name="Sparkles" className="w-3 h-3" /> Secret
                     knowledge unlocked!
                   </p>
                 )}
               </div>
 
               {selectedLore.thumbnailUrl && (
-                <div className="relative w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                <div className="relative w-full overflow-hidden rounded-lg border border-blue-800/30">
                   <img
                     src={selectedLore.thumbnailUrl}
                     alt={selectedLore.title}
-                    className="w-full h-48 sm:h-64 object-cover"
+                    className="w-full h-40 sm:h-48 object-cover"
                   />
                 </div>
               )}
 
-              <div className="prose prose-sm sm:prose prose-zinc dark:prose-invert max-w-none">
+              <div className="prose prose-sm prose-invert max-w-none text-blue-50/90">
                 <ReactMarkdown>{selectedLore.content}</ReactMarkdown>
               </div>
 
               {selectedLore.relatedCharacters?.length > 0 && (
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                <div className="pt-3 border-t border-blue-800/30">
+                  <h4 className="text-xs font-medium text-blue-200/60 mb-2">
                     👤 Related Characters
                   </h4>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {selectedLore.relatedCharacters.map((char, idx) => (
                       <span
                         key={idx}
-                        className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm"
+                        className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs"
                       >
                         {char}
                       </span>
@@ -274,15 +274,15 @@ export default function LorePage(storyData: StoryData) {
               )}
 
               {selectedLore.relatedLocations?.length > 0 && (
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                <div className="pt-3 border-t border-blue-800/30">
+                  <h4 className="text-xs font-medium text-blue-200/60 mb-2">
                     📍 Related Locations
                   </h4>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {selectedLore.relatedLocations.map((loc, idx) => (
                       <span
                         key={idx}
-                        className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm"
+                        className="px-2 py-0.5 bg-green-500/20 text-green-300 rounded text-xs"
                       >
                         {loc}
                       </span>
@@ -292,15 +292,15 @@ export default function LorePage(storyData: StoryData) {
               )}
 
               {selectedLore.keys?.length > 0 && (
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                <div className="pt-3 border-t border-blue-800/30">
+                  <h4 className="text-xs font-medium text-blue-200/60 mb-2">
                     🔑 Keywords
                   </h4>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {selectedLore.keys.map((key, idx) => (
                       <span
                         key={idx}
-                        className="px-3 py-1 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-full text-sm"
+                        className="px-2 py-0.5 bg-blue-900/50 text-blue-200/60 rounded text-xs"
                       >
                         {key}
                       </span>

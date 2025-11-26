@@ -186,23 +186,23 @@ export default function ChoicesModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-linear-to-b from-blue-950 via-blue-950 to-indigo-950 rounded-2xl shadow-2xl border border-purple-900/50 max-w-2xl w-full mx-4 max-h-[85vh] flex flex-col overflow-hidden">
+      <div className="relative bg-linear-to-b from-gray-900 via-blue-950 to-purple-950 rounded-xl shadow-2xl border border-blue-800/30 max-w-2xl w-full mx-4 max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-purple-900/50">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <DynamicIcon name="Compass" className="w-6 h-6 text-purple-400" />
+        <div className="flex items-center justify-between p-4 border-b border-blue-800/30">
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <DynamicIcon name="Compass" className="w-5 h-5 text-blue-400" />
             Choose Your Path
           </h2>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-white hover:bg-purple-900/50 rounded-lg transition-colors"
+            className="p-1.5 text-blue-200/60 hover:text-white hover:bg-blue-900/50 rounded-lg transition-colors"
           >
-            <DynamicIcon name="X" className="w-5 h-5" />
+            <DynamicIcon name="X" className="w-4 h-4" />
           </button>
         </div>
 
         {/* Choices List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {choices?.choices.map((choice, index) => {
             const isSelected = selectedChoice?.text === choice.text;
             const details = getChoiceDetails(choice);
@@ -211,31 +211,31 @@ export default function ChoicesModal({
               <button
                 key={index}
                 onClick={() => onSelectChoice(choice)}
-                className={`w-full text-left p-3 rounded-xl transition-all border-2 ${
+                className={`w-full text-left p-3 rounded-lg transition-all border ${
                   isSelected
-                    ? "bg-purple-900/50 border-purple-500 shadow-lg shadow-purple-500/20"
-                    : "bg-blue-900/30 border-purple-900/50 hover:border-purple-400 hover:bg-blue-900/50"
+                    ? "bg-blue-600/20 border-blue-500/50"
+                    : "bg-blue-900/30 border-blue-800/30 hover:border-blue-600/50"
                 }`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2.5">
                   <div
-                    className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                       isSelected
-                        ? "border-purple-400 bg-purple-500"
-                        : "border-gray-500"
+                        ? "border-blue-400 bg-blue-500"
+                        : "border-blue-700"
                     }`}
                   >
                     {isSelected && (
                       <DynamicIcon
                         name="Check"
-                        className="w-3 h-3 text-white"
+                        className="w-2.5 h-2.5 text-white"
                       />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium">{choice.text}</p>
+                    <p className="text-white text-sm">{choice.text}</p>
                     {details.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-2">
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
                         {details}
                       </div>
                     )}
@@ -248,22 +248,22 @@ export default function ChoicesModal({
           {/* Custom Input Toggle */}
           <button
             onClick={() => setShowCustomInput(!showCustomInput)}
-            className={`w-full text-left p-3 rounded-xl transition-all border-2 border-dashed ${
+            className={`w-full text-left p-3 rounded-lg transition-all border border-dashed ${
               showCustomInput
-                ? "bg-purple-900/30 border-purple-500"
-                : "bg-blue-900/20 border-purple-900/50 hover:border-purple-400"
+                ? "bg-blue-600/10 border-blue-500/50"
+                : "bg-blue-900/20 border-blue-800/30 hover:border-blue-600/50"
             }`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <DynamicIcon
                 name={showCustomInput ? "X" : "PenLine"}
-                className={`w-5 h-5 ${
-                  showCustomInput ? "text-purple-400" : "text-gray-400"
+                className={`w-4 h-4 ${
+                  showCustomInput ? "text-blue-400" : "text-blue-200/60"
                 }`}
               />
               <span
-                className={`font-medium ${
-                  showCustomInput ? "text-purple-300" : "text-gray-300"
+                className={`text-sm font-medium ${
+                  showCustomInput ? "text-blue-300" : "text-blue-200/60"
                 }`}
               >
                 {showCustomInput
@@ -275,16 +275,16 @@ export default function ChoicesModal({
 
           {/* Custom Input Area */}
           {showCustomInput && (
-            <div className="bg-blue-900/30 rounded-xl p-3 border border-purple-900/50 space-y-2">
+            <div className="bg-blue-900/30 rounded-lg p-3 border border-blue-800/30 space-y-2">
               <textarea
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
                 placeholder="Describe your action, dialogue, or narration..."
                 rows={3}
-                className="w-full px-3 py-2 bg-blue-950 border border-purple-800 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none text-sm"
+                className="w-full px-3 py-2 bg-blue-950/50 border border-blue-800/30 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
               />
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-blue-200/40">
                   {customInput.length} characters • No skill check
                 </span>
                 <button
@@ -292,8 +292,8 @@ export default function ChoicesModal({
                   disabled={submittingCustom || loading || !customInput.trim()}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-sm ${
                     submittingCustom || loading || !customInput.trim()
-                      ? "bg-purple-900/50 text-gray-400 cursor-not-allowed"
-                      : "bg-purple-600 hover:bg-purple-700 text-white"
+                      ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 text-white"
                   }`}
                 >
                   {submittingCustom ? "Submitting..." : "Submit Action"}
@@ -304,27 +304,27 @@ export default function ChoicesModal({
         </div>
 
         {/* Footer with Momentum & Confirm */}
-        <div className="p-4 border-t border-purple-900/50 bg-blue-900/30 space-y-3">
+        <div className="p-3 border-t border-blue-800/30 bg-blue-900/30 space-y-2">
           {/* Momentum Controls */}
           {selectedChoice && hasSkillCheck && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <DynamicIcon name="Zap" className="w-5 h-5 text-yellow-400" />
-                <span className="text-sm text-gray-300">
-                  Momentum: {storyData.momentum}/{storyData.maxMomentum}
+                <DynamicIcon name="Zap" className="w-4 h-4 text-yellow-400" />
+                <span className="text-xs text-blue-200/60">
+                  {storyData.momentum}/{storyData.maxMomentum}
                 </span>
-                <div className="flex gap-1 ml-2">
+                <div className="flex gap-0.5 ml-1">
                   {Array.from({ length: storyData.maxMomentum }).map((_, i) => (
                     <div
                       key={i}
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        i < storyData.momentum ? "bg-yellow-400" : "bg-gray-600"
+                      className={`w-2 h-2 rounded-full ${
+                        i < storyData.momentum ? "bg-yellow-400" : "bg-blue-800"
                       }`}
                     />
                   ))}
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <button
                   onClick={() =>
                     onMomentumModeChange(
@@ -332,12 +332,12 @@ export default function ChoicesModal({
                     )
                   }
                   disabled={!canUseReroll}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1 ${
+                  className={`px-2 py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1 ${
                     momentumMode === "reroll"
                       ? "bg-yellow-500 text-white"
                       : canUseReroll
-                      ? "bg-purple-900/50 text-gray-300 hover:bg-yellow-500/30"
-                      : "bg-blue-950 text-gray-600 cursor-not-allowed"
+                      ? "bg-blue-900/50 text-blue-200/70 hover:bg-yellow-500/30"
+                      : "bg-blue-950/50 text-blue-500 cursor-not-allowed"
                   }`}
                 >
                   <DynamicIcon name="Dices" className="w-3 h-3" />
@@ -350,12 +350,12 @@ export default function ChoicesModal({
                     )
                   }
                   disabled={!canUseGuarantee}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1 ${
+                  className={`px-2 py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1 ${
                     momentumMode === "guarantee"
                       ? "bg-green-500 text-white"
                       : canUseGuarantee
-                      ? "bg-purple-900/50 text-gray-300 hover:bg-green-500/30"
-                      : "bg-blue-950 text-gray-600 cursor-not-allowed"
+                      ? "bg-blue-900/50 text-blue-200/70 hover:bg-green-500/30"
+                      : "bg-blue-950/50 text-blue-500 cursor-not-allowed"
                   }`}
                 >
                   <DynamicIcon name="Check" className="w-3 h-3" />
@@ -372,30 +372,30 @@ export default function ChoicesModal({
               onClose();
             }}
             disabled={!selectedChoice || loading}
-            className={`w-full py-3 rounded-xl font-bold text-lg transition-all duration-150 flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 ${
+            className={`w-full py-2.5 rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-2 ${
               !selectedChoice || loading
-                ? "bg-purple-900/50 text-gray-400 cursor-not-allowed"
-                : "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-md hover:shadow-lg active:scale-[0.98]"
+                ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-500 text-white"
             }`}
           >
             {loading ? (
               <>
-                <DynamicIcon name="Loader2" className="w-5 h-5 animate-spin" />
+                <DynamicIcon name="Loader2" className="w-4 h-4 animate-spin" />
                 Generating...
               </>
             ) : momentumMode === "reroll" ? (
               <>
-                <DynamicIcon name="Dices" className="w-5 h-5" />
+                <DynamicIcon name="Dices" className="w-4 h-4" />
                 Continue with Reroll
               </>
             ) : momentumMode === "guarantee" ? (
               <>
-                <DynamicIcon name="Check" className="w-5 h-5" />
+                <DynamicIcon name="Check" className="w-4 h-4" />
                 Continue Guaranteed
               </>
             ) : (
               <>
-                <DynamicIcon name="Sparkles" className="w-5 h-5" />
+                <DynamicIcon name="Sparkles" className="w-4 h-4" />
                 Continue Story
               </>
             )}

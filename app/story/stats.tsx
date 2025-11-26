@@ -31,40 +31,36 @@ export default function StatsPage(storyData: StoryData) {
 
   return (
     <div className="w-full">
-      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+      <div className="bg-blue-950/50 rounded-xl border border-blue-800/30">
         {/* Player Info Section - Always Visible */}
-        <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-blue-800/30">
           <div className="flex flex-col gap-3">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold mb-2 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <h2 className="text-lg font-bold mb-1 text-white">
                 {storyData.player_name}
               </h2>
-              <p className="text-sm text-gray-700 dark:text-gray-300">
+              <p className="text-sm text-blue-200/60">
                 {storyData.player_summary}
               </p>
             </div>
 
             {/* Points Display - Prominent at top */}
-            <div className="flex flex-row items-center gap-3 p-3 rounded-lg bg-linear-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-2 border-yellow-400 dark:border-yellow-600 shadow-md">
+            <div className="flex flex-row items-center gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
               <div className="shrink-0">
-                <DynamicIcon
-                  name="Coins"
-                  className="w-7 h-7 sm:w-8 sm:h-8 text-yellow-600 dark:text-yellow-400"
-                />
+                <DynamicIcon name="Coins" className="w-6 h-6 text-yellow-400" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-row items-baseline justify-between mb-0.5">
-                  <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">
+                  <span className="font-medium text-sm text-white">
                     Upgrade Points
                   </span>
-                  <span className="font-bold text-lg sm:text-xl text-yellow-600 dark:text-yellow-400">
+                  <span className="font-bold text-lg text-yellow-400">
                     {storyData.points}
                   </span>
                 </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
+                <p className="text-xs text-blue-200/40">
                   Earn {UPGRADE_COSTS.BEAT_REWARD} points per story beat,{" "}
-                  {UPGRADE_COSTS.CHAPTER_REWARD} per chapter. Spend in the
-                  Upgrades shop!
+                  {UPGRADE_COSTS.CHAPTER_REWARD} per chapter.
                 </p>
               </div>
             </div>
@@ -72,59 +68,39 @@ export default function StatsPage(storyData: StoryData) {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-1.5 px-3 sm:px-4 pt-3 pb-1.5 border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-1 px-3 pt-2 pb-1 border-b border-blue-800/30 overflow-x-auto scrollbar-hide">
           {[
-            { id: "stats", label: "Stats", icon: "BarChart2", color: "blue" },
-            {
-              id: "resources",
-              label: "Resources",
-              icon: "Zap",
-              color: "yellow",
-            },
-            {
-              id: "inventory",
-              label: "Inventory",
-              icon: "Backpack",
-              color: "purple",
-            },
-            {
-              id: "achievements",
-              label: "Achievements",
-              icon: "Trophy",
-              color: "amber",
-            },
-            { id: "quests", label: "Quests", icon: "Scroll", color: "green" },
-            {
-              id: "relationships",
-              label: "Relationships",
-              icon: "Users",
-              color: "pink",
-            },
+            { id: "stats", label: "Stats", icon: "BarChart2" },
+            { id: "resources", label: "Resources", icon: "Zap" },
+            { id: "inventory", label: "Items", icon: "Backpack" },
+            { id: "achievements", label: "Badges", icon: "Trophy" },
+            { id: "quests", label: "Quests", icon: "Scroll" },
+            { id: "relationships", label: "NPCs", icon: "Users" },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id as StatsTab)}
-              className={`px-2.5 sm:px-3 py-1.5 font-semibold rounded-t-lg transition-colors whitespace-nowrap flex items-center gap-1.5 text-sm ${
+              className={`px-2 py-1.5 font-medium rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 text-xs ${
                 activeTab === tab.id
-                  ? `bg-${tab.color}-600 text-white`
-                  : "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  ? "bg-blue-600 text-white"
+                  : "text-blue-200/60 hover:bg-blue-900/50 hover:text-white"
               }`}
             >
-              <DynamicIcon name={tab.icon} className="w-4 h-4" />
+              <DynamicIcon name={tab.icon} className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{tab.label}</span>
             </button>
           ))}
         </div>
 
         {/* Tab Content */}
-        <div className="p-4 sm:p-6">
+        <div className="p-4">
           {/* Stats Tab */}
           {activeTab === "stats" && (
             <div>
-              <h3 className="text-lg sm:text-xl font-bold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
+              <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
                 <DynamicIcon
                   name="BarChart2"
-                  className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400"
+                  className="w-5 h-5 text-blue-400"
                 />
                 Stats
               </h3>
@@ -171,32 +147,32 @@ export default function StatsPage(storyData: StoryData) {
                   return (
                     <div
                       key={index}
-                      className="flex flex-row items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                      className="flex flex-row items-center gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30"
                     >
                       <div className="shrink-0">
                         <DynamicIcon
                           name={stat.symbol}
-                          className="w-7 h-7 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400"
+                          className="w-6 h-6 text-blue-400"
                         />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-row items-baseline justify-between mb-1 gap-2">
-                          <span className="font-bold text-sm text-gray-900 dark:text-white">
+                          <span className="font-medium text-sm text-white">
                             {stat.name}
                           </span>
                           <div className="flex items-baseline gap-2 shrink-0">
                             {modifierDisplay && (
-                              <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+                              <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
                                 {modifierDisplay}
                               </span>
                             )}
                             <span
-                              className={`font-bold text-base ${
+                              className={`font-bold text-sm ${
                                 stat.value > 0
-                                  ? "text-green-600 dark:text-green-400"
+                                  ? "text-green-400"
                                   : stat.value < 0
-                                  ? "text-red-600 dark:text-red-400"
-                                  : "text-gray-600 dark:text-gray-400"
+                                  ? "text-red-400"
+                                  : "text-blue-200/60"
                               }`}
                             >
                               {stat.value >= 0 ? "+" : ""}
@@ -240,33 +216,29 @@ export default function StatsPage(storyData: StoryData) {
           {/* Resources Tab */}
           {activeTab === "resources" && (
             <div>
-              <h3 className="text-lg sm:text-xl font-bold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
-                <DynamicIcon
-                  name="Zap"
-                  className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 dark:text-yellow-400"
-                />
+              <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
+                <DynamicIcon name="Zap" className="w-5 h-5 text-yellow-400" />
                 Resources
               </h3>
               <div className="space-y-2">
                 {/* Momentum - Special Resource */}
-                <div className="flex flex-row items-center gap-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 shadow-md">
+                <div className="flex flex-row items-center gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
                   <div className="shrink-0">
                     <DynamicIcon
                       name="Zap"
-                      className="w-7 h-7 sm:w-8 sm:h-8 text-yellow-600 dark:text-yellow-400"
+                      className="w-6 h-6 text-yellow-400"
                     />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-row items-baseline justify-between mb-1">
-                      <span className="font-bold text-sm text-gray-900 dark:text-white">
+                      <span className="font-medium text-sm text-white">
                         Momentum
                       </span>
-                      <span className="font-bold text-base text-yellow-600 dark:text-yellow-400">
+                      <span className="font-bold text-sm text-yellow-400">
                         {storyData.momentum}/{storyData.maxMomentum}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1.5">
-                      Earn momentum on critical successes and strong rolls.
+                    <p className="text-xs text-blue-200/40 mb-1.5">
                       Spend to reroll (1⚡) or guarantee success (2⚡).
                     </p>
                     {/* Momentum dots display */}
@@ -275,19 +247,19 @@ export default function StatsPage(storyData: StoryData) {
                         (_, i) => (
                           <div
                             key={i}
-                            className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${
+                            className={`w-3 h-3 rounded-full border transition-all ${
                               i < storyData.momentum
-                                ? "bg-yellow-400 dark:bg-yellow-500 border-yellow-500 dark:border-yellow-400 shadow-sm"
-                                : "bg-transparent border-gray-300 dark:border-gray-600"
+                                ? "bg-yellow-400 border-yellow-500"
+                                : "bg-transparent border-blue-700"
                             }`}
                           />
                         )
                       )}
                     </div>
                     {/* Progress bar */}
-                    <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-2">
+                    <div className="w-full bg-blue-900/50 rounded-full h-1.5">
                       <div
-                        className="bg-linear-to-r from-yellow-400 to-yellow-500 h-2 rounded-full transition-all duration-300 shadow-sm"
+                        className="bg-linear-to-r from-yellow-400 to-yellow-500 h-1.5 rounded-full transition-all duration-300"
                         style={{
                           width: `${
                             (storyData.momentum / storyData.maxMomentum) *
@@ -307,30 +279,30 @@ export default function StatsPage(storyData: StoryData) {
                 {storyData.resources.map((resource, index) => (
                   <div
                     key={index}
-                    className="flex flex-row items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
+                    className="flex flex-row items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/30"
                   >
                     <div className="shrink-0">
                       <DynamicIcon
                         name={resource.symbol}
-                        className="w-7 h-7 sm:w-8 sm:h-8 text-green-600 dark:text-green-400"
+                        className="w-6 h-6 text-green-400"
                       />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-row items-baseline justify-between mb-1">
-                        <span className="font-bold text-sm text-gray-900 dark:text-white">
+                        <span className="font-medium text-sm text-white">
                           {resource.name}
                         </span>
-                        <span className="font-bold text-base text-green-600 dark:text-green-400">
+                        <span className="font-bold text-sm text-green-400">
                           {resource.value}/{resource.maxValue}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1.5">
+                      <p className="text-xs text-blue-200/40 mb-1.5">
                         {resource.description}
                       </p>
                       {/* Progress bar */}
-                      <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-2">
+                      <div className="w-full bg-blue-900/50 rounded-full h-1.5">
                         <div
-                          className={`h-2 rounded-full transition-all duration-300 shadow-sm ${
+                          className={`h-1.5 rounded-full transition-all duration-300 ${
                             resource.value / resource.maxValue > 0.5
                               ? "bg-linear-to-r from-green-500 to-green-600"
                               : resource.value / resource.maxValue > 0.25
@@ -356,10 +328,10 @@ export default function StatsPage(storyData: StoryData) {
           {/* Inventory Tab */}
           {activeTab === "inventory" && (
             <div>
-              <h3 className="text-lg sm:text-xl font-bold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
+              <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
                 <DynamicIcon
                   name="Backpack"
-                  className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400"
+                  className="w-5 h-5 text-purple-400"
                 />
                 Inventory
               </h3>
@@ -368,30 +340,30 @@ export default function StatsPage(storyData: StoryData) {
                   {storyData.inventory.map((item, index) => (
                     <div
                       key={index}
-                      className="flex flex-row items-center gap-2.5 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800"
+                      className="flex flex-row items-center gap-2.5 p-3 rounded-lg bg-purple-500/10 border border-purple-500/30"
                     >
                       <div className="shrink-0">
                         <DynamicIcon
                           name={item.symbol}
-                          className="w-7 h-7 text-purple-600 dark:text-purple-400"
+                          className="w-6 h-6 text-purple-400"
                         />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-row items-baseline justify-between">
-                          <span className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                          <span className="font-medium text-sm text-white truncate">
                             {item.name}
                           </span>
-                          <span className="font-bold text-sm text-purple-600 dark:text-purple-400 ml-2">
+                          <span className="font-bold text-sm text-purple-400 ml-2">
                             ×{item.quantity}
                           </span>
                         </div>
                         {item.description && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1 mt-0.5">
+                          <p className="text-xs text-blue-200/40 line-clamp-1 mt-0.5">
                             {item.description}
                           </p>
                         )}
                         {item.type && (
-                          <span className="inline-block mt-1 px-1.5 py-0.5 text-xs rounded-full bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200 font-medium">
+                          <span className="inline-block mt-1 px-1.5 py-0.5 text-xs rounded bg-purple-500/20 text-purple-300 font-medium">
                             {item.type}
                           </span>
                         )}
@@ -400,8 +372,8 @@ export default function StatsPage(storyData: StoryData) {
                   ))}
                 </div>
               ) : (
-                <div className="p-6 text-center rounded-lg bg-gray-50 dark:bg-gray-900/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="p-4 text-center rounded-lg bg-blue-900/30 border border-blue-800/30">
+                  <p className="text-sm text-blue-200/40">
                     Your inventory is empty
                   </p>
                 </div>
@@ -412,16 +384,13 @@ export default function StatsPage(storyData: StoryData) {
           {/* Achievements Tab */}
           {activeTab === "achievements" && (
             <div>
-              <h3 className="text-lg sm:text-xl font-bold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
-                <DynamicIcon
-                  name="Trophy"
-                  className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 dark:text-yellow-400"
-                />
+              <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
+                <DynamicIcon name="Trophy" className="w-5 h-5 text-amber-400" />
                 Achievements
                 {storyData.achievements.filter(
                   (a) => a.hidden && !a.dateAchieved
                 ).length > 0 && (
-                  <span className="px-2 py-0.5 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full text-xs font-bold ml-2">
+                  <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xs font-medium ml-2">
                     +
                     {
                       storyData.achievements.filter(
@@ -448,34 +417,34 @@ export default function StatsPage(storyData: StoryData) {
                     .map((achievement, index) => (
                       <div
                         key={index}
-                        className={`flex flex-row items-center gap-2.5 p-3 rounded-lg border-2 transition-all ${
+                        className={`flex flex-row items-center gap-2.5 p-3 rounded-lg border transition-all ${
                           achievement.dateAchieved
-                            ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 dark:border-yellow-600 shadow-sm"
-                            : "bg-gray-50 dark:bg-gray-900/30 border-gray-300 dark:border-gray-600 opacity-60"
+                            ? "bg-amber-500/10 border-amber-500/30"
+                            : "bg-blue-900/30 border-blue-800/30 opacity-60"
                         }`}
                       >
                         <div className="shrink-0">
                           <DynamicIcon
                             name={achievement.symbol}
-                            className="w-7 h-7 text-yellow-600 dark:text-yellow-400"
+                            className="w-6 h-6 text-amber-400"
                           />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-row items-baseline justify-between">
-                            <span className="font-bold text-sm text-gray-900 dark:text-white">
+                            <span className="font-medium text-sm text-white">
                               {achievement.title}
                             </span>
-                            <span className="font-bold text-xs text-yellow-600 dark:text-yellow-400 ml-2">
+                            <span className="font-bold text-xs text-amber-400 ml-2">
                               {achievement.points} pts
                             </span>
                           </div>
                           {achievement.description && (
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                            <p className="text-xs text-blue-200/40 mt-0.5">
                               {achievement.description}
                             </p>
                           )}
                           {achievement.dateAchieved && (
-                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
+                            <p className="text-xs text-amber-400/70 mt-0.5">
                               🎉 Unlocked:{" "}
                               {new Date(
                                 achievement.dateAchieved
@@ -487,8 +456,8 @@ export default function StatsPage(storyData: StoryData) {
                     ))}
                 </div>
               ) : (
-                <div className="p-6 text-center rounded-lg bg-gray-50 dark:bg-gray-900/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="p-4 text-center rounded-lg bg-blue-900/30 border border-blue-800/30">
+                  <p className="text-sm text-blue-200/40">
                     No achievements yet
                   </p>
                 </div>
@@ -501,10 +470,10 @@ export default function StatsPage(storyData: StoryData) {
             storyData.quests &&
             storyData.quests.length > 0 && (
               <div>
-                <h3 className="text-lg sm:text-xl font-bold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
+                <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
                   <DynamicIcon
                     name="Scroll"
-                    className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400"
+                    className="w-5 h-5 text-blue-400"
                   />
                   Quests
                 </h3>
@@ -515,20 +484,20 @@ export default function StatsPage(storyData: StoryData) {
                       .map((quest, index) => (
                         <div
                           key={index}
-                          className={`flex flex-col gap-1.5 p-3 rounded-lg border-2 transition-all ${
+                          className={`flex flex-col gap-1.5 p-3 rounded-lg border transition-all ${
                             quest.fulfilled
-                              ? "bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600 shadow-sm"
-                              : "bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-600"
+                              ? "bg-green-500/10 border-green-500/30"
+                              : "bg-blue-500/10 border-blue-500/30"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="font-bold text-sm text-gray-900 dark:text-white">
+                                <span className="font-medium text-sm text-white">
                                   {quest.title}
                                 </span>
                                 {quest.fulfilled && (
-                                  <span className="text-green-500 shrink-0">
+                                  <span className="text-green-400 shrink-0">
                                     <DynamicIcon
                                       name="Check"
                                       className="w-4 h-4"
@@ -536,16 +505,16 @@ export default function StatsPage(storyData: StoryData) {
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                              <p className="text-xs text-blue-200/40 mt-0.5">
                                 {quest.shortDescription}
                               </p>
                               {quest.description !== quest.shortDescription && (
-                                <p className="text-xs text-gray-500 dark:text-gray-500 italic mt-0.5">
+                                <p className="text-xs text-blue-200/30 italic mt-0.5">
                                   {quest.description}
                                 </p>
                               )}
                             </div>
-                            <span className="font-bold text-xs text-blue-600 dark:text-blue-400 shrink-0">
+                            <span className="font-bold text-xs text-blue-400 shrink-0">
                               {quest.points} pts
                             </span>
                           </div>
@@ -553,10 +522,8 @@ export default function StatsPage(storyData: StoryData) {
                       ))}
                   </div>
                 ) : (
-                  <div className="p-6 text-center rounded-lg bg-gray-50 dark:bg-gray-900/30 border-2 border-dashed border-gray-300 dark:border-gray-600">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      No active quests
-                    </p>
+                  <div className="p-4 text-center rounded-lg bg-blue-900/30 border border-blue-800/30">
+                    <p className="text-sm text-blue-200/40">No active quests</p>
                   </div>
                 )}
               </div>
@@ -567,49 +534,49 @@ export default function StatsPage(storyData: StoryData) {
             storyData.relationships &&
             storyData.relationships.length > 0 && (
               <div>
-                <h3 className="text-lg sm:text-xl font-bold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
-                  <DynamicIcon
-                    name="Users"
-                    className="w-5 h-5 sm:w-6 sm:h-6 text-pink-600 dark:text-pink-400"
-                  />
+                <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
+                  <DynamicIcon name="Users" className="w-5 h-5 text-pink-400" />
                   Relationships
                 </h3>
                 <div className="space-y-2">
                   {storyData.relationships.map((rel, index) => (
                     <div
                       key={index}
-                      className="flex flex-row items-start gap-2.5 p-3 rounded-lg bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800"
+                      className="flex flex-row items-start gap-2.5 p-3 rounded-lg bg-pink-500/10 border border-pink-500/30"
                     >
                       <div className="shrink-0">
-                        <DynamicIcon name={rel.symbol} className="w-7 h-7" />
+                        <DynamicIcon
+                          name={rel.symbol}
+                          className="w-6 h-6 text-pink-400"
+                        />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-row items-center justify-between mb-1 gap-2">
-                          <span className="font-bold text-sm text-gray-900 dark:text-white">
+                          <span className="font-medium text-sm text-white">
                             {rel.name}
                           </span>
                           <span
-                            className={`font-bold text-base px-1.5 py-0.5 rounded-full shrink-0 ${
+                            className={`font-bold text-sm px-1.5 py-0.5 rounded shrink-0 ${
                               rel.value >= 50
-                                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                                ? "bg-green-500/20 text-green-400"
                                 : rel.value >= 0
-                                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                                ? "bg-blue-500/20 text-blue-400"
                                 : rel.value >= -50
-                                ? "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300"
-                                : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                                ? "bg-orange-500/20 text-orange-400"
+                                : "bg-red-500/20 text-red-400"
                             }`}
                           >
                             {rel.value > 0 ? "+" : ""}
                             {rel.value}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                        <p className="text-xs text-blue-200/40">
                           {rel.description}
                         </p>
                         {/* Relationship bar - fills from center, -100 to +100 range */}
-                        <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-2 mt-2 relative overflow-hidden">
+                        <div className="w-full bg-blue-900/50 rounded-full h-1.5 mt-2 relative overflow-hidden">
                           {/* Center line indicator */}
-                          <div className="absolute left-1/2 top-0 w-0.5 h-full bg-gray-400 dark:bg-gray-500 -translate-x-1/2 z-10" />
+                          <div className="absolute left-1/2 top-0 w-0.5 h-full bg-blue-700 -translate-x-1/2 z-10" />
                           {/* Fill bar */}
                           {rel.value !== 0 && (
                             <div
@@ -633,7 +600,7 @@ export default function StatsPage(storyData: StoryData) {
                             />
                           )}
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        <div className="flex justify-between text-xs text-blue-200/30 mt-0.5">
                           <span>Hostile</span>
                           <span>Neutral</span>
                           <span>Allied</span>

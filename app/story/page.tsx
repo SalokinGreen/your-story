@@ -4081,13 +4081,11 @@ function StoryPageContent() {
 
   if (loadingStory) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto"></div>
-            <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
-              Loading your story...
-            </p>
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-400 border-t-transparent mx-auto"></div>
+            <p className="mt-4 text-sm text-blue-200/60">Loading story...</p>
           </div>
         </div>
       </div>
@@ -4100,15 +4098,17 @@ function StoryPageContent() {
 
   if (!storyData) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
         <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <p className="text-lg text-gray-600 dark:text-gray-400">
-              Story not found
-            </p>
+          <div className="text-center bg-blue-950/50 rounded-xl p-6 border border-blue-800/30">
+            <DynamicIcon
+              name="FileQuestion"
+              className="w-12 h-12 text-blue-200/30 mx-auto mb-3"
+            />
+            <p className="text-blue-200/60 mb-4">Story not found</p>
             <button
               onClick={() => router.push("/explorer")}
-              className="mt-4 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
             >
               Browse Adventures
             </button>
@@ -4133,129 +4133,137 @@ function StoryPageContent() {
     const totalQuests = storyData.quests?.length || 0;
 
     return (
-      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
-        <div className="max-w-4xl mx-auto">
-          {/*GameOverHeader*/}
-          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6 text-center">
-            <h1 className="text-5xl font-bold mb-4 flex items-center justify-center gap-4">
-              <DynamicIcon name="Skull" className="w-12 h-12" />
-              Game Over{""}
-              <DynamicIcon name="Skull" className="w-12 h-12" />
-            </h1>
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-6 px-4">
+        <div className="max-w-3xl mx-auto">
+          {/* Game Over Header */}
+          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-6 mb-4 text-center">
+            <div className="flex items-center justify-center gap-3 text-red-400 mb-3">
+              <DynamicIcon name="Skull" className="w-8 h-8" />
+              <h1 className="text-3xl font-bold">Game Over</h1>
+              <DynamicIcon name="Skull" className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-semibold text-white mb-1">
               {storyData.story_name}
             </h2>
-            <p className="text-lg text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-blue-200/60">
               {storyData.player_name}'s journey has concluded
             </p>
           </div>
 
-          {/*StatsSummary*/}
-          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6">
-            <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
-              <DynamicIcon name="BarChart2" className="w-8 h-8" />
+          {/* Stats Summary */}
+          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 mb-4">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <DynamicIcon name="BarChart2" className="w-5 h-5 text-blue-400" />
               Final Statistics
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <DynamicIcon name="Trophy" className="w-8 h-8" />
-                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <DynamicIcon
+                    name="Trophy"
+                    className="w-5 h-5 text-purple-400"
+                  />
+                  <span className="text-sm font-medium text-white">
                     Achievements
                   </span>
                 </div>
-                <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                <div className="text-2xl font-bold text-purple-400">
                   {achievedCount}/{totalAchievements}
                 </div>
-                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                <div className="text-xs text-blue-200/40">
                   {totalAchievements > 0
                     ? Math.round((achievedCount / totalAchievements) * 100)
                     : 0}
-                  %Complete
+                  % Complete
                 </div>
               </div>
 
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <DynamicIcon name="BookOpen" className="w-8 h-8" />
-                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+              <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <DynamicIcon
+                    name="BookOpen"
+                    className="w-5 h-5 text-blue-400"
+                  />
+                  <span className="text-sm font-medium text-white">
                     Story Beats
                   </span>
                 </div>
-                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                <div className="text-2xl font-bold text-blue-400">
                   {completedBeats}/{totalBeats}
                 </div>
-                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                <div className="text-xs text-blue-200/40">
                   {totalBeats > 0
                     ? Math.round((completedBeats / totalBeats) * 100)
                     : 0}
-                  %Complete
+                  % Complete
                 </div>
               </div>
 
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <DynamicIcon name="Target" className="w-8 h-8" />
-                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Quests
-                  </span>
+              <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <DynamicIcon
+                    name="Target"
+                    className="w-5 h-5 text-green-400"
+                  />
+                  <span className="text-sm font-medium text-white">Quests</span>
                 </div>
-                <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                <div className="text-2xl font-bold text-green-400">
                   {completedQuests}/{totalQuests}
                 </div>
-                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                <div className="text-xs text-blue-200/40">
                   {totalQuests > 0
                     ? Math.round((completedQuests / totalQuests) * 100)
                     : 0}
-                  %Complete
+                  % Complete
                 </div>
               </div>
 
-              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <DynamicIcon name="Coins" className="w-8 h-8" />
-                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Total Points
-                  </span>
+              <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <DynamicIcon
+                    name="Coins"
+                    className="w-5 h-5 text-yellow-400"
+                  />
+                  <span className="text-sm font-medium text-white">Points</span>
                 </div>
-                <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
+                <div className="text-2xl font-bold text-yellow-400">
                   {storyData.points}
                 </div>
-                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Progression Points Earned
+                <div className="text-xs text-blue-200/40">
+                  Progression Earned
                 </div>
               </div>
             </div>
           </div>
 
-          {/*RecentAchievements*/}
+          {/* Achievements Earned */}
           {achievedCount > 0 && (
-            <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 mb-6">
-              <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
-                <DynamicIcon name="Trophy" className="w-8 h-8" />
+            <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 mb-4">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <DynamicIcon name="Trophy" className="w-5 h-5 text-amber-400" />
                 Achievements Earned
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {storyData.achievements
                   .filter((a) => a.dateAchieved)
                   .map((achievement, idx) => (
                     <div
                       key={idx}
-                      className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800"
+                      className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/30"
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-2">
                         <DynamicIcon
                           name={achievement.symbol}
-                          className="w-8 h-8"
+                          className="w-5 h-5 text-amber-400 shrink-0"
                         />
-                        <div>
-                          <div className="font-bold text-gray-900 dark:text-white">
+                        <div className="min-w-0">
+                          <div className="font-medium text-white text-sm">
                             {achievement.title}
                           </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                          <div className="text-xs text-blue-200/40 line-clamp-1">
                             {achievement.description}
                           </div>
-                          <div className="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-1">
+                          <div className="text-xs text-amber-400 font-medium mt-0.5">
                             +{achievement.points} points
                           </div>
                         </div>
@@ -4266,22 +4274,22 @@ function StoryPageContent() {
             </div>
           )}
 
-          {/*ActionButtons*/}
-          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
-            <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white text-center">
-              What'sNext?
+          {/* Action Buttons */}
+          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
+            <h3 className="text-lg font-semibold text-white mb-4 text-center">
+              What's Next?
             </h3>
-            <div className="gridgrid-cols-1sm:grid-cols-2gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => {
                   setConfirmDialog({
                     isOpen: true,
-                    title: "ReplayStory",
+                    title: "Replay Story",
                     message:
-                      "Startthisadventurefromthebeginning?Allprogresswillbelost.",
+                      "Start this adventure from the beginning? All progress will be lost.",
                     icon: "RotateCcw",
                     confirmText: "Replay",
-                    confirmButtonClass: "bg-blue-600hover:bg-blue-700",
+                    confirmButtonClass: "bg-blue-600 hover:bg-blue-700",
                     onConfirm: async () => {
                       setConfirmDialog({ ...confirmDialog, isOpen: false });
                       //Replaysamestory-resettobeginning
@@ -4371,14 +4379,12 @@ function StoryPageContent() {
                     },
                   });
                 }}
-                className="px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
+                className="p-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
               >
-                <DynamicIcon name="RotateCcw" className="w-8 h-8" />
-                <div className="text-left">
-                  <div>Replay Story</div>
-                  <div className="text-xs opacity-80">
-                    Start from the beginning
-                  </div>
+                <DynamicIcon name="RotateCcw" className="w-5 h-5" />
+                <div className="text-left text-sm">
+                  <div>Replay</div>
+                  <div className="text-xs opacity-70">Fresh start</div>
                 </div>
               </button>
 
@@ -4494,53 +4500,46 @@ function StoryPageContent() {
                     },
                   });
                 }}
-                className="px-6 py-4 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
+                className="p-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
               >
-                <DynamicIcon name="Star" className="w-8 h-8" />
-                <div className="text-left">
-                  <div>New Game Plus</div>
-                  <div className="text-xs opacity-80">
-                    Keep achievements + bonuses
-                  </div>
+                <DynamicIcon name="Star" className="w-5 h-5" />
+                <div className="text-left text-sm">
+                  <div>New Game+</div>
+                  <div className="text-xs opacity-70">Keep progress</div>
                 </div>
               </button>
 
               <button
                 onClick={() => router.push("/library")}
-                className="px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
+                className="p-3 bg-blue-900/50 hover:bg-blue-900/70 text-white font-medium rounded-lg border border-blue-800/30 transition-colors flex items-center gap-2"
               >
-                <DynamicIcon name="Library" className="w-8 h-8" />
-                <div className="text-left">
-                  <div>Return to Library</div>
-                  <div className="text-xs opacity-80">
-                    View all your stories
-                  </div>
+                <DynamicIcon name="Library" className="w-5 h-5" />
+                <div className="text-left text-sm">
+                  <div>Library</div>
+                  <div className="text-xs opacity-70">Your stories</div>
                 </div>
               </button>
 
               <button
                 onClick={() => router.push("/explorer")}
-                className="px-6 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2"
+                className="p-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
               >
-                <DynamicIcon name="Map" className="w-8 h-8" />
-                <div className="text-left">
-                  <div>Explore Adventures</div>
-                  <div className="text-xs opacity-80">
-                    Start a new adventure
-                  </div>
+                <DynamicIcon name="Map" className="w-5 h-5" />
+                <div className="text-left text-sm">
+                  <div>Explore</div>
+                  <div className="text-xs opacity-70">New adventures</div>
                 </div>
               </button>
             </div>
 
             {storyData.newGamePlusCount && storyData.newGamePlusCount > 0 && (
-              <div className="mt-6 p-4 bg-linear-to-r from-amber-50 to-purple-50 dark:from-amber-900/20 dark:to-purple-900/20 rounded-lg border border-amber-200 dark:border-amber-800 text-center">
-                <div className="font-bold text-lg text-amber-900 dark:text-amber-200 flex items-center justify-center gap-2">
-                  <DynamicIcon name="Star" className="w-5 h-5" />
+              <div className="mt-4 p-3 bg-amber-500/10 rounded-lg border border-amber-500/30 text-center">
+                <div className="font-medium text-sm text-amber-300 flex items-center justify-center gap-2">
+                  <DynamicIcon name="Star" className="w-4 h-4" />
                   New Game Plus: Run #{storyData.newGamePlusCount}
                 </div>
-                <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                  Completed {storyData.newGamePlusCount}
-                  {""}
+                <div className="text-xs text-blue-200/40 mt-0.5">
+                  Completed {storyData.newGamePlusCount}{" "}
                   {storyData.newGamePlusCount === 1
                     ? "playthrough"
                     : "playthroughs"}
@@ -4561,188 +4560,185 @@ function StoryPageContent() {
     ];
 
     return (
-      <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8">
-        <div className="max-w-4xl mx-auto">
-          {/*Header*/}
-          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 mb-6">
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-6 px-4">
+        <div className="max-w-3xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
               {storyData.story_name}
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Choose your character preset to begin your adventure
+            <p className="text-sm text-blue-200/60">
+              Choose your character to begin
             </p>
           </div>
 
-          {/*PresetSelection*/}
-          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
-            <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white flex items-center gap-2">
-              <DynamicIcon name="Users" className="w-8 h-8" />
-              Select Your Character
+          {/* Preset Selection */}
+          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 mb-4">
+            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <DynamicIcon name="Users" className="w-5 h-5 text-blue-400" />
+              Select Character
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Choose a character archetype to start with pre-configured stats,
-              items, and resources, or create your own custom character.
-            </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {availablePresets.map((preset) => (
                 <button
                   key={preset.id}
                   onClick={() => handlePresetSelect(preset)}
-                  className={`border-2 rounded-xl p-4 text-left transition-all hover:shadow-lg ${
+                  className={`rounded-lg p-4 text-left transition-all border ${
                     preset.id === "custom"
-                      ? "border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 hover:border-purple-400 dark:hover:border-purple-600"
-                      : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/30 hover:border-purple-400 dark:hover:border-purple-600"
+                      ? "bg-purple-500/10 border-purple-500/30 hover:border-purple-500/60"
+                      : "bg-blue-900/30 border-blue-800/30 hover:border-blue-600/50"
                   }`}
                 >
-                  <div className="flex items-start gap-3 mb-3">
-                    <DynamicIcon name={preset.icon} className="w-8 h-8" />
-                    <div className="flex-1">
-                      <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                  <div className="flex items-start gap-3 mb-2">
+                    <div
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        preset.id === "custom"
+                          ? "bg-purple-500/20"
+                          : "bg-blue-500/20"
+                      }`}
+                    >
+                      <DynamicIcon
+                        name={preset.icon}
+                        className={`w-5 h-5 ${
+                          preset.id === "custom"
+                            ? "text-purple-400"
+                            : "text-blue-400"
+                        }`}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-white text-sm">
                         {preset.name}
                       </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-xs text-blue-200/40 line-clamp-2">
                         {preset.description}
                       </p>
                     </div>
                   </div>
 
-                  {preset.id !== "custom" && (
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      {preset.stats && preset.stats.length > 0 && (
-                        <span className="px-2 py-1 bg-blue-200 dark:bg-blue-800/50 text-blue-800 dark:text-blue-200 rounded-full">
-                          {preset.stats.length} Stats
+                  <div className="flex flex-wrap gap-1.5">
+                    {preset.id !== "custom" ? (
+                      <>
+                        {preset.stats && preset.stats.length > 0 && (
+                          <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded">
+                            {preset.stats.length} Stats
+                          </span>
+                        )}
+                        {preset.resources && preset.resources.length > 0 && (
+                          <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded">
+                            {preset.resources.length} Resources
+                          </span>
+                        )}
+                        {preset.inventory && preset.inventory.length > 0 && (
+                          <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs rounded">
+                            {preset.inventory.length} Items
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
+                          Default Stats
                         </span>
-                      )}
-                      {preset.resources && preset.resources.length > 0 && (
-                        <span className="px-2 py-1 bg-green-200 dark:bg-green-800/50 text-green-800 dark:text-green-200 rounded-full">
-                          {preset.resources.length} Resources
+                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
+                          Starter Items
                         </span>
-                      )}
-                      {preset.inventory && preset.inventory.length > 0 && (
-                        <span className="px-2 py-1 bg-yellow-200 dark:bg-yellow-800/50 text-yellow-800 dark:text-yellow-200 rounded-full">
-                          {preset.inventory.length} Items
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {preset.id === "custom" && (
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="px-2 py-1 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full">
-                        Default Stats
-                      </span>
-                      <span className="px-2 py-1 bg-purple-200 dark:bg-purple-800/50 text-purple-800 dark:text-purple-200 rounded-full">
-                        Starting Items
-                      </span>
-                    </div>
-                  )}
+                      </>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
           </div>
 
-          {/*BackButton*/}
-          <div className="mt-6">
-            <button
-              onClick={() => router.push("/library")}
-              className="px-6 py-3 bg-white dark:bg-blue-950 border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
-            >
-              <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
-              Back to Library
-            </button>
-          </div>
+          {/* Back Button */}
+          <button
+            onClick={() => router.push("/library")}
+            className="px-4 py-2 bg-blue-950/50 hover:bg-blue-900/50 text-blue-200 text-sm font-medium rounded-lg border border-blue-800/30 transition-colors flex items-center gap-2"
+          >
+            <DynamicIcon name="ArrowLeft" className="w-4 h-4" />
+            Back to Library
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 font-sans py-8 px-4 sm:px-8 pt-24">
-      <main className="flex gap-6 w-full max-w-4xl mx-auto flex-col">
-        {/*StoryHeader*/}
-        <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl sm:text-4xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-              {storyData.story_name}
-            </h1>
-            {tokenBalance !== null && (
-              <div className="text-xl sm:text-2xl font-semibold text-yellow-500 dark:text-yellow-400 flex items-center gap-2">
-                <DynamicIcon name="Coins" className="w-6 h-6" />
-                <span>{tokenBalance}</span>
-              </div>
-            )}
+    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-4 px-4 pb-20">
+      <main className="flex gap-4 w-full max-w-4xl mx-auto flex-col">
+        {/* Compact Story Header */}
+        <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={() => router.push("/library")}
+                className="p-1.5 hover:bg-blue-900/50 rounded-lg transition-colors"
+                title="Back to Library"
+              >
+                <DynamicIcon
+                  name="ArrowLeft"
+                  className="w-5 h-5 text-blue-300"
+                />
+              </button>
+              <h1 className="text-lg font-semibold text-white truncate">
+                {storyData.story_name}
+              </h1>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Sync Status */}
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  syncStatus === "synced"
+                    ? "bg-green-500"
+                    : syncStatus === "pending"
+                    ? "bg-yellow-500"
+                    : syncStatus === "syncing"
+                    ? "bg-blue-500 animate-pulse"
+                    : "bg-red-500"
+                }`}
+                title={`Sync: ${syncStatus}`}
+              />
+              {/* Token Balance */}
+              {tokenBalance !== null && (
+                <div className="flex items-center gap-1.5 text-yellow-400 font-medium">
+                  <DynamicIcon name="Coins" className="w-4 h-4" />
+                  <span className="text-sm">{tokenBalance}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        {/*Buttonsfornavigationandpages*/}
-        <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
-          <div className="flex flex-row flex-wrap items-center justify-center sm:justify-start gap-3">
-            <button
-              onClick={() => setCurrentState(StoryState.STORY)}
-              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
-                currentState === StoryState.STORY
-                  ? "bg-linear-to-r from-gray-700 to-gray-900 text-white ring-2 ring-gray-400 shadow-lg"
-                  : "bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
-              }`}
-            >
-              <DynamicIcon name="BookOpen" className="w-5 h-5" />
-              Story
-            </button>
-            <button
-              onClick={() => setCurrentState(StoryState.STATS)}
-              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
-                currentState === StoryState.STATS
-                  ? "bg-linear-to-r from-blue-600 to-blue-800 text-white ring-2 ring-blue-400 shadow-lg"
-                  : "bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/50"
-              }`}
-            >
-              <DynamicIcon name="BarChart2" className="w-5 h-5" />
-              Stats
-            </button>
-            <button
-              onClick={() => setCurrentState(StoryState.LORE)}
-              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
-                currentState === StoryState.LORE
-                  ? "bg-linear-to-r from-purple-600 to-purple-800 text-white ring-2 ring-purple-400 shadow-lg"
-                  : "bg-purple-50 dark:bg-purple-900/30 text-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900/50"
-              }`}
-            >
-              <DynamicIcon name="Scroll" className="w-5 h-5" />
-              Lore
-            </button>
-            <button
-              onClick={() => setCurrentState(StoryState.QUESTS)}
-              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
-                currentState === StoryState.QUESTS
-                  ? "bg-linear-to-r from-blue-600 to-blue-800 text-white ring-2 ring-blue-400 shadow-lg"
-                  : "bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/50"
-              }`}
-            >
-              <DynamicIcon name="Target" className="w-5 h-5" />
-              Quests
-            </button>
-            <button
-              onClick={() => setCurrentState(StoryState.UPGRADES)}
-              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
-                currentState === StoryState.UPGRADES
-                  ? "bg-linear-to-r from-yellow-600 to-yellow-800 text-white ring-2 ring-yellow-400 shadow-lg"
-                  : "bg-yellow-50 dark:bg-yellow-900/30 text-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900/50"
-              }`}
-            >
-              <DynamicIcon name="ShoppingCart" className="w-5 h-5" />
-              Upgrades
-            </button>
-            <button
-              onClick={() => setCurrentState(StoryState.MENU)}
-              className={`px-4 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
-                currentState === StoryState.MENU
-                  ? "bg-linear-to-r from-green-600 to-green-800 text-white ring-2 ring-green-400 shadow-lg"
-                  : "bg-green-50 dark:bg-green-900/30 text-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900/50"
-              }`}
-            >
-              <DynamicIcon name="Settings" className="w-5 h-5" />
-              Menu
-            </button>
+
+        {/* Tab Navigation */}
+        <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-2">
+          <div className="flex flex-wrap items-center justify-center gap-1">
+            {[
+              { state: StoryState.STORY, icon: "BookOpen", label: "Story" },
+              { state: StoryState.STATS, icon: "BarChart2", label: "Stats" },
+              { state: StoryState.LORE, icon: "Scroll", label: "Lore" },
+              { state: StoryState.QUESTS, icon: "Target", label: "Quests" },
+              {
+                state: StoryState.UPGRADES,
+                icon: "ShoppingCart",
+                label: "Upgrades",
+              },
+              { state: StoryState.MENU, icon: "Settings", label: "Menu" },
+            ].map(({ state, icon, label }) => (
+              <button
+                key={state}
+                onClick={() => setCurrentState(state)}
+                className={`px-3 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+                  currentState === state
+                    ? "bg-blue-600 text-white"
+                    : "text-blue-200/70 hover:bg-blue-900/50 hover:text-white"
+                }`}
+              >
+                <DynamicIcon name={icon} className="w-4 h-4" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
           </div>
         </div>
 

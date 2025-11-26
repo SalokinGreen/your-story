@@ -180,7 +180,7 @@ export default function Story({
   return (
     <div className="w-full max-w-3xl mx-auto">
       {/* Main Story Card */}
-      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl border border-gray-200 dark:border-purple-900/50 overflow-hidden relative">
+      <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 overflow-hidden relative">
         {/* Sync Status Indicator - top right corner */}
         {syncStatus && syncStatus !== "local-only" && (
           <div className="absolute top-3 right-3 z-10">
@@ -190,24 +190,24 @@ export default function Story({
 
         {/* Story Navigation Header */}
         {uniqueStoryParts.length > 1 && (
-          <div className="flex items-center justify-center gap-3 py-2 px-4 bg-gray-50 dark:bg-blue-900/30 border-b border-gray-200 dark:border-purple-900/50">
+          <div className="flex items-center justify-center gap-3 py-2 px-4 bg-blue-900/30 border-b border-blue-800/30">
             <button
               onClick={onNavigateLeft}
               disabled={currentStoryIndex <= 0}
-              className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed transition-colors rounded-lg hover:bg-gray-200 dark:hover:bg-purple-900/50"
+              className="p-1.5 text-blue-300 hover:text-white disabled:text-blue-500/30 disabled:cursor-not-allowed transition-colors rounded-lg hover:bg-blue-800/50"
               title="Previous"
             >
-              <DynamicIcon name="ChevronLeft" className="w-5 h-5" />
+              <DynamicIcon name="ChevronLeft" className="w-4 h-4" />
             </button>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <span className="text-sm font-medium text-blue-200/60">
                 {currentStoryIndex + 1} / {uniqueStoryParts.length}
               </span>
               {isViewingPast && (
                 <button
                   onClick={onResetToCurrentPart}
-                  className="px-2 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded transition-colors"
+                  className="px-2 py-0.5 text-xs font-medium text-blue-400 hover:bg-blue-800/50 rounded transition-colors"
                 >
                   Jump to Latest
                 </button>
@@ -220,28 +220,28 @@ export default function Story({
                 !isViewingPast ||
                 currentStoryIndex >= uniqueStoryParts.length - 1
               }
-              className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed transition-colors rounded-lg hover:bg-gray-200 dark:hover:bg-purple-900/50"
+              className="p-1.5 text-blue-300 hover:text-white disabled:text-blue-500/30 disabled:cursor-not-allowed transition-colors rounded-lg hover:bg-blue-800/50"
               title="Next"
             >
-              <DynamicIcon name="ChevronRight" className="w-5 h-5" />
+              <DynamicIcon name="ChevronRight" className="w-4 h-4" />
             </button>
           </div>
         )}
 
         {/* Story Content Area */}
         <div
-          className="relative p-4 sm:p-6 min-h-[250px]"
+          className="relative p-4 min-h-[200px]"
           onMouseEnter={() => setIsHovering(true)}
           onMouseLeave={() => setIsHovering(false)}
         >
           {editMode ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <DynamicIcon name="Pencil" className="w-5 h-5" />
+                <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                  <DynamicIcon name="Pencil" className="w-4 h-4" />
                   Edit Response
                 </h3>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-blue-200/40">
                   XML tags: &lt;story&gt;, &lt;choices&gt;, &lt;memory&gt;,
                   &lt;commands&gt;
                 </span>
@@ -249,11 +249,11 @@ export default function Story({
               <textarea
                 value={editedText}
                 onChange={(e) => setEditedText(e.target.value)}
-                className="w-full h-80 px-4 py-3 bg-gray-50 dark:bg-blue-900/50 border border-gray-300 dark:border-purple-800 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm resize-none"
+                className="w-full h-64 px-3 py-2 bg-blue-900/50 border border-blue-800/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm resize-none"
                 placeholder="Edit the raw AI output..."
               />
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-blue-200/40">
                   {editedText.length} characters
                 </span>
                 <div className="flex gap-2">
@@ -262,7 +262,7 @@ export default function Story({
                       setEditMode(false);
                       setEditedText("");
                     }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-purple-900/50 hover:bg-gray-300 dark:hover:bg-purple-800 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium text-blue-200 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
@@ -275,7 +275,7 @@ export default function Story({
                       }
                     }}
                     disabled={!editedText.trim()}
-                    className="px-4 py-2 text-sm font-medium bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center gap-2"
+                    className="px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800/50 disabled:text-blue-400 text-white rounded-lg transition-colors flex items-center gap-1.5"
                   >
                     <DynamicIcon name="Save" className="w-4 h-4" />
                     Save
@@ -296,10 +296,10 @@ export default function Story({
                       storyData.scene.parts[storyData.scene.parts.length - 1];
                     setEditedText(lastPart?.raw || storyText);
                   }}
-                  className="absolute top-4 right-4 p-2 bg-gray-900/80 hover:bg-gray-900 text-white rounded-lg shadow-lg transition-all flex items-center gap-2 text-sm"
+                  className="absolute top-3 right-3 p-1.5 bg-blue-900/80 hover:bg-blue-800 text-white rounded-lg transition-all flex items-center gap-1.5 text-xs"
                   title="Edit response"
                 >
-                  <DynamicIcon name="Pencil" className="w-4 h-4" />
+                  <DynamicIcon name="Pencil" className="w-3 h-3" />
                   Edit
                 </button>
               )}
@@ -309,14 +309,14 @@ export default function Story({
 
         {/* Action Buttons Bar */}
         {!editMode && (
-          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-blue-900/30 border-t border-gray-200 dark:border-purple-900/50">
+          <div className="flex items-center justify-between px-4 py-2 bg-blue-900/30 border-t border-blue-800/30">
             {/* Left side: Retry & Undo */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               {canUndo && onUndo && (
                 <button
                   onClick={onUndo}
                   disabled={loading || !!loadingStage}
-                  className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-purple-900/50 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-blue-800/50 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Undo last action"
                 >
                   <DynamicIcon name="Undo2" className="w-4 h-4" />
@@ -327,7 +327,7 @@ export default function Story({
                 <button
                   onClick={onRetry}
                   disabled={loading || !!loadingStage}
-                  className="px-3 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-900/30 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Regenerate response"
                 >
                   <DynamicIcon name="RotateCcw" className="w-4 h-4" />
@@ -346,19 +346,19 @@ export default function Story({
 
         {/* Continue Button */}
         {!editMode && (
-          <div className="p-4 pt-0">
+          <div className="p-3">
             <button
               onClick={() => setShowChoicesModal(true)}
               disabled={loading || !!loadingStage}
-              className={`w-full py-3 text-lg font-bold rounded-xl shadow-md transition-all duration-150 flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 ${
+              className={`w-full py-2.5 text-base font-semibold rounded-lg transition-all duration-150 flex items-center justify-center gap-2 ${
                 loading || loadingStage
-                  ? "bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-400 cursor-not-allowed"
-                  : "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white hover:shadow-lg active:scale-[0.98]"
+                  ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-500 text-white"
               }`}
             >
               {loading || loadingStage ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-gray-300 dark:border-gray-500 border-t-white dark:border-t-gray-300 rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-blue-300 rounded-full animate-spin" />
                   {loadingStage === "tools"
                     ? "Updating game state..."
                     : loadingStage === "choices"
@@ -367,7 +367,7 @@ export default function Story({
                 </>
               ) : (
                 <>
-                  <DynamicIcon name="Compass" className="w-5 h-5" />
+                  <DynamicIcon name="Compass" className="w-4 h-4" />
                   Continue
                 </>
               )}
@@ -397,43 +397,51 @@ export default function Story({
 const prettify = (text: string, animate: boolean = true) => {
   return (
     <div
-      className={`prose prose-lg prose-zinc dark:prose-invert max-w-none ${
+      className={`prose prose-sm prose-invert max-w-none ${
         animate ? "animate-fade-in" : ""
       }`}
     >
       <ReactMarkdown
         components={{
           p: ({ node, ...props }) => (
-            <p className="mb-3 leading-relaxed last:mb-0" {...props} />
+            <p
+              className="mb-2 leading-relaxed text-blue-50/90 last:mb-0"
+              {...props}
+            />
           ),
           h1: ({ node, ...props }) => (
             <h1
-              className="text-2xl font-bold mb-3 mt-4 first:mt-0"
+              className="text-xl font-bold mb-2 mt-3 first:mt-0 text-white"
               {...props}
             />
           ),
           h2: ({ node, ...props }) => (
-            <h2 className="text-xl font-bold mb-2 mt-4 first:mt-0" {...props} />
-          ),
-          h3: ({ node, ...props }) => (
-            <h3 className="text-lg font-bold mb-2 mt-3 first:mt-0" {...props} />
-          ),
-          strong: ({ node, ...props }) => (
-            <strong
-              className="font-bold text-gray-900 dark:text-white"
+            <h2
+              className="text-lg font-bold mb-2 mt-3 first:mt-0 text-white"
               {...props}
             />
           ),
-          em: ({ node, ...props }) => <em className="italic" {...props} />,
+          h3: ({ node, ...props }) => (
+            <h3
+              className="text-base font-bold mb-1.5 mt-2 first:mt-0 text-white"
+              {...props}
+            />
+          ),
+          strong: ({ node, ...props }) => (
+            <strong className="font-bold text-white" {...props} />
+          ),
+          em: ({ node, ...props }) => (
+            <em className="italic text-blue-100" {...props} />
+          ),
           ul: ({ node, ...props }) => (
             <ul
-              className="list-disc ml-5 mb-3 space-y-1 last:mb-0"
+              className="list-disc ml-4 mb-2 space-y-0.5 last:mb-0 text-blue-50/90"
               {...props}
             />
           ),
           ol: ({ node, ...props }) => (
             <ol
-              className="list-decimal ml-5 mb-3 space-y-1 last:mb-0"
+              className="list-decimal ml-4 mb-2 space-y-0.5 last:mb-0 text-blue-50/90"
               {...props}
             />
           ),
@@ -442,7 +450,7 @@ const prettify = (text: string, animate: boolean = true) => {
           ),
           blockquote: ({ node, ...props }) => (
             <blockquote
-              className="border-l-4 border-purple-500 pl-4 italic text-gray-600 dark:text-gray-400 my-3"
+              className="border-l-2 border-blue-500 pl-3 italic text-blue-200/70 my-2"
               {...props}
             />
           ),

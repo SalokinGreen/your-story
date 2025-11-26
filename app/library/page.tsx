@@ -1263,7 +1263,9 @@ export default function LibraryPage() {
                 {/* Local Stories */}
                 {filteredLocalStories.map((story) => {
                   const chapter = story.storyData?.currentChapter ?? 0;
-                  const timeSinceUpdate = getRelativeTime(story.updatedAt);
+                  const timeSinceUpdate = getRelativeTime(
+                    String(story.updatedAt)
+                  );
 
                   return (
                     <div
