@@ -644,9 +644,7 @@ function AIModelSelector({
             {/* API Keys */}
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-medium text-blue-200">
-                  API Keys
-                </h4>
+                <h4 className="text-sm font-medium text-blue-200">API Keys</h4>
                 <button
                   onClick={() => setShowKeys(!showKeys)}
                   className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
@@ -686,9 +684,7 @@ function AIModelSelector({
 
             {/* Custom Model Config */}
             <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-bold text-white">
-                Custom Models
-              </h4>
+              <h4 className="text-sm font-bold text-white">Custom Models</h4>
 
               {/* Existing Custom Models */}
               {customModels.length > 0 && (
@@ -1603,9 +1599,7 @@ function StatsResourcesEditor({
                         className="w-8 h-8 text-blue-600 dark:text-blue-400"
                       />
                       <div>
-                        <div className="font-bold text-white">
-                          {stat.name}
-                        </div>
+                        <div className="font-bold text-white">{stat.name}</div>
                         <div className="text-sm text-blue-200/60">
                           {stat.description}
                         </div>
@@ -2014,9 +2008,7 @@ function StatsResourcesEditor({
             )
           )}
           {localAchievements.length === 0 && (
-            <p className="text-sm text-blue-200/60">
-              No achievements yet.
-            </p>
+            <p className="text-sm text-blue-200/60">No achievements yet.</p>
           )}
         </div>
       </div>
@@ -2320,9 +2312,7 @@ function QuestEditor({
             )
           )}
           {localQuests.length === 0 && (
-            <p className="text-sm text-blue-200/60">
-              No quests yet.
-            </p>
+            <p className="text-sm text-blue-200/60">No quests yet.</p>
           )}
         </div>
       </div>
@@ -2941,7 +2931,7 @@ function LoreEditor({
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="e.g., 'Found the Ancient Map'"
+                          placeholder="e.g., Found the Ancient Map"
                           className="flex-1 px-3 py-2 text-sm bg-blue-950/50 border border-blue-700/40 rounded text-white"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
@@ -3006,7 +2996,7 @@ function LoreEditor({
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="e.g., 'Destroyed the Map'"
+                          placeholder="e.g., Destroyed the Map"
                           className="flex-1 px-3 py-2 text-sm bg-blue-950/50 border border-blue-700/40 rounded text-white"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
@@ -3641,9 +3631,7 @@ function RelationshipsEditor({
                     {rel.value}
                   </span>
                 </div>
-                <p className="text-sm text-blue-200/60">
-                  {rel.description}
-                </p>
+                <p className="text-sm text-blue-200/60">{rel.description}</p>
               </div>
               <div className="flex gap-2 shrink-0">
                 <button
@@ -4298,10 +4286,13 @@ export default function MenuPage({
       <div className="bg-[#0f1a2e] rounded-xl p-4 border border-blue-800/30">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <DynamicIcon name="Settings" className="w-5 h-5 text-purple-400" /> Story Menu
+            <DynamicIcon name="Settings" className="w-5 h-5 text-purple-400" />{" "}
+            Story Menu
           </h2>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-blue-300/60">{stats.progress}% complete</span>
+            <span className="text-xs text-blue-300/60">
+              {stats.progress}% complete
+            </span>
             <div className="w-20 h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
               <div
                 className="h-full bg-linear-to-r from-purple-500 to-pink-500"
@@ -4310,23 +4301,31 @@ export default function MenuPage({
             </div>
           </div>
         </div>
-        
+
         {/* Quick Stats Row */}
         <div className="grid grid-cols-4 gap-2 text-center">
           <div className="bg-blue-900/30 rounded-lg py-2 px-1">
-            <p className="text-lg font-bold text-blue-400">{stats.totalParts}</p>
+            <p className="text-lg font-bold text-blue-400">
+              {stats.totalParts}
+            </p>
             <p className="text-[10px] text-blue-300/50">Parts</p>
           </div>
           <div className="bg-purple-900/30 rounded-lg py-2 px-1">
-            <p className="text-lg font-bold text-purple-400">{stats.fulfilledBeats}/{stats.totalBeats}</p>
+            <p className="text-lg font-bold text-purple-400">
+              {stats.fulfilledBeats}/{stats.totalBeats}
+            </p>
             <p className="text-[10px] text-purple-300/50">Beats</p>
           </div>
           <div className="bg-yellow-900/30 rounded-lg py-2 px-1">
-            <p className="text-lg font-bold text-yellow-400">{availablePoints}</p>
+            <p className="text-lg font-bold text-yellow-400">
+              {availablePoints}
+            </p>
             <p className="text-[10px] text-yellow-300/50">Points</p>
           </div>
           <div className="bg-cyan-900/30 rounded-lg py-2 px-1">
-            <p className="text-lg font-bold text-cyan-400">{storyData.momentum}/{storyData.maxMomentum}</p>
+            <p className="text-lg font-bold text-cyan-400">
+              {storyData.momentum}/{storyData.maxMomentum}
+            </p>
             <p className="text-[10px] text-cyan-300/50">Momentum</p>
           </div>
         </div>
@@ -4341,7 +4340,7 @@ export default function MenuPage({
           <DynamicIcon name="Settings" className="w-4 h-4" />
           <span>Story Editor</span>
         </button>
-        
+
         <button
           onClick={handleSaveProgress}
           disabled={saving || !storyDbId}
@@ -4407,15 +4406,18 @@ export default function MenuPage({
           className="w-full flex items-center justify-between p-3 hover:bg-blue-900/20 transition-colors"
         >
           <span className="text-sm font-medium text-white flex items-center gap-2">
-            <DynamicIcon name="StickyNote" className="w-4 h-4 text-yellow-400" />
+            <DynamicIcon
+              name="StickyNote"
+              className="w-4 h-4 text-yellow-400"
+            />
             Player Notes
           </span>
-          <DynamicIcon 
-            name={editingNotes ? "ChevronUp" : "ChevronDown"} 
-            className="w-4 h-4 text-blue-300/60" 
+          <DynamicIcon
+            name={editingNotes ? "ChevronUp" : "ChevronDown"}
+            className="w-4 h-4 text-blue-300/60"
           />
         </button>
-        
+
         {editingNotes && (
           <div className="p-3 pt-0 space-y-2">
             <textarea
@@ -4443,7 +4445,7 @@ export default function MenuPage({
             </div>
           </div>
         )}
-        
+
         {!editingNotes && playerNotes && (
           <div className="px-3 pb-3">
             <p className="text-xs text-blue-200/70 whitespace-pre-wrap line-clamp-2">
@@ -4486,25 +4488,59 @@ export default function MenuPage({
                       earnedPointsFromBeats: [],
                       earnedPointsFromChapters: [],
                       earnedPointsFromQuests: [],
-                      plot_beats: storyData.plot_beats.map((b) => ({ ...b, fulfilled: false })),
-                      achievements: storyData.achievements.map((a) => ({ ...a, dateAchieved: null })),
-                      quests: storyData.quests?.map((q) => ({ ...q, fulfilled: false, active: false })) || [],
-                      lore: storyData.lore.map((l) => ({ ...l, on: l.on_triggers && l.on_triggers.length > 0 ? false : true })),
+                      plot_beats: storyData.plot_beats.map((b) => ({
+                        ...b,
+                        fulfilled: false,
+                      })),
+                      achievements: storyData.achievements.map((a) => ({
+                        ...a,
+                        dateAchieved: null,
+                      })),
+                      quests:
+                        storyData.quests?.map((q) => ({
+                          ...q,
+                          fulfilled: false,
+                          active: false,
+                        })) || [],
+                      lore: storyData.lore.map((l) => ({
+                        ...l,
+                        on:
+                          l.on_triggers && l.on_triggers.length > 0
+                            ? false
+                            : true,
+                      })),
                       newGamePlusMode: false,
                     };
                     if (storyDbId.startsWith("local_")) {
-                      const { saveLocalStory } = await import("@/app/misc/localStoryManager");
+                      const { saveLocalStory } = await import(
+                        "@/app/misc/localStoryManager"
+                      );
                       await saveLocalStory(storyDbId, resetStoryData);
                     } else {
-                      const { data: { session } } = await supabase.auth.getSession();
-                      if (!session) { addNotification("Please sign in", "warning"); return; }
+                      const {
+                        data: { session },
+                      } = await supabase.auth.getSession();
+                      if (!session) {
+                        addNotification("Please sign in", "warning");
+                        return;
+                      }
                       const password = getEncryptionPassword();
                       const email = user?.email;
-                      if (!password || !email) { addNotification("Please sign in again", "warning"); return; }
-                      const encryptedData = await encryptStoryData(resetStoryData, email, password);
+                      if (!password || !email) {
+                        addNotification("Please sign in again", "warning");
+                        return;
+                      }
+                      const encryptedData = await encryptStoryData(
+                        resetStoryData,
+                        email,
+                        password
+                      );
                       await fetch(`/api/stories/${storyDbId}`, {
                         method: "PATCH",
-                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${session.access_token}`,
+                        },
                         body: JSON.stringify({ storyData: encryptedData }),
                       });
                     }
@@ -4537,23 +4573,32 @@ export default function MenuPage({
                   setDeleting(true);
                   try {
                     if (storyDbId.startsWith("local_")) {
-                      const { deleteLocalStory } = await import("../misc/localStoryManager");
+                      const { deleteLocalStory } = await import(
+                        "../misc/localStoryManager"
+                      );
                       await deleteLocalStory(storyDbId);
                       addNotification("Story deleted", "success");
                       router.push("/library");
                       return;
                     }
-                    const { data: { session } } = await supabase.auth.getSession();
+                    const {
+                      data: { session },
+                    } = await supabase.auth.getSession();
                     if (!session) throw new Error("Not authenticated");
                     const response = await fetch(`/api/stories/${storyDbId}`, {
                       method: "DELETE",
-                      headers: { Authorization: `Bearer ${session.access_token}` },
+                      headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                      },
                     });
                     if (!response.ok) throw new Error("Failed to delete");
                     addNotification("Story deleted", "success");
                     router.push("/explorer");
                   } catch (error: any) {
-                    addNotification(error.message || "Failed to delete", "failure");
+                    addNotification(
+                      error.message || "Failed to delete",
+                      "failure"
+                    );
                     setDeleting(false);
                   }
                 },
@@ -4580,41 +4625,31 @@ export default function MenuPage({
 
         <div className="space-y-3 text-sm">
           <div className="flex justify-between py-2 border-b border-blue-800/30">
-            <span className="text-blue-200/60">
-              Story Name:
-            </span>
+            <span className="text-blue-200/60">Story Name:</span>
             <span className="font-semibold text-white">
               {storyData.story_name}
             </span>
           </div>
           <div className="flex justify-between py-2 border-b border-blue-800/30">
-            <span className="text-blue-200/60">
-              Player Name:
-            </span>
+            <span className="text-blue-200/60">Player Name:</span>
             <span className="font-semibold text-white">
               {storyData.player_name}
             </span>
           </div>
           <div className="flex justify-between py-2 border-b border-blue-800/30">
-            <span className="text-blue-200/60">
-              Total Memory Entries:
-            </span>
+            <span className="text-blue-200/60">Total Memory Entries:</span>
             <span className="font-semibold text-white">
               {storyData.memory.length}
             </span>
           </div>
           <div className="flex justify-between py-2 border-b border-blue-800/30">
-            <span className="text-blue-200/60">
-              Inventory Items:
-            </span>
+            <span className="text-blue-200/60">Inventory Items:</span>
             <span className="font-semibold text-white">
               {storyData.inventory.length}
             </span>
           </div>
           <div className="flex justify-between py-2">
-            <span className="text-blue-200/60">
-              Lore Entries:
-            </span>
+            <span className="text-blue-200/60">Lore Entries:</span>
             <span className="font-semibold text-white">
               {storyData.lore.length}
             </span>

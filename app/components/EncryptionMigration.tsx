@@ -199,14 +199,14 @@ export default function EncryptionMigration({
                   </h3>
                   <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                     <li>
-                      • If you change your password, you won't be able to
+                      - If you change your password, you won&apos;t be able to
                       decrypt old stories
                     </li>
                     <li>
-                      • Keep your password safe - we cannot recover encrypted
+                      - Keep your password safe - we cannot recover encrypted
                       stories
                     </li>
-                    <li>• Encryption cannot be reversed once applied</li>
+                    <li>- Encryption cannot be reversed once applied</li>
                   </ul>
                 </div>
 

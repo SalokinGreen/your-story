@@ -427,7 +427,7 @@ export default function ExplorerPage() {
                             className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500"
                           />
                           <span className="text-blue-100">
-                            {adventure.rating?.toFixed(1) || "—"}
+                            {adventure.rating?.toFixed(1) || "-"}
                           </span>
                         </span>
                         <span className="flex items-center gap-1">

@@ -540,7 +540,7 @@ export default function AdventureDetailPage() {
           <div className="flex items-center gap-2 px-3 py-2 bg-blue-900/30 border border-blue-800/30 rounded-xl text-sm">
             <DynamicIcon name="Star" className="w-4 h-4 text-yellow-500" />
             <span className="font-semibold">
-              {adventure.rating?.toFixed(1) || "—"}
+              {adventure.rating?.toFixed(1) || "-"}
             </span>
           </div>
           <div className="flex items-center gap-2 px-3 py-2 bg-blue-900/30 border border-blue-800/30 rounded-xl text-sm">

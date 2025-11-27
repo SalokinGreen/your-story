@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   Scene,
@@ -244,11 +244,11 @@ export function processCommands(
           points: existing.points,
         });
         addNotification(
-          `🏆 Achievement Unlocked: ${existing.title}`,
+          `?? Achievement Unlocked: ${existing.title}`,
           "success"
         );
         addNotification(
-          `✨ Earned ${existing.points} points! Total: ${storyData.points}`,
+          `? Earned ${existing.points} points! Total: ${storyData.points}`,
           "success"
         );
       } else if (!existing) {
@@ -257,7 +257,7 @@ export function processCommands(
           availableAchievements: storyData.achievements.map((a) => a.title),
         });
         addNotification(
-          `⚠️ Achievement not found: ${achievementTitle}`,
+          `?? Achievement not found: ${achievementTitle}`,
           "warning"
         );
       }
@@ -291,7 +291,7 @@ export function processCommands(
           beatIndex: beatIndex + 1,
           title: storyData.plot_beats[beatIndex].title,
         });
-        addNotification(`✨ Story beat ${beatIndex + 1} completed`, "success");
+        addNotification(`? Story beat ${beatIndex + 1} completed`, "success");
 
         // Award points for completing a new beat (use custom points if set, otherwise default)
         if (!storyData.earnedPointsFromBeats.includes(beatIndex)) {
@@ -339,7 +339,7 @@ export function processCommands(
 
       storyData.quests.push(newQuest);
       logger.action("New quest created via command", { title, points });
-      addNotification(`✨ New quest: ${title}`, "success");
+      addNotification(`? New quest: ${title}`, "success");
       continue;
     }
 
@@ -369,7 +369,7 @@ export function processCommands(
         logger.warn("Quest not found or no fuzzy match", {
           quest: questTitle,
         });
-        addNotification(`⚠️ Quest not found: ${questTitle}`, "warning");
+        addNotification(`?? Quest not found: ${questTitle}`, "warning");
       }
       continue;
     }
@@ -407,19 +407,19 @@ export function processCommands(
             points: quest.points,
             totalPoints: storyData.points,
           });
-          addNotification(`✅ Quest completed: ${quest.title}`, "success");
+          addNotification(`? Quest completed: ${quest.title}`, "success");
           addNotification(
-            `✨ Earned ${quest.points} points! Total: ${storyData.points}`,
+            `? Earned ${quest.points} points! Total: ${storyData.points}`,
             "success"
           );
         } else {
-          addNotification(`✅ Quest completed: ${quest.title}`, "success");
+          addNotification(`? Quest completed: ${quest.title}`, "success");
         }
       } else if (!quest) {
         logger.warn("Quest not found or no fuzzy match", {
           quest: questTitle,
         });
-        addNotification(`⚠️ Quest not found: ${questTitle}`, "warning");
+        addNotification(`?? Quest not found: ${questTitle}`, "warning");
       }
       continue;
     }
@@ -450,7 +450,7 @@ export function processCommands(
         logger.warn("Quest not found or no fuzzy match", {
           quest: questTitle,
         });
-        addNotification(`⚠️ Quest not found: ${questTitle}`, "warning");
+        addNotification(`?? Quest not found: ${questTitle}`, "warning");
       }
       continue;
     }
@@ -471,7 +471,7 @@ export function processCommands(
       const existingLore = storyData.lore.find((l) => l.title === loreTitle);
       if (existingLore) {
         logger.warn("Lore already exists", { loreTitle });
-        addNotification(`⚠️ Lore "${loreTitle}" already exists`, "warning");
+        addNotification(`?? Lore "${loreTitle}" already exists`, "warning");
       } else {
         const onTriggerArray = onTriggers
           ? onTriggers
@@ -767,7 +767,7 @@ export function processCommands(
           value: current,
           maxValue: max,
           description,
-          symbol: "💎",
+          symbol: "??",
           custom_symbol_url: undefined,
         });
         logger.action("Resource added via command", { name, current, max });
@@ -875,7 +875,7 @@ export function processCommands(
           name,
           value,
           description,
-          symbol: "⭐",
+          symbol: "?",
           custom_symbol_url: undefined,
         });
         logger.action("Stat added via command", { name, value });
@@ -967,7 +967,7 @@ export function processCommands(
       }
 
       if (!quest) {
-        addNotification(`⚠️ Quest "${questTitle}" not found`, "warning");
+        addNotification(`?? Quest "${questTitle}" not found`, "warning");
         logger.warn("Quest description update failed: quest not found", {
           title: questTitle,
         });
@@ -1003,7 +1003,7 @@ export function processCommands(
       }
 
       if (!quest) {
-        addNotification(`⚠️ Quest "${questTitle}" not found`, "warning");
+        addNotification(`?? Quest "${questTitle}" not found`, "warning");
         logger.warn("Quest short description update failed: quest not found", {
           title: questTitle,
         });
@@ -1030,7 +1030,7 @@ export function processCommands(
 
       // Validate name is not empty
       if (!name) {
-        addNotification(`⚠️ Relationship name cannot be empty`, "warning");
+        addNotification(`?? Relationship name cannot be empty`, "warning");
         logger.warn("Relationship add failed: empty name");
         continue;
       }
@@ -1042,10 +1042,10 @@ export function processCommands(
 
       if (existing) {
         logger.warn("Relationship add failed: already exists", { name });
-        addNotification(`⚠️ Relationship "${name}" already exists`, "warning");
+        addNotification(`?? Relationship "${name}" already exists`, "warning");
       } else if (value < -100 || value > 100) {
         addNotification(
-          `⚠️ Relationship value must be between -100 and 100`,
+          `?? Relationship value must be between -100 and 100`,
           "warning"
         );
         logger.warn("Relationship add failed: invalid value", {
@@ -1054,15 +1054,15 @@ export function processCommands(
         });
       } else {
         // Determine symbol based on relationship value
-        let symbol = "🤝"; // Default neutral
-        if (value >= 75) symbol = "💚"; // Strong ally
-        else if (value >= 50) symbol = "💙"; // Ally
-        else if (value >= 25) symbol = "😊"; // Friend
-        else if (value >= 0) symbol = "🤝"; // Neutral/Acquaintance
-        else if (value >= -25) symbol = "😐"; // Slight tension
-        else if (value >= -50) symbol = "😠"; // Unfriendly
-        else if (value >= -75) symbol = "💔"; // Enemy
-        else symbol = "⚔️"; // Hostile
+        let symbol = "??"; // Default neutral
+        if (value >= 75) symbol = "??"; // Strong ally
+        else if (value >= 50) symbol = "??"; // Ally
+        else if (value >= 25) symbol = "??"; // Friend
+        else if (value >= 0) symbol = "??"; // Neutral/Acquaintance
+        else if (value >= -25) symbol = "??"; // Slight tension
+        else if (value >= -50) symbol = "??"; // Unfriendly
+        else if (value >= -75) symbol = "??"; // Enemy
+        else symbol = "??"; // Hostile
 
         storyData.relationships.push({
           name,
@@ -1102,20 +1102,20 @@ export function processCommands(
 
       if (!relationship) {
         logger.warn("Relationship modify failed: not found", { name });
-        addNotification(`⚠️ Relationship not found: ${name}`, "warning");
+        addNotification(`?? Relationship not found: ${name}`, "warning");
       } else {
         const oldValue = relationship.value;
         relationship.value = Math.max(-100, Math.min(100, oldValue + delta));
 
         // Update symbol based on new value
-        if (relationship.value >= 75) relationship.symbol = "💚";
-        else if (relationship.value >= 50) relationship.symbol = "💙";
-        else if (relationship.value >= 25) relationship.symbol = "😊";
-        else if (relationship.value >= 0) relationship.symbol = "🤝";
-        else if (relationship.value >= -25) relationship.symbol = "😐";
-        else if (relationship.value >= -50) relationship.symbol = "😠";
-        else if (relationship.value >= -75) relationship.symbol = "💔";
-        else relationship.symbol = "⚔️";
+        if (relationship.value >= 75) relationship.symbol = "??";
+        else if (relationship.value >= 50) relationship.symbol = "??";
+        else if (relationship.value >= 25) relationship.symbol = "??";
+        else if (relationship.value >= 0) relationship.symbol = "??";
+        else if (relationship.value >= -25) relationship.symbol = "??";
+        else if (relationship.value >= -50) relationship.symbol = "??";
+        else if (relationship.value >= -75) relationship.symbol = "??";
+        else relationship.symbol = "??";
 
         logger.action("Relationship modified via command", {
           name: relationship.name,
@@ -1149,7 +1149,7 @@ export function processCommands(
 
       if (!relationship) {
         logger.warn("Relationship remove failed: not found", { name });
-        addNotification(`⚠️ Relationship not found: ${name}`, "warning");
+        addNotification(`?? Relationship not found: ${name}`, "warning");
       } else {
         storyData.relationships = storyData.relationships.filter(
           (r) => r !== relationship
@@ -1187,7 +1187,7 @@ export function processCommands(
         logger.warn("Relationship description update failed: not found", {
           name,
         });
-        addNotification(`⚠️ Relationship not found: ${name}`, "warning");
+        addNotification(`?? Relationship not found: ${name}`, "warning");
       } else {
         relationship.description = newDescription;
         logger.action("Relationship description updated via command", {
@@ -1453,7 +1453,7 @@ function StoryPageContent() {
                 storyData.memory.push(entry);
                 existingMemoryLower.push(entry.toLowerCase().trim());
                 addNotification(
-                  `🧠 Memory added: ${entry.substring(0, 80)}${
+                  `?? Memory added: ${entry.substring(0, 80)}${
                     entry.length > 80 ? "..." : ""
                   }`,
                   "success"
@@ -1981,7 +1981,7 @@ function StoryPageContent() {
     setShowPresetSelection(false);
     setSelectedPreset(preset);
 
-    addNotification(`Character preset "${preset.name}" applied! ✨`, "success");
+    addNotification(`Character preset "${preset.name}" applied! ?`, "success");
   };
 
   //Savestoryprogresstodatabase(debounced)
@@ -2046,7 +2046,7 @@ function StoryPageContent() {
           "Cannot save story: encryption credentials not available"
         );
         addNotification(
-          "⚠️ Please sign out and sign back in to enable encrypted story saving",
+          "?? Please sign out and sign back in to enable encrypted story saving",
           "warning"
         );
         return; //Abortsavetopreventunencrypteddatastorage
@@ -2063,7 +2063,7 @@ function StoryPageContent() {
       } catch (encryptError) {
         console.error("Encryption failed:", encryptError);
         addNotification(
-          "⚠ Failed to encrypt story data. Please sign out and sign back in.",
+          "? Failed to encrypt story data. Please sign out and sign back in.",
           "failure"
         );
         return; //Abortsaveonencryptionfailure
@@ -2307,7 +2307,7 @@ function StoryPageContent() {
 
             if (result.meta.totalTokenCost) {
               addNotification(
-                `✨ Used ${result.meta.totalTokenCost} tokens`,
+                `? Used ${result.meta.totalTokenCost} tokens`,
                 "success"
               );
             }
@@ -2406,7 +2406,7 @@ function StoryPageContent() {
         remaining: storyData.momentum,
       });
       addNotification(
-        `⚡ Spent 1 Momentum for Reroll! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
+        `? Spent 1 Momentum for Reroll! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
         "info"
       );
     } else if (momentumMode === "guarantee" && storyData.momentum >= 2) {
@@ -2417,7 +2417,7 @@ function StoryPageContent() {
         remaining: storyData.momentum,
       });
       addNotification(
-        `⚡ Spent 2 Momentum for Guaranteed Success! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
+        `? Spent 2 Momentum for Guaranteed Success! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
         "success"
       );
     }
@@ -2619,7 +2619,7 @@ function StoryPageContent() {
           score: matchResult.score,
         });
         addNotification(
-          `📝 Matched "${choice.item_used}" → "${
+          `?? Matched "${choice.item_used}" ? "${
             matchResult.name
           }" (${Math.round(matchResult.score * 100)}% match)`,
           "info"
@@ -2708,7 +2708,7 @@ function StoryPageContent() {
           score: matchResult.score,
         });
         addNotification(
-          `📝 Matched "${choice.resource_used}" → "${
+          `?? Matched "${choice.resource_used}" ? "${
             matchResult.name
           }" (${Math.round(matchResult.score * 100)}% match)`,
           "info"
@@ -2745,14 +2745,14 @@ function StoryPageContent() {
             disadvantage: true,
           });
           addNotification(
-            `⚠️ Insufficient ${matchedResource.name}! Need ${requiredAmount}, have ${matchedResource.value}. Disadvantage on roll!`,
+            `?? Insufficient ${matchedResource.name}! Need ${requiredAmount}, have ${matchedResource.value}. Disadvantage on roll!`,
             "warning"
           );
         }
       } else {
         logger.warn("Resource not found", { resource: choice.resource_used });
         addNotification(
-          `⚠️ Resource not found: ${choice.resource_used}`,
+          `?? Resource not found: ${choice.resource_used}`,
           "warning"
         );
       }
@@ -2776,7 +2776,7 @@ function StoryPageContent() {
             ? ` (x${Math.abs(netAdvantage)} stacked)`
             : "";
         addNotification(
-          `${isAdvantage ? "✨ Advantage" : "⚠️ Disadvantage"}${stackText}: ${
+          `${isAdvantage ? "? Advantage" : "?? Disadvantage"}${stackText}: ${
             isAdvantage ? "+" : "-"
           }${Math.abs(netAdvantage)} modifier from ${sourcesList}`,
           isAdvantage ? "success" : "warning"
@@ -2829,7 +2829,7 @@ function StoryPageContent() {
             extraDiceCount > 1 ? ` (+${extraDiceCount} dice)` : " (+1 die)";
           addNotification(
             `${
-              isAdvantage ? "✨ Advantage" : "⚠️ Disadvantage"
+              isAdvantage ? "? Advantage" : "?? Disadvantage"
             }${stackText}: kept ${selectedDice.join(",")} from [${pool.join(
               ","
             )}]`,
@@ -2874,7 +2874,7 @@ function StoryPageContent() {
               : "";
           addNotification(
             `${
-              isAdvantage ? "✨ Advantage" : "⚠️ Disadvantage"
+              isAdvantage ? "? Advantage" : "?? Disadvantage"
             }${stackText} from: ${sourcesList}`,
             isAdvantage ? "success" : "warning"
           );
@@ -2907,7 +2907,7 @@ function StoryPageContent() {
           const currentStress = storyData.stress || 0;
           storyData.stress = Math.min(10, currentStress + stressDiceCount);
           addNotification(
-            `Added ${stressDiceCount} stress dice (+${stressDiceCount} stress → ${storyData.stress}/10)`,
+            `Added ${stressDiceCount} stress dice (+${stressDiceCount} stress ? ${storyData.stress}/10)`,
             "warning"
           );
         }
@@ -3037,7 +3037,7 @@ function StoryPageContent() {
           });
 
           addNotification(
-            `⚡ Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} → Best: ${dice_roll}`,
+            `? Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} ? Best: ${dice_roll}`,
             "success"
           );
         }
@@ -3053,7 +3053,7 @@ function StoryPageContent() {
           score: matchResult.score,
         });
         addNotification(
-          `📝 Matched "${choice.skill_used}" → "${
+          `?? Matched "${choice.skill_used}" ? "${
             matchResult.name
           }" (${Math.round(matchResult.score * 100)}% match)`,
           "info"
@@ -3065,7 +3065,7 @@ function StoryPageContent() {
         logger.warn("Skill not found or no fuzzy match", {
           skill: choice.skill_used,
         });
-        addNotification(`⚠️ Skill not found: ${choice.skill_used}`, "warning");
+        addNotification(`?? Skill not found: ${choice.skill_used}`, "warning");
       }
 
       const dc = choice.skill_dc || 0;
@@ -3081,7 +3081,7 @@ function StoryPageContent() {
           dc,
         });
         addNotification(
-          `✓ Guaranteed Success! (${choice.skill_used}: Auto-success with 2 Momentum)`,
+          `? Guaranteed Success! (${choice.skill_used}: Auto-success with 2 Momentum)`,
           "success"
         );
       } else {
@@ -3478,11 +3478,11 @@ function StoryPageContent() {
               result: result.text,
             });
           } else {
-            addNotification(`⚠️ Table "${table.name}" is empty`, "warning");
+            addNotification(`?? Table "${table.name}" is empty`, "warning");
           }
         } else {
           addNotification(
-            `⚠️ Table not found: ${choice.custom_table}`,
+            `?? Table not found: ${choice.custom_table}`,
             "warning"
           );
           logger.action("Custom table not found", {
@@ -3668,7 +3668,7 @@ function StoryPageContent() {
                   storyData.earnedPointsFromChapters.push(currentChapter);
                   storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
                   addNotification(
-                    `✨ Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                    `? Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
                     "success"
                   );
                 }
@@ -3915,7 +3915,7 @@ function StoryPageContent() {
                 storyData.earnedPointsFromChapters.push(currentChapter);
                 storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
                 addNotification(
-                  `🎉 Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                  `?? Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
                   "success"
                 );
               }
@@ -3936,7 +3936,7 @@ function StoryPageContent() {
             // Save progress
             saveProgress(storyData);
 
-            addNotification("✓ Response regenerated", "success");
+            addNotification("? Response regenerated", "success");
 
             logger.ai_response("Generation complete (retry)", {
               totalTokenCost: result.meta.totalTokenCost,
@@ -4067,13 +4067,13 @@ function StoryPageContent() {
       callback(); //Execute the upgrade
       setStoryData({ ...storyData });
       addNotification(
-        `✓ Upgrade purchased! (${storyData.points} points remaining)`,
+        `? Upgrade purchased! (${storyData.points} points remaining)`,
         "success"
       );
       await saveProgress(storyData);
     } else {
       addNotification(
-        `⚠ Not enough points! Need ${cost}, have ${storyData.points}`,
+        `? Not enough points! Need ${cost}, have ${storyData.points}`,
         "failure"
       );
     }
@@ -4146,7 +4146,7 @@ function StoryPageContent() {
               {storyData.story_name}
             </h2>
             <p className="text-sm text-blue-200/60">
-              {storyData.player_name}'s journey has concluded
+              {storyData.player_name}&apos;s journey has concluded
             </p>
           </div>
 
@@ -4277,7 +4277,7 @@ function StoryPageContent() {
           {/* Action Buttons */}
           <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
             <h3 className="text-lg font-semibold text-white mb-4 text-center">
-              What's Next?
+              What&apos;s Next?
             </h3>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -4394,7 +4394,7 @@ function StoryPageContent() {
                     isOpen: true,
                     title: "New Game Plus",
                     message:
-                      "Start a New Game Plus run? You'll keep all achievements, stats, resources, and items, plus earn bonus rewards!",
+                      "Start a New Game Plus run? You&apos;ll keep all achievements, stats, resources, and items, plus earn bonus rewards!",
                     icon: "Star",
                     confirmText: "Start NG+",
                     confirmButtonClass:
@@ -4891,7 +4891,7 @@ function StoryPageContent() {
                 </span>
               </p>
               <p className="text-gray-400 text-xs text-center border-t border-gray-700 pt-3">
-                ⚠️ Stress dice increase your chances (count 6s) but add stress
+                ?? Stress dice increase your chances (count 6s) but add stress
                 and risk PANIC on 1s!
               </p>
             </div>
@@ -4922,7 +4922,7 @@ function StoryPageContent() {
             {yzeStressDiceChoice > 0 && (
               <div className="bg-red-950/30 border border-red-800 rounded-lg p-3 mb-6">
                 <p className="text-red-200 text-sm text-center">
-                  +{yzeStressDiceChoice} stress →{" "}
+                  +{yzeStressDiceChoice} stress ?{" "}
                   <span className="font-bold">
                     {(storyData.stress || 0) + yzeStressDiceChoice}/10
                   </span>

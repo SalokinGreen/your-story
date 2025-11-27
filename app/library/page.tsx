@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -1182,7 +1182,7 @@ export default function LibraryPage() {
                             </h3>
                             {story.is_completed && (
                               <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">
-                                ✓
+                                ?
                               </span>
                             )}
                             {isEncrypted(story.story_data) && (
@@ -1512,7 +1512,7 @@ export default function LibraryPage() {
                             name="Star"
                             className="w-3 h-3 text-yellow-500"
                           />
-                          {adventure.rating?.toFixed(1) || "—"}
+                          {adventure.rating?.toFixed(1) || "-"}
                         </span>
                         <span className="flex items-center gap-1">
                           <DynamicIcon name="Play" className="w-3 h-3" />

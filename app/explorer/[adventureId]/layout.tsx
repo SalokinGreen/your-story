@@ -148,7 +148,7 @@ export async function generateMetadata({
           url: imageUrl,
           width: 1200,
           height: 630,
-          alt: `${title} – ${author ? `by ${author}` : "Adventure Preview"}`,
+          alt: `${title} - ${author ? `by ${author}` : "Adventure Preview"}`,
         },
       ],
       ...(author && { authors: [author] }),

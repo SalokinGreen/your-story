@@ -311,7 +311,7 @@ export default function ProfilePage() {
           <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-3 text-center">
             <div className="flex items-center justify-center gap-1.5 text-yellow-400 mb-1">
               <DynamicIcon name="Coins" className="w-4 h-4" />
-              <span className="text-lg font-bold">{balance?.total ?? "—"}</span>
+              <span className="text-lg font-bold">{balance?.total ?? "-"}</span>
             </div>
             <p className="text-xs text-blue-200/40">Coins</p>
           </div>
@@ -319,7 +319,7 @@ export default function ProfilePage() {
             <div className="flex items-center justify-center gap-1.5 text-green-400 mb-1">
               <DynamicIcon name="Send" className="w-4 h-4" />
               <span className="text-lg font-bold">
-                {balance?.tradable ?? "—"}
+                {balance?.tradable ?? "-"}
               </span>
             </div>
             <p className="text-xs text-blue-200/40">Tradable</p>
@@ -379,8 +379,8 @@ export default function ProfilePage() {
                 />
                 <p className="text-blue-200/40 mb-3">
                   {isOwnProfile
-                    ? "You haven't created any adventures yet."
-                    : "This user hasn't created any public adventures."}
+                    ? "You haven&apos;t created any adventures yet."
+                    : "This user hasn&apos;t created any public adventures."}
                 </p>
                 {isOwnProfile && (
                   <button
@@ -418,7 +418,7 @@ export default function ProfilePage() {
                           name="Star"
                           className="w-3 h-3 fill-current"
                         />
-                        {adventure.rating?.toFixed(1) || "—"}
+                        {adventure.rating?.toFixed(1) || "-"}
                       </span>
                       <span className="text-blue-200/40">
                         {adventure.playCount} plays

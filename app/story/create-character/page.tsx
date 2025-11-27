@@ -565,8 +565,8 @@ function CreateCharacterContent() {
                   Point Allocation
                 </h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-2">
-                  Customize your character's stats and resources. You don't have
-                  to spend all points.
+                  Customize your character&apos;s stats and resources. You
+                  don&apos;t have to spend all points.
                 </p>
                 <div className="inline-block px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-bold rounded-lg">
                   Remaining Points: {remainingPoints}

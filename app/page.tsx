@@ -467,7 +467,7 @@ export default function Home() {
                           name="Star"
                           className="w-3 h-3 fill-current"
                         />
-                        {adventure.rating?.toFixed(1) || "—"}
+                        {adventure.rating?.toFixed(1) || "-"}
                       </span>
                       <span className="text-blue-200/40">
                         {adventure.playCount >= 1000
@@ -586,6 +586,21 @@ export default function Home() {
           <p className="text-xs text-blue-200/30">
             © 2025 Your Story • AI-powered interactive fiction
           </p>
+          <div className="mt-2 flex justify-center gap-4">
+            <button
+              onClick={() => router.push("/terms")}
+              className="text-xs text-blue-200/40 hover:text-blue-200/60 transition-colors"
+            >
+              Terms of Service
+            </button>
+            <span className="text-blue-200/20">•</span>
+            <button
+              onClick={() => router.push("/privacy")}
+              className="text-xs text-blue-200/40 hover:text-blue-200/60 transition-colors"
+            >
+              Privacy Policy
+            </button>
+          </div>
         </footer>
       </main>
     </div>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -2832,9 +2832,7 @@ function AdventureCreatorContent() {
               </div>
 
               <div className="mb-3">
-                <p className="text-xs text-blue-300/60 mb-2">
-                  Quick add:
-                </p>
+                <p className="text-xs text-blue-300/60 mb-2">Quick add:</p>
                 <div className="flex flex-wrap gap-2">
                   {commonTags
                     .filter((t) => !tags.includes(t))
@@ -2875,7 +2873,7 @@ function AdventureCreatorContent() {
                 Thumbnail Image
               </label>
               <p className="text-xs text-blue-300/60 mb-3">
-                Recommended: 400�300px (or 320�180px), max 5MB
+                Recommended: 400?300px (or 320?180px), max 5MB
               </p>
               <div className="flex items-start gap-4">
                 {thumbnailUrl && (
@@ -2932,7 +2930,7 @@ function AdventureCreatorContent() {
                 Banner Image
               </label>
               <p className="text-xs text-blue-300/60 mb-3">
-                Recommended: 1200�400px, max 5MB
+                Recommended: 1200?400px, max 5MB
               </p>
               <div className="flex items-start gap-4">
                 {bannerUrl && (
@@ -2996,15 +2994,13 @@ function AdventureCreatorContent() {
               <p className="text-sm text-blue-300">
                 Create custom character presets for your adventure. Players can
                 choose these when starting your adventure to customize their
-                character's stats, items, and resources.
+                character&apos;s stats, items, and resources.
               </p>
             </div>
 
             {/* Create New Preset Button */}
             <div className="flex justify-between items-center mb-4">
-              <h4 className="text-lg font-bold text-white">
-                Your Presets
-              </h4>
+              <h4 className="text-lg font-bold text-white">Your Presets</h4>
               <button
                 onClick={() => {
                   setShowPresetForm(!showPresetForm);
@@ -3071,8 +3067,8 @@ function AdventureCreatorContent() {
                       />{" "}
                       <strong>Tip:</strong> The preset will copy your current
                       Player Name, Player Summary, Intro, Stats, Resources,
-                      Inventory, and Author Notes. Make sure they're configured
-                      as you want before saving!
+                      Inventory, and Author Notes. Make sure they&apos;re
+                      configured as you want before saving!
                     </p>
                   </div>
 
@@ -3304,11 +3300,14 @@ function AdventureCreatorContent() {
             {selectedPreset && selectedPreset !== "custom" && (
               <div className="bg-green-900/20 border border-green-800/50 rounded-lg p-4">
                 <h4 className="text-sm font-bold text-green-300 mb-2 flex items-center gap-2">
-                  <DynamicIcon name="Sparkles" className="w-4 h-4 text-green-400" /> Preset
-                  Applied
+                  <DynamicIcon
+                    name="Sparkles"
+                    className="w-4 h-4 text-green-400"
+                  />{" "}
+                  Preset Applied
                 </h4>
                 <p className="text-xs text-green-400/80">
-                  Your character's stats, items, and resources have been
+                  Your character&apos;s stats, items, and resources have been
                   pre-configured. You can review and customize them in the
                   following steps.
                 </p>
@@ -4178,9 +4177,7 @@ function AdventureCreatorContent() {
                       <div className="flex items-start gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="font-bold text-white flex items-center gap-2 flex-wrap">
-                            <span className="text-green-400">
-                              {index + 1}.
-                            </span>
+                            <span className="text-green-400">{index + 1}.</span>
                             <span>{choice.text}</span>
                           </div>
                           {choice.intro_override && (
@@ -4380,9 +4377,7 @@ function AdventureCreatorContent() {
                 Stats ({stats.length})
               </h3>
               {stats.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">
-                  No stats added yet
-                </p>
+                <p className="text-blue-300/60 text-sm">No stats added yet</p>
               ) : (
                 stats.map((stat, index) =>
                   editingStatIndex === index ? (
@@ -4492,9 +4487,7 @@ function AdventureCreatorContent() {
                         <DynamicIcon name={stat.symbol} className="w-8 h-8" />
                       </div>
                       <div className="flex-1">
-                        <div className="font-bold text-white">
-                          {stat.name}
-                        </div>
+                        <div className="font-bold text-white">{stat.name}</div>
                         <div className="text-sm text-blue-300/60">
                           {stat.description}
                         </div>
@@ -4970,9 +4963,7 @@ function AdventureCreatorContent() {
                 Starting Inventory ({inventory.length})
               </h3>
               {inventory.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">
-                  No items added yet
-                </p>
+                <p className="text-blue-300/60 text-sm">No items added yet</p>
               ) : (
                 inventory.map((item, index) =>
                   editingInventoryIndex === index ? (
@@ -5107,7 +5098,7 @@ function AdventureCreatorContent() {
                       </div>
                       <div className="flex-1">
                         <div className="font-bold text-white">
-                          {item.name} �{item.quantity}
+                          {item.name} ?{item.quantity}
                         </div>
                         {item.description && (
                           <div className="text-sm text-blue-300/60">
@@ -5287,7 +5278,7 @@ function AdventureCreatorContent() {
                           }
                           className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs"
                         >
-                          �
+                          ?
                         </button>
                       </div>
                     ) : (
@@ -5380,7 +5371,7 @@ function AdventureCreatorContent() {
                         e.key === "Enter" &&
                         (e.preventDefault(), addLoreOnTrigger())
                       }
-                      placeholder="e.g., 'Ancient Map'"
+                      placeholder="e.g., Ancient Map"
                       className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                     />
                     <button
@@ -5409,7 +5400,7 @@ function AdventureCreatorContent() {
                           }
                           className="hover:text-green-100"
                         >
-                          �
+                          ?
                         </button>
                       </span>
                     ))}
@@ -5432,7 +5423,7 @@ function AdventureCreatorContent() {
                         e.key === "Enter" &&
                         (e.preventDefault(), addLoreOffTrigger())
                       }
-                      placeholder="e.g., 'Destroyed the Map'"
+                      placeholder="e.g., Destroyed the Map"
                       className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                     />
                     <button
@@ -5460,7 +5451,7 @@ function AdventureCreatorContent() {
                           }
                           className="hover:text-red-100"
                         >
-                          �
+                          ?
                         </button>
                       </span>
                     ))}
@@ -5602,7 +5593,7 @@ function AdventureCreatorContent() {
                                 e.key === "Enter" &&
                                 (e.preventDefault(), addLoreKey())
                               }
-                              placeholder="e.g., 'Dragon Defeated' or 'Ancient Ruins'"
+                              placeholder="e.g., Dragon Defeated or Ancient Ruins"
                               className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                             />
                             <button
@@ -5631,7 +5622,7 @@ function AdventureCreatorContent() {
                                   }
                                   className="hover:text-yellow-100"
                                 >
-                                  �
+                                  ?
                                 </button>
                               </span>
                             ))}
@@ -5939,7 +5930,7 @@ function AdventureCreatorContent() {
                                         }
                                         className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs"
                                       >
-                                        �
+                                        ?
                                       </button>
                                     </div>
                                   ) : (
@@ -6047,7 +6038,7 @@ function AdventureCreatorContent() {
                                       (e.preventDefault(),
                                       addEditLoreOnTrigger())
                                     }
-                                    placeholder="e.g., 'Ancient Map'"
+                                    placeholder="e.g., Ancient Map"
                                     className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                   />
                                   <button
@@ -6080,7 +6071,7 @@ function AdventureCreatorContent() {
                                           }
                                           className="hover:text-green-100"
                                         >
-                                          �
+                                          ?
                                         </button>
                                       </span>
                                     )
@@ -6107,7 +6098,7 @@ function AdventureCreatorContent() {
                                       (e.preventDefault(),
                                       addEditLoreOffTrigger())
                                     }
-                                    placeholder="e.g., 'Destroyed the Map'"
+                                    placeholder="e.g., Destroyed the Map"
                                     className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                   />
                                   <button
@@ -6140,7 +6131,7 @@ function AdventureCreatorContent() {
                                           }
                                           className="hover:text-red-100"
                                         >
-                                          �
+                                          ?
                                         </button>
                                       </span>
                                     )
@@ -6318,7 +6309,7 @@ function AdventureCreatorContent() {
                                               (e.preventDefault(),
                                               addEditLoreKey())
                                             }
-                                            placeholder="e.g., 'Dragon Defeated'"
+                                            placeholder="e.g., Dragon Defeated"
                                             className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                           />
                                           <button
@@ -6350,7 +6341,7 @@ function AdventureCreatorContent() {
                                                 }
                                                 className="hover:text-yellow-100"
                                               >
-                                                �
+                                                ?
                                               </button>
                                             </span>
                                           ))}
@@ -7734,9 +7725,7 @@ function AdventureCreatorContent() {
             </div>
 
             <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <h3 className="text-lg font-bold mb-4 text-white">
-                Add Quest
-              </h3>
+              <h3 className="text-lg font-bold mb-4 text-white">Add Quest</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-semibold text-blue-200 mb-1">
@@ -7891,9 +7880,7 @@ function AdventureCreatorContent() {
                 Quests ({quests.length})
               </h3>
               {quests.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">
-                  No quests added yet
-                </p>
+                <p className="text-blue-300/60 text-sm">No quests added yet</p>
               ) : (
                 quests.map((quest, index) =>
                   editingQuestIndex === index ? (
@@ -8308,7 +8295,7 @@ function AdventureCreatorContent() {
                             setNewThread("");
                           }
                         }}
-                        placeholder="Add a story thread (e.g., 'Find the missing heir')"
+                        placeholder="Add a story thread (e.g., Find the missing heir)"
                         className="flex-1 px-3 py-2 border-2 border-gray-600 rounded-lg bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <button
@@ -8468,7 +8455,7 @@ function AdventureCreatorContent() {
                         type="text"
                         value={newCharacterName}
                         onChange={(e) => setNewCharacterName(e.target.value)}
-                        placeholder="Name (e.g., 'Marcus the Merchant')"
+                        placeholder="Name (e.g., Marcus the Merchant)"
                         className="flex-1 px-3 py-2 border-2 border-gray-600 rounded-lg bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
                       />
                       <input
@@ -8498,7 +8485,7 @@ function AdventureCreatorContent() {
                             setNewCharacterRole("");
                           }
                         }}
-                        placeholder="Role (e.g., 'Tavern keeper')"
+                        placeholder="Role (e.g., Tavern keeper)"
                         className="flex-1 px-3 py-2 border-2 border-gray-600 rounded-lg bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
                       />
                       <button
@@ -9467,95 +9454,71 @@ function AdventureCreatorContent() {
             </div>
 
             <div className="bg-blue-900/20 rounded-xl shadow-lg p-6 border border-blue-800/30">
-              <h3 className="text-xl font-bold mb-4 text-white">
-                Summary
-              </h3>
+              <h3 className="text-xl font-bold mb-4 text-white">Summary</h3>
               <div className="space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className="text-blue-300/60">
-                      Stats:
-                    </span>
+                    <span className="text-blue-300/60">Stats:</span>
                     <span className="ml-2 font-semibold text-white">
                       {stats.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">
-                      Resources:
-                    </span>
+                    <span className="text-blue-300/60">Resources:</span>
                     <span className="ml-2 font-semibold text-white">
                       {resources.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">
-                      Starting Items:
-                    </span>
+                    <span className="text-blue-300/60">Starting Items:</span>
                     <span className="ml-2 font-semibold text-white">
                       {inventory.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">
-                      Lore Entries:
-                    </span>
+                    <span className="text-blue-300/60">Lore Entries:</span>
                     <span className="ml-2 font-semibold text-white">
                       {lore.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">
-                      Relationships:
-                    </span>
+                    <span className="text-blue-300/60">Relationships:</span>
                     <span className="ml-2 font-semibold text-white">
                       {relationships.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">
-                      Achievements:
-                    </span>
+                    <span className="text-blue-300/60">Achievements:</span>
                     <span className="ml-2 font-semibold text-white">
                       {achievements.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">
-                      Quests:
-                    </span>
+                    <span className="text-blue-300/60">Quests:</span>
                     <span className="ml-2 font-semibold text-white">
                       {quests.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">
-                      Plot Beats:
-                    </span>
+                    <span className="text-blue-300/60">Plot Beats:</span>
                     <span className="ml-2 font-semibold text-white">
                       {plotBeats.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">
-                      Tags:
-                    </span>
+                    <span className="text-blue-300/60">Tags:</span>
                     <span className="ml-2 font-semibold text-white">
                       {tags.length}
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">
-                      Starting Points:
-                    </span>
+                    <span className="text-blue-300/60">Starting Points:</span>
                     <span className="ml-2 font-semibold text-white">
                       {points}
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">
-                      Momentum:
-                    </span>
+                    <span className="text-blue-300/60">Momentum:</span>
                     <span className="ml-2 font-semibold text-white">
                       {momentum}/{maxMomentum}
                     </span>
@@ -9570,9 +9533,7 @@ function AdventureCreatorContent() {
                   Opening Scene
                 </h3>
                 <div className="bg-blue-900/20 rounded-lg p-6 border-l-4 border-purple-500">
-                  <p className="text-blue-200 italic">
-                    "{intro}"
-                  </p>
+                  <p className="text-blue-200 italic">"{intro}"</p>
                 </div>
               </div>
             )}
@@ -9627,11 +9588,15 @@ function AdventureCreatorContent() {
               </button>
               <div>
                 <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                  <DynamicIcon name="Wand2" className="w-5 h-5 text-purple-400" />
+                  <DynamicIcon
+                    name="Wand2"
+                    className="w-5 h-5 text-purple-400"
+                  />
                   {editAdventureId ? "Edit Adventure" : "Create Adventure"}
                 </h1>
                 <p className="text-xs text-blue-300/50">
-                  {title || "Untitled"} � Step {currentStepIndex + 1}/{steps.length}
+                  {title || "Untitled"} ? Step {currentStepIndex + 1}/
+                  {steps.length}
                 </p>
               </div>
             </div>
@@ -9679,7 +9644,10 @@ function AdventureCreatorContent() {
         {/* Content */}
         <div className="bg-[#0f1a2e] rounded-xl p-4 sm:p-6 border border-blue-800/30 mb-4">
           <h2 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
-            <DynamicIcon name={steps.find((s) => s.id === currentStep)?.icon || "FileText"} className="w-5 h-5 text-purple-400" />
+            <DynamicIcon
+              name={steps.find((s) => s.id === currentStep)?.icon || "FileText"}
+              className="w-5 h-5 text-purple-400"
+            />
             {steps.find((s) => s.id === currentStep)?.label}
           </h2>
           {renderStepContent()}

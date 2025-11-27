@@ -172,7 +172,7 @@ export default function AuthForm() {
         >
           {isSignUp
             ? "Already have an account? Sign In"
-            : "Don't have an account? Sign Up"}
+            : "Don&apos;t have an account? Sign Up"}
         </button>
       </form>
     </div>
