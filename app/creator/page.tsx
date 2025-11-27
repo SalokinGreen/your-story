@@ -152,6 +152,8 @@ function AdventureCreatorContent() {
     }));
   }, [rpgSystem]);
   const [nsfw, setNsfw] = useState(false);
+  const [showAllSystems, setShowAllSystems] = useState(false);
+  const [showAdvancedBasic, setShowAdvancedBasic] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
@@ -976,7 +978,7 @@ function AdventureCreatorContent() {
       name: "",
       value: 0,
       description: "",
-      symbol: "??",
+      symbol: "Meh",
     }
   );
   const [draggedRelationshipIndex, setDraggedRelationshipIndex] = useState<
@@ -1217,6 +1219,16 @@ function AdventureCreatorContent() {
     // Don't save until initial load is complete to avoid overwriting draft with API data
     if (!initialLoadComplete) return;
     if (!draftKey) return;
+
+    // Safety check: Don't auto-save an empty/invalid draft over an existing adventure
+    // This prevents accidental data loss when editing
+    if (editAdventureId) {
+      // When editing, only save draft if we have minimum valid data
+      if (!title.trim() && !premise.trim() && !intro.trim()) {
+        // All critical fields are empty - don't save draft to avoid overwriting
+        return;
+      }
+    }
 
     const payload = {
       title,
@@ -1943,16 +1955,22 @@ function AdventureCreatorContent() {
     }
   };
 
-  // Helper function to get relationship symbol based on value
-  const getRelationshipSymbol = (value: number): string => {
-    if (value >= 75) return "??"; // Strong ally
-    if (value >= 50) return "??"; // Ally
-    if (value >= 25) return "??"; // Friendly
-    if (value >= 0) return "??"; // Neutral/Acquaintance
-    if (value >= -25) return "??"; // Distant
-    if (value >= -50) return "??"; // Unfriendly
-    if (value >= -75) return "??"; // Hostile
-    return "??"; // Enemy
+  // Helper function to get relationship icon name based on value
+  const getRelationshipIcon = (value: number): string => {
+    if (value >= 75) return "Heart"; // Strong ally
+    if (value >= 50) return "Star"; // Ally
+    if (value >= 25) return "Smile"; // Friendly
+    if (value >= 0) return "Meh"; // Neutral/Acquaintance
+    if (value >= -25) return "Frown"; // Distant
+    if (value >= -50) return "Angry"; // Unfriendly
+    if (value >= -75) return "Skull"; // Hostile
+    return "X"; // Enemy
+  };
+
+  // Helper function to clamp numeric values within a valid range
+  const clampNumber = (value: number, min: number, max: number): number => {
+    if (isNaN(value)) return min;
+    return Math.max(min, Math.min(max, value));
   };
 
   const addRelationship = () => {
@@ -1963,14 +1981,14 @@ function AdventureCreatorContent() {
         {
           ...newRelationship,
           value,
-          symbol: getRelationshipSymbol(value),
+          symbol: getRelationshipIcon(value),
         } as Relationship,
       ]);
       setNewRelationship({
         name: "",
         value: 0,
         description: "",
-        symbol: "??",
+        symbol: "Meh",
       });
     }
   };
@@ -2000,7 +2018,7 @@ function AdventureCreatorContent() {
       updated[editingRelationshipIndex] = {
         ...editRelationship,
         value,
-        symbol: getRelationshipSymbol(value),
+        symbol: getRelationshipIcon(value),
       } as Relationship;
       setRelationships(updated);
       setEditingRelationshipIndex(null);
@@ -2103,7 +2121,7 @@ function AdventureCreatorContent() {
       await saveLocalAdventure(localId, adventureTemplate);
 
       addNotification(
-        "Adventure saved locally! ?? You can find it in your library.",
+        "Adventure saved locally! You can find it in your library.",
         "success"
       );
 
@@ -2591,15 +2609,11 @@ function AdventureCreatorContent() {
                 RPG Dice System
               </label>
               <p className="text-xs text-blue-300/60 mb-3">
-                <strong>3d6 (Bell Curve):</strong> Rolls 3d6 (3-18),
-                predictable. <strong>1d20 (D&D):</strong> Rolls 1d20 (1-20),
-                swingy. <strong>1d100:</strong> Rolls 1d100 (1-100), granular.{" "}
-                <strong>Classic Percentile:</strong> Roll-under d100, lower is
-                better! <strong>PbtA:</strong> Roll 2d6+mod, partial success on
-                7-9! <strong>Explosive:</strong> Stat determines die size, max
-                rolls explode!
+                Choose how dice rolls determine success in your adventure.
               </p>
-              <div className="grid grid-cols-2 gap-3">
+
+              {/* Popular Systems */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
                 <button
                   onClick={() => setRpgSystem("3d6")}
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
@@ -2609,9 +2623,9 @@ function AdventureCreatorContent() {
                   }`}
                 >
                   <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
-                  3d6
+                  3d6 (Recommended)
                   <div className="text-xs opacity-75 mt-1">
-                    Roll 3-18, add to stat
+                    Roll 3-18, predictable bell curve
                   </div>
                 </button>
                 <button
@@ -2623,96 +2637,9 @@ function AdventureCreatorContent() {
                   }`}
                 >
                   <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
-                  1d20
+                  1d20 (D&D Style)
                   <div className="text-xs opacity-75 mt-1">
-                    Roll 1-20, add to stat
-                  </div>
-                </button>
-                <button
-                  onClick={() => setRpgSystem("1d100")}
-                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
-                    rpgSystem === "1d100"
-                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
-                  1d100
-                  <div className="text-xs opacity-75 mt-1">
-                    Roll 1-100, add to stat
-                  </div>
-                </button>
-                <button
-                  onClick={() => setRpgSystem("percentile")}
-                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
-                    rpgSystem === "percentile"
-                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon
-                    name="TrendingDown"
-                    className="w-5 h-5 inline mr-2"
-                  />
-                  Classic Percentile
-                  <div className="text-xs opacity-75 mt-1">
-                    Roll 1-100, under stat wins
-                  </div>
-                </button>
-                <button
-                  onClick={() => setRpgSystem("pbta")}
-                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
-                    rpgSystem === "pbta"
-                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon name="Zap" className="w-5 h-5 inline mr-2" />
-                  Powered by the Apocalypse (PbtA)
-                  <div className="text-xs opacity-75 mt-1">
-                    Roll 2d6+modifier, 10+ success, 7-9 partial, 6- failure
-                  </div>
-                </button>
-                <button
-                  onClick={() => setRpgSystem("fate")}
-                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
-                    rpgSystem === "fate"
-                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon name="Scale" className="w-5 h-5 inline mr-2" />
-                  Fate Core (4dF)
-                  <div className="text-xs opacity-75 mt-1">
-                    Roll 4 Fudge dice + ladder: fail/tie/succeed/style
-                  </div>
-                </button>
-                <button
-                  onClick={() => setRpgSystem("yze")}
-                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
-                    rpgSystem === "yze"
-                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon name="Skull" className="w-5 h-5 inline mr-2" />
-                  Year Zero Engine (YZE)
-                  <div className="text-xs opacity-75 mt-1">
-                    Roll d6 pool (count 6s), stress dice add power + panic risk
-                  </div>
-                </button>
-                <button
-                  onClick={() => setRpgSystem("explosive")}
-                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
-                    rpgSystem === "explosive"
-                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon name="Flame" className="w-5 h-5 inline mr-2" />
-                  Exploding Dice
-                  <div className="text-xs opacity-75 mt-1">
-                    Stat ? die size (d4-d20), max rolls explode and add!
+                    Roll 1-20, swingy results
                   </div>
                 </button>
                 <button
@@ -2733,6 +2660,113 @@ function AdventureCreatorContent() {
                   </div>
                 </button>
               </div>
+
+              {/* Show More Systems Toggle */}
+              <button
+                onClick={() => setShowAllSystems(!showAllSystems)}
+                className="w-full py-2 text-sm text-blue-300 hover:text-purple-300 transition-colors flex items-center justify-center gap-2"
+              >
+                <DynamicIcon
+                  name={showAllSystems ? "ChevronUp" : "ChevronDown"}
+                  className="w-4 h-4"
+                />
+                {showAllSystems
+                  ? "Hide advanced systems"
+                  : "Show more systems (6 more)"}
+              </button>
+
+              {/* Advanced Systems (Collapsible) */}
+              {showAllSystems && (
+                <div className="grid grid-cols-2 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200">
+                  <button
+                    onClick={() => setRpgSystem("1d100")}
+                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
+                      rpgSystem === "1d100"
+                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
+                    }`}
+                  >
+                    <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
+                    1d100
+                    <div className="text-xs opacity-75 mt-1">
+                      Roll 1-100, very granular
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setRpgSystem("percentile")}
+                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
+                      rpgSystem === "percentile"
+                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
+                    }`}
+                  >
+                    <DynamicIcon
+                      name="TrendingDown"
+                      className="w-5 h-5 inline mr-2"
+                    />
+                    Classic Percentile
+                    <div className="text-xs opacity-75 mt-1">
+                      Roll under stat to win
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setRpgSystem("pbta")}
+                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
+                      rpgSystem === "pbta"
+                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
+                    }`}
+                  >
+                    <DynamicIcon name="Zap" className="w-5 h-5 inline mr-2" />
+                    Powered by the Apocalypse (PbtA)
+                    <div className="text-xs opacity-75 mt-1">
+                      2d6+mod: 10+ success, 7-9 partial, 6- failure
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setRpgSystem("fate")}
+                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
+                      rpgSystem === "fate"
+                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
+                    }`}
+                  >
+                    <DynamicIcon name="Scale" className="w-5 h-5 inline mr-2" />
+                    Fate Core (4dF)
+                    <div className="text-xs opacity-75 mt-1">
+                      Fudge dice + ladder: fail/tie/succeed/style
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setRpgSystem("yze")}
+                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
+                      rpgSystem === "yze"
+                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
+                    }`}
+                  >
+                    <DynamicIcon name="Skull" className="w-5 h-5 inline mr-2" />
+                    Year Zero Engine (YZE)
+                    <div className="text-xs opacity-75 mt-1">
+                      d6 pool, count 6s, stress + panic
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setRpgSystem("explosive")}
+                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
+                      rpgSystem === "explosive"
+                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
+                    }`}
+                  >
+                    <DynamicIcon name="Flame" className="w-5 h-5 inline mr-2" />
+                    Exploding Dice
+                    <div className="text-xs opacity-75 mt-1">
+                      Stat = die size, max rolls explode!
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>
@@ -2785,201 +2819,233 @@ function AdventureCreatorContent() {
               </div>
             </div>
 
-            <div>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={nsfw}
-                    onChange={(e) => setNsfw(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
-                </div>
+            {/* Advanced Options Toggle */}
+            <button
+              onClick={() => setShowAdvancedBasic(!showAdvancedBasic)}
+              className="w-full py-3 text-sm text-blue-300 hover:text-purple-300 border border-blue-700/40 rounded-lg hover:border-purple-500/50 transition-all flex items-center justify-center gap-2"
+            >
+              <DynamicIcon
+                name={showAdvancedBasic ? "ChevronUp" : "Settings"}
+                className="w-4 h-4"
+              />
+              {showAdvancedBasic
+                ? "Hide advanced options"
+                : "Advanced options (NSFW, tags, images)"}
+              {(nsfw || tags.length > 0 || thumbnailUrl || bannerUrl) && (
+                <span className="ml-2 px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">
+                  {[
+                    nsfw && "18+",
+                    tags.length > 0 && `${tags.length} tags`,
+                    (thumbnailUrl || bannerUrl) && "images",
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                </span>
+              )}
+            </button>
+
+            {/* Advanced Options (Collapsible) */}
+            {showAdvancedBasic && (
+              <div className="space-y-6 animate-in slide-in-from-top-2 duration-200 border-t border-blue-700/40 pt-6">
                 <div>
-                  <span className="block text-sm font-semibold text-blue-200">
-                    NSFW Content
-                  </span>
-                  <span className="block text-xs text-blue-300/60">
-                    Mark this adventure as containing Not Safe For Work content
-                    (18+)
-                  </span>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={nsfw}
+                        onChange={(e) => setNsfw(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                    </div>
+                    <div>
+                      <span className="block text-sm font-semibold text-blue-200">
+                        NSFW Content
+                      </span>
+                      <span className="block text-xs text-blue-300/60">
+                        Mark this adventure as containing Not Safe For Work
+                        content (18+)
+                      </span>
+                    </div>
+                  </label>
                 </div>
-              </label>
-            </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-blue-200 mb-2">
-                Tags
-              </label>
-              <div className="flex gap-2 mb-3">
-                <input
-                  type="text"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && (e.preventDefault(), addTag())
-                  }
-                  placeholder="Add a tag..."
-                  className="flex-1 px-4 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 transition-colors"
-                />
-                <button
-                  onClick={addTag}
-                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
-                >
-                  Add
-                </button>
-              </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Tags
+                  </label>
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && (e.preventDefault(), addTag())
+                      }
+                      placeholder="Add a tag..."
+                      className="flex-1 px-4 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 transition-colors"
+                    />
+                    <button
+                      onClick={addTag}
+                      className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
 
-              <div className="mb-3">
-                <p className="text-xs text-blue-300/60 mb-2">Quick add:</p>
-                <div className="flex flex-wrap gap-2">
-                  {commonTags
-                    .filter((t) => !tags.includes(t))
-                    .slice(0, 10)
-                    .map((tag) => (
-                      <button
+                  <div className="mb-3">
+                    <p className="text-xs text-blue-300/60 mb-2">Quick add:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {commonTags
+                        .filter((t) => !tags.includes(t))
+                        .slice(0, 10)
+                        .map((tag) => (
+                          <button
+                            key={tag}
+                            onClick={() => setTags([...tags, tag])}
+                            className="px-3 py-1 bg-blue-900/30 text-blue-200 rounded-full text-sm hover:bg-purple-900/30 transition-colors"
+                          >
+                            + {tag}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map((tag) => (
+                      <span
                         key={tag}
-                        onClick={() => setTags([...tags, tag])}
-                        className="px-3 py-1 bg-blue-900/30 text-blue-200 rounded-full text-sm hover:bg-purple-900/30 transition-colors"
+                        className="px-3 py-1 bg-purple-900/30 text-purple-300 rounded-full text-sm font-semibold flex items-center gap-2"
                       >
-                        + {tag}
-                      </button>
+                        {tag}
+                        <button
+                          onClick={() => removeTag(tag)}
+                          className="hover:text-purple-100"
+                        >
+                          <DynamicIcon name="X" className="w-3 h-3" />
+                        </button>
+                      </span>
                     ))}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-3 py-1 bg-purple-900/30 text-purple-300 rounded-full text-sm font-semibold flex items-center gap-2"
-                  >
-                    {tag}
-                    <button
-                      onClick={() => removeTag(tag)}
-                      className="hover:text-purple-100"
-                    >
-                      <DynamicIcon name="X" className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Thumbnail Upload */}
-            <div>
-              <label className="block text-sm font-semibold text-blue-200 mb-2">
-                Thumbnail Image
-              </label>
-              <p className="text-xs text-blue-300/60 mb-3">
-                Recommended: 400?300px (or 320?180px), max 5MB
-              </p>
-              <div className="flex items-start gap-4">
-                {thumbnailUrl && (
-                  <div className="relative">
-                    <img
-                      src={thumbnailUrl}
-                      alt="Thumbnail preview"
-                      className="w-32 h-24 object-cover rounded-lg border border-blue-700/40"
-                    />
-                    <button
-                      onClick={() => setThumbnailUrl("")}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs font-bold"
-                    >
-                      <DynamicIcon name="X" className="w-3 h-3" />
-                    </button>
                   </div>
-                )}
-                <div className="flex-1">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleThumbnailUpload}
-                    disabled={uploadingThumbnail}
-                    className="hidden"
-                    id="thumbnail-upload"
-                  />
-                  <label
-                    htmlFor="thumbnail-upload"
-                    className={`block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
-                      uploadingThumbnail ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    {uploadingThumbnail ? (
-                      "Uploading..."
-                    ) : thumbnailUrl ? (
-                      "Change Thumbnail"
-                    ) : (
-                      <>
-                        <DynamicIcon
-                          name="Camera"
-                          className="w-4 h-4 inline mr-2"
-                        />
-                        Upload Thumbnail
-                      </>
-                    )}
-                  </label>
                 </div>
-              </div>
-            </div>
 
-            {/* Banner Upload */}
-            <div>
-              <label className="block text-sm font-semibold text-blue-200 mb-2">
-                Banner Image
-              </label>
-              <p className="text-xs text-blue-300/60 mb-3">
-                Recommended: 1200?400px, max 5MB
-              </p>
-              <div className="flex items-start gap-4">
-                {bannerUrl && (
-                  <div className="relative">
-                    <img
-                      src={bannerUrl}
-                      alt="Banner preview"
-                      className="w-48 h-16 object-cover rounded-lg border border-blue-700/40"
-                    />
-                    <button
-                      onClick={() => setBannerUrl("")}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs font-bold"
-                    >
-                      <DynamicIcon name="X" className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
-                <div className="flex-1">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleBannerUpload}
-                    disabled={uploadingBanner}
-                    className="hidden"
-                    id="banner-upload"
-                  />
-                  <label
-                    htmlFor="banner-upload"
-                    className={`block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
-                      uploadingBanner ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    {uploadingBanner ? (
-                      "Uploading..."
-                    ) : bannerUrl ? (
-                      "Change Banner"
-                    ) : (
-                      <>
-                        <DynamicIcon
-                          name="Image"
-                          className="w-4 h-4 inline mr-2"
-                        />
-                        Upload Banner
-                      </>
-                    )}
+                {/* Thumbnail Upload */}
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Thumbnail Image
                   </label>
+                  <p className="text-xs text-blue-300/60 mb-3">
+                    Recommended: 400?300px (or 320?180px), max 5MB
+                  </p>
+                  <div className="flex items-start gap-4">
+                    {thumbnailUrl && (
+                      <div className="relative">
+                        <img
+                          src={thumbnailUrl}
+                          alt="Thumbnail preview"
+                          className="w-32 h-24 object-cover rounded-lg border border-blue-700/40"
+                        />
+                        <button
+                          onClick={() => setThumbnailUrl("")}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs font-bold"
+                        >
+                          <DynamicIcon name="X" className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleThumbnailUpload}
+                        disabled={uploadingThumbnail}
+                        className="hidden"
+                        id="thumbnail-upload"
+                      />
+                      <label
+                        htmlFor="thumbnail-upload"
+                        className={`block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
+                          uploadingThumbnail
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
+                        }`}
+                      >
+                        {uploadingThumbnail ? (
+                          "Uploading..."
+                        ) : thumbnailUrl ? (
+                          "Change Thumbnail"
+                        ) : (
+                          <>
+                            <DynamicIcon
+                              name="Camera"
+                              className="w-4 h-4 inline mr-2"
+                            />
+                            Upload Thumbnail
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Banner Upload */}
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Banner Image
+                  </label>
+                  <p className="text-xs text-blue-300/60 mb-3">
+                    Recommended: 1200?400px, max 5MB
+                  </p>
+                  <div className="flex items-start gap-4">
+                    {bannerUrl && (
+                      <div className="relative">
+                        <img
+                          src={bannerUrl}
+                          alt="Banner preview"
+                          className="w-48 h-16 object-cover rounded-lg border border-blue-700/40"
+                        />
+                        <button
+                          onClick={() => setBannerUrl("")}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs font-bold"
+                        >
+                          <DynamicIcon name="X" className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleBannerUpload}
+                        disabled={uploadingBanner}
+                        className="hidden"
+                        id="banner-upload"
+                      />
+                      <label
+                        htmlFor="banner-upload"
+                        className={`block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
+                          uploadingBanner ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
+                      >
+                        {uploadingBanner ? (
+                          "Uploading..."
+                        ) : bannerUrl ? (
+                          "Change Banner"
+                        ) : (
+                          <>
+                            <DynamicIcon
+                              name="Image"
+                              className="w-4 h-4 inline mr-2"
+                            />
+                            Upload Banner
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         );
 
@@ -3391,23 +3457,35 @@ function AdventureCreatorContent() {
                   className="w-4 h-4 mt-0.5 shrink-0 text-purple-400"
                 />
                 <span>
-                  <strong>Tip:</strong> Story Points let players upgrade their
-                  character. Momentum builds up from dramatic moments and
-                  choices. Plot beat completion rewards points.
+                  <strong>What are these?</strong> <strong>Points</strong> are
+                  currency players earn and spend on upgrades (like stat boosts
+                  or new abilities).
+                  <strong> Momentum</strong> is a bonus resource that builds up
+                  from dramatic actions - when it hits max, players can spend it
+                  for powerful bonuses on dice rolls.
                 </span>
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-blue-200 mb-2">
+                <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
                   Starting Points
+                  <span
+                    className="text-xs text-blue-400"
+                    title="Used to buy upgrades like stat increases"
+                  >
+                    💰
+                  </span>
                 </label>
                 <input
                   type="number"
                   min="0"
+                  max="99999"
                   value={points}
-                  onChange={(e) => setPoints(parseInt(e.target.value) || 0)}
+                  onChange={(e) =>
+                    setPoints(clampNumber(parseInt(e.target.value), 0, 99999))
+                  }
                   className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                 />
                 <p className="text-xs text-blue-300/60 mt-1">
@@ -3426,7 +3504,7 @@ function AdventureCreatorContent() {
                   value={momentum}
                   onChange={(e) =>
                     setMomentum(
-                      Math.min(parseInt(e.target.value) || 0, maxMomentum)
+                      clampNumber(parseInt(e.target.value), 0, maxMomentum)
                     )
                   }
                   className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
@@ -3443,9 +3521,12 @@ function AdventureCreatorContent() {
                 <input
                   type="number"
                   min="1"
+                  max="999"
                   value={maxMomentum}
                   onChange={(e) =>
-                    setMaxMomentum(Math.max(1, parseInt(e.target.value) || 5))
+                    setMaxMomentum(
+                      clampNumber(parseInt(e.target.value), 1, 999)
+                    )
                   }
                   className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                 />
@@ -4900,11 +4981,12 @@ function AdventureCreatorContent() {
                   <input
                     type="number"
                     min="1"
+                    max="999"
                     value={newItem.quantity}
                     onChange={(e) =>
                       setNewItem({
                         ...newItem,
-                        quantity: parseInt(e.target.value) || 1,
+                        quantity: clampNumber(parseInt(e.target.value), 1, 999),
                       })
                     }
                     className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
@@ -5010,11 +5092,16 @@ function AdventureCreatorContent() {
                           <input
                             type="number"
                             min="1"
+                            max="999"
                             value={editInventoryItem.quantity || 1}
                             onChange={(e) =>
                               setEditInventoryItem({
                                 ...editInventoryItem,
-                                quantity: parseInt(e.target.value) || 1,
+                                quantity: clampNumber(
+                                  parseInt(e.target.value),
+                                  1,
+                                  999
+                                ),
                               })
                             }
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
@@ -5164,10 +5251,15 @@ function AdventureCreatorContent() {
                   className="w-4 h-4 mt-0.5 shrink-0"
                 />
                 <span>
-                  <strong>Tip:</strong> Lore entries provide background
-                  information about your world. Keys determine when the lore is
-                  revealed during gameplay (e.g., "Ancient Ruins", "Dragon
-                  Defeated").
+                  <strong>What is Lore?</strong> Lore entries are world-building
+                  facts the AI uses for context.
+                  <strong> Triggers</strong> control visibility:{" "}
+                  <span className="text-green-400">ON triggers</span> (keywords
+                  that reveal this lore when mentioned),
+                  <span className="text-red-400"> OFF triggers</span> (keywords
+                  that hide it), and
+                  <span className="text-purple-400"> Beat triggers</span> (plot
+                  beat numbers that toggle visibility).
                 </span>
               </p>
             </div>
@@ -5202,6 +5294,7 @@ function AdventureCreatorContent() {
                     }
                     placeholder="Write the lore entry content..."
                     rows={5}
+                    maxLength={5000}
                     className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                   />
                 </div>
@@ -5840,6 +5933,7 @@ function AdventureCreatorContent() {
                                     })
                                   }
                                   rows={5}
+                                  maxLength={5000}
                                   className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                                 />
                               </div>
@@ -6719,9 +6813,10 @@ function AdventureCreatorContent() {
                     <span>
                       Relationship Value * ({newRelationship.value ?? 0})
                     </span>
-                    <span className="text-2xl">
-                      {getRelationshipSymbol(newRelationship.value ?? 0)}
-                    </span>
+                    <DynamicIcon
+                      name={getRelationshipIcon(newRelationship.value ?? 0)}
+                      className="w-6 h-6"
+                    />
                   </label>
                   <input
                     type="range"
@@ -6745,9 +6840,9 @@ function AdventureCreatorContent() {
                     }}
                   />
                   <div className="flex justify-between text-xs text-blue-300/60 mt-1">
-                    <span>?? -100 (Enemy)</span>
-                    <span>?? 0 (Neutral)</span>
-                    <span>?? +100 (Ally)</span>
+                    <span>-100 (Enemy)</span>
+                    <span>0 (Neutral)</span>
+                    <span>+100 (Ally)</span>
                   </div>
                 </div>
                 <div>
@@ -6764,6 +6859,7 @@ function AdventureCreatorContent() {
                     }
                     placeholder="Describe the current state of this relationship..."
                     rows={3}
+                    maxLength={1000}
                     className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                   />
                 </div>
@@ -6878,11 +6974,12 @@ function AdventureCreatorContent() {
                                       Relationship Value (
                                       {editRelationship.value ?? 0})
                                     </span>
-                                    <span className="text-2xl">
-                                      {getRelationshipSymbol(
+                                    <DynamicIcon
+                                      name={getRelationshipIcon(
                                         editRelationship.value ?? 0
                                       )}
-                                    </span>
+                                      className="w-6 h-6"
+                                    />
                                   </label>
                                   <input
                                     type="range"
@@ -6906,9 +7003,9 @@ function AdventureCreatorContent() {
                                     }}
                                   />
                                   <div className="flex justify-between text-xs text-blue-300/60 mt-1">
-                                    <span>?? -100 (Enemy)</span>
-                                    <span>?? 0 (Neutral)</span>
-                                    <span>?? +100 (Ally)</span>
+                                    <span>-100 (Enemy)</span>
+                                    <span>0 (Neutral)</span>
+                                    <span>+100 (Ally)</span>
                                   </div>
                                 </div>
                                 <div>
@@ -6924,6 +7021,7 @@ function AdventureCreatorContent() {
                                       })
                                     }
                                     rows={3}
+                                    maxLength={1000}
                                     className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
                                   />
                                 </div>
@@ -7103,11 +7201,12 @@ function AdventureCreatorContent() {
                   <input
                     type="number"
                     min="1"
+                    max="1000"
                     value={newAchievement.points}
                     onChange={(e) =>
                       setNewAchievement({
                         ...newAchievement,
-                        points: parseInt(e.target.value) || 10,
+                        points: clampNumber(parseInt(e.target.value), 1, 1000),
                       })
                     }
                     className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
@@ -7250,12 +7349,17 @@ function AdventureCreatorContent() {
                           </label>
                           <input
                             type="number"
-                            min="0"
+                            min="1"
+                            max="1000"
                             value={editAchievement.points || 10}
                             onChange={(e) =>
                               setEditAchievement({
                                 ...editAchievement,
-                                points: parseInt(e.target.value) || 10,
+                                points: clampNumber(
+                                  parseInt(e.target.value),
+                                  1,
+                                  1000
+                                ),
                               })
                             }
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
@@ -7442,9 +7546,12 @@ function AdventureCreatorContent() {
                   className="w-5 h-5 text-orange-600 shrink-0 mt-0.5"
                 />
                 <span>
-                  <strong>Tip:</strong> Plot beats are key story moments you
-                  want to guide the AI toward (optional but helpful for
-                  structured stories).
+                  <strong>What are Plot Beats?</strong> These are story
+                  milestones the AI tries to weave into the narrative. When the
+                  AI determines a beat has been achieved, it marks it complete
+                  and awards points. Beats can also trigger lore entries to
+                  become visible/hidden. <em>Order matters</em> - the AI prefers
+                  earlier uncompleted beats.
                 </span>
               </p>
             </div>
@@ -7785,11 +7892,12 @@ function AdventureCreatorContent() {
                   <input
                     type="number"
                     min="1"
+                    max="1000"
                     value={newQuest.points}
                     onChange={(e) =>
                       setNewQuest({
                         ...newQuest,
-                        points: parseInt(e.target.value) || 10,
+                        points: clampNumber(parseInt(e.target.value), 1, 1000),
                       })
                     }
                     className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
@@ -7944,12 +8052,17 @@ function AdventureCreatorContent() {
                           </label>
                           <input
                             type="number"
-                            min="0"
+                            min="1"
+                            max="1000"
                             value={editQuest.points || 10}
                             onChange={(e) =>
                               setEditQuest({
                                 ...editQuest,
-                                points: parseInt(e.target.value) || 10,
+                                points: clampNumber(
+                                  parseInt(e.target.value),
+                                  1,
+                                  1000
+                                ),
                               })
                             }
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
@@ -9545,9 +9658,27 @@ function AdventureCreatorContent() {
                   className="w-4 h-4 mt-1 shrink-0 text-yellow-400"
                 />
                 <span>
-                  <strong>Note:</strong> Once you publish this adventure,
-                  players will be able to start it. Make sure everything looks
-                  good before proceeding!
+                  <strong>Note:</strong>{" "}
+                  {visibility === "private" ? (
+                    <>
+                      This adventure is set to <strong>private</strong>. Only
+                      you will be able to see and play it. The adventure
+                      metadata (title, description) will be stored on the
+                      server, but stories created from it remain encrypted.
+                    </>
+                  ) : visibility === "hidden" ? (
+                    <>
+                      This adventure is set to <strong>hidden</strong>. It
+                      won&apos;t appear in the explorer, but anyone with the
+                      direct link can access it.
+                    </>
+                  ) : (
+                    <>
+                      Once you publish this adventure, it will be{" "}
+                      <strong>public</strong> and players will be able to find
+                      and start it from the explorer.
+                    </>
+                  )}
                 </span>
               </p>
             </div>
@@ -9675,28 +9806,33 @@ function AdventureCreatorContent() {
               <button
                 onClick={handleSaveLocally}
                 disabled={saving}
-                className="flex-1 sm:flex-none px-3 py-2.5 bg-blue-800/40 hover:bg-blue-700/50 text-blue-200 text-sm font-medium rounded-lg transition-all whitespace-nowrap border border-blue-700/30"
+                className="flex-1 sm:flex-none px-3 py-3 sm:py-2.5 bg-blue-800/40 hover:bg-blue-700/50 active:bg-blue-600/50 text-blue-200 text-sm font-medium rounded-lg transition-all whitespace-nowrap border border-blue-700/30 touch-manipulation flex items-center justify-center gap-2"
                 title="Save to your device without publishing"
               >
-                <DynamicIcon name="Save" className="w-4 h-4 inline mr-2" />
-                Save Locally
+                <DynamicIcon name="Save" className="w-4 h-4" />
+                <span className="hidden sm:inline">Save Locally</span>
+                <span className="sm:hidden">Local</span>
               </button>
               {isLocal && (
                 <button
                   onClick={handleSaveToDatabase}
                   disabled={saving}
-                  className="flex-1 sm:flex-none px-3 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap"
+                  className="flex-1 sm:flex-none px-3 py-3 sm:py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap touch-manipulation flex items-center justify-center gap-2"
                   title="Upload local adventure to database"
                 >
                   {saving ? (
-                    "Uploading..."
-                  ) : (
                     <>
                       <DynamicIcon
-                        name="Upload"
-                        className="w-4 h-4 inline mr-2"
+                        name="Loader2"
+                        className="w-4 h-4 animate-spin"
                       />
-                      Save to Database
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <DynamicIcon name="Upload" className="w-4 h-4" />
+                      <span className="hidden sm:inline">Save to Database</span>
+                      <span className="sm:hidden">Upload</span>
                     </>
                   )}
                 </button>
@@ -9704,23 +9840,25 @@ function AdventureCreatorContent() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 sm:flex-none px-3 py-2.5 bg-green-600 hover:bg-green-500 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap"
+                className="flex-1 sm:flex-none px-3 py-3 sm:py-2.5 bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap touch-manipulation flex items-center justify-center gap-2"
                 title={
                   isLocal ? "Save changes locally" : "Publish to the community"
                 }
               >
                 {saving ? (
-                  isLocal ? (
-                    "Saving..."
-                  ) : (
-                    "Publishing..."
-                  )
+                  <>
+                    <DynamicIcon
+                      name="Loader2"
+                      className="w-4 h-4 animate-spin"
+                    />
+                    {isLocal ? "Saving..." : "Publishing..."}
+                  </>
                 ) : (
                   <>
                     <DynamicIcon
                       name={isLocal ? "Save" : "Rocket"}
-                      className="w-4 h-4 inline mr-2"
-                    />{" "}
+                      className="w-4 h-4"
+                    />
                     {isLocal ? "Save" : "Publish"}
                   </>
                 )}

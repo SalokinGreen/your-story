@@ -13,8 +13,8 @@ export const AI_MODELS = {
       "An imaginative model excelling in creative writing and storytelling, ideal for generating vivid narratives.",
     bannerUrl: undefined,
     cost: 10,
-    inputPrice: 2.0,
-    outputPrice: 10.0,
+    inputPrice: 0.4,
+    outputPrice: 1,
     finetunes: [],
   },
 
@@ -27,8 +27,8 @@ export const AI_MODELS = {
     provider: "deepseek",
     supportsToolCalling: true,
     cost: 1,
-    inputPrice: 0.14,
-    outputPrice: 0.28,
+    inputPrice: 0.28,
+    outputPrice: 0.42,
     finetunes: [],
     strengths: ["creativity", "nsfw"],
     weaknesses: ["price"],
@@ -81,8 +81,8 @@ export const AI_MODELS = {
     maxTokens: 200000,
     maxOutputTokens: 4000,
     cost: 10,
-    inputPrice: 10.0,
-    outputPrice: 10.0,
+    inputPrice: 0.4,
+    outputPrice: 1.75,
     provider: "openrouter",
     supportsToolCalling: true,
     finetunes: [],
@@ -92,61 +92,7 @@ export const AI_MODELS = {
       "A robust model designed for handling extensive context and delivering powerful performance, making it suitable for complex storytelling and detailed narratives.",
     bannerUrl: undefined,
   },
-  "Qwen 2.5 72B Instruct": {
-    name: "Qwen 2.5 72B Instruct",
-    original_model: "Qwen3 235B A22B Instruct 2507",
-    model: "qwen/qwen-2.5-72b-instruct",
-    maxTokens: 200000,
-    maxOutputTokens: 4000,
-    provider: "openrouter",
-    supportsToolCalling: true,
-    cost: 1,
-    inputPrice: 0.35,
-    outputPrice: 0.4,
-    finetunes: [],
-    strengths: ["long context", "powerful"],
-    weaknesses: ["price", "nsfw"],
-    description:
-      "A powerful model capable of handling long contexts, making it suitable for detailed and complex storytelling tasks.",
-    bannerUrl: undefined,
-  },
 
-  "GPT-OSS 120B": {
-    name: "GPT-OSS 120B",
-    original_model: "gpt-oss-120b",
-    model: "openai/gpt-oss-120b",
-    maxTokens: 131000,
-    maxOutputTokens: 4000,
-    provider: "openrouter",
-    supportsToolCalling: true,
-    cost: 4,
-    inputPrice: 2.5,
-    outputPrice: 10.0,
-    finetunes: [],
-    strengths: ["powerful", "nsfw"],
-    weaknesses: ["price"],
-    description:
-      "A powerful open-source model with 120 billion parameters, suitable for tasks requiring high computational power and detailed content generation.",
-    bannerUrl: undefined,
-  },
-  "Gemini 2.5 Pro": {
-    name: "Gemini 2.5 Pro",
-    original_model: "Gemini 2.5 Pro",
-    model: "google/gemini-2.5-pro",
-    maxTokens: 200000,
-    maxOutputTokens: 4000,
-    provider: "openrouter",
-    supportsToolCalling: true,
-    cost: 15,
-    inputPrice: 3.5,
-    outputPrice: 10.5,
-    finetunes: [],
-    strengths: ["long context", "powerful", "creativity"],
-    weaknesses: ["price"],
-    description:
-      "The premium model in the lineup, offering unparalleled performance, creativity, and the ability to handle extensive contexts, making it ideal for the most demanding storytelling tasks.",
-    bannerUrl: undefined,
-  },
   "Deepseek R1": {
     name: "DeepSeek R1",
     original_model: "DeepSeek R1",
@@ -201,83 +147,6 @@ export const AI_MODELS = {
       "A logic and reasoning-focused model that excels at understanding and generating structured content. Ideal for scenarios requiring precise logic and tool usage.",
     bannerUrl: undefined,
   },
-  "NovelAI GLM scribe": {
-    name: "NovelAI GLM Tablet",
-    original_model: "NovelAI GLM Tablet",
-    model: "glm-tablet",
-    maxTokens: 8000,
-    maxOutputTokens: 2000,
-    provider: "novelai",
-    supportsToolCalling: false,
-    cost: 0,
-    inputPrice: 0,
-    outputPrice: 0,
-    finetunes: [],
-    strengths: ["creative", "storytelling", "prose"],
-    weaknesses: ["context length", "complex logic"],
-    description:
-      "A storytelling-focused model from NovelAI, designed to generate creative and engaging narratives with rich prose.",
-    bannerUrl: undefined,
-  },
-  "NovelAI GLM Scribe": {
-    name: "NovelAI GLM Scribe",
-    original_model: "NovelAI GLM Scribe",
-    model: "glm-scribe",
-    maxTokens: 14000,
-    maxOutputTokens: 2000,
-    provider: "novelai",
-    supportsToolCalling: false,
-    cost: 0,
-    inputPrice: 0,
-    outputPrice: 0,
-    finetunes: [],
-    strengths: ["creative", "storytelling", "prose"],
-    weaknesses: ["context length", "complex logic"],
-    description:
-      "An enhanced storytelling model from NovelAI, offering a longer context length for more detailed and immersive narratives.",
-    bannerUrl: undefined,
-  },
-  "NovelAI GLM Opus": {
-    name: "NovelAI GLM Opus",
-    original_model: "NovelAI GLM Opus",
-    model: "glm-opus",
-    maxTokens: 28000,
-    maxOutputTokens: 2000,
-    provider: "novelai",
-    supportsToolCalling: false,
-    cost: 0,
-    inputPrice: 0,
-    outputPrice: 0,
-    finetunes: [],
-    strengths: ["creative", "storytelling", "prose", "longer context"],
-    weaknesses: ["complex logic"],
-    description:
-      "The premium storytelling model from NovelAI, featuring the longest context length and enhanced capabilities for crafting intricate and immersive narratives.",
-    bannerUrl: undefined,
-  },
-  "Mistral Nemo": {
-    name: "Mistral Nemo",
-    original_model: "Mistral Nemo",
-    model: "mistralai/mistral-nemo",
-    maxTokens: 131000,
-    maxOutputTokens: 4000,
-    provider: "openrouter",
-    supportsToolCalling: false,
-    cost: 1,
-    inputPrice: 0.02,
-    outputPrice: 0.04,
-    finetunes: [],
-    strengths: ["cost-effective", "general purpose"],
-    weaknesses: [
-      "creativity",
-      "complex tasks",
-      "no tool calling",
-      "weak ass brains",
-    ],
-    description:
-      "A cost-effective general-purpose model from Mistral, suitable for a variety of tasks but less creative and without tool calling capabilities.",
-    bannerUrl: undefined,
-  },
 } as const;
 
 export interface ModelPreset {
@@ -298,43 +167,16 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     storyModel: "Deepseek Chat",
     toolsModel: "Grok Code Fast 1",
     choicesModel: "Gemini 2.5 Flash Lite",
-    estimatedCost: 12, // 1 + 10 + 1
+    estimatedCost: 6, // 1 + 10 + 1
   },
   mainBrain: {
     id: "mainBrain",
     name: "Main with Brain",
-    description: "Creative narration, powerful tools, fast choices with Brain",
+    description: "Smarter than main, with reasoning capabilities",
     storyModel: "Deepseek R1",
     toolsModel: "Grok Code Fast 1",
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 13, // 2 + 10 + 1
-  },
-  budget: {
-    id: "broke",
-    name: "Broke (Cost-Effective)",
-    description: "Best if you owe money or are hiding from the IRS",
-    storyModel: "Mistral Medium 3.1",
-    toolsModel: "Grok Code Fast 1",
-    choicesModel: "Gemini 2.5 Flash Lite",
-    estimatedCost: 3, // 1 + 1 + 1
-  },
-  creative: {
-    id: "creative",
-    name: "Creative (High Quality)",
-    description: "Best creative writing with powerful tool execution",
-    storyModel: "Deepseek Reasoner",
-    toolsModel: "Grok Code Fast 1",
-    choicesModel: "Gemini 2.5 Flash",
-    estimatedCost: 21, // 10 + 10 + 1
-  },
-  balanced: {
-    id: "balanced",
-    name: "Balanced (Quality + Cost)",
-    description: "Good balance between quality and token cost",
-    storyModel: "Deepseek Chat",
-    toolsModel: "Grok Code Fast 1",
-    choicesModel: "Gemini 2.5 Flash Lite",
-    estimatedCost: 3, // 1 + 1 + 1
   },
   speed: {
     id: "speed",
@@ -344,15 +186,6 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     toolsModel: "Grok Code Fast 1",
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 12, // 10 + 1 + 1
-  },
-  novelai: {
-    id: "novelai",
-    name: "NovelAI (Prose Focused)",
-    description: "Focused on rich prose and storytelling",
-    storyModel: "NovelAI GLM Opus",
-    toolsModel: "Grok Code Fast 1",
-    choicesModel: "NovelAI GLM Opus",
-    estimatedCost: 1, // 0 + 1 + 1
   },
   custom: {
     id: "custom",
@@ -386,6 +219,123 @@ export interface AIModelConfig {
 
 export type AIModelKey = keyof typeof AI_MODELS;
 
+// ============================================
+// DYNAMIC COST CALCULATION
+// ============================================
+
+// Constants for cost calculation
+export const MARKUP_MULTIPLIER = 1.5; // 50% markup for service
+export const COINS_PER_DOLLAR = 1000; // 1 coin = $0.001
+export const MINIMUM_COST = 1; // Minimum 1 coin per API call
+
+// TTS pricing (Speechify)
+export const TTS_PRICE_PER_MILLION_CHARS = 10; // $10 per 1M characters
+
+/**
+ * Calculate the cost in coins for TTS generation
+ * @param characterCount - Number of characters to convert to speech
+ * @returns Cost in coins (minimum 1)
+ */
+export function calculateTTSCost(characterCount: number): number {
+  // Calculate raw cost in dollars ($10 per 1M characters)
+  const rawCost = (characterCount / 1_000_000) * TTS_PRICE_PER_MILLION_CHARS;
+
+  // Apply markup and convert to coins
+  const costWithMarkup = rawCost * MARKUP_MULTIPLIER;
+  const costInCoins = Math.ceil(costWithMarkup * COINS_PER_DOLLAR);
+
+  // Ensure minimum cost
+  return Math.max(costInCoins, MINIMUM_COST);
+}
+
+/**
+ * Calculate the cost in coins for a given model and token usage
+ * @param modelKey - The key of the model in AI_MODELS (or model identifier string)
+ * @param inputTokens - Number of input tokens used
+ * @param outputTokens - Number of output tokens generated
+ * @returns Cost in coins (minimum 1)
+ */
+export function calculateTokenCost(
+  modelKey: string,
+  inputTokens: number,
+  outputTokens: number
+): number {
+  const model = getModelConfig(modelKey);
+
+  // Calculate raw cost in dollars (prices are per 1M tokens)
+  const inputCost = (inputTokens / 1_000_000) * model.inputPrice;
+  const outputCost = (outputTokens / 1_000_000) * model.outputPrice;
+  const rawCost = inputCost + outputCost;
+
+  // Apply markup and convert to coins
+  const costWithMarkup = rawCost * MARKUP_MULTIPLIER;
+  const costInCoins = Math.ceil(costWithMarkup * COINS_PER_DOLLAR);
+
+  // Ensure minimum cost
+  return Math.max(costInCoins, MINIMUM_COST);
+}
+
+/**
+ * Estimate cost for a typical generation (for display purposes)
+ * @param modelKey - The key of the model in AI_MODELS
+ * @param estimatedInputTokens - Expected input tokens (default 3000)
+ * @param estimatedOutputTokens - Expected output tokens (default 1500)
+ * @returns Estimated cost in coins
+ */
+export function estimateGenerationCost(
+  modelKey: string,
+  estimatedInputTokens: number = 3000,
+  estimatedOutputTokens: number = 1500
+): number {
+  return calculateTokenCost(
+    modelKey,
+    estimatedInputTokens,
+    estimatedOutputTokens
+  );
+}
+
+/**
+ * Estimate total cost for a full 3-stage generation turn
+ * @param storyModel - Model key for story generation
+ * @param toolsModel - Model key for tools stage
+ * @param choicesModel - Model key for choices stage
+ * @returns Estimated total cost in coins
+ */
+export function estimateFullTurnCost(
+  storyModel: string,
+  toolsModel: string,
+  choicesModel: string
+): number {
+  // Typical token usage per stage
+  const storyCost = calculateTokenCost(storyModel, 5000, 2000);
+  const toolsCost = calculateTokenCost(toolsModel, 3000, 1000);
+  const choicesCost = calculateTokenCost(choicesModel, 2000, 500);
+
+  return storyCost + toolsCost + choicesCost;
+}
+
+/**
+ * Get a human-readable cost breakdown for a model
+ * @param modelKey - The key of the model
+ * @returns Object with pricing info
+ */
+export function getModelPricing(modelKey: string): {
+  inputPricePerMillion: number;
+  outputPricePerMillion: number;
+  inputPriceWithMarkup: number;
+  outputPriceWithMarkup: number;
+  estimatedCostPerTurn: number;
+} {
+  const model = getModelConfig(modelKey);
+  return {
+    inputPricePerMillion: model.inputPrice,
+    outputPricePerMillion: model.outputPrice,
+    inputPriceWithMarkup: model.inputPrice * MARKUP_MULTIPLIER,
+    outputPriceWithMarkup: model.outputPrice * MARKUP_MULTIPLIER,
+    estimatedCostPerTurn: estimateGenerationCost(modelKey),
+  };
+}
+
 export function getModelConfig(modelKey: string): AIModelConfig {
   // Check if the key exists in AI_MODELS
   if (modelKey in AI_MODELS) {
@@ -397,4 +347,36 @@ export function getModelConfig(modelKey: string): AIModelConfig {
     `Model key "${modelKey}" not found, falling back to Deepseek Chat`
   );
   return AI_MODELS["Deepseek Chat"] as unknown as AIModelConfig;
+}
+
+/**
+ * Get the dynamic estimated cost for a preset
+ * @param presetId - The preset ID from MODEL_PRESETS
+ * @returns Estimated cost in coins for a full turn
+ */
+export function getPresetEstimatedCost(presetId: string): number {
+  const preset = MODEL_PRESETS[presetId];
+  if (!preset) {
+    return MINIMUM_COST;
+  }
+  return estimateFullTurnCost(
+    preset.storyModel,
+    preset.toolsModel,
+    preset.choicesModel
+  );
+}
+
+/**
+ * Get the dynamic estimated cost for custom model selection
+ * @param storyModel - Model key for story stage
+ * @param toolsModel - Model key for tools stage
+ * @param choicesModel - Model key for choices stage
+ * @returns Estimated cost in coins for a full turn
+ */
+export function getCustomEstimatedCost(
+  storyModel: string,
+  toolsModel: string,
+  choicesModel: string
+): number {
+  return estimateFullTurnCost(storyModel, toolsModel, choicesModel);
 }

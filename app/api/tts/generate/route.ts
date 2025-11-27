@@ -3,12 +3,11 @@ import { Speechify } from "@speechify/api-sdk";
 import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import { createClient } from "@supabase/supabase-js";
 import { getUserSettings } from "@/app/misc/user_settings";
+import { calculateTTSCost } from "@/app/misc/ai_prices";
 
 const SPEECHIFY_API_KEY = process.env.SPEECHIFY_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const TTS_COST = 3; // 3 tokens per TTS generation
 
 export async function POST(req: NextRequest) {
   try {
@@ -148,10 +147,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Calculate dynamic TTS cost based on character count
+    const ttsCost = calculateTTSCost(cleanText.length);
+
     // Deduct tokens after successful generation IF using tokens
     if (shouldUseTokens) {
       try {
-        await deductTokens(userId, TTS_COST, supabase);
+        await deductTokens(userId, ttsCost, supabase);
       } catch (deductError: any) {
         console.error("Failed to deduct tokens:", deductError);
         // Still return the audio since generation succeeded
@@ -174,7 +176,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "audio/mpeg",
         "Content-Length": audioBuffer.byteLength.toString(),
         "Cache-Control": "public, max-age=3600", // Cache for 1 hour
-        "X-Token-Cost": shouldUseTokens ? TTS_COST.toString() : "0",
+        "X-Token-Cost": shouldUseTokens ? ttsCost.toString() : "0",
         "X-Token-Balance": (newBalance?.total ?? 0).toString(),
       },
     });

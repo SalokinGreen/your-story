@@ -102,13 +102,13 @@ const features = [
   { icon: "Zap", label: "Fast Generation" },
 ];
 
-// Coin packages
+// Coin packages (1 coin = $0.001)
 const packages = [
-  { name: "Starter", cost: 0.99, coins: 100, bonus: 0, savings: 0 },
-  { name: "Basic", cost: 4.99, coins: 500, bonus: 50, savings: 8 },
-  { name: "Standard", cost: 9.99, coins: 1000, bonus: 150, savings: 13 },
-  { name: "Premium", cost: 19.99, coins: 2000, bonus: 400, savings: 17 },
-  { name: "Ultimate", cost: 49.99, coins: 5000, bonus: 1500, savings: 23 },
+  { name: "Starter", cost: 0.99, coins: 990, bonus: 0, savings: 0 },
+  { name: "Basic", cost: 4.99, coins: 4990, bonus: 500, savings: 10 },
+  { name: "Standard", cost: 9.99, coins: 9990, bonus: 1500, savings: 15 },
+  { name: "Premium", cost: 19.99, coins: 19990, bonus: 4000, savings: 20 },
+  { name: "Ultimate", cost: 49.99, coins: 49990, bonus: 12500, savings: 25 },
 ];
 
 // InfoTabs Component - Compact version

@@ -155,11 +155,31 @@ export default function CreatorAIChat({
     }
   };
 
+  // Handle click outside to close
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="flex h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white/95 dark:bg-gray-900/95 shadow-2xl border border-white/20 dark:border-gray-700 ring-1 ring-black/5">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-200"
+      onClick={handleBackdropClick}
+    >
+      <div className="flex h-[95vh] sm:h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white/95 dark:bg-gray-900/95 shadow-2xl border border-white/20 dark:border-gray-700 ring-1 ring-black/5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-6 py-4 backdrop-blur-sm">
           <div>
@@ -179,12 +199,38 @@ export default function CreatorAIChat({
               value={model}
               onChange={(e) => setModel(e.target.value)}
               className="bg-gray-100 dark:bg-blue-950 border-none text-xs rounded-md px-2 py-1 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer max-w-[150px] truncate"
+              title="Select AI model"
             >
-              {Object.values(AI_MODELS).map((m) => (
-                <option key={m.model} value={m.model}>
-                  {m.original_model}
+              <optgroup label="Recommended">
+                <option value={AI_MODELS["Deepseek Chat"].model}>
+                  Deepseek Chat (Best)
                 </option>
-              ))}
+                <option value={AI_MODELS["Gemini 2.5 Flash"].model}>
+                  Gemini 2.5 Flash
+                </option>
+                <option value={AI_MODELS["Mistral Medium 3.1"].model}>
+                  Mistral Medium 3.1
+                </option>
+              </optgroup>
+              <optgroup label="Advanced">
+                <option value={AI_MODELS["Deepseek R1"].model}>
+                  DeepSeek R1 (Reasoning)
+                </option>
+                <option value={AI_MODELS["Grok 4 Fast"].model}>
+                  Grok 4 Fast (Creative)
+                </option>
+                <option value={AI_MODELS["GLM 4.6"].model}>
+                  GLM 4.6 (Long Context)
+                </option>
+              </optgroup>
+              <optgroup label="Budget">
+                <option value={AI_MODELS["Gemini 2.5 Flash Lite"].model}>
+                  Gemini Flash Lite
+                </option>
+                <option value={AI_MODELS["Grok Code Fast 1"].model}>
+                  Grok Code Fast
+                </option>
+              </optgroup>
             </select>
             {messages.length > 0 && (
               <button

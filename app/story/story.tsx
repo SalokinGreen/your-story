@@ -194,10 +194,13 @@ export default function Story({
             <button
               onClick={onNavigateLeft}
               disabled={currentStoryIndex <= 0}
-              className="p-1.5 text-blue-300 hover:text-white disabled:text-blue-500/30 disabled:cursor-not-allowed transition-colors rounded-lg hover:bg-blue-800/50"
+              className="p-2.5 sm:p-1.5 text-blue-300 hover:text-white disabled:text-blue-500/30 disabled:cursor-not-allowed transition-colors rounded-lg hover:bg-blue-800/50 active:bg-blue-700/50 touch-manipulation"
               title="Previous"
             >
-              <DynamicIcon name="ChevronLeft" className="w-4 h-4" />
+              <DynamicIcon
+                name="ChevronLeft"
+                className="w-5 h-5 sm:w-4 sm:h-4"
+              />
             </button>
 
             <div className="flex items-center gap-2">
@@ -207,7 +210,7 @@ export default function Story({
               {isViewingPast && (
                 <button
                   onClick={onResetToCurrentPart}
-                  className="px-2 py-0.5 text-xs font-medium text-blue-400 hover:bg-blue-800/50 rounded transition-colors"
+                  className="px-3 py-1.5 sm:px-2 sm:py-0.5 text-xs font-medium text-blue-400 hover:bg-blue-800/50 active:bg-blue-700/50 rounded transition-colors touch-manipulation"
                 >
                   Jump to Latest
                 </button>
@@ -220,10 +223,13 @@ export default function Story({
                 !isViewingPast ||
                 currentStoryIndex >= uniqueStoryParts.length - 1
               }
-              className="p-1.5 text-blue-300 hover:text-white disabled:text-blue-500/30 disabled:cursor-not-allowed transition-colors rounded-lg hover:bg-blue-800/50"
+              className="p-2.5 sm:p-1.5 text-blue-300 hover:text-white disabled:text-blue-500/30 disabled:cursor-not-allowed transition-colors rounded-lg hover:bg-blue-800/50 active:bg-blue-700/50 touch-manipulation"
               title="Next"
             >
-              <DynamicIcon name="ChevronRight" className="w-4 h-4" />
+              <DynamicIcon
+                name="ChevronRight"
+                className="w-5 h-5 sm:w-4 sm:h-4"
+              />
             </button>
           </div>
         )}
@@ -311,15 +317,15 @@ export default function Story({
         {!editMode && (
           <div className="flex items-center justify-between px-4 py-2 bg-blue-900/30 border-t border-blue-800/30">
             {/* Left side: Retry & Undo */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5 sm:gap-1">
               {canUndo && onUndo && (
                 <button
                   onClick={onUndo}
                   disabled={loading || !!loadingStage}
-                  className="px-2 py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-blue-800/50 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-blue-800/50 active:bg-blue-700/50 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                   title="Undo last action"
                 >
-                  <DynamicIcon name="Undo2" className="w-4 h-4" />
+                  <DynamicIcon name="Undo2" className="w-5 h-5 sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Undo</span>
                 </button>
               )}
@@ -327,10 +333,13 @@ export default function Story({
                 <button
                   onClick={onRetry}
                   disabled={loading || !!loadingStage}
-                  className="px-2 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-900/30 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-900/30 active:bg-amber-800/40 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                   title="Regenerate response"
                 >
-                  <DynamicIcon name="RotateCcw" className="w-4 h-4" />
+                  <DynamicIcon
+                    name="RotateCcw"
+                    className="w-5 h-5 sm:w-4 sm:h-4"
+                  />
                   <span className="hidden sm:inline">Retry</span>
                 </button>
               )}
@@ -350,7 +359,7 @@ export default function Story({
             <button
               onClick={() => setShowChoicesModal(true)}
               disabled={loading || !!loadingStage}
-              className={`w-full py-2.5 text-base font-semibold rounded-lg transition-all duration-150 flex items-center justify-center gap-2 ${
+              className={`w-full py-3.5 sm:py-2.5 text-base font-semibold rounded-lg transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation ${
                 loading || loadingStage
                   ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
                   : "bg-blue-600 hover:bg-blue-500 text-white"

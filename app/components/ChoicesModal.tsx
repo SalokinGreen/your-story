@@ -59,6 +59,16 @@ export default function ChoicesModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const hasSkillCheck = selectedChoice?.skill_used !== undefined;
@@ -195,14 +205,14 @@ export default function ChoicesModal({
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 text-blue-200/60 hover:text-white hover:bg-blue-900/50 rounded-lg transition-colors"
+            className="p-2.5 sm:p-2 text-blue-200/60 hover:text-white hover:bg-blue-900/50 rounded-lg transition-colors touch-manipulation"
           >
-            <DynamicIcon name="X" className="w-4 h-4" />
+            <DynamicIcon name="X" className="w-5 h-5 sm:w-4 sm:h-4" />
           </button>
         </div>
 
         {/* Choices List */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-3 space-y-2.5 sm:space-y-2">
           {choices?.choices.map((choice, index) => {
             const isSelected = selectedChoice?.text === choice.text;
             const details = getChoiceDetails(choice);
@@ -211,10 +221,10 @@ export default function ChoicesModal({
               <button
                 key={index}
                 onClick={() => onSelectChoice(choice)}
-                className={`w-full text-left p-3 rounded-lg transition-all border ${
+                className={`w-full text-left p-4 sm:p-3 rounded-lg transition-all border touch-manipulation ${
                   isSelected
                     ? "bg-blue-600/20 border-blue-500/50"
-                    : "bg-blue-900/30 border-blue-800/30 hover:border-blue-600/50"
+                    : "bg-blue-900/30 border-blue-800/30 hover:border-blue-600/50 active:bg-blue-800/40"
                 }`}
               >
                 <div className="flex items-start gap-2.5">
@@ -248,10 +258,10 @@ export default function ChoicesModal({
           {/* Custom Input Toggle */}
           <button
             onClick={() => setShowCustomInput(!showCustomInput)}
-            className={`w-full text-left p-3 rounded-lg transition-all border border-dashed ${
+            className={`w-full text-left p-4 sm:p-3 rounded-lg transition-all border border-dashed touch-manipulation ${
               showCustomInput
                 ? "bg-blue-600/10 border-blue-500/50"
-                : "bg-blue-900/20 border-blue-800/30 hover:border-blue-600/50"
+                : "bg-blue-900/20 border-blue-800/30 hover:border-blue-600/50 active:bg-blue-800/30"
             }`}
           >
             <div className="flex items-center gap-2.5">
@@ -324,7 +334,7 @@ export default function ChoicesModal({
                   ))}
                 </div>
               </div>
-              <div className="flex gap-1.5">
+              <div className="flex gap-2">
                 <button
                   onClick={() =>
                     onMomentumModeChange(
@@ -332,15 +342,15 @@ export default function ChoicesModal({
                     )
                   }
                   disabled={!canUseReroll}
-                  className={`px-2 py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1 ${
+                  className={`px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
                     momentumMode === "reroll"
                       ? "bg-yellow-500 text-white"
                       : canUseReroll
-                      ? "bg-blue-900/50 text-blue-200/70 hover:bg-yellow-500/30"
+                      ? "bg-blue-900/50 text-blue-200/70 hover:bg-yellow-500/30 active:bg-yellow-500/50"
                       : "bg-blue-950/50 text-blue-500 cursor-not-allowed"
                   }`}
                 >
-                  <DynamicIcon name="Dices" className="w-3 h-3" />
+                  <DynamicIcon name="Dices" className="w-4 h-4 sm:w-3 sm:h-3" />
                   Reroll (1)
                 </button>
                 <button
@@ -350,15 +360,15 @@ export default function ChoicesModal({
                     )
                   }
                   disabled={!canUseGuarantee}
-                  className={`px-2 py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1 ${
+                  className={`px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
                     momentumMode === "guarantee"
                       ? "bg-green-500 text-white"
                       : canUseGuarantee
-                      ? "bg-blue-900/50 text-blue-200/70 hover:bg-green-500/30"
+                      ? "bg-blue-900/50 text-blue-200/70 hover:bg-green-500/30 active:bg-green-500/50"
                       : "bg-blue-950/50 text-blue-500 cursor-not-allowed"
                   }`}
                 >
-                  <DynamicIcon name="Check" className="w-3 h-3" />
+                  <DynamicIcon name="Check" className="w-4 h-4 sm:w-3 sm:h-3" />
                   Guarantee (2)
                 </button>
               </div>
@@ -372,10 +382,10 @@ export default function ChoicesModal({
               onClose();
             }}
             disabled={!selectedChoice || loading}
-            className={`w-full py-2.5 rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-2 ${
+            className={`w-full py-3.5 sm:py-2.5 rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation ${
               !selectedChoice || loading
                 ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-500 text-white"
+                : "bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white"
             }`}
           >
             {loading ? (

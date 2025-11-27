@@ -127,9 +127,18 @@ export default function AuthForm() {
         <button
           type="submit"
           disabled={loading}
-          className="px-6 py-3 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed"
+          className="px-6 py-3.5 sm:py-3 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed flex items-center justify-center gap-2 touch-manipulation"
         >
-          {loading ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
+          {loading ? (
+            <>
+              <DynamicIcon name="Loader2" className="w-5 h-5 animate-spin" />
+              {isSignUp ? "Creating Account..." : "Signing In..."}
+            </>
+          ) : isSignUp ? (
+            "Create Account"
+          ) : (
+            "Sign In"
+          )}
         </button>
 
         {isSignUp && (

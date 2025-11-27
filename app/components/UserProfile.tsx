@@ -10,8 +10,9 @@ export default function UserProfile() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
-        Loading...
+      <div className="flex items-center justify-center gap-2 text-zinc-600 dark:text-zinc-400 p-6">
+        <DynamicIcon name="Loader2" className="w-5 h-5 animate-spin" />
+        <span className="text-sm">Loading profile...</span>
       </div>
     );
   }
@@ -38,13 +39,13 @@ export default function UserProfile() {
       <div className="flex flex-col w-full gap-2">
         <button
           onClick={() => router.push(`/profile/${user.id}`)}
-          className="w-full px-6 py-3 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+          className="w-full px-6 py-3.5 sm:py-3 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 active:from-blue-800 active:to-purple-800 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 touch-manipulation"
         >
           <DynamicIcon name="User" className="w-5 h-5" /> View Profile
         </button>
         <button
           onClick={() => router.push("/library")}
-          className="w-full px-6 py-3 bg-linear-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+          className="w-full px-6 py-3.5 sm:py-3 bg-linear-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 active:from-green-800 active:to-teal-800 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 touch-manipulation"
         >
           <DynamicIcon name="Library" className="w-5 h-5" /> My Library
         </button>
@@ -56,7 +57,7 @@ export default function UserProfile() {
         </button> */}
         <button
           onClick={signOut}
-          className="w-full px-6 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-900 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-semibold transition-colors border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center gap-2"
+          className="w-full px-6 py-3.5 sm:py-3 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 dark:bg-gray-900 dark:hover:bg-gray-600 dark:active:bg-gray-700 text-gray-900 dark:text-white rounded-lg font-semibold transition-colors border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center gap-2 touch-manipulation"
         >
           <DynamicIcon name="LogOut" className="w-5 h-5" /> Sign Out
         </button>

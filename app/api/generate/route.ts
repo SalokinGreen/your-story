@@ -16,7 +16,7 @@ import {
   deductTokens,
   getUserTokenBalance,
 } from "@/app/misc/tokens";
-import { getModelConfig } from "@/app/misc/ai_prices";
+import { getModelConfig, calculateTokenCost } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -233,13 +233,12 @@ export async function POST(req: NextRequest) {
       total_tokens: 0,
     };
 
-    // Calculate token cost
-    const inputCost =
-      (usage.prompt_tokens / 1_000_000) * modelConfig.inputPrice;
-    const outputCost =
-      (usage.completion_tokens / 1_000_000) * modelConfig.outputPrice;
-    const totalCost = inputCost + outputCost;
-    const tokenCost = Math.max(1, Math.ceil(totalCost * 100));
+    // Calculate token cost using helper (includes 50% markup, $0.001/coin)
+    const tokenCost = calculateTokenCost(
+      model,
+      usage.prompt_tokens,
+      usage.completion_tokens
+    );
 
     // Deduct tokens
     await deductTokens(user.id, tokenCost, supabase);

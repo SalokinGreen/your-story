@@ -21,7 +21,12 @@ import { useNotification } from "../misc/NotificationContext";
 import { supabase } from "../misc/supabase";
 import { compressImage } from "../misc/imageCompression";
 import CustomVoiceManager from "../components/CustomVoiceManager";
-import { AI_MODELS, MODEL_PRESETS } from "../misc/ai_prices";
+import {
+  AI_MODELS,
+  MODEL_PRESETS,
+  getPresetEstimatedCost,
+  getCustomEstimatedCost,
+} from "../misc/ai_prices";
 import ConfirmDialog from "../components/ConfirmDialog";
 import {
   getUserSettings,
@@ -298,6 +303,16 @@ function AIModelSelector({
       ? choicesModel
       : preset.choicesModel;
 
+  // Calculate dynamic estimated cost based on actual models being used
+  const estimatedCost =
+    currentPreset === "custom"
+      ? getCustomEstimatedCost(
+          effectiveStoryModel,
+          effectiveToolsModel,
+          effectiveChoicesModel
+        )
+      : getPresetEstimatedCost(currentPreset);
+
   const handlePresetChange = (newPreset: string) => {
     if (typeof window !== "undefined") {
       localStorage.setItem("aiPreset", newPreset);
@@ -334,7 +349,7 @@ function AIModelSelector({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold">~{preset.estimatedCost}</div>
+              <div className="text-2xl font-bold">~{estimatedCost}</div>
               <div className="text-xs text-purple-100">coins/gen</div>
             </div>
           </div>
@@ -362,7 +377,7 @@ function AIModelSelector({
         >
           {Object.entries(MODEL_PRESETS).map(([key, presetConfig]) => (
             <option key={key} value={key}>
-              {presetConfig.name} - ~{presetConfig.estimatedCost} coins
+              {presetConfig.name} - ~{getPresetEstimatedCost(key)} coins
             </option>
           ))}
         </select>

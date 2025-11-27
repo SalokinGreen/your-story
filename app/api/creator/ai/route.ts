@@ -8,7 +8,11 @@ import {
   deductTokens,
   getUserTokenBalance,
 } from "@/app/misc/tokens";
-import { getModelConfig, AI_MODELS } from "@/app/misc/ai_prices";
+import {
+  getModelConfig,
+  AI_MODELS,
+  calculateTokenCost,
+} from "@/app/misc/ai_prices";
 
 export const runtime = "nodejs";
 
@@ -102,17 +106,12 @@ export async function POST(req: NextRequest) {
   const estimatedInputTokens = Math.ceil(inputText.length / 4);
   const estimatedOutputTokens = 2000;
 
-  // Calculate estimated cost in USD
-  const estimatedCostUSD =
-    (estimatedInputTokens / 1000000) * (modelConfig.inputPrice || 0) +
-    (estimatedOutputTokens / 1000000) * (modelConfig.outputPrice || 0);
-
-  // Convert to coins (1 coin = 1 cent = 0.01 USD)
-  // coins = USD * 100
-  const estimatedCoins = Math.ceil(estimatedCostUSD * 100);
-  // Ensure at least 1 coin if not free (though prices might be 0 for some future models?)
-  // Let's enforce minimum 1 coin for now to prevent abuse if price is very low
-  const requiredCoins = Math.max(1, estimatedCoins);
+  // Calculate estimated cost using dynamic pricing
+  const requiredCoins = calculateTokenCost(
+    modelKey,
+    estimatedInputTokens,
+    estimatedOutputTokens
+  );
 
   const hasTokens = await hasEnoughTokens(
     user.id,
@@ -205,12 +204,12 @@ export async function POST(req: NextRequest) {
       (usage as any).completion_tokens ||
       (usage.total_tokens ? usage.total_tokens - promptTokens : 0);
 
-    const actualCostUSD =
-      (promptTokens / 1000000) * (modelConfig.inputPrice || 0) +
-      (completionTokens / 1000000) * (modelConfig.outputPrice || 0);
-
-    const actualCoins = Math.ceil(actualCostUSD * 100);
-    const coinsToDeduct = Math.max(1, actualCoins);
+    // Calculate actual cost using dynamic pricing
+    const coinsToDeduct = calculateTokenCost(
+      modelKey,
+      promptTokens,
+      completionTokens
+    );
 
     // Deduct tokens
     await deductTokens(user.id, coinsToDeduct, supabaseAdmin);

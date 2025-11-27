@@ -4713,7 +4713,7 @@ function StoryPageContent() {
 
         {/* Tab Navigation */}
         <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-2">
-          <div className="flex flex-wrap items-center justify-center gap-1">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-1">
             {[
               { state: StoryState.STORY, icon: "BookOpen", label: "Story" },
               { state: StoryState.STATS, icon: "BarChart2", label: "Stats" },
@@ -4729,13 +4729,13 @@ function StoryPageContent() {
               <button
                 key={state}
                 onClick={() => setCurrentState(state)}
-                className={`px-3 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-4 py-3 sm:px-3 sm:py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
                   currentState === state
                     ? "bg-blue-600 text-white"
-                    : "text-blue-200/70 hover:bg-blue-900/50 hover:text-white"
+                    : "text-blue-200/70 hover:bg-blue-900/50 hover:text-white active:bg-blue-800/50"
                 }`}
               >
-                <DynamicIcon name={icon} className="w-4 h-4" />
+                <DynamicIcon name={icon} className="w-5 h-5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">{label}</span>
               </button>
             ))}
