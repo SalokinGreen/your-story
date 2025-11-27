@@ -296,6 +296,7 @@ export function estimateGenerationCost(
 
 /**
  * Estimate total cost for a full 3-stage generation turn
+ * Based on typical 100k context gameplay
  * @param storyModel - Model key for story generation
  * @param toolsModel - Model key for tools stage
  * @param choicesModel - Model key for choices stage
@@ -306,12 +307,74 @@ export function estimateFullTurnCost(
   toolsModel: string,
   choicesModel: string
 ): number {
-  // Typical token usage per stage
-  const storyCost = calculateTokenCost(storyModel, 5000, 2000);
-  const toolsCost = calculateTokenCost(toolsModel, 3000, 1000);
-  const choicesCost = calculateTokenCost(choicesModel, 2000, 500);
+  // Typical token usage per stage at ~120k story context
+  // Story: ~120k input (full context + system prompt), ~1.5k output
+  // Tools: ~30k input (trimmed context), ~500 output
+  // Choices: ~20k input (trimmed context), ~300 output
+  const storyCost = calculateTokenCost(storyModel, 120000, 1500);
+  const toolsCost = calculateTokenCost(toolsModel, 30000, 500);
+  const choicesCost = calculateTokenCost(choicesModel, 20000, 300);
 
   return storyCost + toolsCost + choicesCost;
+}
+
+// Average TTS character count per generation (typical story narration)
+export const AVERAGE_TTS_CHARACTERS = 1500;
+
+/**
+ * Estimate cost for a full turn including TTS narration
+ * @param storyModel - Model key for story generation
+ * @param toolsModel - Model key for tools stage
+ * @param choicesModel - Model key for choices stage
+ * @param includeTTS - Whether to include TTS cost (default true)
+ * @returns Estimated total cost in coins
+ */
+export function estimateFullTurnWithTTS(
+  storyModel: string,
+  toolsModel: string,
+  choicesModel: string,
+  includeTTS: boolean = true
+): number {
+  const generationCost = estimateFullTurnCost(
+    storyModel,
+    toolsModel,
+    choicesModel
+  );
+  const ttsCost = includeTTS ? calculateTTSCost(AVERAGE_TTS_CHARACTERS) : 0;
+  return generationCost + ttsCost;
+}
+
+/**
+ * Get estimated costs for display purposes
+ * @param presetId - The preset ID from MODEL_PRESETS
+ * @returns Object with generation and TTS costs
+ */
+export function getPresetCostBreakdown(presetId: string): {
+  generationCost: number;
+  ttsCost: number;
+  totalWithTTS: number;
+} {
+  const preset = MODEL_PRESETS[presetId];
+  if (!preset) {
+    return {
+      generationCost: MINIMUM_COST,
+      ttsCost: MINIMUM_COST,
+      totalWithTTS: MINIMUM_COST * 2,
+    };
+  }
+
+  const generationCost = estimateFullTurnCost(
+    preset.storyModel,
+    preset.toolsModel,
+    preset.choicesModel
+  );
+  const ttsCost = calculateTTSCost(AVERAGE_TTS_CHARACTERS);
+
+  return {
+    generationCost,
+    ttsCost,
+    totalWithTTS: generationCost + ttsCost,
+  };
 }
 
 /**

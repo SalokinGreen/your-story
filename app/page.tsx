@@ -7,7 +7,11 @@ import { useAuth } from "./misc/AuthContext";
 import AuthForm from "./components/AuthForm";
 import { supabase } from "./misc/supabase";
 import { Adventure } from "./misc/structs";
-import { AI_MODELS, AIModelKey } from "./misc/ai_prices";
+import {
+  AI_MODELS,
+  AIModelKey,
+  getPresetCostBreakdown,
+} from "./misc/ai_prices";
 import { DynamicIcon } from "./components/DynamicIcon";
 import { DraggableScroll } from "./components/DraggableScroll";
 
@@ -117,7 +121,7 @@ function InfoTabs() {
   );
 
   return (
-    <div className="w-full max-w-4xl">
+    <div className="w-full max-w-4xl mx-auto">
       {/* Tab Navigation */}
       <div className="flex justify-center mb-4">
         <div className="inline-flex bg-blue-950/50 rounded-lg p-1 border border-blue-800/30 gap-1">
@@ -192,35 +196,49 @@ function InfoTabs() {
         )}
 
         {activeTab === "coins" && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {packages.map((pkg, index) => (
-              <div
-                key={pkg.name}
-                className={`bg-blue-950/50 rounded-lg p-3 border transition-colors ${
-                  index === 2
-                    ? "border-purple-500 ring-1 ring-purple-500/50"
-                    : "border-blue-800/30 hover:border-blue-600/50"
-                }`}
-              >
-                <div className="text-center">
-                  <h3 className="text-sm font-semibold text-white">
-                    {pkg.name}
-                  </h3>
-                  <div className="text-2xl font-bold text-white mt-1">
-                    ${pkg.cost}
+          <div className="space-y-4 max-w-2xl mx-auto">
+            {/* Average cost info */}
+            <div className="bg-blue-900/30 rounded-lg p-3 text-center border border-blue-700/30">
+              <p className="text-sm text-blue-200/60 mb-1">
+                Average cost per turn
+              </p>
+              <p className="text-2xl font-bold text-white">
+                ~{getPresetCostBreakdown("main").generationCost} coins
+              </p>
+              <p className="text-xs text-blue-200/40 mt-1">
+                Based on 120k context • Main preset
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {packages.map((pkg, index) => (
+                <div
+                  key={pkg.name}
+                  className={`bg-blue-950/50 rounded-lg p-3 border transition-colors ${
+                    index === 2
+                      ? "border-purple-500 ring-1 ring-purple-500/50"
+                      : "border-blue-800/30 hover:border-blue-600/50"
+                  }`}
+                >
+                  <div className="text-center">
+                    <h3 className="text-sm font-semibold text-white">
+                      {pkg.name}
+                    </h3>
+                    <div className="text-2xl font-bold text-white mt-1">
+                      ${pkg.cost}
+                    </div>
+                    <div className="text-lg text-blue-200">
+                      {pkg.coins + pkg.bonus}
+                    </div>
+                    <div className="text-xs text-blue-200/40">coins</div>
+                    {pkg.savings > 0 && (
+                      <span className="inline-block mt-2 px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded-full">
+                        Save {pkg.savings}%
+                      </span>
+                    )}
                   </div>
-                  <div className="text-lg text-blue-200">
-                    {pkg.coins + pkg.bonus}
-                  </div>
-                  <div className="text-xs text-blue-200/40">coins</div>
-                  {pkg.savings > 0 && (
-                    <span className="inline-block mt-2 px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded-full">
-                      Save {pkg.savings}%
-                    </span>
-                  )}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
