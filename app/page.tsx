@@ -104,7 +104,6 @@ const features = [
 
 // Coin packages (1 coin = $0.001)
 const packages = [
-  { name: "Starter", cost: 0.99, coins: 990, bonus: 0, savings: 0 },
   { name: "Basic", cost: 4.99, coins: 4990, bonus: 500, savings: 10 },
   { name: "Standard", cost: 9.99, coins: 9990, bonus: 1500, savings: 15 },
   { name: "Premium", cost: 19.99, coins: 19990, bonus: 4000, savings: 20 },

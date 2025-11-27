@@ -224,7 +224,7 @@ export type AIModelKey = keyof typeof AI_MODELS;
 // ============================================
 
 // Constants for cost calculation
-export const MARKUP_MULTIPLIER = 1.5; // 50% markup for service
+export const MARKUP_MULTIPLIER = 2.0; // 100% markup for service
 export const COINS_PER_DOLLAR = 1000; // 1 coin = $0.001
 export const MINIMUM_COST = 1; // Minimum 1 coin per API call
 
