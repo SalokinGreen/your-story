@@ -215,7 +215,7 @@ describe("Explosive Dice System", () => {
       const result = calculateResourceRequirements(SYSTEM_EXPLOSIVE, 12);
 
       expect(result.required).toBe(4); // 12 / 3 = 4
-      expect(result.penalty).toBe(Infinity); // 12 / 0 = Infinity (no penalties in explosive)
+      expect(result.penalty).toBe(0); // penaltyDivisor = 0 means no penalty mechanic
       expect(result.recovery).toBe(3); // 12 / 4 = 3
       expect(result.loss).toBe(4); // 12 / 3 = 4
     });
@@ -224,7 +224,7 @@ describe("Explosive Dice System", () => {
       const result = calculateResourceRequirements(SYSTEM_EXPLOSIVE, 18);
 
       expect(result.required).toBe(6); // 18 / 3 = 6
-      expect(result.penalty).toBe(Infinity); // 18 / 0 = Infinity
+      expect(result.penalty).toBe(0); // penaltyDivisor = 0 means no penalty mechanic
       expect(result.recovery).toBe(4); // 18 / 4 = 4
       expect(result.loss).toBe(6); // 18 / 3 = 6
     });
@@ -233,7 +233,7 @@ describe("Explosive Dice System", () => {
       const result = calculateResourceRequirements(SYSTEM_EXPLOSIVE, 3);
 
       expect(result.required).toBe(2); // Min 2
-      expect(result.penalty).toBe(Infinity); // 3 / 0 = Infinity
+      expect(result.penalty).toBe(0); // penaltyDivisor = 0 means no penalty mechanic
       expect(result.recovery).toBe(1); // Min 1
       expect(result.loss).toBe(2); // Min 2
     });
@@ -242,7 +242,7 @@ describe("Explosive Dice System", () => {
       const result = calculateResourceRequirements(SYSTEM_EXPLOSIVE, 30);
 
       expect(result.required).toBe(10); // 30 / 3 = 10
-      expect(result.penalty).toBe(Infinity); // 30 / 0 = Infinity
+      expect(result.penalty).toBe(0); // penaltyDivisor = 0 means no penalty mechanic
       expect(result.recovery).toBe(7); // 30 / 4 = 7
       expect(result.loss).toBe(10); // 30 / 3 = 10
     });

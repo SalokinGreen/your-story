@@ -181,32 +181,32 @@ describe("Year Zero Engine (YZE) Stress System", () => {
   });
 
   describe("calculateResourceRequirements", () => {
-    it("should return zero/infinity values (YZE has no resource requirements)", () => {
+    it("should return zero values (YZE has no resource requirements)", () => {
       const result = calculateResourceRequirements(SYSTEM_YZE, 2);
 
-      // YZE has all divisors = 0, so Math.max(0, DC/0) = Math.max(0, Infinity) = Infinity
-      expect(result.required).toBe(Infinity); // 2 / 0 = Infinity
-      expect(result.penalty).toBe(Infinity); // 2 / 0 = Infinity
-      expect(result.recovery).toBe(Infinity); // 2 / 0 = Infinity
-      expect(result.loss).toBe(Infinity); // 2 / 0 = Infinity
+      // YZE has all divisors = 0, meaning resource mechanics are disabled
+      expect(result.required).toBe(0); // No resource requirement
+      expect(result.penalty).toBe(0); // No penalty
+      expect(result.recovery).toBe(0); // No automatic recovery
+      expect(result.loss).toBe(0); // No automatic loss
     });
 
-    it("should return infinity for DC 4", () => {
+    it("should return zero for DC 4", () => {
       const result = calculateResourceRequirements(SYSTEM_YZE, 4);
 
-      expect(result.required).toBe(Infinity);
-      expect(result.penalty).toBe(Infinity);
-      expect(result.recovery).toBe(Infinity);
-      expect(result.loss).toBe(Infinity);
+      expect(result.required).toBe(0);
+      expect(result.penalty).toBe(0);
+      expect(result.recovery).toBe(0);
+      expect(result.loss).toBe(0);
     });
 
-    it("should return infinity for higher DC", () => {
+    it("should return zero for higher DC", () => {
       const result = calculateResourceRequirements(SYSTEM_YZE, 10);
 
-      expect(result.required).toBe(Infinity);
-      expect(result.penalty).toBe(Infinity);
-      expect(result.recovery).toBe(Infinity);
-      expect(result.loss).toBe(Infinity);
+      expect(result.required).toBe(0);
+      expect(result.penalty).toBe(0);
+      expect(result.recovery).toBe(0);
+      expect(result.loss).toBe(0);
     });
   });
 
