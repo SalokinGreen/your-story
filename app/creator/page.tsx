@@ -23,6 +23,10 @@ import {
   MythicCharacter,
   CustomTable,
   StartingChoice,
+  Variable,
+  NumberVariable,
+  BooleanVariable,
+  ListVariable,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
@@ -59,6 +63,7 @@ type CreatorStep =
   | "quests"
   | "plot"
   | "mythic"
+  | "variables"
   | "tables"
   | "upgrades"
   | "preview";
@@ -83,6 +88,406 @@ function getChaosDescription(chaos: number): string {
   if (chaos <= 5) return "Standard chaos level";
   if (chaos <= 7) return "Unexpected twists likely";
   return "Anything can happen!";
+}
+
+// Variable Editor Card Component
+function VariableEditorCard({
+  variable,
+  onChange,
+  onDelete,
+}: {
+  variable: Variable;
+  onChange: (variable: Variable) => void;
+  onDelete: () => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState<Variable>({ ...variable });
+  const [newListItem, setNewListItem] = useState("");
+
+  const getIcon = () => {
+    switch (variable.type) {
+      case "number":
+        return "Hash";
+      case "boolean":
+        return "ToggleLeft";
+      case "list":
+        return "List";
+      default:
+        return "Variable";
+    }
+  };
+
+  const getColorClasses = () => {
+    switch (variable.type) {
+      case "number":
+        return {
+          bg: "bg-cyan-900/20",
+          border: "border-cyan-800",
+          text: "text-cyan-400",
+          badge: "bg-cyan-500/20 text-cyan-300",
+        };
+      case "boolean":
+        return {
+          bg: "bg-emerald-900/20",
+          border: "border-emerald-800",
+          text: "text-emerald-400",
+          badge: "bg-emerald-500/20 text-emerald-300",
+        };
+      case "list":
+        return {
+          bg: "bg-violet-900/20",
+          border: "border-violet-800",
+          text: "text-violet-400",
+          badge: "bg-violet-500/20 text-violet-300",
+        };
+      default:
+        return {
+          bg: "bg-blue-900/20",
+          border: "border-blue-800",
+          text: "text-blue-400",
+          badge: "bg-blue-500/20 text-blue-300",
+        };
+    }
+  };
+
+  const colors = getColorClasses();
+
+  const handleSave = () => {
+    onChange(editData);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditData({ ...variable });
+    setIsEditing(false);
+    setNewListItem("");
+  };
+
+  const addListItem = () => {
+    if (editData.type === "list" && newListItem.trim()) {
+      const listVar = editData as ListVariable;
+      if (listVar.maxSize && listVar.items.length >= listVar.maxSize) {
+        return;
+      }
+      setEditData({
+        ...editData,
+        items: [...listVar.items, newListItem.trim()],
+      } as ListVariable);
+      setNewListItem("");
+    }
+  };
+
+  const removeListItem = (itemIndex: number) => {
+    if (editData.type === "list") {
+      const listVar = editData as ListVariable;
+      setEditData({
+        ...editData,
+        items: listVar.items.filter((_, i) => i !== itemIndex),
+      } as ListVariable);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className={`p-4 rounded-lg ${colors.bg} border-2 ${colors.border}`}>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <DynamicIcon
+              name={getIcon()}
+              className={`w-5 h-5 ${colors.text}`}
+            />
+            <span className="text-xs uppercase tracking-wider text-gray-400 font-semibold">
+              {variable.type} Variable
+            </span>
+          </div>
+
+          <input
+            type="text"
+            value={editData.name}
+            onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+            placeholder="Variable name"
+            className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white font-semibold"
+          />
+
+          <textarea
+            value={editData.description}
+            onChange={(e) =>
+              setEditData({ ...editData, description: e.target.value })
+            }
+            placeholder="Description (optional)"
+            className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+            rows={2}
+          />
+
+          {/* Type-specific fields */}
+          {editData.type === "number" && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-blue-200 mb-1">
+                  Default Value
+                </label>
+                <input
+                  type="number"
+                  value={(editData as NumberVariable).value}
+                  onChange={(e) =>
+                    setEditData({
+                      ...editData,
+                      value: parseFloat(e.target.value) || 0,
+                    } as NumberVariable)
+                  }
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Min Value (optional)
+                  </label>
+                  <input
+                    type="number"
+                    value={(editData as NumberVariable).minValue ?? ""}
+                    onChange={(e) =>
+                      setEditData({
+                        ...editData,
+                        minValue:
+                          e.target.value === ""
+                            ? undefined
+                            : parseFloat(e.target.value),
+                      } as NumberVariable)
+                    }
+                    placeholder="No minimum"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Max Value (optional)
+                  </label>
+                  <input
+                    type="number"
+                    value={(editData as NumberVariable).maxValue ?? ""}
+                    onChange={(e) =>
+                      setEditData({
+                        ...editData,
+                        maxValue:
+                          e.target.value === ""
+                            ? undefined
+                            : parseFloat(e.target.value),
+                      } as NumberVariable)
+                    }
+                    placeholder="No maximum"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {editData.type === "boolean" && (
+            <div>
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
+                Default Value
+              </label>
+              <button
+                onClick={() =>
+                  setEditData({
+                    ...editData,
+                    value: !(editData as BooleanVariable).value,
+                  } as BooleanVariable)
+                }
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  (editData as BooleanVariable).value
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                    : "bg-red-600 hover:bg-red-700 text-white"
+                }`}
+              >
+                {(editData as BooleanVariable).value ? "TRUE" : "FALSE"}
+              </button>
+            </div>
+          )}
+
+          {editData.type === "list" && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-blue-200 mb-1">
+                  Max Size (optional)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={(editData as ListVariable).maxSize ?? ""}
+                  onChange={(e) =>
+                    setEditData({
+                      ...editData,
+                      maxSize:
+                        e.target.value === ""
+                          ? undefined
+                          : parseInt(e.target.value),
+                    } as ListVariable)
+                  }
+                  placeholder="No limit"
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-blue-200 mb-1">
+                  Default Items ({(editData as ListVariable).items.length}
+                  {(editData as ListVariable).maxSize &&
+                    ` / ${(editData as ListVariable).maxSize}`}
+                  )
+                </label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={newListItem}
+                    onChange={(e) => setNewListItem(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addListItem();
+                      }
+                    }}
+                    placeholder="Add item..."
+                    className="flex-1 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  />
+                  <button
+                    onClick={addListItem}
+                    disabled={!newListItem.trim()}
+                    className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-600 text-white rounded"
+                  >
+                    <DynamicIcon name="Plus" className="w-4 h-4" />
+                  </button>
+                </div>
+                {(editData as ListVariable).items.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {(editData as ListVariable).items.map((item, itemIndex) => (
+                      <span
+                        key={itemIndex}
+                        className="px-2 py-1 bg-violet-500/30 text-violet-200 rounded flex items-center gap-1"
+                      >
+                        {item}
+                        <button
+                          onClick={() => removeListItem(itemIndex)}
+                          className="hover:text-red-400"
+                        >
+                          <DynamicIcon name="X" className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={handleSave}
+              disabled={!editData.name}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded"
+            >
+              <DynamicIcon name="Save" className="inline-block w-4 h-4 mr-1" />
+              Save
+            </button>
+            <button
+              onClick={handleCancel}
+              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Display mode
+  return (
+    <div
+      className={`flex items-start gap-3 p-4 rounded-lg ${colors.bg} border ${colors.border}`}
+    >
+      <div className="shrink-0">
+        <DynamicIcon name={getIcon()} className={`w-8 h-8 ${colors.text}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-bold text-white flex items-center gap-2 flex-wrap mb-1">
+          <span>{variable.name}</span>
+          {variable.type === "number" && (
+            <span
+              className={`text-sm px-2 py-0.5 rounded-full ${colors.badge}`}
+            >
+              {(variable as NumberVariable).value}
+            </span>
+          )}
+          {variable.type === "boolean" && (
+            <span
+              className={`text-sm px-2 py-0.5 rounded-full ${
+                (variable as BooleanVariable).value
+                  ? "bg-emerald-500/20 text-emerald-300"
+                  : "bg-red-500/20 text-red-300"
+              }`}
+            >
+              {(variable as BooleanVariable).value ? "TRUE" : "FALSE"}
+            </span>
+          )}
+          {variable.type === "list" && (
+            <span
+              className={`text-sm px-2 py-0.5 rounded-full ${colors.badge}`}
+            >
+              {(variable as ListVariable).items.length} items
+              {(variable as ListVariable).maxSize &&
+                ` / ${(variable as ListVariable).maxSize} max`}
+            </span>
+          )}
+        </div>
+        {variable.description && (
+          <p className="text-sm text-gray-400 mb-2">{variable.description}</p>
+        )}
+        {/* Show number range if defined */}
+        {variable.type === "number" &&
+          ((variable as NumberVariable).minValue !== undefined ||
+            (variable as NumberVariable).maxValue !== undefined) && (
+            <p className="text-xs text-gray-500">
+              Range: {(variable as NumberVariable).minValue ?? "-∞"} to{" "}
+              {(variable as NumberVariable).maxValue ?? "∞"}
+            </p>
+          )}
+        {/* Show list items preview */}
+        {variable.type === "list" &&
+          (variable as ListVariable).items.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {(variable as ListVariable).items.slice(0, 5).map((item, i) => (
+                <span
+                  key={i}
+                  className="px-2 py-0.5 text-xs rounded bg-violet-500/20 text-violet-300"
+                >
+                  {item}
+                </span>
+              ))}
+              {(variable as ListVariable).items.length > 5 && (
+                <span className="px-2 py-0.5 text-xs rounded bg-violet-500/10 text-violet-400">
+                  +{(variable as ListVariable).items.length - 5} more
+                </span>
+              )}
+            </div>
+          )}
+      </div>
+      <div className="flex gap-2 shrink-0">
+        <button
+          onClick={() => setIsEditing(true)}
+          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
+        >
+          <DynamicIcon name="Edit" className="w-4 h-4" />
+        </button>
+        <button
+          onClick={onDelete}
+          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
+        >
+          <DynamicIcon name="Trash2" className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function AdventureCreatorContent() {
@@ -735,6 +1140,7 @@ function AdventureCreatorContent() {
         setAchievements(template.achievements || []);
         setQuests(template.quests || []);
         setCustomTables(template.customTables || []);
+        setVariables(template.variables || []);
         setUpgradeSettings(
           template.upgradeSettings || DEFAULT_UPGRADE_SETTINGS
         );
@@ -813,6 +1219,7 @@ function AdventureCreatorContent() {
             if (Array.isArray(saved.quests)) setQuests(saved.quests);
             if (Array.isArray(saved.customTables))
               setCustomTables(saved.customTables);
+            if (Array.isArray(saved.variables)) setVariables(saved.variables);
             if (saved.upgradeSettings)
               setUpgradeSettings(saved.upgradeSettings);
             if (saved.mythicEnabled !== undefined)
@@ -1088,6 +1495,9 @@ function AdventureCreatorContent() {
   );
   const [editTable, setEditTable] = useState<Partial<CustomTable>>({});
 
+  // Variables
+  const [variables, setVariables] = useState<Variable[]>([]);
+
   // Local draft persistence (separate keys for new vs edit mode)
   const draftKey = editAdventureId
     ? `your-story:creator-draft:${editAdventureId}`
@@ -1130,6 +1540,7 @@ function AdventureCreatorContent() {
     { id: "relationships", label: "Relationships", icon: "Users" },
     { id: "achievements", label: "Achievements", icon: "Trophy" },
     { id: "quests", label: "Quests", icon: "ClipboardList" },
+    { id: "variables", label: "Variables", icon: "Variable" },
     { id: "tables", label: "Custom Tables", icon: "Dices" },
     { id: "plot", label: "Plot Beats", icon: "Clapperboard" },
     { id: "mythic", label: "Mythic GME", icon: "Sparkles" },
@@ -1188,6 +1599,7 @@ function AdventureCreatorContent() {
       if (Array.isArray(saved.quests)) setQuests(saved.quests);
       if (Array.isArray(saved.customTables))
         setCustomTables(saved.customTables);
+      if (Array.isArray(saved.variables)) setVariables(saved.variables);
       if (saved.upgradeSettings) setUpgradeSettings(saved.upgradeSettings);
       if (saved.mythicEnabled !== undefined)
         setMythicEnabled(saved.mythicEnabled);
@@ -1261,6 +1673,7 @@ function AdventureCreatorContent() {
       achievements,
       quests,
       customTables,
+      variables,
       upgradeSettings,
       mythicEnabled,
       mythicState,
@@ -1308,6 +1721,7 @@ function AdventureCreatorContent() {
     achievements,
     quests,
     customTables,
+    variables,
     mythicEnabled,
     mythicState,
     upgradeSettings,
@@ -2079,6 +2493,7 @@ function AdventureCreatorContent() {
       relationships,
       quests,
       customTables,
+      variables,
       earnedPointsFromQuests: [],
       momentum,
       maxMomentum,
@@ -2244,6 +2659,7 @@ function AdventureCreatorContent() {
         relationships,
         quests,
         customTables,
+        variables,
         earnedPointsFromQuests: [],
         momentum,
         maxMomentum,
@@ -2380,6 +2796,7 @@ function AdventureCreatorContent() {
       relationships,
       quests,
       customTables,
+      variables,
       earnedPointsFromQuests: [],
       momentum,
       maxMomentum,
@@ -8284,6 +8701,110 @@ function AdventureCreatorContent() {
                     </div>
                   )
                 )
+              )}
+            </div>
+          </div>
+        );
+
+      case "variables":
+        return (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 rounded-lg bg-linear-to-r from-cyan-500/10 to-transparent border-l-4 border-cyan-500">
+              <div>
+                <h3 className="text-xl font-bold text-cyan-400 flex items-center gap-2">
+                  <DynamicIcon name="Variable" className="w-6 h-6" />
+                  Variables
+                </h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  Track custom values: numbers, flags, and lists
+                </p>
+              </div>
+            </div>
+
+            {/* Add Variable Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  const newVar: NumberVariable = {
+                    id: crypto.randomUUID(),
+                    name: "New Number",
+                    description: "",
+                    type: "number",
+                    value: 0,
+                  };
+                  setVariables([...variables, newVar]);
+                }}
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg flex items-center gap-2"
+              >
+                <DynamicIcon name="Hash" className="w-4 h-4" />
+                Add Number
+              </button>
+              <button
+                onClick={() => {
+                  const newVar: BooleanVariable = {
+                    id: crypto.randomUUID(),
+                    name: "New Flag",
+                    description: "",
+                    type: "boolean",
+                    value: false,
+                  };
+                  setVariables([...variables, newVar]);
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2"
+              >
+                <DynamicIcon name="ToggleLeft" className="w-4 h-4" />
+                Add Boolean
+              </button>
+              <button
+                onClick={() => {
+                  const newVar: ListVariable = {
+                    id: crypto.randomUUID(),
+                    name: "New List",
+                    description: "",
+                    type: "list",
+                    items: [],
+                  };
+                  setVariables([...variables, newVar]);
+                }}
+                className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg flex items-center gap-2"
+              >
+                <DynamicIcon name="List" className="w-4 h-4" />
+                Add List
+              </button>
+            </div>
+
+            {/* Variables List */}
+            <div className="space-y-4">
+              {variables.map((variable, index) => (
+                <VariableEditorCard
+                  key={variable.id}
+                  variable={variable}
+                  onChange={(updated) => {
+                    const newVars = [...variables];
+                    newVars[index] = updated;
+                    setVariables(newVars);
+                  }}
+                  onDelete={() => {
+                    setVariables(variables.filter((_, i) => i !== index));
+                  }}
+                />
+              ))}
+
+              {variables.length === 0 && (
+                <div className="p-8 text-center rounded-lg bg-blue-900/30 border-2 border-dashed border-blue-700/40">
+                  <DynamicIcon
+                    name="Variable"
+                    className="w-12 h-12 mx-auto mb-3 text-blue-400/50"
+                  />
+                  <p className="text-lg font-semibold text-blue-300/70 mb-2">
+                    No variables yet
+                  </p>
+                  <p className="text-sm text-blue-400/50">
+                    Variables let you track custom values like counters, flags,
+                    or lists of items that the AI can reference and modify.
+                  </p>
+                </div>
               )}
             </div>
           </div>

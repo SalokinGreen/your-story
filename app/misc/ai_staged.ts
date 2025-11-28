@@ -211,6 +211,29 @@ ${
           .join("\n")}`
       : "";
 
+  // Build variables section if any exist
+  const variablesSection =
+    storyData.variables && storyData.variables.length > 0
+      ? `Variables (track state with set_variable, modify_variable, toggle_variable, add_to_list, remove_from_list, clear_list):\n${storyData.variables
+          .map((v) => {
+            if (v.type === "number") {
+              const bounds =
+                v.minValue !== undefined || v.maxValue !== undefined
+                  ? ` [${v.minValue ?? "∞"}..${v.maxValue ?? "∞"}]`
+                  : "";
+              return `- ${v.name} (number): ${v.value}${bounds}${v.description ? ` - ${v.description}` : ""}`;
+            } else if (v.type === "boolean") {
+              return `- ${v.name} (boolean): ${v.value}${v.description ? ` - ${v.description}` : ""}`;
+            } else {
+              // list type
+              const items = v.items.length ? v.items.join(", ") : "(empty)";
+              const maxSize = v.maxSize ? ` [max ${v.maxSize}]` : "";
+              return `- ${v.name} (list${maxSize}): ${items}${v.description ? ` - ${v.description}` : ""}`;
+            }
+          })
+          .join("\n")}`
+      : "";
+
   // Combine all sections
   const sections = [
     `Story: ${cleanString(storyData.story_name || "Untitled Story")}`,
@@ -233,6 +256,7 @@ ${
     relationshipsSection,
     conditionsSection,
     questsSection,
+    variablesSection,
     mythicSection,
     customTablesSection,
     storyData.author_notes

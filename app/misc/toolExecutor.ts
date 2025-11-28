@@ -11,6 +11,10 @@ import {
   MythicThread,
   MythicCharacter,
   Condition,
+  Variable,
+  NumberVariable,
+  BooleanVariable,
+  ListVariable,
 } from "@/app/misc/structs";
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
@@ -28,6 +32,70 @@ export interface ToolCall {
     name: string;
     arguments: string | Record<string, any>;
   };
+}
+
+/**
+ * Parse dice notation (e.g., "2d6+3", "-1d8+2", "3d6-5") and return the rolled value
+ * Returns null if the string is not valid dice notation
+ */
+function parseDiceNotation(
+  input: string | number
+): { value: number; notation: string } | null {
+  // If it's already a number, return it directly
+  if (typeof input === "number") {
+    return { value: input, notation: input.toString() };
+  }
+
+  // Check if it's a plain number string
+  const plainNum = parseFloat(input);
+  if (!isNaN(plainNum) && /^[+-]?\d+(\.\d+)?$/.test(input.trim())) {
+    return { value: plainNum, notation: input };
+  }
+
+  // Dice notation regex: optional sign, optional count, d, sides, optional modifier
+  // Examples: 1d6, 2d8+3, -1d8, d20-2, +3d6+5
+  const diceRegex = /^([+-])?(\d*)d(\d+)([+-]\d+)?$/i;
+  const match = input.trim().match(diceRegex);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, sign, countStr, sidesStr, modifierStr] = match;
+  const negative = sign === "-";
+  const count = countStr ? parseInt(countStr) : 1;
+  const sides = parseInt(sidesStr);
+  const modifier = modifierStr ? parseInt(modifierStr) : 0;
+
+  // Validate dice parameters
+  if (count < 1 || count > 100 || sides < 2 || sides > 1000) {
+    return null;
+  }
+
+  // Roll the dice
+  let total = 0;
+  const rolls: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const roll = Math.floor(Math.random() * sides) + 1;
+    rolls.push(roll);
+    total += roll;
+  }
+
+  // Apply modifier
+  total += modifier;
+
+  // Apply negative sign if present
+  if (negative) {
+    total = -total;
+  }
+
+  // Build notation string for display
+  const rollsStr = rolls.join("+");
+  const modStr =
+    modifier > 0 ? `+${modifier}` : modifier < 0 ? modifier.toString() : "";
+  const notation = `${negative ? "-" : ""}(${rollsStr}${modStr}) = ${total}`;
+
+  return { value: total, notation };
 }
 
 /**
@@ -163,6 +231,30 @@ export function executeTools(
           success: true,
           message: successMsg,
           timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for variable management tools
+      if (
+        [
+          "set_variable",
+          "modify_variable",
+          "toggle_variable",
+          "add_to_list",
+          "remove_from_list",
+          "clear_list",
+        ].includes(toolCall.function.name)
+      ) {
+        const variableResult = executeVariableTool(
+          toolCall.function.name,
+          args,
+          storyData,
+          toolId
+        );
+        responses.push({
+          ...variableResult,
           toolCallId: toolCall.id,
         });
         continue;
@@ -1662,8 +1754,372 @@ function convertToolToCommand(
     case "add_memory":
       return null; // Signal to handle directly
 
+    // Variable Management - handled directly in executeTools
+    case "set_variable":
+    case "modify_variable":
+    case "toggle_variable":
+    case "add_to_list":
+    case "remove_from_list":
+    case "clear_list":
+      return null; // Signal to handle directly
+
     default:
       throw new Error(`Unhandled tool: ${toolName}`);
+  }
+}
+
+/**
+ * Execute variable management tools
+ * Returns CommandResponse for the operation
+ */
+function executeVariableTool(
+  toolName: string,
+  args: Record<string, any>,
+  storyData: StoryData,
+  toolId: string
+): Omit<CommandResponse, "toolCallId"> {
+  // Initialize variables array if not present
+  if (!storyData.variables) {
+    storyData.variables = [];
+  }
+
+  // Find variable by name with fuzzy matching
+  const findVariable = (
+    name: string
+  ): { variable: Variable; index: number } | null => {
+    const match = findBestMatch(name, storyData.variables!, (v) => v.name, 0.6);
+    if (!match) return null;
+    const index = storyData.variables!.findIndex((v) => v.name === match.name);
+    if (index === -1) return null;
+    return { variable: storyData.variables![index], index };
+  };
+
+  switch (toolName) {
+    case "set_variable": {
+      const found = findVariable(args.name);
+      if (!found) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Variable "${args.name}" not found`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const { variable, index } = found;
+
+      if (variable.type === "list") {
+        return {
+          command: toolName,
+          success: false,
+          message: `Cannot set list variable "${variable.name}" directly. Use add_to_list, remove_from_list, or clear_list instead.`,
+          timestamp: Date.now(),
+        };
+      }
+
+      if (variable.type === "boolean") {
+        const newValue =
+          typeof args.value === "boolean"
+            ? args.value
+            : args.value === "true" || args.value === true;
+        (storyData.variables![index] as BooleanVariable).value = newValue;
+        logger.action(`Set boolean variable: ${variable.name} = ${newValue}`, {
+          toolId,
+        });
+        return {
+          command: toolName,
+          success: true,
+          message: `Set ${variable.name} to ${newValue}`,
+          timestamp: Date.now(),
+        };
+      }
+
+      // Number variable - support dice notation
+      const parsed = parseDiceNotation(args.value);
+      if (!parsed) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Invalid value "${args.value}" - must be a number or dice notation (e.g., "2d6+3")`,
+          timestamp: Date.now(),
+        };
+      }
+
+      let finalValue = parsed.value;
+      const numVar = variable as NumberVariable;
+
+      // Clamp to min/max if defined
+      if (numVar.minValue !== undefined && finalValue < numVar.minValue) {
+        finalValue = numVar.minValue;
+      }
+      if (numVar.maxValue !== undefined && finalValue > numVar.maxValue) {
+        finalValue = numVar.maxValue;
+      }
+
+      (storyData.variables![index] as NumberVariable).value = finalValue;
+      const notation =
+        typeof args.value === "string" && args.value.includes("d")
+          ? ` [${parsed.notation}]`
+          : "";
+      logger.action(
+        `Set number variable: ${variable.name} = ${finalValue}${notation}`,
+        { toolId }
+      );
+      return {
+        command: toolName,
+        success: true,
+        message: `Set ${variable.name} to ${finalValue}${notation}`,
+        timestamp: Date.now(),
+      };
+    }
+
+    case "modify_variable": {
+      const found = findVariable(args.name);
+      if (!found) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Variable "${args.name}" not found`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const { variable, index } = found;
+
+      if (variable.type !== "number") {
+        return {
+          command: toolName,
+          success: false,
+          message: `Cannot modify ${variable.type} variable "${variable.name}". modify_variable only works on number variables.`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const parsed = parseDiceNotation(args.amount);
+      if (!parsed) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Invalid amount "${args.amount}" - must be a number or dice notation (e.g., "-1d8+2")`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const numVar = storyData.variables![index] as NumberVariable;
+      const oldValue = numVar.value;
+      let newValue = oldValue + parsed.value;
+
+      // Clamp to min/max if defined
+      if (numVar.minValue !== undefined && newValue < numVar.minValue) {
+        newValue = numVar.minValue;
+      }
+      if (numVar.maxValue !== undefined && newValue > numVar.maxValue) {
+        newValue = numVar.maxValue;
+      }
+
+      numVar.value = newValue;
+      const delta =
+        parsed.value >= 0 ? `+${parsed.value}` : parsed.value.toString();
+      const notation =
+        typeof args.amount === "string" && args.amount.includes("d")
+          ? ` [${parsed.notation}]`
+          : "";
+      logger.action(
+        `Modified variable: ${variable.name} ${delta}${notation} (${oldValue} → ${newValue})`,
+        { toolId }
+      );
+      return {
+        command: toolName,
+        success: true,
+        message: `${variable.name}: ${oldValue} ${delta}${notation} → ${newValue}`,
+        timestamp: Date.now(),
+      };
+    }
+
+    case "toggle_variable": {
+      const found = findVariable(args.name);
+      if (!found) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Variable "${args.name}" not found`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const { variable, index } = found;
+
+      if (variable.type !== "boolean") {
+        return {
+          command: toolName,
+          success: false,
+          message: `Cannot toggle ${variable.type} variable "${variable.name}". toggle_variable only works on boolean variables.`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const boolVar = storyData.variables![index] as BooleanVariable;
+      const oldValue = boolVar.value;
+      boolVar.value = !oldValue;
+      logger.action(
+        `Toggled variable: ${variable.name} ${oldValue} → ${boolVar.value}`,
+        { toolId }
+      );
+      return {
+        command: toolName,
+        success: true,
+        message: `Toggled ${variable.name}: ${oldValue} → ${boolVar.value}`,
+        timestamp: Date.now(),
+      };
+    }
+
+    case "add_to_list": {
+      const found = findVariable(args.name);
+      if (!found) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Variable "${args.name}" not found`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const { variable, index } = found;
+
+      if (variable.type !== "list") {
+        return {
+          command: toolName,
+          success: false,
+          message: `Cannot add to ${variable.type} variable "${variable.name}". add_to_list only works on list variables.`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const listVar = storyData.variables![index] as ListVariable;
+
+      // Check maxSize
+      if (
+        listVar.maxSize !== undefined &&
+        listVar.items.length >= listVar.maxSize
+      ) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Cannot add to ${variable.name}: list is at maximum size (${listVar.maxSize})`,
+          timestamp: Date.now(),
+        };
+      }
+
+      listVar.items.push(args.item);
+      logger.action(`Added to list: ${variable.name} += "${args.item}"`, {
+        toolId,
+      });
+      return {
+        command: toolName,
+        success: true,
+        message: `Added "${args.item}" to ${variable.name} (${listVar.items.length} items)`,
+        timestamp: Date.now(),
+      };
+    }
+
+    case "remove_from_list": {
+      const found = findVariable(args.name);
+      if (!found) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Variable "${args.name}" not found`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const { variable, index } = found;
+
+      if (variable.type !== "list") {
+        return {
+          command: toolName,
+          success: false,
+          message: `Cannot remove from ${variable.type} variable "${variable.name}". remove_from_list only works on list variables.`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const listVar = storyData.variables![index] as ListVariable;
+
+      // Find item with fuzzy matching
+      const itemMatchResult = findBestMatch(
+        args.item,
+        listVar.items,
+        (item) => item,
+        0.6
+      );
+      if (!itemMatchResult) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Item "${args.item}" not found in ${variable.name}`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const matchedItem = itemMatchResult.item;
+      const itemIndex = listVar.items.indexOf(matchedItem);
+      listVar.items.splice(itemIndex, 1);
+      logger.action(`Removed from list: ${variable.name} -= "${matchedItem}"`, {
+        toolId,
+      });
+      return {
+        command: toolName,
+        success: true,
+        message: `Removed "${matchedItem}" from ${variable.name} (${listVar.items.length} items remaining)`,
+        timestamp: Date.now(),
+      };
+    }
+
+    case "clear_list": {
+      const found = findVariable(args.name);
+      if (!found) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Variable "${args.name}" not found`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const { variable, index } = found;
+
+      if (variable.type !== "list") {
+        return {
+          command: toolName,
+          success: false,
+          message: `Cannot clear ${variable.type} variable "${variable.name}". clear_list only works on list variables.`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const listVar = storyData.variables![index] as ListVariable;
+      const oldCount = listVar.items.length;
+      listVar.items = [];
+      logger.action(
+        `Cleared list: ${variable.name} (${oldCount} items removed)`,
+        { toolId }
+      );
+      return {
+        command: toolName,
+        success: true,
+        message: `Cleared ${variable.name} (${oldCount} items removed)`,
+        timestamp: Date.now(),
+      };
+    }
+
+    default:
+      return {
+        command: toolName,
+        success: false,
+        message: `Unknown variable tool: ${toolName}`,
+        timestamp: Date.now(),
+      };
   }
 }
 

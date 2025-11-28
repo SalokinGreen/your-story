@@ -1,6 +1,14 @@
 "use client";
 
-import { StoryData, UPGRADE_COSTS, Condition } from "../misc/structs";
+import {
+  StoryData,
+  UPGRADE_COSTS,
+  Condition,
+  Variable,
+  NumberVariable,
+  BooleanVariable,
+  ListVariable,
+} from "../misc/structs";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { useState } from "react";
 import { getRPGSystem } from "../misc/rpgSystems";
@@ -11,7 +19,8 @@ type StatsTab =
   | "inventory"
   | "achievements"
   | "quests"
-  | "relationships";
+  | "relationships"
+  | "variables";
 
 export default function StatsPage(storyData: StoryData) {
   const [activeTab, setActiveTab] = useState<StatsTab>(() => {
@@ -76,6 +85,9 @@ export default function StatsPage(storyData: StoryData) {
             { id: "achievements", label: "Badges", icon: "Trophy" },
             { id: "quests", label: "Quests", icon: "Scroll" },
             { id: "relationships", label: "NPCs", icon: "Users" },
+            ...(storyData.variables && storyData.variables.length > 0
+              ? [{ id: "variables", label: "Variables", icon: "Variable" }]
+              : []),
           ].map((tab) => (
             <button
               key={tab.id}
@@ -697,6 +709,176 @@ export default function StatsPage(storyData: StoryData) {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+          {/* Variables Tab */}
+          {activeTab === "variables" &&
+            storyData.variables &&
+            storyData.variables.length > 0 && (
+              <div>
+                <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
+                  <DynamicIcon
+                    name="Variable"
+                    className="w-5 h-5 text-cyan-400"
+                  />
+                  Variables
+                </h3>
+                <div className="space-y-2">
+                  {storyData.variables.map((variable) => {
+                    const getIcon = () => {
+                      switch (variable.type) {
+                        case "number":
+                          return "Hash";
+                        case "boolean":
+                          return "ToggleLeft";
+                        case "list":
+                          return "List";
+                        default:
+                          return "Variable";
+                      }
+                    };
+
+                    const getColorClass = () => {
+                      switch (variable.type) {
+                        case "number":
+                          return "bg-cyan-500/10 border-cyan-500/30 text-cyan-400";
+                        case "boolean":
+                          return "bg-emerald-500/10 border-emerald-500/30 text-emerald-400";
+                        case "list":
+                          return "bg-violet-500/10 border-violet-500/30 text-violet-400";
+                        default:
+                          return "bg-blue-500/10 border-blue-500/30 text-blue-400";
+                      }
+                    };
+
+                    const colorParts = getColorClass().split(" ");
+
+                    return (
+                      <div
+                        key={variable.id}
+                        className={`flex flex-row items-start gap-3 p-3 rounded-lg border ${colorParts
+                          .slice(0, 2)
+                          .join(" ")}`}
+                      >
+                        <div className="shrink-0">
+                          <DynamicIcon
+                            name={getIcon()}
+                            className={`w-6 h-6 ${colorParts[2]}`}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-row items-center justify-between mb-1 gap-2">
+                            <span className="font-medium text-sm text-white">
+                              {variable.name}
+                            </span>
+                            {/* Value display */}
+                            {variable.type === "number" && (
+                              <span className="font-bold text-sm text-cyan-400">
+                                {(variable as NumberVariable).value}
+                              </span>
+                            )}
+                            {variable.type === "boolean" && (
+                              <span
+                                className={`font-bold text-xs px-2 py-0.5 rounded ${
+                                  (variable as BooleanVariable).value
+                                    ? "bg-emerald-500/20 text-emerald-400"
+                                    : "bg-red-500/20 text-red-400"
+                                }`}
+                              >
+                                {(variable as BooleanVariable).value
+                                  ? "TRUE"
+                                  : "FALSE"}
+                              </span>
+                            )}
+                            {variable.type === "list" && (
+                              <span className="font-bold text-xs text-violet-400">
+                                {(variable as ListVariable).items.length} items
+                                {(variable as ListVariable).maxSize &&
+                                  ` / ${
+                                    (variable as ListVariable).maxSize
+                                  } max`}
+                              </span>
+                            )}
+                          </div>
+                          {variable.description && (
+                            <p className="text-xs text-blue-200/60">
+                              {variable.description}
+                            </p>
+                          )}
+                          {/* Number range display */}
+                          {variable.type === "number" &&
+                            ((variable as NumberVariable).minValue !==
+                              undefined ||
+                              (variable as NumberVariable).maxValue !==
+                                undefined) && (
+                              <div className="mt-2">
+                                {(variable as NumberVariable).minValue !==
+                                  undefined &&
+                                  (variable as NumberVariable).maxValue !==
+                                    undefined && (
+                                    <>
+                                      <div className="flex justify-between text-xs text-blue-200/40 mb-1">
+                                        <span>
+                                          {
+                                            (variable as NumberVariable)
+                                              .minValue
+                                          }
+                                        </span>
+                                        <span>
+                                          {
+                                            (variable as NumberVariable)
+                                              .maxValue
+                                          }
+                                        </span>
+                                      </div>
+                                      <div className="w-full bg-blue-900/50 rounded-full h-1.5">
+                                        <div
+                                          className="bg-linear-to-r from-cyan-400 to-cyan-500 h-1.5 rounded-full transition-all duration-300"
+                                          style={{
+                                            width: `${Math.min(
+                                              Math.max(
+                                                (((variable as NumberVariable)
+                                                  .value -
+                                                  (variable as NumberVariable)
+                                                    .minValue!) /
+                                                  ((variable as NumberVariable)
+                                                    .maxValue! -
+                                                    (variable as NumberVariable)
+                                                      .minValue!)) *
+                                                  100,
+                                                0
+                                              ),
+                                              100
+                                            )}%`,
+                                          }}
+                                        />
+                                      </div>
+                                    </>
+                                  )}
+                              </div>
+                            )}
+                          {/* List items display */}
+                          {variable.type === "list" &&
+                            (variable as ListVariable).items.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {(variable as ListVariable).items.map(
+                                  (item, index) => (
+                                    <span
+                                      key={index}
+                                      className="px-2 py-0.5 text-xs rounded bg-violet-500/20 text-violet-300"
+                                    >
+                                      {item}
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

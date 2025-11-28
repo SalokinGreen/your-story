@@ -991,6 +991,151 @@ const gameOverTool: ToolSchema = {
   },
 };
 
+// Variable Management Tools
+const setVariableTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "set_variable",
+    description:
+      "Set a variable to a specific value. For numbers, supports dice notation (e.g., '3d6+5'). For booleans, set true/false. Cannot be used on list variables.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Variable name (fuzzy matching supported)",
+        },
+        value: {
+          oneOf: [
+            { type: "number" },
+            { type: "boolean" },
+            {
+              type: "string",
+              description: "Dice notation like '2d6+3' for numbers",
+            },
+          ],
+          description: "Value to set: number, boolean, or dice notation string",
+        },
+      },
+      required: ["name", "value"],
+    },
+  },
+};
+
+const modifyVariableTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "modify_variable",
+    description:
+      "Modify a number variable by adding/subtracting. Supports dice notation (e.g., '-1d8+2' for damage, '+2d6' for healing). Only works on number variables.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Variable name (fuzzy matching supported)",
+        },
+        amount: {
+          oneOf: [
+            { type: "number" },
+            {
+              type: "string",
+              description: "Dice notation like '-1d8+2' or '+2d6'",
+            },
+          ],
+          description:
+            "Amount to add/subtract: number or dice notation (negative for subtraction)",
+        },
+      },
+      required: ["name", "amount"],
+    },
+  },
+};
+
+const toggleVariableTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "toggle_variable",
+    description:
+      "Toggle a boolean variable between true and false. Only works on boolean variables.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Variable name (fuzzy matching supported)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
+const addToListTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "add_to_list",
+    description:
+      "Add an item to a list variable. Respects maxSize if defined. Only works on list variables.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "List variable name (fuzzy matching supported)",
+        },
+        item: {
+          type: "string",
+          description: "Item to add to the list",
+        },
+      },
+      required: ["name", "item"],
+    },
+  },
+};
+
+const removeFromListTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "remove_from_list",
+    description:
+      "Remove an item from a list variable. Uses fuzzy matching to find the item. Only works on list variables.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "List variable name (fuzzy matching supported)",
+        },
+        item: {
+          type: "string",
+          description: "Item to remove (fuzzy matching supported)",
+        },
+      },
+      required: ["name", "item"],
+    },
+  },
+};
+
+const clearListTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "clear_list",
+    description:
+      "Remove all items from a list variable. Only works on list variables.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "List variable name (fuzzy matching supported)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
 // Export all tools as array
 export const TOOL_SCHEMAS: ToolSchema[] = [
   // Quest Management (5 tools)
@@ -1053,6 +1198,14 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   removeConditionTool,
   modifyConditionTool,
   gameOverTool,
+
+  // Variable Management (6 tools)
+  setVariableTool,
+  modifyVariableTool,
+  toggleVariableTool,
+  addToListTool,
+  removeFromListTool,
+  clearListTool,
 
   // Mythic GME (9 tools)
   ...MYTHIC_TOOLS,

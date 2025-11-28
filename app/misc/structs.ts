@@ -174,6 +174,7 @@ export interface Preset {
   inventory: InventoryItem[];
   relationships: Relationship[];
   conditions?: Condition[]; // Starting conditions/afflictions for this preset
+  variables?: Variable[]; // Starting variables for this preset
   authorNotes: string;
 }
 
@@ -189,6 +190,35 @@ export interface CustomTable {
   description: string; // What this table is for
   entries: CustomTableEntry[]; // Array of possible results
 }
+
+// Variables system - dynamic named values the AI and player can track
+export type VariableType = "number" | "boolean" | "list";
+
+export interface VariableBase {
+  id: string; // Unique identifier
+  name: string; // Display name (e.g., "Days Until Festival")
+  description: string; // What this variable tracks
+}
+
+export interface NumberVariable extends VariableBase {
+  type: "number";
+  value: number;
+  minValue?: number; // Optional minimum (e.g., 0)
+  maxValue?: number; // Optional maximum (e.g., 100)
+}
+
+export interface BooleanVariable extends VariableBase {
+  type: "boolean";
+  value: boolean;
+}
+
+export interface ListVariable extends VariableBase {
+  type: "list";
+  items: string[]; // Array of items
+  maxSize?: number; // Optional maximum list size
+}
+
+export type Variable = NumberVariable | BooleanVariable | ListVariable;
 
 export interface StoryData {
   story_name: string;
@@ -239,6 +269,7 @@ export interface StoryData {
   maxStress?: number; // YZE: Maximum stress (default 10)
   mythicState?: MythicState; // Mythic GME state (chaos factor, threads, characters)
   customTables?: CustomTable[]; // Creator-defined random tables
+  variables?: Variable[]; // Dynamic tracked variables (numbers, booleans, lists)
   starting_choices?: StartingChoice[]; // Optional custom starting choices from adventure
 }
 
