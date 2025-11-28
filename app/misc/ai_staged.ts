@@ -790,6 +790,21 @@ ${
         .join("\n")}`
     : ""
 }
+${
+  storyData.mythicState
+    ? `
+MYTHIC GME (for mythic_check):
+Use mythic_check for yes/no questions about the world that skill checks can't answer.
+Format: "question (likelihood)" where likelihood is one of:
+Impossible, No Way, Very Unlikely, Unlikely, 50/50, Somewhat Likely, Likely, Very Likely, Near Sure Thing, A Sure Thing, Has To Be
+
+Current Chaos Factor: ${storyData.mythicState.chaosFactor}/9
+
+Good uses: "Is the door locked? (50/50)", "Is someone watching? (Likely)", "Are there guards nearby? (Somewhat Likely)"
+Bad uses: Don't use mythic_check to determine success of skill-based actions - that's what skill_used is for.
+If skill_used is set, only use mythic_check for CONTEXT questions that don't override the skill result.`
+    : ""
+}
 
 DC GUIDELINES (${rpgSystem.name}):
 ${rpgSystem.aiInstructions.dcGuidelines}

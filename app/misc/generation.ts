@@ -658,6 +658,12 @@ export async function analyzeAction(
 
   const prompt = buildActionAnalysisPrompt({ storyData, userAction });
 
+  // Log the context being sent to AI for debugging
+  console.log("[analyzeAction] System prompt sent to AI:");
+  console.log(prompt.messages[0].content);
+  console.log("\n[analyzeAction] User message sent to AI:");
+  console.log(prompt.messages[1].content);
+
   const response = await fetch("/api/generate", {
     method: "POST",
     headers: {
@@ -680,6 +686,10 @@ export async function analyzeAction(
   const data = await response.json();
   const content = data.content;
   const meta = data.meta;
+
+  // Log raw AI response
+  console.log("\n[analyzeAction] Raw AI response:");
+  console.log(content);
 
   // Parse JSON from response
   let analysis: ActionAnalysis;
@@ -803,6 +813,15 @@ export async function analyzeAction(
     analysis,
     validationWarnings,
   });
+
+  // Log final parsed analysis
+  console.log(
+    "\n[analyzeAction] Parsed analysis:",
+    JSON.stringify(analysis, null, 2)
+  );
+  if (validationWarnings.length > 0) {
+    console.log("[analyzeAction] Validation warnings:", validationWarnings);
+  }
 
   return {
     analysis,

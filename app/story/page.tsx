@@ -3556,7 +3556,7 @@ function StoryPageContent() {
     if (choiceDetails.length > 0) {
       text = choiceDetails.join("\n") + "\n";
     }
-    text += ">" + choices.choices[key].text;
+    text += ">" + choice.text;
     console.log("Final choice text:", text);
     //Resetmomentummodeafteruse
     setMomentumMode("none");
