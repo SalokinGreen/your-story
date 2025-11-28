@@ -430,8 +430,8 @@ ${
     { role: "user", content: cleanString(infoMessage) },
   ];
 
-  // Add last 10 scene parts for context (INCLUDING PAST TOOL CALLS)
-  const recentParts = storyData.scene.parts.slice(-10);
+  // Add last 20 scene parts for context (INCLUDING PAST TOOL CALLS)
+  const recentParts = storyData.scene.parts.slice(-20);
   for (const part of recentParts) {
     if (part.user) {
       messages.push({

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Choice, Choices, StoryData, ActionAnalysis } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
 import {
@@ -64,6 +64,20 @@ export default function ChoicesModal({
   const [builderPlain, setBuilderPlain] = useState(true);
 
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+
+  // Ref for auto-focusing textarea in action mode
+  const actionTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-focus textarea when action mode opens
+  useEffect(() => {
+    if (isOpen && actionMode && actionTextareaRef.current) {
+      // Small delay to ensure modal is rendered and keyboard can open
+      const timer = setTimeout(() => {
+        actionTextareaRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, actionMode]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -373,7 +387,13 @@ export default function ChoicesModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      className={`fixed inset-0 z-50 flex justify-center ${
+        actionMode
+          ? "items-start pt-4 sm:items-center sm:pt-0"
+          : "items-center"
+      }`}
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -431,6 +451,7 @@ export default function ChoicesModal({
               {/* Action Input */}
               <div className="space-y-2">
                 <textarea
+                  ref={actionTextareaRef}
                   value={actionText}
                   onChange={(e) => {
                     setActionText(e.target.value);

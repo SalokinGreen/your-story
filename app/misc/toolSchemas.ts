@@ -481,7 +481,8 @@ const createLoreTool: ToolSchema = {
         },
         on: {
           type: "boolean",
-          description: "Whether lore is initially visible (default: false if triggers provided, true otherwise)",
+          description:
+            "Whether lore is initially visible (default: false if triggers provided, true otherwise)",
         },
         onTriggers: {
           type: "array",
