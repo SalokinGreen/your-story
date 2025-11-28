@@ -1,6 +1,6 @@
 "use client";
 
-import { StoryData, UPGRADE_COSTS } from "../misc/structs";
+import { StoryData, UPGRADE_COSTS, Condition } from "../misc/structs";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { useState } from "react";
 import { getRPGSystem } from "../misc/rpgSystems";
@@ -210,6 +210,95 @@ export default function StatsPage(storyData: StoryData) {
                   );
                 })}
               </div>
+
+              {/* Conditions Section - within Stats tab */}
+              {storyData.conditions && storyData.conditions.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
+                    <DynamicIcon
+                      name="AlertTriangle"
+                      className="w-5 h-5 text-red-400"
+                    />
+                    Active Conditions
+                  </h3>
+                  <div className="space-y-2">
+                    {storyData.conditions.map((condition: Condition) => {
+                      const tierLabels = ["I", "II", "III", "IV", "V", "VI"];
+                      const tierColors = [
+                        "bg-yellow-500/10 border-yellow-500/30 text-yellow-400",
+                        "bg-orange-500/10 border-orange-500/30 text-orange-400",
+                        "bg-red-500/10 border-red-500/30 text-red-400",
+                        "bg-red-600/10 border-red-600/30 text-red-500",
+                        "bg-purple-500/10 border-purple-500/30 text-purple-400",
+                        "bg-gray-500/10 border-gray-500/30 text-gray-400",
+                      ];
+                      const tierIndex = Math.min(
+                        Math.max(condition.tier - 1, 0),
+                        5
+                      );
+                      const colorClass = tierColors[tierIndex];
+
+                      return (
+                        <div
+                          key={condition.id}
+                          className={`flex flex-row items-start gap-3 p-3 rounded-lg border ${colorClass
+                            .split(" ")
+                            .slice(0, 2)
+                            .join(" ")}`}
+                        >
+                          <div className="shrink-0">
+                            <DynamicIcon
+                              name={
+                                condition.tier >= 5
+                                  ? "Skull"
+                                  : condition.tier >= 3
+                                  ? "HeartCrack"
+                                  : "Activity"
+                              }
+                              className={`w-6 h-6 ${colorClass.split(" ")[2]}`}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-row items-center justify-between mb-1 gap-2">
+                              <span className="font-medium text-sm text-white">
+                                {condition.name}
+                              </span>
+                              <span
+                                className={`font-bold text-xs px-1.5 py-0.5 rounded ${colorClass
+                                  .split(" ")
+                                  .slice(0, 2)
+                                  .join(" ")} ${colorClass.split(" ")[2]}`}
+                              >
+                                Tier {tierLabels[tierIndex]}
+                                {condition.permanent && " (Permanent)"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-blue-200/60">
+                              {condition.description}
+                            </p>
+                            {/* Affected stats */}
+                            {condition.affectsAll ? (
+                              <p className="text-xs text-red-400/70 mt-1">
+                                ⚠️ Affects all skill checks
+                              </p>
+                            ) : condition.affects &&
+                              condition.affects.length > 0 ? (
+                              <p className="text-xs text-orange-400/70 mt-1">
+                                Affects: {condition.affects.join(", ")}
+                              </p>
+                            ) : null}
+                            {condition.source && (
+                              <p className="text-xs text-blue-200/40 mt-1 italic">
+                                Source: {condition.source}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

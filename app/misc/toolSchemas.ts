@@ -802,6 +802,193 @@ const addMemoryTool: ToolSchema = {
   },
 };
 
+// Condition Management Tools
+const addConditionTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "add_condition",
+    description:
+      "Inflict a condition/affliction on the character. Conditions impose penalties on skill checks based on their tier. Tier VI is permanent (often results in game over). Choose appropriate tier based on severity: I (minor inconvenience), II (noticeable hindrance), III (significant impairment), IV (severe debilitation), V (critical injury), VI (permanent disability).",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description:
+            "Condition name (e.g., 'Broken Arm', 'Poisoned', 'Exhausted', 'Blinded', 'Cursed')",
+        },
+        tier: {
+          type: "number",
+          enum: [1, 2, 3, 4, 5, 6],
+          description:
+            "Severity tier (1-6). Higher tiers impose greater penalties. Tier 6 is permanent.",
+        },
+        description: {
+          type: "string",
+          description: "Description of the condition and its narrative effects",
+        },
+        affects: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "List of stat names this condition affects (e.g., ['Strength', 'Acrobatics']). Use affectsAll for conditions affecting all checks.",
+        },
+        affectsAll: {
+          type: "boolean",
+          description:
+            "If true, this condition affects ALL skill checks regardless of stat (optional, default: false)",
+        },
+        source: {
+          type: "string",
+          description:
+            "What caused this condition (e.g., 'Dragon fire breath', 'Fell from cliff')",
+        },
+      },
+      required: ["name", "tier", "description", "affects"],
+    },
+  },
+};
+
+const upgradeConditionTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "upgrade_condition",
+    description:
+      "Worsen a condition by increasing its tier. Use when a condition becomes more severe due to neglect, failed treatment, or story events. Cannot go above tier 6.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Condition name (fuzzy matching supported)",
+        },
+        tiers: {
+          type: "number",
+          description: "Number of tiers to increase (default: 1)",
+          minimum: 1,
+        },
+        description: {
+          type: "string",
+          description:
+            "Updated description reflecting worsened state (optional)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
+const downgradeConditionTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "downgrade_condition",
+    description:
+      "Improve a condition by decreasing its tier. Use when healing, treatment, or recovery occurs. If tier reaches 0, the condition is removed. Tier 6 (permanent) conditions cannot be downgraded.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Condition name (fuzzy matching supported)",
+        },
+        tiers: {
+          type: "number",
+          description: "Number of tiers to decrease (default: 1)",
+          minimum: 1,
+        },
+        description: {
+          type: "string",
+          description:
+            "Updated description reflecting improved state (optional)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
+const removeConditionTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "remove_condition",
+    description:
+      "Completely remove a condition (full recovery or cure). Tier 6 (permanent) conditions cannot be removed without extraordinary circumstances (e.g., divine intervention, powerful magic).",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Condition name (fuzzy matching supported)",
+        },
+        force: {
+          type: "boolean",
+          description:
+            "Force removal of permanent (tier 6) condition due to extraordinary circumstances (default: false)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
+const modifyConditionTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "modify_condition",
+    description:
+      "Update a condition's affected stats or description without changing tier",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Condition name (fuzzy matching supported)",
+        },
+        description: {
+          type: "string",
+          description: "New description (optional)",
+        },
+        affects: {
+          type: "array",
+          items: { type: "string" },
+          description: "New list of affected stats (optional)",
+        },
+        affectsAll: {
+          type: "boolean",
+          description: "New value for affectsAll flag (optional)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
+// Game Over Tool
+const gameOverTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "game_over",
+    description:
+      "End the game due to character death or permanent incapacitation. Use when a tier 6 condition narratively prevents the character from continuing, or when the story reaches a definitive fatal end. This is a major decision - only use when there is no reasonable way to continue.",
+    parameters: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description:
+            "Narrative reason for game over (e.g., 'Succumbed to wounds', 'Permanent blindness makes adventuring impossible')",
+        },
+        condition: {
+          type: "string",
+          description:
+            "Name of the tier 6 condition causing game over (if applicable)",
+        },
+      },
+      required: ["reason"],
+    },
+  },
+};
+
 // Export all tools as array
 export const TOOL_SCHEMAS: ToolSchema[] = [
   // Quest Management (5 tools)
@@ -856,6 +1043,14 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
 
   // Memory (1 tool)
   addMemoryTool,
+
+  // Conditions (6 tools)
+  addConditionTool,
+  upgradeConditionTool,
+  downgradeConditionTool,
+  removeConditionTool,
+  modifyConditionTool,
+  gameOverTool,
 
   // Mythic GME (9 tools)
   ...MYTHIC_TOOLS,

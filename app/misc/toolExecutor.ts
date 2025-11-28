@@ -10,6 +10,7 @@ import {
   CommandResponse,
   MythicThread,
   MythicCharacter,
+  Condition,
 } from "@/app/misc/structs";
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
@@ -18,6 +19,7 @@ import {
   applyChaosAdjustment,
   getChaosAdjustmentReason,
 } from "@/app/misc/mythicChaos";
+import { findBestMatch } from "@/app/misc/fuzzyMatch";
 
 export interface ToolCall {
   id?: string;
@@ -832,6 +834,572 @@ export function executeTools(
           command: `/increment_scene: ${oldCount} → ${oldCount + 1}`,
           success: true,
           message,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // === CONDITION MANAGEMENT TOOL HANDLERS ===
+
+      // Add condition
+      if (toolCall.function.name === "add_condition") {
+        const name = args.name?.trim();
+        const tier = args.tier as 1 | 2 | 3 | 4 | 5 | 6;
+        const description = args.description?.trim();
+        const affects = args.affects || [];
+        const affectsAll = args.affectsAll || false;
+        const source = args.source?.trim() || undefined;
+
+        if (!name || name.length < 2) {
+          const errorMsg = "Condition name must be at least 2 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_condition: ${name || ""}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!tier || tier < 1 || tier > 6) {
+          const errorMsg = "Condition tier must be between 1 and 6";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_condition: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!description || description.length < 5) {
+          const errorMsg =
+            "Condition description must be at least 5 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_condition: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Initialize conditions array if needed
+        if (!storyData.conditions) {
+          storyData.conditions = [];
+        }
+
+        // Check for duplicate condition name
+        const existing = storyData.conditions.find(
+          (c) => c.name.toLowerCase() === name.toLowerCase()
+        );
+        if (existing) {
+          const errorMsg = `Condition "${name}" already exists at tier ${existing.tier}`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_condition: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const newCondition: Condition = {
+          id: crypto.randomUUID(),
+          name,
+          tier,
+          description,
+          affects: affectsAll ? [] : affects,
+          affectsAll,
+          source,
+          permanent: tier === 6,
+          createdAt: Date.now(),
+        };
+
+        storyData.conditions.push(newCondition);
+
+        const tierLabel = ["I", "II", "III", "IV", "V", "VI"][tier - 1];
+        const affectsLabel = affectsAll
+          ? "all checks"
+          : affects.length > 0
+          ? affects.join(", ")
+          : "unspecified";
+
+        logger.action("Condition added via tool", {
+          toolCallId: toolId,
+          name,
+          tier,
+          affectsAll,
+          affects,
+        });
+        responses.push({
+          command: `/add_condition: ${name} (Tier ${tierLabel})`,
+          success: true,
+          message: `✓ Inflicted ${
+            tier === 6 ? "PERMANENT " : ""
+          }condition: ${name} (Tier ${tierLabel}) - affects ${affectsLabel}`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Upgrade condition (increase tier)
+      if (toolCall.function.name === "upgrade_condition") {
+        const name = args.name?.trim();
+        const tiers = args.tiers || 1;
+        const newDescription = args.description?.trim();
+
+        if (!storyData.conditions || storyData.conditions.length === 0) {
+          const errorMsg = "No conditions to upgrade";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/upgrade_condition: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const match = findBestMatch(
+          name,
+          storyData.conditions,
+          (c) => c.name,
+          0.6
+        );
+        if (!match) {
+          const errorMsg = `Condition not found: "${name}"`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/upgrade_condition: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const condition = match.item;
+        const oldTier = condition.tier;
+
+        if (condition.tier >= 6) {
+          const errorMsg = `Condition "${condition.name}" is already at maximum tier (VI)`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/upgrade_condition: ${condition.name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const newTier = Math.min(6, condition.tier + tiers) as
+          | 1
+          | 2
+          | 3
+          | 4
+          | 5
+          | 6;
+        condition.tier = newTier;
+        if (newTier === 6) {
+          condition.permanent = true;
+        }
+        if (newDescription) {
+          condition.description = newDescription;
+        }
+
+        const oldTierLabel = ["I", "II", "III", "IV", "V", "VI"][oldTier - 1];
+        const newTierLabel = ["I", "II", "III", "IV", "V", "VI"][newTier - 1];
+
+        logger.action("Condition upgraded via tool", {
+          toolCallId: toolId,
+          name: condition.name,
+          oldTier,
+          newTier,
+        });
+        responses.push({
+          command: `/upgrade_condition: ${condition.name} (Tier ${oldTierLabel} → ${newTierLabel})`,
+          success: true,
+          message: `✓ ${
+            condition.name
+          } worsened: Tier ${oldTierLabel} → ${newTierLabel}${
+            newTier === 6 ? " (PERMANENT)" : ""
+          }`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Downgrade condition (decrease tier)
+      if (toolCall.function.name === "downgrade_condition") {
+        const name = args.name?.trim();
+        const tiers = args.tiers || 1;
+        const newDescription = args.description?.trim();
+
+        if (!storyData.conditions || storyData.conditions.length === 0) {
+          const errorMsg = "No conditions to downgrade";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/downgrade_condition: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const match = findBestMatch(
+          name,
+          storyData.conditions,
+          (c) => c.name,
+          0.6
+        );
+        if (!match) {
+          const errorMsg = `Condition not found: "${name}"`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/downgrade_condition: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const condition = match.item;
+        const oldTier = condition.tier;
+
+        if (condition.permanent || condition.tier === 6) {
+          const errorMsg = `Condition "${condition.name}" is permanent and cannot be downgraded`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/downgrade_condition: ${condition.name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const newTier = condition.tier - tiers;
+
+        if (newTier <= 0) {
+          // Remove condition entirely
+          storyData.conditions = storyData.conditions.filter(
+            (c) => c.id !== condition.id
+          );
+
+          const oldTierLabel = ["I", "II", "III", "IV", "V", "VI"][oldTier - 1];
+
+          logger.action("Condition removed via downgrade", {
+            toolCallId: toolId,
+            name: condition.name,
+            oldTier,
+          });
+          responses.push({
+            command: `/downgrade_condition: ${condition.name} (Tier ${oldTierLabel} → Removed)`,
+            success: true,
+            message: `✓ ${condition.name} fully recovered - condition removed`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        condition.tier = newTier as 1 | 2 | 3 | 4 | 5 | 6;
+        if (newDescription) {
+          condition.description = newDescription;
+        }
+
+        const oldTierLabel = ["I", "II", "III", "IV", "V", "VI"][oldTier - 1];
+        const newTierLabel = ["I", "II", "III", "IV", "V", "VI"][newTier - 1];
+
+        logger.action("Condition downgraded via tool", {
+          toolCallId: toolId,
+          name: condition.name,
+          oldTier,
+          newTier,
+        });
+        responses.push({
+          command: `/downgrade_condition: ${condition.name} (Tier ${oldTierLabel} → ${newTierLabel})`,
+          success: true,
+          message: `✓ ${condition.name} improved: Tier ${oldTierLabel} → ${newTierLabel}`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Remove condition
+      if (toolCall.function.name === "remove_condition") {
+        const name = args.name?.trim();
+        const force = args.force || false;
+
+        if (!storyData.conditions || storyData.conditions.length === 0) {
+          const errorMsg = "No conditions to remove";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/remove_condition: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const match = findBestMatch(
+          name,
+          storyData.conditions,
+          (c) => c.name,
+          0.6
+        );
+        if (!match) {
+          const errorMsg = `Condition not found: "${name}"`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/remove_condition: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const condition = match.item;
+
+        if ((condition.permanent || condition.tier === 6) && !force) {
+          const errorMsg = `Condition "${condition.name}" is permanent. Use force=true for extraordinary circumstances.`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/remove_condition: ${condition.name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        storyData.conditions = storyData.conditions.filter(
+          (c) => c.id !== condition.id
+        );
+
+        const tierLabel = ["I", "II", "III", "IV", "V", "VI"][
+          condition.tier - 1
+        ];
+
+        logger.action("Condition removed via tool", {
+          toolCallId: toolId,
+          name: condition.name,
+          tier: condition.tier,
+          forced: force,
+        });
+        responses.push({
+          command: `/remove_condition: ${condition.name}`,
+          success: true,
+          message: `✓ ${
+            condition.permanent && force
+              ? "Miraculously cured permanent "
+              : "Removed "
+          }condition: ${condition.name} (was Tier ${tierLabel})`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Modify condition
+      if (toolCall.function.name === "modify_condition") {
+        const name = args.name?.trim();
+        const newDescription = args.description?.trim();
+        const newAffects = args.affects;
+        const newAffectsAll = args.affectsAll;
+
+        if (!storyData.conditions || storyData.conditions.length === 0) {
+          const errorMsg = "No conditions to modify";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/modify_condition: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const match = findBestMatch(
+          name,
+          storyData.conditions,
+          (c) => c.name,
+          0.6
+        );
+        if (!match) {
+          const errorMsg = `Condition not found: "${name}"`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/modify_condition: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const condition = match.item;
+        const changes: string[] = [];
+
+        if (newDescription) {
+          condition.description = newDescription;
+          changes.push("description");
+        }
+        if (newAffects !== undefined) {
+          condition.affects = newAffects;
+          changes.push("affected stats");
+        }
+        if (newAffectsAll !== undefined) {
+          condition.affectsAll = newAffectsAll;
+          changes.push("affectsAll");
+        }
+
+        if (changes.length === 0) {
+          const errorMsg = "No changes specified";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/modify_condition: ${condition.name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        logger.action("Condition modified via tool", {
+          toolCallId: toolId,
+          name: condition.name,
+          changes,
+        });
+        responses.push({
+          command: `/modify_condition: ${condition.name}`,
+          success: true,
+          message: `✓ Updated condition "${condition.name}": ${changes.join(
+            ", "
+          )}`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Game over
+      if (toolCall.function.name === "game_over") {
+        const reason = args.reason?.trim();
+        const conditionName = args.condition?.trim();
+
+        if (!reason || reason.length < 10) {
+          const errorMsg = "Game over reason must be at least 10 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/game_over`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Mark story as game over
+        storyData.gameOver = {
+          reason,
+          condition: conditionName,
+          timestamp: Date.now(),
+        };
+
+        logger.action("Game over triggered via tool", {
+          toolCallId: toolId,
+          reason,
+          condition: conditionName,
+        });
+        responses.push({
+          command: `/game_over: ${reason}`,
+          success: true,
+          message: `⚠️ GAME OVER: ${reason}${
+            conditionName ? ` (due to ${conditionName})` : ""
+          }`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });

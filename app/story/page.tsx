@@ -16,6 +16,7 @@ import {
   rollDice,
   checkSuccess,
   calculateResourceRequirements,
+  getConditionPenalty,
 } from "../misc/rpgSystems";
 import {
   askFate,
@@ -1353,6 +1354,8 @@ function StoryPageContent() {
     stressRelief?: boolean; // YZE: strong success (-1 stress)
     explosions?: number; // Explosive: number of explosions
     dieSize?: number; // Explosive: die size (d4-d20)
+    conditionAutoFail?: boolean; // Condition caused auto-fail
+    conditionName?: string; // Name of condition that caused auto-fail
   } | null>(null);
 
   // YZE: Stress dice selection state
@@ -2946,490 +2949,643 @@ function StoryPageContent() {
       // If skill not found, treat as if player has 1 stat point in it
       const statValue = matchResult?.item.value ?? 1;
 
-      // For YZE: Roll dice NOW using stat value
-      // For Explosive: Roll dice NOW using stat value to determine die size
-      if (rpgSystem.id === "yze") {
-        const baseDiceCount = Math.floor(statValue / 20); // 0-5 base dice from stat
-        const stressDiceCount = yzeStressDiceChoice; // Use player's choice
-        const totalDiceCount = baseDiceCount + stressDiceCount;
+      // Check for applicable conditions and apply penalties
+      let conditionPenaltyModifier = 0;
+      let conditionAutoFail = false;
+      let conditionGameOver = false;
+      let appliedCondition: {
+        name: string;
+        tier: number;
+        penaltyType: string;
+      } | null = null;
 
-        // Roll all dice (base + stress)
-        const rolls: number[] = [];
-        for (let i = 0; i < totalDiceCount; i++) {
-          rolls.push(Math.floor(Math.random() * 6) + 1);
+      if (storyData.conditions && storyData.conditions.length > 0) {
+        // Find the most severe applicable condition
+        // Priority: affectsAll conditions, then conditions that affect this specific skill
+        const skillNameLower = (
+          matchResult?.name || choice.skill_used
+        ).toLowerCase();
+
+        const applicableConditions = storyData.conditions.filter((c) => {
+          if (c.affectsAll) return true;
+          return c.affects.some((a) => a.toLowerCase() === skillNameLower);
+        });
+
+        if (applicableConditions.length > 0) {
+          // Find highest tier condition
+          const highestTierCondition = applicableConditions.reduce((max, c) =>
+            c.tier > max.tier ? c : max
+          );
+
+          const penalty = getConditionPenalty(
+            storyData.rpgSystem,
+            highestTierCondition.tier
+          );
+
+          appliedCondition = {
+            name: highestTierCondition.name,
+            tier: highestTierCondition.tier,
+            penaltyType: penalty.type,
+          };
+
+          const tierLabel = ["I", "II", "III", "IV", "V", "VI"][
+            highestTierCondition.tier - 1
+          ];
+
+          switch (penalty.type) {
+            case "modifier":
+              conditionPenaltyModifier = penalty.value;
+              disadvantageCount++;
+              disadvantageSources.push(
+                `${highestTierCondition.name} (Tier ${tierLabel})`
+              );
+              addNotification(
+                `?? Condition penalty: ${highestTierCondition.name} (Tier ${tierLabel}) ? ${penalty.value} to roll`,
+                "warning"
+              );
+              break;
+            case "auto-fail":
+            case "auto-miss":
+            case "taken-out":
+              conditionAutoFail = true;
+              addNotification(
+                `?? Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Auto-fail!`,
+                "failure"
+              );
+              break;
+            case "game-over":
+              conditionGameOver = true;
+              addNotification(
+                `?? PERMANENT CONDITION: ${highestTierCondition.name} (Tier ${tierLabel}) ? The story may end here.`,
+                "failure"
+              );
+              break;
+            case "die-size-down":
+              // For explosive system: reduce die size
+              // This is handled specially in the explosive dice section
+              disadvantageCount += penalty.value; // Each step down counts as disadvantage
+              disadvantageSources.push(
+                `${highestTierCondition.name} (Tier ${tierLabel})`
+              );
+              addNotification(
+                `?? Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Die size reduced by ${penalty.value}`,
+                "warning"
+              );
+              break;
+            case "d4-only":
+              // For explosive system: force d4
+              disadvantageCount += 4; // Severe penalty
+              disadvantageSources.push(
+                `${highestTierCondition.name} (Tier ${tierLabel})`
+              );
+              addNotification(
+                `?? Severe Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Forced to use d4!`,
+                "failure"
+              );
+              break;
+            case "none":
+              // No mechanical effect (narrative system)
+              break;
+          }
+
+          logger.action("Condition penalty applied", {
+            condition: highestTierCondition.name,
+            tier: highestTierCondition.tier,
+            penaltyType: penalty.type,
+            penaltyValue: penalty.value,
+            skill: choice.skill_used,
+          });
+        }
+      }
+
+      // Handle auto-fail from conditions
+      if (conditionAutoFail) {
+        skillCheckResult = "failure";
+
+        // Show dice visualizer with auto-fail
+        setDiceRoll({
+          show: true,
+          rolls: [0],
+          finalRoll: 0,
+          skillName: choice.skill_used,
+          skillBonus: statValue,
+          dc: choice.skill_dc || 0,
+          isSuccess: false,
+          isCritical: false,
+          hasAdvantage: false,
+          hasDisadvantage: true,
+          advantageCount: 0,
+          disadvantageCount: 1,
+          netAdvantage: -1,
+          advantageSources: "",
+          disadvantageSources: appliedCondition?.name || "Condition",
+          diceRolls: [[0]],
+          rpgSystem: storyData.rpgSystem || "3d6",
+          conditionAutoFail: true,
+          conditionName: appliedCondition?.name,
+        });
+
+        // Skip normal dice rolling and success calculation
+        // Continue to choice details generation
+      } else if (conditionGameOver) {
+        // Game over condition - still roll but mark as game over potential
+        skillCheckResult = "failure";
+
+        // Don't trigger game_over immediately - let the AI decide based on the narrative
+        // The tool stage will handle game_over if appropriate
+      }
+
+      // Skip dice rolling if condition auto-fail
+      if (!conditionAutoFail) {
+        // For YZE: Roll dice NOW using stat value
+        // For Explosive: Roll dice NOW using stat value to determine die size
+        if (rpgSystem.id === "yze") {
+          const baseDiceCount = Math.floor(statValue / 20); // 0-5 base dice from stat
+          const stressDiceCount = yzeStressDiceChoice; // Use player's choice
+          const totalDiceCount = baseDiceCount + stressDiceCount;
+
+          // Roll all dice (base + stress)
+          const rolls: number[] = [];
+          for (let i = 0; i < totalDiceCount; i++) {
+            rolls.push(Math.floor(Math.random() * 6) + 1);
+          }
+
+          // Add stress to character
+          if (stressDiceCount > 0) {
+            const currentStress = storyData.stress || 0;
+            storyData.stress = Math.min(10, currentStress + stressDiceCount);
+            addNotification(
+              `Added ${stressDiceCount} stress dice (+${stressDiceCount} stress ? ${storyData.stress}/10)`,
+              "warning"
+            );
+          }
+
+          logger.action("YZE dice roll", {
+            system: "yze",
+            baseDice: baseDiceCount,
+            stressDice: stressDiceCount,
+            rolls,
+            stat: statValue,
+          });
+
+          // Ensure dice visualizer gets the actual dice rolled for YZE
+          if (Array.isArray(allDiceDetails) && allDiceDetails.length > 0) {
+            allDiceDetails[0] = rolls;
+          }
+
+          diceResult = { rolls, total: 0 }; // Total doesn't matter for YZE
+          dice_roll = 0; // Not used for YZE
+
+          // Reset YZE state
+          setYzeAwaitingStressChoice(false);
+          setYzePendingChoice(null);
+        } else if (rpgSystem.id === "explosive") {
+          // Explosive dice: Determine die size from stat
+          const dieSize = rpgSystem.statToDieSize
+            ? rpgSystem.statToDieSize(statValue)
+            : 20;
+          yzeData.dieSize = dieSize;
+
+          // Check if we have item advantage
+          const hasItemForAdvantage =
+            choice.item_used &&
+            storyData.inventory.find((i) => i.name === choice.item_used);
+          const itemType = hasItemForAdvantage
+            ? hasItemForAdvantage.type || "normal"
+            : null;
+          const hasAdvantage =
+            hasItemForAdvantage && itemType && itemType !== "misc";
+          const hasDisadvantage = choice.item_used && !hasItemForAdvantage;
+
+          // Roll initial die with explosions
+          diceResult = rollDice(rpgSystem, dieSize);
+          dice_roll = diceResult.total;
+          explosionCount = diceResult.explosions || 0;
+
+          logger.action("Explosive dice roll", {
+            system: "explosive",
+            dieSize,
+            rolls: diceResult.rolls,
+            total: dice_roll,
+            explosions: explosionCount,
+            stat: statValue,
+          });
+
+          // Handle advantage (roll second die, take higher)
+          if (hasAdvantage) {
+            const secondResult = rollDice(rpgSystem, dieSize);
+            const second_roll = secondResult.total;
+            allDiceRolls.push(dice_roll, second_roll);
+            allDiceDetails.push(diceResult.rolls, secondResult.rolls);
+
+            logger.action("Explosive advantage roll from item", {
+              item: choice.item_used,
+              firstRoll: dice_roll,
+              firstExplosions: explosionCount,
+              secondRoll: second_roll,
+              secondExplosions: secondResult.explosions || 0,
+            });
+
+            if (second_roll > dice_roll) {
+              dice_roll = second_roll;
+              explosionCount = secondResult.explosions || 0;
+              diceResult = secondResult;
+            }
+          } else if (hasDisadvantage) {
+            // Disadvantage: roll second die, take lower
+            const secondResult = rollDice(rpgSystem, dieSize);
+            const second_roll = secondResult.total;
+            allDiceRolls.push(dice_roll, second_roll);
+            allDiceDetails.push(diceResult.rolls, secondResult.rolls);
+
+            logger.action("Explosive disadvantage roll from missing item", {
+              item: choice.item_used,
+              firstRoll: dice_roll,
+              secondRoll: second_roll,
+            });
+
+            if (second_roll < dice_roll) {
+              dice_roll = second_roll;
+              explosionCount = secondResult.explosions || 0;
+              diceResult = secondResult;
+            }
+          } else {
+            // No advantage/disadvantage
+            allDiceRolls.push(dice_roll);
+            allDiceDetails.push(diceResult.rolls);
+          }
+
+          // Handle momentum reroll for explosive
+          if (momentumMode === "reroll") {
+            const reroll1Result = rollDice(rpgSystem, dieSize);
+            const reroll2Result = rollDice(rpgSystem, dieSize);
+            const reroll1 = reroll1Result.total;
+            const reroll2 = reroll2Result.total;
+            allDiceRolls.push(reroll1, reroll2);
+            allDiceDetails.push(reroll1Result.rolls, reroll2Result.rolls);
+
+            const oldRoll = dice_roll;
+            const bestRoll = Math.max(dice_roll, reroll1, reroll2);
+            if (bestRoll === reroll1) {
+              dice_roll = reroll1;
+              explosionCount = reroll1Result.explosions || 0;
+              diceResult = reroll1Result;
+            } else if (bestRoll === reroll2) {
+              dice_roll = reroll2;
+              explosionCount = reroll2Result.explosions || 0;
+              diceResult = reroll2Result;
+            }
+
+            logger.action("Explosive momentum reroll", {
+              oldRoll,
+              reroll1,
+              reroll2,
+              finalRoll: dice_roll,
+              finalExplosions: explosionCount,
+            });
+
+            addNotification(
+              `? Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} ? Best: ${dice_roll}`,
+              "success"
+            );
+          }
+
+          yzeData.explosions = explosionCount;
         }
 
-        // Add stress to character
-        if (stressDiceCount > 0) {
-          const currentStress = storyData.stress || 0;
-          storyData.stress = Math.min(10, currentStress + stressDiceCount);
+        // Log fuzzy match result
+        if (matchResult && !matchResult.isExact) {
+          logger.info("Fuzzy matched skill", {
+            aiProvided: choice.skill_used,
+            matched: matchResult.name,
+            score: matchResult.score,
+          });
           addNotification(
-            `Added ${stressDiceCount} stress dice (+${stressDiceCount} stress ? ${storyData.stress}/10)`,
+            `?? Matched "${choice.skill_used}" ? "${
+              matchResult.name
+            }" (${Math.round(matchResult.score * 100)}% match)`,
+            "info"
+          );
+          // Update choice to use the exact matched name
+          choice.skill_used = matchResult.name;
+        } else if (!matchResult) {
+          // No match found - log warning
+          logger.warn("Skill not found or no fuzzy match", {
+            skill: choice.skill_used,
+          });
+          addNotification(
+            `?? Skill not found: ${choice.skill_used}`,
             "warning"
           );
         }
 
-        logger.action("YZE dice roll", {
-          system: "yze",
-          baseDice: baseDiceCount,
-          stressDice: stressDiceCount,
-          rolls,
-          stat: statValue,
-        });
+        const dc = choice.skill_dc || 0;
 
-        // Ensure dice visualizer gets the actual dice rolled for YZE
-        if (Array.isArray(allDiceDetails) && allDiceDetails.length > 0) {
-          allDiceDetails[0] = rolls;
-        }
+        //Calculate resource requirements based on RPG system
+        const resourceReqs = calculateResourceRequirements(rpgSystem, dc);
 
-        diceResult = { rolls, total: 0 }; // Total doesn't matter for YZE
-        dice_roll = 0; // Not used for YZE
-
-        // Reset YZE state
-        setYzeAwaitingStressChoice(false);
-        setYzePendingChoice(null);
-      } else if (rpgSystem.id === "explosive") {
-        // Explosive dice: Determine die size from stat
-        const dieSize = rpgSystem.statToDieSize
-          ? rpgSystem.statToDieSize(statValue)
-          : 20;
-        yzeData.dieSize = dieSize;
-
-        // Check if we have item advantage
-        const hasItemForAdvantage =
-          choice.item_used &&
-          storyData.inventory.find((i) => i.name === choice.item_used);
-        const itemType = hasItemForAdvantage
-          ? hasItemForAdvantage.type || "normal"
-          : null;
-        const hasAdvantage =
-          hasItemForAdvantage && itemType && itemType !== "misc";
-        const hasDisadvantage = choice.item_used && !hasItemForAdvantage;
-
-        // Roll initial die with explosions
-        diceResult = rollDice(rpgSystem, dieSize);
-        dice_roll = diceResult.total;
-        explosionCount = diceResult.explosions || 0;
-
-        logger.action("Explosive dice roll", {
-          system: "explosive",
-          dieSize,
-          rolls: diceResult.rolls,
-          total: dice_roll,
-          explosions: explosionCount,
-          stat: statValue,
-        });
-
-        // Handle advantage (roll second die, take higher)
-        if (hasAdvantage) {
-          const secondResult = rollDice(rpgSystem, dieSize);
-          const second_roll = secondResult.total;
-          allDiceRolls.push(dice_roll, second_roll);
-          allDiceDetails.push(diceResult.rolls, secondResult.rolls);
-
-          logger.action("Explosive advantage roll from item", {
-            item: choice.item_used,
-            firstRoll: dice_roll,
-            firstExplosions: explosionCount,
-            secondRoll: second_roll,
-            secondExplosions: secondResult.explosions || 0,
+        //Handleguaranteedsuccess
+        if (momentumMode === "guarantee") {
+          skillCheckResult = "success";
+          logger.action("Skill check (Guaranteed)", {
+            skill: choice.skill_used,
+            dc,
           });
-
-          if (second_roll > dice_roll) {
-            dice_roll = second_roll;
-            explosionCount = secondResult.explosions || 0;
-            diceResult = secondResult;
-          }
-        } else if (hasDisadvantage) {
-          // Disadvantage: roll second die, take lower
-          const secondResult = rollDice(rpgSystem, dieSize);
-          const second_roll = secondResult.total;
-          allDiceRolls.push(dice_roll, second_roll);
-          allDiceDetails.push(diceResult.rolls, secondResult.rolls);
-
-          logger.action("Explosive disadvantage roll from missing item", {
-            item: choice.item_used,
-            firstRoll: dice_roll,
-            secondRoll: second_roll,
-          });
-
-          if (second_roll < dice_roll) {
-            dice_roll = second_roll;
-            explosionCount = secondResult.explosions || 0;
-            diceResult = secondResult;
-          }
-        } else {
-          // No advantage/disadvantage
-          allDiceRolls.push(dice_roll);
-          allDiceDetails.push(diceResult.rolls);
-        }
-
-        // Handle momentum reroll for explosive
-        if (momentumMode === "reroll") {
-          const reroll1Result = rollDice(rpgSystem, dieSize);
-          const reroll2Result = rollDice(rpgSystem, dieSize);
-          const reroll1 = reroll1Result.total;
-          const reroll2 = reroll2Result.total;
-          allDiceRolls.push(reroll1, reroll2);
-          allDiceDetails.push(reroll1Result.rolls, reroll2Result.rolls);
-
-          const oldRoll = dice_roll;
-          const bestRoll = Math.max(dice_roll, reroll1, reroll2);
-          if (bestRoll === reroll1) {
-            dice_roll = reroll1;
-            explosionCount = reroll1Result.explosions || 0;
-            diceResult = reroll1Result;
-          } else if (bestRoll === reroll2) {
-            dice_roll = reroll2;
-            explosionCount = reroll2Result.explosions || 0;
-            diceResult = reroll2Result;
-          }
-
-          logger.action("Explosive momentum reroll", {
-            oldRoll,
-            reroll1,
-            reroll2,
-            finalRoll: dice_roll,
-            finalExplosions: explosionCount,
-          });
-
           addNotification(
-            `? Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} ? Best: ${dice_roll}`,
+            `? Guaranteed Success! (${choice.skill_used}: Auto-success with 2 Momentum)`,
             "success"
           );
-        }
+        } else {
+          let dc_passed: boolean;
+          let isCritical: boolean;
+          let total: number;
 
-        yzeData.explosions = explosionCount;
-      }
+          // For YZE: calculate success count and panic FIRST
+          if (rpgSystem.id === "yze" && allDiceDetails.length > 0) {
+            const lastRoll = allDiceDetails[allDiceDetails.length - 1];
+            const currentStress = storyData.stress || 0;
+            const stressDiceCount = yzeStressDiceChoice; // Use player's chosen stress dice
 
-      // Log fuzzy match result
-      if (matchResult && !matchResult.isExact) {
-        logger.info("Fuzzy matched skill", {
-          aiProvided: choice.skill_used,
-          matched: matchResult.name,
-          score: matchResult.score,
-        });
-        addNotification(
-          `?? Matched "${choice.skill_used}" ? "${
-            matchResult.name
-          }" (${Math.round(matchResult.score * 100)}% match)`,
-          "info"
-        );
-        // Update choice to use the exact matched name
-        choice.skill_used = matchResult.name;
-      } else if (!matchResult) {
-        // No match found - log warning
-        logger.warn("Skill not found or no fuzzy match", {
-          skill: choice.skill_used,
-        });
-        addNotification(`?? Skill not found: ${choice.skill_used}`, "warning");
-      }
+            // Split dice into base and stress dice
+            const baseDiceCount = lastRoll.length - stressDiceCount;
+            yzeData.baseDice = lastRoll.slice(0, baseDiceCount);
+            yzeData.stressDice =
+              stressDiceCount > 0 ? lastRoll.slice(baseDiceCount) : [];
 
-      const dc = choice.skill_dc || 0;
+            // Calculate success using checkSuccess (pass rolls array)
+            const successResult = checkSuccess(
+              rpgSystem,
+              dice_roll,
+              statValue,
+              dc,
+              conditionPenaltyModifier, // Apply condition penalty (YZE uses dice pool reduction)
+              lastRoll
+            );
 
-      //Calculate resource requirements based on RPG system
-      const resourceReqs = calculateResourceRequirements(rpgSystem, dc);
+            yzeData.successes = successResult.successes;
+            yzeData.stressRelief = successResult.stressRelief;
+            yzeData.stressLevel = currentStress;
 
-      //Handleguaranteedsuccess
-      if (momentumMode === "guarantee") {
-        skillCheckResult = "success";
-        logger.action("Skill check (Guaranteed)", {
-          skill: choice.skill_used,
-          dc,
-        });
-        addNotification(
-          `? Guaranteed Success! (${choice.skill_used}: Auto-success with 2 Momentum)`,
-          "success"
-        );
-      } else {
-        let dc_passed: boolean;
-        let isCritical: boolean;
-        let total: number;
+            // For YZE: use success count to determine if check passed
+            dc_passed = successResult.success;
+            isCritical = successResult.critical;
+            total = successResult.successes || 0;
 
-        // For YZE: calculate success count and panic FIRST
-        if (rpgSystem.id === "yze" && allDiceDetails.length > 0) {
-          const lastRoll = allDiceDetails[allDiceDetails.length - 1];
-          const currentStress = storyData.stress || 0;
-          const stressDiceCount = yzeStressDiceChoice; // Use player's chosen stress dice
+            // Store for AI context
+            rollTotal = total;
+            rollDC = dc;
 
-          // Split dice into base and stress dice
-          const baseDiceCount = lastRoll.length - stressDiceCount;
-          yzeData.baseDice = lastRoll.slice(0, baseDiceCount);
-          yzeData.stressDice =
-            stressDiceCount > 0 ? lastRoll.slice(baseDiceCount) : [];
-
-          // Calculate success using checkSuccess (pass rolls array)
-          const successResult = checkSuccess(
-            rpgSystem,
-            dice_roll,
-            statValue,
-            dc,
-            0, // No penalty - disadvantage handled via dice rolls
-            lastRoll
-          );
-
-          yzeData.successes = successResult.successes;
-          yzeData.stressRelief = successResult.stressRelief;
-          yzeData.stressLevel = currentStress;
-
-          // For YZE: use success count to determine if check passed
-          dc_passed = successResult.success;
-          isCritical = successResult.critical;
-          total = successResult.successes || 0;
-
-          // Store for AI context
-          rollTotal = total;
-          rollDC = dc;
-
-          // Check for panic (1s on stress dice)
-          if (stressDiceCount > 0 && yzeData.stressDice) {
-            const hasOnes = yzeData.stressDice.some((die) => die === 1);
-            if (hasOnes) {
-              yzeData.panicTriggered = true;
-              // Roll panic: d6 + stress
-              const panicRoll =
-                Math.floor(Math.random() * 6) + 1 + currentStress;
-              // Find panic effect from table
-              if (rpgSystem.panicTable) {
-                const panicEntry = rpgSystem.panicTable.find(
-                  (entry) => panicRoll >= entry.min && panicRoll <= entry.max
-                );
-                if (panicEntry) {
-                  yzeData.panicEffect = `${panicEntry.effect}: ${panicEntry.description}`;
+            // Check for panic (1s on stress dice)
+            if (stressDiceCount > 0 && yzeData.stressDice) {
+              const hasOnes = yzeData.stressDice.some((die) => die === 1);
+              if (hasOnes) {
+                yzeData.panicTriggered = true;
+                // Roll panic: d6 + stress
+                const panicRoll =
+                  Math.floor(Math.random() * 6) + 1 + currentStress;
+                // Find panic effect from table
+                if (rpgSystem.panicTable) {
+                  const panicEntry = rpgSystem.panicTable.find(
+                    (entry) => panicRoll >= entry.min && panicRoll <= entry.max
+                  );
+                  if (panicEntry) {
+                    yzeData.panicEffect = `${panicEntry.effect}: ${panicEntry.description}`;
+                  }
                 }
               }
             }
-          }
-        } else {
-          // All other systems: use checkSuccess function
-          const successResult = checkSuccess(
-            rpgSystem,
-            dice_roll,
-            statValue,
-            dc,
-            rpgSystem.id === "pbta" ? pbtaPenalty : 0 // PbtA uses +/-1 per net advantage/disadv; others use extra rolls
-          );
+          } else {
+            // All other systems: use checkSuccess function
+            const successResult = checkSuccess(
+              rpgSystem,
+              dice_roll,
+              statValue,
+              dc,
+              (rpgSystem.id === "pbta" ? pbtaPenalty : 0) +
+                conditionPenaltyModifier // PbtA uses +/-1 per net advantage/disadv; add condition penalty
+            );
 
-          dc_passed = successResult.success;
-          isCritical = successResult.critical;
-          total = successResult.total;
+            dc_passed = successResult.success;
+            isCritical = successResult.critical;
+            total = successResult.total;
 
-          // Store for AI context
-          rollTotal = total;
-          rollDC = dc;
+            // Store for AI context
+            rollTotal = total;
+            rollDC = dc;
 
-          // Store partial success for PbtA
-          if (successResult.partial) {
-            // PbtA partial success counts as "success" for progression but with complications
-            dc_passed = true;
-            skillCheckResult = "partial";
-          }
+            // Store partial success for PbtA
+            if (successResult.partial) {
+              // PbtA partial success counts as "success" for progression but with complications
+              dc_passed = true;
+              skillCheckResult = "partial";
+            }
 
-          // Store Fate-specific outcomes (tie, style)
-          if (rpgSystem.id === "fate") {
-            if (successResult.tie) {
-              skillCheckResult = "tie";
-              dc_passed = true; // Ties count as partial success
-            } else if (successResult.style) {
-              skillCheckResult = "style";
+            // Store Fate-specific outcomes (tie, style)
+            if (rpgSystem.id === "fate") {
+              if (successResult.tie) {
+                skillCheckResult = "tie";
+                dc_passed = true; // Ties count as partial success
+              } else if (successResult.style) {
+                skillCheckResult = "style";
+              }
             }
           }
-        }
 
-        logger.action("Skill check result", {
-          skill: choice.skill_used,
-          dc,
-          roll: dice_roll,
-          stat: statValue,
-          total,
-          passed: dc_passed,
-        });
-
-        // Track skill check for Mythic chaos adjustment
-        if (storyData.mythicState && choice.skill_used) {
-          const { addSkillCheckResult } = await import(
-            "@/app/misc/mythicChaos"
-          );
-          const skillResult = {
-            sceneNumber: storyData.mythicState.sceneCount,
-            success: dc_passed,
+          logger.action("Skill check result", {
             skill: choice.skill_used,
-            difficulty: dc,
-            margin: total - dc,
-            timestamp: Date.now(),
-          };
-          storyData.mythicState = addSkillCheckResult(
-            storyData.mythicState,
-            skillResult
-          );
-        }
+            dc,
+            roll: dice_roll,
+            stat: statValue,
+            total,
+            passed: dc_passed,
+          });
 
-        // Show dice visualizer
-        const usedItem = choice.item_used
-          ? storyData.inventory.find((i) => i.name === choice.item_used)
-          : null;
-        const hasItemAdvantage =
-          !!usedItem && (usedItem.type || "normal") !== "misc";
-        const hasItemDisadvantage = !!(choice.item_used && !usedItem);
-
-        // For display: use modifier instead of raw stat for systems with statToModifier
-        const baseDisplayBonus = rpgSystem.statToModifier
-          ? rpgSystem.statToModifier(statValue)
-          : statValue;
-        const displayBonus =
-          rpgSystem.id === "pbta"
-            ? baseDisplayBonus - pbtaPenalty
-            : baseDisplayBonus; // pbtaPenalty negative increases modifier
-
-        // Calculate net advantage/disadvantage for display
-        const netAdvantage = advantageCount - disadvantageCount;
-
-        setDiceRoll({
-          show: true,
-          rolls: allDiceRolls,
-          finalRoll: dice_roll,
-          skillName: choice.skill_used,
-          skillBonus: displayBonus,
-          dc,
-          isSuccess: dc_passed,
-          isCritical: isCritical,
-          hasAdvantage: hasItemAdvantage,
-          hasDisadvantage: hasItemDisadvantage,
-          advantageCount,
-          disadvantageCount,
-          netAdvantage,
-          advantageSources: advantageSources.join(", "),
-          disadvantageSources: disadvantageSources.join(", "),
-          diceRolls: allDiceDetails, // Individual dice for each roll
-          rpgSystem: storyData.rpgSystem || "3d6", // Pass system type
-          ...yzeData, // Spread YZE-specific data
-        });
-
-        // Process result - dice visualizer shows all check details
-        if (dc_passed) {
-          // Only set to "success" if not already set to partial/tie/style
-          if (
-            skillCheckResult !== "partial" &&
-            skillCheckResult !== "tie" &&
-            skillCheckResult !== "style"
-          ) {
-            skillCheckResult = "success";
-          }
-
-          // YZE stress relief on strong success
-          if (rpgSystem.id === "yze" && yzeData.stressRelief) {
-            if (storyData.stress && storyData.stress > 0) {
-              storyData.stress--;
-            }
-          }
-
-          // Recover resource on success
-          if (choice.resource_used && matchedResource) {
-            // Ensure resource.value is a valid number (prevent NaN)
-            if (
-              typeof matchedResource.value !== "number" ||
-              isNaN(matchedResource.value)
-            ) {
-              matchedResource.value = 0;
-            }
-
-            const recovery = resourceReqs.recovery;
-            matchedResource.value = Math.min(
-              matchedResource.maxValue,
-              matchedResource.value + recovery
+          // Track skill check for Mythic chaos adjustment
+          if (storyData.mythicState && choice.skill_used) {
+            const { addSkillCheckResult } = await import(
+              "@/app/misc/mythicChaos"
             );
-            resourceUsedAfter = matchedResource.value;
-            logger.action("Resource recovered", {
-              resource: choice.resource_used,
-              amount: recovery,
-              newTotal: matchedResource.value,
-            });
+            const skillResult = {
+              sceneNumber: storyData.mythicState.sceneCount,
+              success: dc_passed,
+              skill: choice.skill_used,
+              difficulty: dc,
+              margin: total - dc,
+              timestamp: Date.now(),
+            };
+            storyData.mythicState = addSkillCheckResult(
+              storyData.mythicState,
+              skillResult
+            );
           }
 
-          // Earn momentum on success (not when using guarantee or reroll)
-          if (momentumMode === "none") {
-            if (isCritical) {
-              // Critical success: Earn 2 momentum
-              if (storyData.momentum < storyData.maxMomentum) {
-                const earned = Math.min(
-                  2,
-                  storyData.maxMomentum - storyData.momentum
-                );
-                storyData.momentum += earned;
-                logger.action("Momentum earned (Critical Success)", {
-                  earned,
-                  newTotal: storyData.momentum,
-                });
-              }
-            } else if (!rpgSystem.rollUnder && total >= dc + 20) {
-              // Strong success (beat DC by 20+): earn 1 momentum (only for roll-over systems)
-              if (storyData.momentum < storyData.maxMomentum) {
-                storyData.momentum++;
-                logger.action("Momentum earned (Strong Success)", {
-                  earned: 1,
-                  newTotal: storyData.momentum,
-                });
+          // Show dice visualizer
+          const usedItem = choice.item_used
+            ? storyData.inventory.find((i) => i.name === choice.item_used)
+            : null;
+          const hasItemAdvantage =
+            !!usedItem && (usedItem.type || "normal") !== "misc";
+          const hasItemDisadvantage = !!(choice.item_used && !usedItem);
+
+          // For display: use modifier instead of raw stat for systems with statToModifier
+          const baseDisplayBonus = rpgSystem.statToModifier
+            ? rpgSystem.statToModifier(statValue)
+            : statValue;
+          const displayBonus =
+            rpgSystem.id === "pbta"
+              ? baseDisplayBonus - pbtaPenalty
+              : baseDisplayBonus; // pbtaPenalty negative increases modifier
+
+          // Calculate net advantage/disadvantage for display
+          const netAdvantage = advantageCount - disadvantageCount;
+
+          setDiceRoll({
+            show: true,
+            rolls: allDiceRolls,
+            finalRoll: dice_roll,
+            skillName: choice.skill_used,
+            skillBonus: displayBonus,
+            dc,
+            isSuccess: dc_passed,
+            isCritical: isCritical,
+            hasAdvantage: hasItemAdvantage,
+            hasDisadvantage: hasItemDisadvantage,
+            advantageCount,
+            disadvantageCount,
+            netAdvantage,
+            advantageSources: advantageSources.join(", "),
+            disadvantageSources: disadvantageSources.join(", "),
+            diceRolls: allDiceDetails, // Individual dice for each roll
+            rpgSystem: storyData.rpgSystem || "3d6", // Pass system type
+            ...yzeData, // Spread YZE-specific data
+          });
+
+          // Process result - dice visualizer shows all check details
+          if (dc_passed) {
+            // Only set to "success" if not already set to partial/tie/style
+            if (
+              skillCheckResult !== "partial" &&
+              skillCheckResult !== "tie" &&
+              skillCheckResult !== "style"
+            ) {
+              skillCheckResult = "success";
+            }
+
+            // YZE stress relief on strong success
+            if (rpgSystem.id === "yze" && yzeData.stressRelief) {
+              if (storyData.stress && storyData.stress > 0) {
+                storyData.stress--;
               }
             }
-          }
-        } else {
-          skillCheckResult = "failure";
 
-          // On failure: Lose additional resource if one was used (DC-based penalty)
-          if (choice.resource_used && matchedResource) {
-            // Ensure resource.value is a valid number (prevent NaN)
-            if (
-              typeof matchedResource.value !== "number" ||
-              isNaN(matchedResource.value)
-            ) {
-              matchedResource.value = 0;
+            // Recover resource on success
+            if (choice.resource_used && matchedResource) {
+              // Ensure resource.value is a valid number (prevent NaN)
+              if (
+                typeof matchedResource.value !== "number" ||
+                isNaN(matchedResource.value)
+              ) {
+                matchedResource.value = 0;
+              }
+
+              const recovery = resourceReqs.recovery;
+              matchedResource.value = Math.min(
+                matchedResource.maxValue,
+                matchedResource.value + recovery
+              );
+              resourceUsedAfter = matchedResource.value;
+              logger.action("Resource recovered", {
+                resource: choice.resource_used,
+                amount: recovery,
+                newTotal: matchedResource.value,
+              });
             }
 
-            const penalty = resourceReqs.loss;
-            matchedResource.value = Math.max(
-              0,
-              matchedResource.value - penalty
-            );
-            logger.action("Resource lost (Failure)", {
-              resource: choice.resource_used,
-              penalty,
-              newTotal: matchedResource.value,
-            });
-          }
+            // Earn momentum on success (not when using guarantee or reroll)
+            if (momentumMode === "none") {
+              if (isCritical) {
+                // Critical success: Earn 2 momentum
+                if (storyData.momentum < storyData.maxMomentum) {
+                  const earned = Math.min(
+                    2,
+                    storyData.maxMomentum - storyData.momentum
+                  );
+                  storyData.momentum += earned;
+                  logger.action("Momentum earned (Critical Success)", {
+                    earned,
+                    newTotal: storyData.momentum,
+                  });
+                }
+              } else if (!rpgSystem.rollUnder && total >= dc + 20) {
+                // Strong success (beat DC by 20+): earn 1 momentum (only for roll-over systems)
+                if (storyData.momentum < storyData.maxMomentum) {
+                  storyData.momentum++;
+                  logger.action("Momentum earned (Strong Success)", {
+                    earned: 1,
+                    newTotal: storyData.momentum,
+                  });
+                }
+              }
+            }
+          } else {
+            skillCheckResult = "failure";
 
-          // Handle item breakage on failure (only for 'normal' type items)
-          if (choice.item_used) {
-            const item = storyData.inventory.find(
-              (i) => i.name === choice.item_used
-            );
-            const itemType = item?.type || "normal";
+            // On failure: Lose additional resource if one was used (DC-based penalty)
+            if (choice.resource_used && matchedResource) {
+              // Ensure resource.value is a valid number (prevent NaN)
+              if (
+                typeof matchedResource.value !== "number" ||
+                isNaN(matchedResource.value)
+              ) {
+                matchedResource.value = 0;
+              }
 
-            // Only normal items break on failure (not consumable, story, or misc)
-            if (itemType === "normal" && item) {
-              const itemIndex = storyData.inventory.findIndex(
+              const penalty = resourceReqs.loss;
+              matchedResource.value = Math.max(
+                0,
+                matchedResource.value - penalty
+              );
+              logger.action("Resource lost (Failure)", {
+                resource: choice.resource_used,
+                penalty,
+                newTotal: matchedResource.value,
+              });
+            }
+
+            // Handle item breakage on failure (only for 'normal' type items)
+            if (choice.item_used) {
+              const item = storyData.inventory.find(
                 (i) => i.name === choice.item_used
               );
-              if (
-                itemIndex !== -1 &&
-                itemQuantityAfter === itemQuantityBefore
-              ) {
-                // Only break if not already consumed
-                if (storyData.inventory[itemIndex].quantity > 1) {
-                  storyData.inventory[itemIndex].quantity--;
-                  itemQuantityAfter = storyData.inventory[itemIndex].quantity;
-                } else {
-                  storyData.inventory.splice(itemIndex, 1);
-                  itemQuantityAfter = 0;
-                  itemBroken = true;
+              const itemType = item?.type || "normal";
+
+              // Only normal items break on failure (not consumable, story, or misc)
+              if (itemType === "normal" && item) {
+                const itemIndex = storyData.inventory.findIndex(
+                  (i) => i.name === choice.item_used
+                );
+                if (
+                  itemIndex !== -1 &&
+                  itemQuantityAfter === itemQuantityBefore
+                ) {
+                  // Only break if not already consumed
+                  if (storyData.inventory[itemIndex].quantity > 1) {
+                    storyData.inventory[itemIndex].quantity--;
+                    itemQuantityAfter = storyData.inventory[itemIndex].quantity;
+                  } else {
+                    storyData.inventory.splice(itemIndex, 1);
+                    itemQuantityAfter = 0;
+                    itemBroken = true;
+                  }
+                  logger.action("Item broken (Failure)", {
+                    item: choice.item_used,
+                  });
                 }
-                logger.action("Item broken (Failure)", {
-                  item: choice.item_used,
-                });
               }
             }
           }
         }
-      }
+      } // End of if (!conditionAutoFail)
 
       //Buildskillcheckline
       const insufficientText = insufficientResource ? " (no skill bonus)" : "";

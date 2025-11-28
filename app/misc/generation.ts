@@ -717,6 +717,7 @@ export async function analyzeAction(
       item_used: null,
       resource_used: null,
       mythic_check: null,
+      mythic_table: null,
       custom_table: null,
       is_plain_action: true,
     };
@@ -804,6 +805,7 @@ export async function analyzeAction(
     !analysis.item_used &&
     !analysis.resource_used &&
     !analysis.mythic_check &&
+    !analysis.mythic_table &&
     !analysis.custom_table
   ) {
     analysis.is_plain_action = true;
@@ -844,6 +846,7 @@ export function analysisToChoice(
     item_used: analysis.item_used || undefined,
     resource_used: analysis.resource_used || undefined,
     mythic_check: analysis.mythic_check || undefined,
+    mythic_table: analysis.mythic_table || undefined,
     custom_table: analysis.custom_table || undefined,
   };
 }

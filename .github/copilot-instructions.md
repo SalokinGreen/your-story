@@ -29,7 +29,9 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `beats_trigger` (number[]), `beats_untrigger` (number[]) for dynamic visibility.
   - **ScenePart**: Includes optional `toolCalls` (ToolCall[]) and `toolResponses` (CommandResponse[]) for preserving tool calling conversation history.
   - **CommandResponse**: Includes optional `toolCallId` for linking responses to specific tool calls in conversation history.
-- app/misc/rpgSystems.ts: RPG system configurations and mechanics. Exports 8 systems (3d6, 1d20, 1d100, percentile, pbta, fate, yze, explosive) with dice rolling, DC calculation, and success checking. Key exports: getRPGSystem(), rollDice(), checkSuccess(), calculateResourceRequirements(). Each system has unique mechanics (PbtA partial success, Fate ladder/style, YZE stress/panic, Explosive dice chains).
+  - **Condition**: Afflictions/injuries with tiers I-VI that penalize skill checks. Includes `id`, `name`, `tier` (1-6), `description`, `affects` (array of stat names), `affectsAll` (boolean), `source`, `permanent`, `createdAt`.
+  - **GameOver**: State for permanent character death/loss with `reason`, `condition` (optional), `timestamp`.
+- app/misc/rpgSystems.ts: RPG system configurations and mechanics. Exports 9 systems (3d6, 1d20, 1d100, percentile, pbta, fate, yze, explosive, narrative) with dice rolling, DC calculation, and success checking. Key exports: getRPGSystem(), rollDice(), checkSuccess(), calculateResourceRequirements(), getConditionPenalty(). Each system has unique mechanics (PbtA partial success, Fate ladder/style, YZE stress/panic, Explosive dice chains) and conditionPenalties configuration.
 - app/misc/starter_stories.ts: Example datasets for testing and development.
 
 ### Auth & Tokens
@@ -223,6 +225,20 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - Success: Recovers DC ÷ 20 points (minimum 1), capped at max value
   - Failure: Loses DC ÷ 10 points (minimum 5)
   - Players keep skill bonus but dice roll is penalized when under-resourced
+- **Condition/Affliction System**:
+  - Tiers I-VI with escalating penalties per RPG system
+  - Conditions affect specific stats (via `affects` array) or all checks (via `affectsAll`)
+  - On skill check: Find highest-tier applicable condition, apply its penalty
+  - Penalty types by system:
+    - 3d6/1d20/1d100/percentile: Negative modifier to roll
+    - PbtA: -1 per tier (tiers 4-5 auto-miss, tier 6 game over)
+    - Fate: -1 per tier (tier 5 "taken out", tier 6 game over)
+    - YZE: Dice pool reduction (tier 6 game over)
+    - Explosive: Die size reduction (tier 5 auto-fail, tier 6 game over)
+    - Narrative: No mechanical effect (tier 6 game over only)
+  - AI manages conditions via tools: add_condition, upgrade_condition, downgrade_condition, remove_condition
+  - Tier 6 = permanent, cannot be downgraded (use remove_condition with force=true for miraculous cures)
+  - game_over tool for when tier 6 conditions narratively end the story
 - **Custom input**: handleCustomInput function allows free-form text submission to AI without predefined choices.
 - **Retry system**: handleRetry removes last AI response and regenerates with same context.
 - **TTS Integration**: Auto-generate narration clears old audio on text change, triggers handlePlay after 500ms delay when enabled.

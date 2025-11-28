@@ -54,10 +54,6 @@ export default function ChoicesModal({
   // Action mode state
   const [actionText, setActionText] = useState("");
   const [analyzingAction, setAnalyzingAction] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<{
-    analysis: ActionAnalysis;
-    warnings: string[];
-  } | null>(null);
   const [showActionBuilder, setShowActionBuilder] = useState(false);
 
   // Action builder state
@@ -76,7 +72,6 @@ export default function ChoicesModal({
       setCustomInput("");
       setActionText("");
       setAnalyzingAction(false);
-      setAnalysisResult(null);
       setShowActionBuilder(false);
       setBuilderSkill("");
       setBuilderDc(rpgSystem.dc.medium);
@@ -117,11 +112,6 @@ export default function ChoicesModal({
   const canUseReroll = storyData.momentum >= 1 && hasSkillCheck;
   const canUseGuarantee = storyData.momentum >= 2 && hasSkillCheck;
 
-  // For action mode, check if the analyzed action has a skill check
-  const actionHasSkillCheck = analysisResult?.analysis?.skill_used != null;
-  const canUseRerollAction = storyData.momentum >= 1 && actionHasSkillCheck;
-  const canUseGuaranteeAction = storyData.momentum >= 2 && actionHasSkillCheck;
-
   const handleSubmitCustom = async () => {
     const text = customInput.trim();
     if (!text || !onCustomInput) return;
@@ -139,42 +129,36 @@ export default function ChoicesModal({
 
   const handleActionAnalyze = async () => {
     const text = actionText.trim();
-    if (!text || !onActionSubmit) return;
+    if (!text || !onActionSubmit || !onActionConfirm) return;
 
     setAnalyzingAction(true);
     setShowActionBuilder(false);
     try {
       const result = await onActionSubmit(text);
       if (result) {
-        setAnalysisResult(result);
+        // Directly submit the action without requiring confirmation
+        const choice: Choice = {
+          text: actionText,
+          skill_used: result.analysis.skill_used || undefined,
+          skill_dc: result.analysis.skill_dc || undefined,
+          item_used: result.analysis.item_used || undefined,
+          resource_used: result.analysis.resource_used || undefined,
+          mythic_check: result.analysis.mythic_check || undefined,
+          mythic_table: result.analysis.mythic_table || undefined,
+          custom_table: result.analysis.custom_table || undefined,
+        };
+        onActionConfirm(choice);
+        onClose();
       } else {
         // Analysis failed - show action builder
         setShowActionBuilder(true);
+        setAnalyzingAction(false);
       }
     } catch (error) {
       console.error("Action analysis failed:", error);
       setShowActionBuilder(true);
-    } finally {
       setAnalyzingAction(false);
     }
-  };
-
-  const handleActionConfirmClick = () => {
-    if (!analysisResult || !onActionConfirm) return;
-
-    // Convert analysis to choice format and submit
-    const choice: Choice = {
-      text: actionText,
-      skill_used: analysisResult.analysis.skill_used || undefined,
-      skill_dc: analysisResult.analysis.skill_dc || undefined,
-      item_used: analysisResult.analysis.item_used || undefined,
-      resource_used: analysisResult.analysis.resource_used || undefined,
-      mythic_check: analysisResult.analysis.mythic_check || undefined,
-      custom_table: analysisResult.analysis.custom_table || undefined,
-    };
-
-    onActionConfirm(choice);
-    onClose();
   };
 
   const handleManualActionSubmit = () => {
@@ -292,48 +276,6 @@ export default function ChoicesModal({
     }
 
     return details;
-  };
-
-  // Render action mode analysis details
-  const renderAnalysisDetails = () => {
-    if (!analysisResult) return null;
-    const { analysis, warnings } = analysisResult;
-
-    // Convert to choice format for display
-    const pseudoChoice: Choice = {
-      text: actionText,
-      skill_used: analysis.skill_used || undefined,
-      skill_dc: analysis.skill_dc || undefined,
-      item_used: analysis.item_used || undefined,
-      resource_used: analysis.resource_used || undefined,
-      mythic_check: analysis.mythic_check || undefined,
-      custom_table: analysis.custom_table || undefined,
-    };
-
-    const details = getChoiceDetails(pseudoChoice);
-
-    return (
-      <div className="bg-blue-900/30 rounded-lg p-3 border border-blue-500/30 space-y-2">
-        <div className="flex items-center gap-2 text-blue-300 text-sm font-medium">
-          <DynamicIcon name="CheckCircle" className="w-4 h-4" />
-          Action Analyzed
-        </div>
-        {details.length > 0 ? (
-          <div className="flex flex-wrap gap-2">{details}</div>
-        ) : (
-          <p className="text-blue-200/60 text-sm">
-            Plain action (no dice roll)
-          </p>
-        )}
-        {warnings.length > 0 && (
-          <div className="text-xs text-amber-400/80">
-            {warnings.map((w, i) => (
-              <div key={i}>• {w}</div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
   };
 
   // Render action builder UI for when analysis fails
@@ -492,7 +434,6 @@ export default function ChoicesModal({
                   value={actionText}
                   onChange={(e) => {
                     setActionText(e.target.value);
-                    setAnalysisResult(null);
                     setShowActionBuilder(false);
                   }}
                   placeholder="Describe your action... (e.g., 'I kick the door open' or 'I try to convince the guard to let us pass')"
@@ -502,66 +443,41 @@ export default function ChoicesModal({
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && e.ctrlKey && actionText.trim()) {
                       e.preventDefault();
-                      if (analysisResult) {
-                        handleActionConfirmClick();
-                      } else {
-                        handleActionAnalyze();
-                      }
+                      handleActionAnalyze();
                     }
                   }}
                 />
                 <p className="text-xs text-blue-200/40">
-                  {actionText.length} characters • Ctrl+Enter to{" "}
-                  {analysisResult ? "confirm" : "analyze"}
+                  {actionText.length} characters • Ctrl+Enter to act
                 </p>
               </div>
 
-              {/* Analysis Result or Builder */}
-              {analysisResult && renderAnalysisDetails()}
+              {/* Action Builder (only shown when analysis fails) */}
               {showActionBuilder && renderActionBuilder()}
 
-              {/* Analyze/Confirm Button */}
+              {/* Act Button */}
               {!showActionBuilder && (
                 <button
-                  onClick={
-                    analysisResult
-                      ? handleActionConfirmClick
-                      : handleActionAnalyze
-                  }
+                  onClick={handleActionAnalyze}
                   disabled={!actionText.trim() || analyzingAction || loading}
                   className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
                     !actionText.trim() || analyzingAction || loading
                       ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
-                      : analysisResult
-                      ? "bg-green-600 hover:bg-green-500 text-white"
                       : "bg-blue-600 hover:bg-blue-500 text-white"
                   }`}
                 >
-                  {analyzingAction ? (
+                  {analyzingAction || loading ? (
                     <>
                       <DynamicIcon
                         name="Loader2"
                         className="w-4 h-4 animate-spin"
                       />
-                      Analyzing...
-                    </>
-                  ) : loading ? (
-                    <>
-                      <DynamicIcon
-                        name="Loader2"
-                        className="w-4 h-4 animate-spin"
-                      />
-                      Generating...
-                    </>
-                  ) : analysisResult ? (
-                    <>
-                      <DynamicIcon name="Play" className="w-4 h-4" />
-                      Confirm & Roll
+                      {analyzingAction ? "Processing..." : "Generating..."}
                     </>
                   ) : (
                     <>
-                      <DynamicIcon name="Sparkles" className="w-4 h-4" />
-                      Analyze Action
+                      <DynamicIcon name="Play" className="w-4 h-4" />
+                      Act
                     </>
                   )}
                 </button>
@@ -676,9 +592,10 @@ export default function ChoicesModal({
 
         {/* Footer with Momentum & Confirm */}
         <div className="p-3 border-t border-blue-800/30 bg-blue-900/30 space-y-2">
-          {/* Momentum Controls - show for choice mode with skill check OR action mode with analyzed skill check */}
-          {((actionMode && actionHasSkillCheck) ||
-            (!actionMode && selectedChoice && hasSkillCheck)) && (
+          {/* Momentum Controls - show for both modes */}
+          {/* In choice mode: only show if selected choice has skill check */}
+          {/* In action mode: always show (will apply if AI detects skill check) */}
+          {(actionMode || (selectedChoice && hasSkillCheck)) && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <DynamicIcon name="Zap" className="w-4 h-4 text-yellow-400" />
@@ -703,11 +620,16 @@ export default function ChoicesModal({
                       momentumMode === "reroll" ? "none" : "reroll"
                     )
                   }
-                  disabled={actionMode ? !canUseRerollAction : !canUseReroll}
+                  disabled={actionMode ? storyData.momentum < 1 : !canUseReroll}
+                  title={
+                    actionMode
+                      ? "Reroll if action requires a skill check"
+                      : undefined
+                  }
                   className={`px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
                     momentumMode === "reroll"
                       ? "bg-yellow-500 text-white"
-                      : (actionMode ? canUseRerollAction : canUseReroll)
+                      : (actionMode ? storyData.momentum >= 1 : canUseReroll)
                       ? "bg-blue-900/50 text-blue-200/70 hover:bg-yellow-500/30 active:bg-yellow-500/50"
                       : "bg-blue-950/50 text-blue-500 cursor-not-allowed"
                   }`}
@@ -722,12 +644,17 @@ export default function ChoicesModal({
                     )
                   }
                   disabled={
-                    actionMode ? !canUseGuaranteeAction : !canUseGuarantee
+                    actionMode ? storyData.momentum < 2 : !canUseGuarantee
+                  }
+                  title={
+                    actionMode
+                      ? "Guarantee success if action requires a skill check"
+                      : undefined
                   }
                   className={`px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
                     momentumMode === "guarantee"
                       ? "bg-green-500 text-white"
-                      : (actionMode ? canUseGuaranteeAction : canUseGuarantee)
+                      : (actionMode ? storyData.momentum >= 2 : canUseGuarantee)
                       ? "bg-blue-900/50 text-blue-200/70 hover:bg-green-500/30 active:bg-green-500/50"
                       : "bg-blue-950/50 text-blue-500 cursor-not-allowed"
                   }`}

@@ -28,6 +28,7 @@ const kids_on_machines: StoryData = {
   quests: [],
   earnedPointsFromQuests: [],
   relationships: [],
+  conditions: [],
 };
 const goblin_layer: StoryData = {
   story_name: "Goblin Layer",
@@ -176,6 +177,7 @@ const goblin_layer: StoryData = {
   quests: [],
   earnedPointsFromQuests: [],
   relationships: [],
+  conditions: [],
   author_notes:
     "Mind the Layer in Goblin Layer. The player doesn't only kill but he also lays with monsters! Sex baby!",
   player_notes: "",

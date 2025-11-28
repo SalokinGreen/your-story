@@ -103,6 +103,7 @@ export interface Choice {
   skill_used?: string;
   skill_dc?: number;
   resource_used?: string;
+  condition_applies?: string; // Name of condition that applies penalty to this roll (AI chooses most relevant)
   mythic_check?: string; // Format: "question (likelihood)" e.g., "Is the door locked? (Likely)"
   mythic_context_only?: boolean; // When true with skill_used, mythic provides context only and doesn't override skill check result
   mythic_table?: string; // Element category name e.g., "character_descriptors", "locations"
@@ -134,6 +135,29 @@ export interface Relationship {
   symbol: string; // Icon representing the relationship
   custom_symbol_url?: string;
 }
+
+// Conditions/Afflictions system
+export type ConditionTier = 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface Condition {
+  id: string; // Unique identifier
+  name: string; // e.g., "Broken Leg", "Poisoned", "Exhausted"
+  tier: ConditionTier; // Severity level (1-6, where 6 is permanent/game-over potential)
+  description: string; // What this condition represents at current tier
+  affects: string[]; // Which stats/skills this penalizes (e.g., ["Agility", "Athletics"])
+  affectsAll?: boolean; // If true, affects ALL rolls (e.g., "Dying", "Severe Exhaustion")
+  source?: string; // How it was acquired (for narrative context)
+  permanent?: boolean; // Tier VI conditions are typically permanent
+  createdAt: number; // Timestamp when condition was acquired
+}
+
+// Game Over state for permanent character death/loss
+export interface GameOver {
+  reason: string; // Narrative reason for game over
+  condition?: string; // Name of condition that caused it (if applicable)
+  timestamp: number; // When the game ended
+}
+
 export interface Choices {
   choices: Choice[];
 }
@@ -149,6 +173,7 @@ export interface Preset {
   resources: Resource[];
   inventory: InventoryItem[];
   relationships: Relationship[];
+  conditions?: Condition[]; // Starting conditions/afflictions for this preset
   authorNotes: string;
 }
 
@@ -190,6 +215,8 @@ export interface StoryData {
   quests: Quest[]; // Quest system
   earnedPointsFromQuests: string[]; // Array of quest IDs that have awarded points
   relationships: Relationship[]; // Relationship tracking system
+  conditions: Condition[]; // Active conditions/afflictions affecting the player
+  gameOver?: GameOver; // Game over state if the player has permanently died/lost
   author_notes?: string;
   player_notes?: string;
   selected_preset?: string; // ID of the preset used
@@ -422,6 +449,7 @@ export interface ActionAnalysis {
   item_used: string | null; // Item name if using an item
   resource_used: string | null; // Resource name if using a resource
   mythic_check: string | null; // Mythic yes/no question with likelihood
+  mythic_table: string | null; // Mythic table to roll on for random generation
   custom_table: string | null; // Custom table to roll on
   is_plain_action: boolean; // True if no mechanics, just narration
 }

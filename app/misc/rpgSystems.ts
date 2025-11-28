@@ -103,6 +103,19 @@ export interface RPGSystem {
     choiceSyntax: string; // How to format choices for this system
     dcGuidelines: string; // Detailed DC usage guidelines
   };
+
+  // Condition/Affliction penalties by tier (1-6)
+  // Tier 6 typically means auto-fail or game-over potential
+  // String values represent special effects (auto-fail, game-over, die-size-down, etc.)
+  // null means no mechanical effect (e.g., narrative system)
+  conditionPenalties: {
+    tier1: number | string | null; // Minor inconvenience
+    tier2: number | string | null; // Noticeable hindrance
+    tier3: number | string | null; // Serious impediment
+    tier4: number | string | null; // Severe disability
+    tier5: number | string | null; // Critical condition
+    tier6: number | string | null; // Permanent/fatal
+  };
 }
 
 /**
@@ -170,6 +183,15 @@ export const SYSTEM_3D6: RPGSystem = {
       "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; mythic_check: question (likelihood) or none; mythic_table: category or none; custom_table: table name or none>\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 25); use_resource: Stamina; use_item: none; mythic_check: Is the dragon asleep? (Likely); mythic_table: sounds; custom_table: none>\n- You approach the mysterious door. <use_skill: none; use_resource: none; use_item: none; mythic_check: Is it locked? (50/50); mythic_table: none; custom_table: none>",
     dcGuidelines:
       "⚠️ DC GUIDELINES:\n- Use DCs that scale with the adventure's stat range.\n- 3-15: Easy challenge (most characters can succeed)\n- 20: Medium challenge (requires decent stats)\n- 25: Hard challenge (high stats or items needed)\n- 30-35: Very Hard challenge (only the most prepared succeed)",
+  },
+
+  conditionPenalties: {
+    tier1: -1,
+    tier2: -2,
+    tier3: -3,
+    tier4: -4,
+    tier5: -5,
+    tier6: "auto-fail",
   },
 };
 
@@ -239,6 +261,15 @@ export const SYSTEM_1D20: RPGSystem = {
     dcGuidelines:
       "⚠️ DC GUIDELINES:\n- Use DCs that scale with the adventure's stat range (typically 0-100).\n- 10-15: Easy challenge (most characters can succeed)\n- 15-20: Medium challenge (requires decent stats)\n- 20-25: Hard challenge (high stats or items needed)\n- 25-30: Very Hard challenge (only the most prepared succeed)",
   },
+
+  conditionPenalties: {
+    tier1: -2,
+    tier2: -4,
+    tier3: -6,
+    tier4: -8,
+    tier5: -10,
+    tier6: "auto-fail",
+  },
 };
 
 /**
@@ -306,6 +337,15 @@ export const SYSTEM_1D100: RPGSystem = {
       "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; mythic_check: question (likelihood) or none; mythic_table: category or none; custom_table: table name or none>\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 100); use_resource: Stamina; use_item: none; mythic_check: Is the dragon asleep? (Likely); mythic_table: sounds; custom_table: none>\n- You approach the mysterious door. <use_skill: none; use_resource: none; use_item: none; mythic_check: Is it locked? (50/50); mythic_table: none; custom_table: none>",
     dcGuidelines:
       "⚠️ DC GUIDELINES:\n- Use DCs that scale with the adventure's stat range (typically 0-100).\n- 60-80: Easy challenge (most characters can succeed)\n- 80-100: Medium challenge (requires decent stats)\n- 100-120: Hard challenge (high stats or items needed)\n- 120-140: Very Hard challenge (only the most prepared succeed)",
+  },
+
+  conditionPenalties: {
+    tier1: -10,
+    tier2: -20,
+    tier3: -30,
+    tier4: -40,
+    tier5: -50,
+    tier6: "auto-fail",
   },
 };
 
@@ -376,6 +416,15 @@ export const SYSTEM_PERCENTILE: RPGSystem = {
       "- ...Prose <use_skill: skill name or none; use_resource: resource name or none; use_item: item name or none; mythic_check: question (likelihood) or none; mythic_table: category or none; custom_table: table name or none>\nPercentile Roll-Under System - No DC needed! Success = roll ≤ stat value:\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth; use_resource: none; use_item: none; mythic_check: Is the dragon asleep? (Likely); mythic_table: sounds; custom_table: none>\n- You approach the mysterious door. <use_skill: none; use_resource: none; use_item: none; mythic_check: Is it locked? (50/50); mythic_table: none; custom_table: none>",
     dcGuidelines:
       "⚠️ ROLL-UNDER SYSTEM - NO DC NEEDED:\n- DO NOT specify DC values! The system compares roll directly to stat.\n- Success is automatic if roll ≤ stat value.\n- Challenge comes from stat requirements (need high stats to succeed at difficult tasks).\n- Use resources and items to create additional challenge, not DCs.",
+  },
+
+  conditionPenalties: {
+    tier1: -10,
+    tier2: -20,
+    tier3: -30,
+    tier4: -40,
+    tier5: -50,
+    tier6: "auto-fail",
   },
 };
 
@@ -486,6 +535,15 @@ EXAMPLES:
       "- ...Prose <use_skill: skill name or none; use_resource: resource name or none; use_item: item name or none; mythic_check: question (likelihood) or none; mythic_table: category or none; custom_table: table name or none>\\nPbtA System - No DC needed! Results are: 10+ = success, 7-9 = partial success, 6- = failure:\\nExample:\\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth; use_resource: none; use_item: none; mythic_check: Is the dragon asleep? (Likely); mythic_table: sounds; custom_table: none>\\n- You try to charm the guard. <use_skill: Charisma; use_resource: none; use_item: Fancy Clothes; mythic_check: Is he in a good mood? (50/50); mythic_table: none; custom_table: none>",
     dcGuidelines:
       "⚠️ POWERED BY THE APOCALYPSE - NO DC NEEDED:\\n- DO NOT specify DC values for PbtA! The system has fixed thresholds: 10+ success, 7-9 partial, 6- failure.\\n- Just specify which skill to use - the roll is 2d6 + stat modifier.\\n- Focus on making partial success (7-9) interesting with complications, costs, or hard choices.\\n- Failures (6-) should advance the story with consequences, not just block progress.",
+  },
+
+  conditionPenalties: {
+    tier1: -1,
+    tier2: -2,
+    tier3: -3,
+    tier4: "auto-fail", // PbtA: at tier 4, you auto-miss
+    tier5: "auto-fail",
+    tier6: "game-over",
   },
 };
 
@@ -673,6 +731,15 @@ When players take ACTION, convert it to a roll. When they declare INTENT, ask wh
       "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; mythic_check: question (likelihood) or none; mythic_table: category or none; custom_table: table name or none>\\nFate Core System - Present meaningful obstacles and opposition that require rolls. DC is the ladder level (use Fair +2 as default, Great +4 for serious challenges):\\nExample:\\n- You carefully sneak past the alert guards (Awareness: Great +4). <use_skill: Stealth (DC 4); use_resource: none; use_item: none; mythic_check: none; mythic_table: sounds; custom_table: none>\\n- You try to convince the skeptical merchant (Will: Good +3). <use_skill: Rapport (DC 3); use_resource: none; use_item: none; mythic_check: Is he desperate? (Unlikely); mythic_table: none; custom_table: none>\\n- You scale the treacherous cliff face. <use_skill: Athletics (DC 4); use_resource: Stamina; use_item: Climbing Gear; mythic_check: none; mythic_table: terrain; custom_table: none>",
     dcGuidelines:
       "⚠️ FATE CORE DC GUIDELINES:\\n- DC is the opposition level on the Fate ladder. Set opposition for every meaningful action with uncertain outcome.\\n- Active Opposition: When facing NPCs, use their relevant skill as DC (guard's Awareness, noble's Will, etc.)\\n- Passive Opposition: For environmental challenges, set ladder level based on difficulty\\n  * DC 0-1: Average/Fair (routine skilled work, minor obstacles)\\n  * DC 2-3: Good/Great (serious challenges, trained opposition)\\n  * DC 4-5: Superb/Fantastic (impressive feats, expert opposition)\\n  * DC 6+: Epic/Legendary (near-impossible, legendary opposition)\\n- Success with style (beat DC by 3+) grants boosts or extra benefits. Describe them vividly!\\n- Ties are partial successes - success at a cost. Make the cost meaningful.\\n- Present obstacles, opposition, and challenges that naturally require rolls to resolve.",
+  },
+
+  conditionPenalties: {
+    tier1: -1,
+    tier2: -2,
+    tier3: -3,
+    tier4: -4,
+    tier5: "auto-fail", // Fate: Taken Out
+    tier6: "game-over",
   },
 };
 
@@ -966,6 +1033,15 @@ Remember: Stress creates tension, panic creates drama, pushing creates desperati
     dcGuidelines:
       "⚠️ YEAR ZERO ENGINE DC GUIDELINES:\\n- DC is the NUMBER OF SUCCESSES NEEDED (count 6s on dice rolled).\\n- DC 1: Simple task, needs 1 success (most common)\\n- DC 2: Moderate challenge, needs 2 successes\\n- DC 3: Difficult task, needs 3 successes\\n- DC 4+: Extremely challenging, rarely use\\n- DO NOT use DC values like 20, 50, 80! Those are for other RPG systems.\\n- The dice pool size (0-5 base dice) comes from the character's stat value ÷ 20.\\n- Players can add stress dice (voluntary) to increase success chances but risk panic on 1s.",
   },
+
+  conditionPenalties: {
+    tier1: -1, // -1 die from pool
+    tier2: -2, // -2 dice from pool
+    tier3: -3, // -3 dice from pool
+    tier4: -4, // -4 dice from pool
+    tier5: "auto-fail", // 0 dice = auto-fail
+    tier6: "game-over",
+  },
 };
 
 /**
@@ -1047,6 +1123,15 @@ export const SYSTEM_EXPLOSIVE: RPGSystem = {
       "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; mythic_check: question (likelihood) or none; mythic_table: category or none; custom_table: table name or none>\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 14); use_resource: Stamina; use_item: none; mythic_check: Is the dragon asleep? (Likely); mythic_table: sounds; custom_table: none>\n- You leap across the chasm. <use_skill: Athletics (DC 18); use_resource: none; use_item: none; mythic_check: none; mythic_table: terrain; custom_table: none>",
     dcGuidelines:
       "⚠️ EXPLODING DICE DC GUIDELINES:\n- Die sizes: d4 (weak 0-16), d6 (below avg 17-33), d8 (average 34-50), d10 (good 51-66), d12 (great 67-83), d20 (exceptional 84-100)\n- DC 8-12: Easy for most characters (d6+ succeed 50%+)\n- DC 12-16: Medium challenge (needs d10+ or luck)\n- DC 16-20: Hard challenge (needs d12+ or explosion)\n- DC 20-25: Very hard (needs d20 or multiple explosions)\n- DC 25+: Heroic/impossible (requires explosive luck)\n- When narrating explosions, describe the excitement: 'Your die explodes! Roll again...'\n- Remember: A character with 50 stat (d8) can still beat DC 20 through explosions, making every roll exciting!",
+  },
+
+  conditionPenalties: {
+    tier1: -1, // -1 die size step (d8 → d6)
+    tier2: -2, // -2 die size steps (d8 → d4)
+    tier3: -3, // -3 die size steps
+    tier4: -4, // d4 only
+    tier5: "auto-fail",
+    tier6: "game-over",
   },
 };
 
@@ -1158,6 +1243,15 @@ Stats and resources exist for character definition but don't mechanically affect
       "- ...Prose <use_skill: none; use_resource: none; use_item: item name or none; mythic_check: question (likelihood) or none; mythic_table: category or none; custom_table: table name or none>\n\nNARRATIVE SYSTEM - No skill checks! Outcomes flow from character choices and story logic:\nExample:\n- You slip through the shadows, using your training to avoid detection. <use_skill: none; use_resource: none; use_item: none; mythic_check: none; mythic_table: none; custom_table: none>\n- You confront the villain with the evidence you've gathered. <use_skill: none; use_resource: none; use_item: Evidence Folder; mythic_check: Does he try to flee? (Likely); mythic_table: none; custom_table: none>",
     dcGuidelines:
       "⚠️ NO DICE ROLLS IN NARRATIVE SYSTEM:\n- NEVER include use_skill with any skill name\n- NEVER specify DC values\n- Outcomes are determined by dramatic logic and character choices\n- Stats exist for character definition only, not mechanical resolution\n- Focus on meaningful choices, not random chance\n- Use Mythic checks for world-building questions, not character actions",
+  },
+
+  conditionPenalties: {
+    tier1: 0, // Narrative system - no mechanical penalties
+    tier2: 0,
+    tier3: 0,
+    tier4: 0,
+    tier5: 0,
+    tier6: "game-over", // Only tier 6 has game effect
   },
 };
 
@@ -1421,4 +1515,58 @@ export function getSystemUpgradeDefaults(systemId: RPGSystemType = "3d6"): {
     resourceUpgradeAmount: system.upgrades.resourceUpgradeAmount,
     shopStatStartingValue: system.upgrades.shopStatStartingValue,
   };
+}
+
+/**
+ * Get condition penalty for a given tier
+ * Returns an object with the penalty type and value
+ */
+export function getConditionPenalty(
+  systemId: RPGSystemType | undefined,
+  tier: 1 | 2 | 3 | 4 | 5 | 6
+): {
+  type:
+    | "modifier"
+    | "auto-fail"
+    | "auto-miss"
+    | "taken-out"
+    | "game-over"
+    | "die-size-down"
+    | "d4-only"
+    | "none";
+  value: number;
+} {
+  const system = getRPGSystem(systemId);
+  const tierKey = `tier${tier}` as keyof typeof system.conditionPenalties;
+  const penalty = system.conditionPenalties[tierKey];
+
+  if (penalty === null) {
+    return { type: "none", value: 0 };
+  }
+
+  if (typeof penalty === "number") {
+    return { type: "modifier", value: penalty };
+  }
+
+  // Handle special string penalties
+  switch (penalty) {
+    case "auto-fail":
+      return { type: "auto-fail", value: 0 };
+    case "auto-miss":
+      return { type: "auto-miss", value: 0 };
+    case "taken-out":
+      return { type: "taken-out", value: 0 };
+    case "game-over":
+      return { type: "game-over", value: 0 };
+    case "die-size-down":
+      return { type: "die-size-down", value: 1 };
+    case "die-size-down-2":
+      return { type: "die-size-down", value: 2 };
+    case "die-size-down-3":
+      return { type: "die-size-down", value: 3 };
+    case "d4-only":
+      return { type: "d4-only", value: 0 };
+    default:
+      return { type: "none", value: 0 };
+  }
 }

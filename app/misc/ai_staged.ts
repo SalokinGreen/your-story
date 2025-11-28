@@ -118,6 +118,24 @@ export function buildInfoMessage(storyData: StoryData): string {
           .join("\n")}`
       : "";
 
+  // Build conditions/afflictions section if any exist
+  const conditionsSection =
+    storyData.conditions && storyData.conditions.length > 0
+      ? `Active Conditions/Afflictions (impose penalties on skill checks):\n${storyData.conditions
+          .map((c) => {
+            const tierLabel = ["I", "II", "III", "IV", "V", "VI"][c.tier - 1];
+            const affectsLabel = c.affectsAll
+              ? "all checks"
+              : c.affects.length > 0
+              ? c.affects.join(", ")
+              : "unspecified";
+            const permanentLabel =
+              c.permanent || c.tier === 6 ? " [PERMANENT]" : "";
+            return `- ${c.name} (Tier ${tierLabel}${permanentLabel}): ${c.description} - affects ${affectsLabel}`;
+          })
+          .join("\n")}`
+      : "";
+
   // Build quests section if any exist
   const activeQuests = storyData.quests?.filter((q) => q.active) || [];
   const inactiveQuests =
@@ -207,6 +225,7 @@ ${
     memorySection,
     plotBeatsSection,
     relationshipsSection,
+    conditionsSection,
     questsSection,
     mythicSection,
     customTablesSection,
@@ -328,6 +347,9 @@ Think step-by-step in your message content:
 5. Any achievements unlocked? (use unlock_achievement for each that meets its trigger condition)
 6. Any quests updated? (use update_quest for progress)
 7. Any relationships changed? (use update_relationship for each)
+8. Any injuries, afflictions, or conditions? (use add_condition, upgrade_condition, downgrade_condition)
+9. Any conditions healed or worsened? (use downgrade_condition for healing, upgrade_condition for worsening)
+10. Is the character permanently incapacitated? (use game_over for tier VI conditions that end the story)
 
 You have access to various tools (functions) to modify game state. Use them to:
 - Add/remove items from inventory
@@ -336,6 +358,7 @@ You have access to various tools (functions) to modify game state. Use them to:
 - Manage relationships
 - Add memory entries for important story developments
 - Update lore and plot beats
+- Manage conditions/afflictions (injuries, poison, exhaustion, curses, etc.)
 
 ⚠️ EXACT NAME MATCHING REQUIREMENT:
 When referencing skills, resources, items, achievements, quests, or relationships, you MUST use the EXACT names as they appear in the game state.
@@ -352,6 +375,17 @@ Guidelines:
 - Add quest objectives as they're discovered or mentioned
 - Add lore entries for world-building information revealed in the story
 - Use game_over tool if the story clearly ends (death, complete victory, etc.)
+
+Condition/Affliction Guidelines:
+- Use add_condition when the player suffers injuries, curses, poison, exhaustion, or other afflictions
+- Condition tiers: I (minor), II (noticeable), III (significant), IV (severe), V (critical), VI (permanent/disability)
+- Use upgrade_condition when a condition worsens (e.g., untreated wound becomes infected)
+- Use downgrade_condition when healing occurs (magical healing, rest, medical treatment)
+- Use remove_condition when a condition is fully cured
+- Tier VI conditions are PERMANENT and typically mean game over - use game_over when appropriate
+- Set "affects" to the stats penalized by this condition (e.g., broken arm affects Strength, Athletics)
+- Set "affectsAll" to true for conditions affecting all actions (e.g., severe exhaustion, dying)
+- Example conditions: "Broken Arm" (affects Strength), "Poisoned" (affects all), "Exhausted" (affects all)
 
 Memory Guidelines:
 - Add NEW memory entries that don't already exist in the Memory section
@@ -541,6 +575,25 @@ ${
   storyData.inventory.length > 0
     ? storyData.inventory.map((i) => `• ${i.name} [${i.type}]`).join("\n")
     : "• (No items in inventory)"
+}
+
+⚠️ ACTIVE CONDITIONS (penalize skill checks):
+${
+  storyData.conditions && storyData.conditions.length > 0
+    ? storyData.conditions
+        .map((c) => {
+          const tierLabel = ["I", "II", "III", "IV", "V", "VI"][c.tier - 1];
+          const affectsLabel = c.affectsAll
+            ? "ALL checks"
+            : c.affects.length > 0
+            ? c.affects.join(", ")
+            : "unspecified";
+          return `• ${c.name} (Tier ${tierLabel}): affects ${affectsLabel}${
+            c.permanent ? " [PERMANENT]" : ""
+          }`;
+        })
+        .join("\n")
+    : "• (No active conditions)"
 }
 
 Resource System:
@@ -752,6 +805,7 @@ RESPOND WITH VALID JSON ONLY - no markdown, no explanation, just the JSON object
   "item_used": "exact item name from inventory, or null",
   "resource_used": "exact resource name from the list below, or null",
   "mythic_check": "yes/no question (likelihood)" or null,
+  "mythic_table": "table name" or null,
   "custom_table": "exact table name" or null,
   "is_plain_action": true/false (true if this is just dialogue/narration with no mechanics)
 }
@@ -783,6 +837,25 @@ ${
     : "• (No items - set item_used to null)"
 }
 
+ACTIVE CONDITIONS (apply penalties to skill checks):
+${
+  storyData.conditions && storyData.conditions.length > 0
+    ? storyData.conditions
+        .map((c) => {
+          const tierLabel = ["I", "II", "III", "IV", "V", "VI"][c.tier - 1];
+          const affectsLabel = c.affectsAll
+            ? "ALL checks"
+            : c.affects.length > 0
+            ? c.affects.join(", ")
+            : "unspecified";
+          return `• ${c.name} (Tier ${tierLabel}): affects ${affectsLabel}${
+            c.permanent ? " [PERMANENT]" : ""
+          }`;
+        })
+        .join("\n")
+    : "• (No active conditions)"
+}
+
 ${
   storyData.customTables && storyData.customTables.length > 0
     ? `CUSTOM TABLES (for custom_table):\n${storyData.customTables
@@ -793,7 +866,7 @@ ${
 ${
   storyData.mythicState
     ? `
-MYTHIC GME (for mythic_check):
+MYTHIC GME (for mythic_check and mythic_table):
 Use mythic_check for yes/no questions about the world that skill checks can't answer.
 Format: "question (likelihood)" where likelihood is one of:
 Impossible, No Way, Very Unlikely, Unlikely, 50/50, Somewhat Likely, Likely, Very Likely, Near Sure Thing, A Sure Thing, Has To Be
@@ -802,12 +875,35 @@ Current Chaos Factor: ${storyData.mythicState.chaosFactor}/9
 
 Good uses: "Is the door locked? (50/50)", "Is someone watching? (Likely)", "Are there guards nearby? (Somewhat Likely)"
 Bad uses: Don't use mythic_check to determine success of skill-based actions - that's what skill_used is for.
-If skill_used is set, only use mythic_check for CONTEXT questions that don't override the skill result.`
+If skill_used is set, only use mythic_check for CONTEXT questions that don't override the skill result.
+
+MYTHIC TABLES (for mythic_table):
+Use mythic_table for random generation when the player's action involves discovery or uncertainty.
+Available tables: actions_combat, actions_general, appearance, background, conversations, descriptors, identity, motivations, personality, skills, traits_flaws, adventure_tone, cavern, city, civilization, domicile, dungeon, dungeon_traps, forest, locations, terrain, alien_species, animal_actions, creature_abilities, creature_descriptors, undead, magic_item, objects, powers, scavenging_results, spell_effects, cryptic_message, curses, gods, legends, names, plot_twists, visions_dreams, army, smells, sounds, mutation, noble_house, starship
+
+Example uses:
+- Player searches a room → mythic_table: "scavenging_results" or "objects"
+- Player asks about an NPC's motives → mythic_table: "motivations"
+- Player explores a dungeon → mythic_table: "dungeon" or "dungeon_traps"
+- Player encounters a creature → mythic_table: "creature_abilities" or "creature_descriptors"`
     : ""
 }
 
 DC GUIDELINES (${rpgSystem.name}):
 ${rpgSystem.aiInstructions.dcGuidelines}
+
+RESOURCE USAGE RULES:
+- Resources CAN and SHOULD be assigned even if the player has low or zero value
+- Low/empty resources give DISADVANTAGE on the roll, but the action is still attempted
+- Match resources thematically: Stamina for physical exertion, Health for dangerous combat, Mana for spellcasting, etc.
+- Example: Sprinting to escape → use Stamina even if at 0 (player attempts while exhausted, with disadvantage)
+
+ITEM USAGE RULES:
+- Items NOT in inventory can still be set as item_used if the action would benefit from having one
+- Missing items give DISADVANTAGE on the roll (attempting without proper tools)
+- Only set item_used to null if the action genuinely doesn't need any equipment
+- Exception: If an action is IMPOSSIBLE without a specific item (e.g., "unlock door with key" when no key exists), set is_plain_action: false but item_used: null, and the story will handle the impossibility
+- Example: Climbing a wall → could use "Rope" even if not owned (climbing without rope = disadvantage)
 
 DECISION RULES:
 1. Simple actions (talking, walking, looking around, basic interactions) → is_plain_action: true, everything else null
