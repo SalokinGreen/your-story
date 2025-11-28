@@ -376,6 +376,14 @@ Guidelines:
 - Add lore entries for world-building information revealed in the story
 - Use game_over tool if the story clearly ends (death, complete victory, etc.)
 
+Lore Guidelines:
+- When creating lore, ALWAYS provide onTriggers for discoverable information
+- Triggers use EXACT word matching (case-insensitive) - "zombie" won't match "zombies"
+- Include word variations: ["dragon", "dragons", "Dragon", "Dragons", "dragonkin"]
+- Set on=false for lore that should be hidden until triggered
+- Only use on=true (no triggers) for lore that should be visible from the start
+- Example: create_lore(title="Undead Horde", content="...", on=false, onTriggers=["zombie", "zombies", "undead", "Undead"])
+
 Condition/Affliction Guidelines:
 - Use add_condition when the player suffers injuries, curses, poison, exhaustion, or other afflictions
 - Condition tiers: I (minor), II (noticeable), III (significant), IV (severe), V (critical), VI (permanent/disability)

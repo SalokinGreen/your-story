@@ -467,7 +467,7 @@ const createLoreTool: ToolSchema = {
   function: {
     name: "create_lore",
     description:
-      "Add a new lore entry with optional trigger/untrigger words and beat conditions",
+      "Add a new lore entry. IMPORTANT: Always provide onTriggers for lore that should be discovered during play. Triggers use EXACT word matching (case-insensitive), so include variations like 'dragon', 'dragons', 'Dragon'. Without triggers, lore is visible immediately.",
     parameters: {
       type: "object",
       properties: {
@@ -481,12 +481,13 @@ const createLoreTool: ToolSchema = {
         },
         on: {
           type: "boolean",
-          description: "Whether lore is initially visible (default: true)",
+          description: "Whether lore is initially visible (default: false if triggers provided, true otherwise)",
         },
         onTriggers: {
           type: "array",
           items: { type: "string" },
-          description: "Words that reveal this lore when mentioned (optional)",
+          description:
+            "Words that reveal this lore when mentioned in the story. Uses EXACT matching - 'zombie' won't match 'zombies', so include all variations. Example: ['zombie', 'zombies', 'undead', 'Zombie']",
         },
         offTriggers: {
           type: "array",

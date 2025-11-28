@@ -426,7 +426,7 @@ export async function generateStoryTurn(
                 messages: toolPrompt.messages,
                 tools: TOOL_SCHEMAS,
                 model: currentModel,
-                maxTokens: 2000,
+                maxTokens: 4000,
                 temperature: 0.3,
               }),
               signal: toolAbortController.signal,
