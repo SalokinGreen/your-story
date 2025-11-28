@@ -117,10 +117,15 @@ async function* parseSSEStream(
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
+    // Append new data to buffer if available
+    if (value) {
+      buffer += decoder.decode(value, { stream: true });
+    }
+
+    // Process all complete lines in buffer
     const lines = buffer.split("\n");
+    // Keep the last incomplete line in buffer
     buffer = lines.pop() || "";
 
     for (const line of lines) {
@@ -136,6 +141,26 @@ async function* parseSSEStream(
       } catch {
         // Skip malformed JSON
       }
+    }
+
+    // Only break AFTER processing - ensures we catch final events
+    if (done) {
+      // Process any remaining data in buffer after stream closes
+      if (buffer.trim()) {
+        const trimmed = buffer.trim();
+        if (trimmed.startsWith("data:")) {
+          const data = trimmed.slice(5).trim();
+          if (data !== "[DONE]") {
+            try {
+              const parsed: StreamEvent = JSON.parse(data);
+              yield parsed;
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+      break;
     }
   }
 }
