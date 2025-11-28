@@ -96,8 +96,15 @@ export async function POST(req: NextRequest) {
   // Use getModelConfig which handles fallback to Deepseek Chat if model not found
   const modelKey = requestedModel || "Deepseek Chat";
   const modelConfig = getModelConfig(modelKey);
-  
-  console.log("[Creator AI] Model requested:", requestedModel, "Using:", modelKey, "Provider:", modelConfig.provider);
+
+  console.log(
+    "[Creator AI] Model requested:",
+    requestedModel,
+    "Using:",
+    modelKey,
+    "Provider:",
+    modelConfig.provider
+  );
 
   // Estimate tokens
   // Rough estimate: 4 chars per token for input

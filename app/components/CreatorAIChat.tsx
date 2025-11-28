@@ -55,10 +55,7 @@ export default function CreatorAIChat({
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return (
-        localStorage.getItem("creatorAiModel") ||
-        "Deepseek Chat"
-      );
+      return localStorage.getItem("creatorAiModel") || "Deepseek Chat";
     }
     return "Deepseek Chat";
   });
@@ -201,34 +198,18 @@ export default function CreatorAIChat({
               title="Select AI model"
             >
               <optgroup label="Recommended">
-                <option value="Deepseek Chat">
-                  Deepseek Chat (Best)
-                </option>
-                <option value="Gemini 2.5 Flash">
-                  Gemini 2.5 Flash
-                </option>
-                <option value="Mistral Medium 3.1">
-                  Mistral Medium 3.1
-                </option>
+                <option value="Deepseek Chat">Deepseek Chat (Best)</option>
+                <option value="Gemini 2.5 Flash">Gemini 2.5 Flash</option>
+                <option value="Mistral Medium 3.1">Mistral Medium 3.1</option>
               </optgroup>
               <optgroup label="Advanced">
-                <option value="Deepseek R1">
-                  DeepSeek R1 (Reasoning)
-                </option>
-                <option value="Grok 4 Fast">
-                  Grok 4 Fast (Creative)
-                </option>
-                <option value="GLM 4.6">
-                  GLM 4.6 (Long Context)
-                </option>
+                <option value="Deepseek R1">DeepSeek R1 (Reasoning)</option>
+                <option value="Grok 4 Fast">Grok 4 Fast (Creative)</option>
+                <option value="GLM 4.6">GLM 4.6 (Long Context)</option>
               </optgroup>
               <optgroup label="Budget">
-                <option value="Gemini 2.5 Flash Lite">
-                  Gemini Flash Lite
-                </option>
-                <option value="Grok Code Fast 1">
-                  Grok Code Fast
-                </option>
+                <option value="Gemini 2.5 Flash Lite">Gemini Flash Lite</option>
+                <option value="Grok Code Fast 1">Grok Code Fast</option>
               </optgroup>
             </select>
             {messages.length > 0 && (

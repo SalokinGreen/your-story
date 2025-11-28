@@ -24,7 +24,9 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [contextString, setContextString] = useState("");
   const [estimatedTokens, setEstimatedTokens] = useState(0);
   const [activeModelName, setActiveModelName] = useState("Deepseek Chat");
-  const [activeModelConfig, setActiveModelConfig] = useState(getModelConfig("Deepseek Chat"));
+  const [activeModelConfig, setActiveModelConfig] = useState(
+    getModelConfig("Deepseek Chat")
+  );
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [prunedParts, setPrunedParts] = useState(0);
@@ -54,7 +56,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       typeof window !== "undefined"
         ? localStorage.getItem("aiPreset") || "main"
         : "main";
-    
+
     const customStoryModel =
       typeof window !== "undefined"
         ? localStorage.getItem("aiModelStory") || ""
@@ -70,18 +72,32 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
 
     // Get preset config (fallback to main if invalid)
     const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["main"];
-    
+
     // Determine effective models - use custom only if preset is "custom" AND value is set
-    const effectiveStoryModel = currentPreset === "custom" && customStoryModel ? customStoryModel : preset.storyModel;
-    const effectiveToolsModel = currentPreset === "custom" && customToolsModel ? customToolsModel : preset.toolsModel;
-    const effectiveChoicesModel = currentPreset === "custom" && customChoicesModel ? customChoicesModel : preset.choicesModel;
+    const effectiveStoryModel =
+      currentPreset === "custom" && customStoryModel
+        ? customStoryModel
+        : preset.storyModel;
+    const effectiveToolsModel =
+      currentPreset === "custom" && customToolsModel
+        ? customToolsModel
+        : preset.toolsModel;
+    const effectiveChoicesModel =
+      currentPreset === "custom" && customChoicesModel
+        ? customChoicesModel
+        : preset.choicesModel;
 
     // Select the model based on active stage
-    const currentModel = activeStage === "story" ? effectiveStoryModel : activeStage === "tools" ? effectiveToolsModel : effectiveChoicesModel;
+    const currentModel =
+      activeStage === "story"
+        ? effectiveStoryModel
+        : activeStage === "tools"
+        ? effectiveToolsModel
+        : effectiveChoicesModel;
     const modelConfig = getModelConfig(currentModel);
     setActiveModelName(currentModel);
     setActiveModelConfig(modelConfig);
-    
+
     const maxTokens = modelConfig.maxTokens;
 
     console.log("🔍 Context Viewer Debug:", {
@@ -323,8 +339,8 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                   {prunedParts > 0 ? (
                     <span className="text-amber-600 dark:text-amber-400">
                       {" "}
-                      Pruned {prunedParts} oldest parts to fit {activeModelName}'s
-                      context.
+                      Pruned {prunedParts} oldest parts to fit {activeModelName}
+                      's context.
                     </span>
                   ) : (
                     <span className="text-green-600 dark:text-green-400">
@@ -465,7 +481,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       </div>
 
       {/* Messages List */}
-      <div 
+      <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 relative"
       >
