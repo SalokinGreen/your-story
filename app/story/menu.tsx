@@ -1632,7 +1632,10 @@ function StatsResourcesEditor({
                         className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded flex items-center justify-center"
                         title="Move up"
                       >
-                        <DynamicIcon name="ChevronUp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <DynamicIcon
+                          name="ChevronUp"
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                        />
                       </button>
                       <button
                         onClick={() => moveStatDown(index)}
@@ -1640,7 +1643,10 @@ function StatsResourcesEditor({
                         className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded flex items-center justify-center"
                         title="Move down"
                       >
-                        <DynamicIcon name="ChevronDown" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <DynamicIcon
+                          name="ChevronDown"
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                        />
                       </button>
                     </div>
                     <div className="flex gap-0.5">
@@ -1649,14 +1655,20 @@ function StatsResourcesEditor({
                         className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
                         title="Edit"
                       >
-                        <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <DynamicIcon
+                          name="Edit"
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                        />
                       </button>
                       <button
                         onClick={() => removeStat(index)}
                         className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
                         title="Remove"
                       >
-                        <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <DynamicIcon
+                          name="Trash2"
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                        />
                       </button>
                     </div>
                   </div>
@@ -1795,7 +1807,10 @@ function StatsResourcesEditor({
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                       title="Move up"
                     >
-                      <DynamicIcon name="ChevronUp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="ChevronUp"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                     <button
                       onClick={() => moveResourceDown(index)}
@@ -1803,7 +1818,10 @@ function StatsResourcesEditor({
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                       title="Move down"
                     >
-                      <DynamicIcon name="ChevronDown" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="ChevronDown"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                   </div>
                   <div className="flex gap-0.5">
@@ -1812,14 +1830,20 @@ function StatsResourcesEditor({
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
                       title="Edit"
                     >
-                      <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="Edit"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                     <button
                       onClick={() => removeResource(index)}
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
                       title="Remove"
                     >
-                      <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="Trash2"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                   </div>
                 </div>
@@ -2315,7 +2339,10 @@ function QuestEditor({
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                       title="Move up"
                     >
-                      <DynamicIcon name="ChevronUp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="ChevronUp"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                     <button
                       onClick={() => moveQuestDown(index)}
@@ -2323,7 +2350,10 @@ function QuestEditor({
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                       title="Move down"
                     >
-                      <DynamicIcon name="ChevronDown" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="ChevronDown"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                   </div>
                   <div className="flex gap-0.5">
@@ -2332,14 +2362,20 @@ function QuestEditor({
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
                       title="Edit"
                     >
-                      <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="Edit"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                     <button
                       onClick={() => removeQuest(index)}
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
                       title="Remove"
                     >
-                      <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="Trash2"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                   </div>
                 </div>
@@ -2604,7 +2640,10 @@ function InventoryEditor({
                     className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                     title="Move up"
                   >
-                    <DynamicIcon name="ChevronUp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <DynamicIcon
+                      name="ChevronUp"
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                    />
                   </button>
                   <button
                     onClick={() => moveInventoryDown(index)}
@@ -2612,7 +2651,10 @@ function InventoryEditor({
                     className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                     title="Move down"
                   >
-                    <DynamicIcon name="ChevronDown" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <DynamicIcon
+                      name="ChevronDown"
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                    />
                   </button>
                 </div>
                 <div className="flex gap-0.5">
@@ -2621,14 +2663,20 @@ function InventoryEditor({
                     className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
                     title="Edit"
                   >
-                    <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <DynamicIcon
+                      name="Edit"
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                    />
                   </button>
                   <button
                     onClick={() => removeItem(index)}
                     className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
                     title="Remove"
                   >
-                    <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <DynamicIcon
+                      name="Trash2"
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                    />
                   </button>
                 </div>
               </div>
@@ -3344,88 +3392,94 @@ function LoreEditor({
             >
               <div className="flex items-start gap-2 sm:gap-3">
                 <span className="text-gray-400 select-none mt-1">
-                  <DynamicIcon name="GripVertical" className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <DynamicIcon
+                    name="GripVertical"
+                    className="w-4 h-4 sm:w-5 sm:h-5"
+                  />
                 </span>
                 <div className="flex-1 min-w-0">
-                <div className="font-medium text-white flex items-center gap-2">
-                  {loreItem.secrtet && (
-                    <DynamicIcon
-                      name="Lock"
-                      className="w-4 h-4 text-gray-500"
+                  <div className="font-medium text-white flex items-center gap-2">
+                    {loreItem.secrtet && (
+                      <DynamicIcon
+                        name="Lock"
+                        className="w-4 h-4 text-gray-500"
+                      />
+                    )}
+                    {loreItem.title}
+                    {/* On/Off Toggle */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const updated = [...localLore];
+                        updated[index] = { ...loreItem, on: !loreItem.on };
+                        setLocalLore(updated);
+                        onUpdate(updated);
+                      }}
+                      className={`px-2 py-1 rounded-full text-xs font-semibold transition-colors ${
+                        loreItem.on
+                          ? "bg-green-600 text-white hover:bg-green-700"
+                          : "bg-gray-400 text-white hover:bg-gray-500"
+                      }`}
+                      title={
+                        loreItem.on ? "Lore is enabled" : "Lore is disabled"
+                      }
+                    >
+                      {loreItem.on ? "ON" : "OFF"}
+                    </button>
+                  </div>
+                  {loreItem.thumbnailUrl && (
+                    <img
+                      src={loreItem.thumbnailUrl}
+                      alt={loreItem.title}
+                      className="mt-2 w-20 h-20 object-cover rounded border border-blue-700/40"
                     />
                   )}
-                  {loreItem.title}
-                  {/* On/Off Toggle */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const updated = [...localLore];
-                      updated[index] = { ...loreItem, on: !loreItem.on };
-                      setLocalLore(updated);
-                      onUpdate(updated);
-                    }}
-                    className={`px-2 py-1 rounded-full text-xs font-semibold transition-colors ${
-                      loreItem.on
-                        ? "bg-green-600 text-white hover:bg-green-700"
-                        : "bg-gray-400 text-white hover:bg-gray-500"
-                    }`}
-                    title={loreItem.on ? "Lore is enabled" : "Lore is disabled"}
-                  >
-                    {loreItem.on ? "ON" : "OFF"}
-                  </button>
-                </div>
-                {loreItem.thumbnailUrl && (
-                  <img
-                    src={loreItem.thumbnailUrl}
-                    alt={loreItem.title}
-                    className="mt-2 w-20 h-20 object-cover rounded border border-blue-700/40"
-                  />
-                )}
-                <div className="text-sm text-blue-200/60 mt-1 line-clamp-2">
-                  {loreItem.content}
-                </div>
-                {loreItem.on_triggers && loreItem.on_triggers.length > 0 && (
-                  <div className="text-xs text-green-700 dark:text-green-400 mt-1 flex items-center gap-1">
-                    <strong className="flex items-center gap-1">
-                      <DynamicIcon name="CheckCircle" className="w-3 h-3" /> ON
-                      Triggers:
-                    </strong>{" "}
-                    {loreItem.on_triggers.join(", ")}
+                  <div className="text-sm text-blue-200/60 mt-1 line-clamp-2">
+                    {loreItem.content}
                   </div>
-                )}
-                {loreItem.off_triggers && loreItem.off_triggers.length > 0 && (
-                  <div className="text-xs text-red-700 dark:text-red-400 mt-1 flex items-center gap-1">
-                    <strong className="flex items-center gap-1">
-                      <DynamicIcon name="XCircle" className="w-3 h-3" /> OFF
-                      Triggers:
-                    </strong>{" "}
-                    {loreItem.off_triggers.join(", ")}
-                  </div>
-                )}
-                {loreItem.beats_trigger &&
-                  loreItem.beats_trigger.length > 0 && (
+                  {loreItem.on_triggers && loreItem.on_triggers.length > 0 && (
                     <div className="text-xs text-green-700 dark:text-green-400 mt-1 flex items-center gap-1">
                       <strong className="flex items-center gap-1">
                         <DynamicIcon name="CheckCircle" className="w-3 h-3" />{" "}
-                        Beats turning ON:
+                        ON Triggers:
                       </strong>{" "}
-                      {loreItem.beats_trigger
-                        .map((i) => plotBeats[i]?.title || `Beat ${i + 1}`)
-                        .join(", ")}
+                      {loreItem.on_triggers.join(", ")}
                     </div>
                   )}
-                {loreItem.beats_untrigger &&
-                  loreItem.beats_untrigger.length > 0 && (
-                    <div className="text-xs text-red-700 dark:text-red-400 mt-1 flex items-center gap-1">
-                      <strong className="flex items-center gap-1">
-                        <DynamicIcon name="XCircle" className="w-3 h-3" /> Beats
-                        turning OFF:
-                      </strong>{" "}
-                      {loreItem.beats_untrigger
-                        .map((i) => plotBeats[i]?.title || `Beat ${i + 1}`)
-                        .join(", ")}
-                    </div>
-                  )}
+                  {loreItem.off_triggers &&
+                    loreItem.off_triggers.length > 0 && (
+                      <div className="text-xs text-red-700 dark:text-red-400 mt-1 flex items-center gap-1">
+                        <strong className="flex items-center gap-1">
+                          <DynamicIcon name="XCircle" className="w-3 h-3" /> OFF
+                          Triggers:
+                        </strong>{" "}
+                        {loreItem.off_triggers.join(", ")}
+                      </div>
+                    )}
+                  {loreItem.beats_trigger &&
+                    loreItem.beats_trigger.length > 0 && (
+                      <div className="text-xs text-green-700 dark:text-green-400 mt-1 flex items-center gap-1">
+                        <strong className="flex items-center gap-1">
+                          <DynamicIcon name="CheckCircle" className="w-3 h-3" />{" "}
+                          Beats turning ON:
+                        </strong>{" "}
+                        {loreItem.beats_trigger
+                          .map((i) => plotBeats[i]?.title || `Beat ${i + 1}`)
+                          .join(", ")}
+                      </div>
+                    )}
+                  {loreItem.beats_untrigger &&
+                    loreItem.beats_untrigger.length > 0 && (
+                      <div className="text-xs text-red-700 dark:text-red-400 mt-1 flex items-center gap-1">
+                        <strong className="flex items-center gap-1">
+                          <DynamicIcon name="XCircle" className="w-3 h-3" />{" "}
+                          Beats turning OFF:
+                        </strong>{" "}
+                        {loreItem.beats_untrigger
+                          .map((i) => plotBeats[i]?.title || `Beat ${i + 1}`)
+                          .join(", ")}
+                      </div>
+                    )}
                 </div>
                 {/* Controls - inline on desktop, wrap on mobile */}
                 <div className="flex items-center gap-1.5 sm:gap-2 mt-2 sm:mt-0 flex-wrap sm:flex-nowrap">
@@ -3436,7 +3490,10 @@ function LoreEditor({
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                       title="Move up"
                     >
-                      <DynamicIcon name="ChevronUp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="ChevronUp"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                     <button
                       onClick={() => moveLoreDown(index)}
@@ -3444,7 +3501,10 @@ function LoreEditor({
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                       title="Move down"
                     >
-                      <DynamicIcon name="ChevronDown" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="ChevronDown"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                   </div>
                   <div className="flex gap-0.5">
@@ -3453,14 +3513,20 @@ function LoreEditor({
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
                       title="Edit"
                     >
-                      <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="Edit"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                     <button
                       onClick={() => removeLore(index)}
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
                       title="Remove"
                     >
-                      <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <DynamicIcon
+                        name="Trash2"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                      />
                     </button>
                   </div>
                 </div>
@@ -4715,7 +4781,11 @@ export default function MenuPage({
             {/* Header */}
             <div className="flex items-center justify-between p-3 sm:p-6 border-b border-blue-800/30">
               <h3 className="text-base sm:text-xl font-bold text-white flex items-center gap-2">
-                <DynamicIcon name="Settings" className="w-5 h-5 sm:w-6 sm:h-6" /> Story Editor
+                <DynamicIcon
+                  name="Settings"
+                  className="w-5 h-5 sm:w-6 sm:h-6"
+                />{" "}
+                Story Editor
               </h3>
               <button
                 onClick={() => setShowSettings(false)}
@@ -4769,8 +4839,13 @@ export default function MenuPage({
                       : "bg-blue-900/30 text-blue-200 hover:bg-blue-800/40"
                   }`}
                 >
-                  <DynamicIcon name={tab.icon} className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                  <span className="leading-none hidden sm:inline">{tab.label}</span>
+                  <DynamicIcon
+                    name={tab.icon}
+                    className="w-4 h-4 sm:w-5 sm:h-5 shrink-0"
+                  />
+                  <span className="leading-none hidden sm:inline">
+                    {tab.label}
+                  </span>
                 </button>
               ))}
             </DraggableScroll>
@@ -5842,10 +5917,7 @@ export default function MenuPage({
                 }}
                 className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-colors flex items-center justify-center gap-1"
               >
-                <DynamicIcon
-                  name="Save"
-                  className="w-4 h-4"
-                />
+                <DynamicIcon name="Save" className="w-4 h-4" />
                 <span className="hidden sm:inline">Save All Changes</span>
                 <span className="sm:hidden">Save</span>
               </button>

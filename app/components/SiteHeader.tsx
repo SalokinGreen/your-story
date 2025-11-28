@@ -132,45 +132,48 @@ export default function SiteHeader() {
             </button>
           </nav>
 
-          {/* Profile */}
-          <button
-            onClick={(e) => handleNavClick(e, `/profile/${user.id}`)}
-            onMouseUp={(e) => handleMouseUp(e, `/profile/${user.id}`)}
-            className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
-          >
-            <span className="text-sm font-medium text-gray-900 dark:text-white hidden sm:inline">
-              {displayName}
-            </span>
-            {profileData?.avatar_url ? (
-              <img
-                src={profileData.avatar_url}
-                alt={`${displayName}'s avatar`}
-                className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center border-2 border-purple-500 shadow-sm">
-                <span className="text-sm font-bold text-white">
-                  {displayName[0]?.toUpperCase() || "?"}
-                </span>
-              </div>
-            )}
-          </button>
+          {/* Right side - Profile + Mobile Menu */}
+          <div className="flex items-center gap-1">
+            {/* Profile */}
+            <button
+              onClick={(e) => handleNavClick(e, `/profile/${user.id}`)}
+              onMouseUp={(e) => handleMouseUp(e, `/profile/${user.id}`)}
+              className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+            >
+              <span className="text-sm font-medium text-gray-900 dark:text-white hidden md:inline">
+                {displayName}
+              </span>
+              {profileData?.avatar_url ? (
+                <img
+                  src={profileData.avatar_url}
+                  alt={`${displayName}'s avatar`}
+                  className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center border-2 border-purple-500 shadow-sm">
+                  <span className="text-sm font-bold text-white">
+                    {displayName[0]?.toUpperCase() || "?"}
+                  </span>
+                </div>
+              )}
+            </button>
 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => {
-              const menu = document.getElementById("mobile-menu");
-              if (menu) {
-                menu.classList.toggle("hidden");
-              }
-            }}
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
-          >
-            <DynamicIcon
-              name="Menu"
-              className="w-5 h-5 text-gray-900 dark:text-white"
-            />
-          </button>
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => {
+                const menu = document.getElementById("mobile-menu");
+                if (menu) {
+                  menu.classList.toggle("hidden");
+                }
+              }}
+              className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+            >
+              <DynamicIcon
+                name="Menu"
+                className="w-5 h-5 text-gray-900 dark:text-white"
+              />
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
