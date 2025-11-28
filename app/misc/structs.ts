@@ -413,3 +413,25 @@ export interface EncryptedStoryData {
   salt: string; // base64 encoded salt
   iv: string; // base64 encoded IV
 }
+
+// Action analysis result from AI (for freeform action mode)
+export interface ActionAnalysis {
+  action_summary: string; // Brief description of the action
+  skill_used: string | null; // Stat name for skill check, or null if no check needed
+  skill_dc: number | null; // Difficulty class if skill check is needed
+  item_used: string | null; // Item name if using an item
+  resource_used: string | null; // Resource name if using a resource
+  mythic_check: string | null; // Mythic yes/no question with likelihood
+  custom_table: string | null; // Custom table to roll on
+  is_plain_action: boolean; // True if no mechanics, just narration
+}
+
+// For manual action building when AI analysis fails
+export interface ManualAction {
+  text: string;
+  skill_used?: string;
+  skill_dc?: number;
+  item_used?: string;
+  resource_used?: string;
+  is_plain_action: boolean;
+}

@@ -15,17 +15,24 @@ import {
   CommandResponse,
   Choice,
   ScenePart,
+  ActionAnalysis,
 } from "@/app/misc/structs";
 import {
   buildStoryPrompt,
   buildToolPrompt,
   buildChoicesPrompt,
+  buildActionAnalysisPrompt,
   ChatMessage,
 } from "@/app/misc/ai_staged";
 import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
 import { getAuthToken } from "@/app/misc/getAuthToken";
 import { logger } from "@/app/misc/logger";
+import {
+  findStatMatch,
+  findResourceMatch,
+  findItemMatch,
+} from "@/app/misc/fuzzyMatch";
 
 // ============================================================
 // TYPES
@@ -37,6 +44,7 @@ export interface GenerationOptions {
   choicesModel: string;
   enableTools: boolean;
   maxToolLoops?: number;
+  skipChoices?: boolean;
 }
 
 export interface GenerationCallbacks {
@@ -487,8 +495,12 @@ export async function generateStoryTurn(
       logger.action("Stage 3 complete", { choicesCount: choices.length });
     };
 
-    // Run tools and choices in parallel
-    await Promise.all([runToolGeneration(), runChoicesGeneration()]);
+    // Run tools and choices in parallel (skip choices if requested)
+    const parallelTasks = [runToolGeneration()];
+    if (!options.skipChoices) {
+      parallelTasks.push(runChoicesGeneration());
+    }
+    await Promise.all(parallelTasks);
 
     // ========================================
     // BUILD SCENE PART
@@ -617,4 +629,202 @@ export async function* generateSimpleStream(
   }
 
   yield* parseSSEStream(response);
+}
+
+// ============================================================
+// ACTION ANALYSIS (for freeform action mode)
+// ============================================================
+
+export interface ActionAnalysisResult {
+  analysis: ActionAnalysis;
+  meta: GenerationMeta;
+  validationWarnings: string[];
+}
+
+/**
+ * Analyze a freeform player action and extract game mechanics
+ */
+export async function analyzeAction(
+  storyData: StoryData,
+  userAction: string,
+  model: string
+): Promise<ActionAnalysisResult> {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error("Not authenticated");
+  }
+
+  logger.action("Analyzing freeform action", { userAction, model });
+
+  const prompt = buildActionAnalysisPrompt({ storyData, userAction });
+
+  const response = await fetch("/api/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      messages: prompt.messages,
+      model,
+      maxTokens: 500,
+      temperature: 0.3, // Low temperature for structured output
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Analysis failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.content;
+  const meta = data.meta;
+
+  // Parse JSON from response
+  let analysis: ActionAnalysis;
+  try {
+    // Try to extract JSON from the response (handle markdown code blocks)
+    let jsonStr = content;
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1];
+    }
+    // Also try to find raw JSON object
+    const objectMatch = jsonStr.match(/\{[\s\S]*\}/);
+    if (objectMatch) {
+      jsonStr = objectMatch[0];
+    }
+
+    analysis = JSON.parse(jsonStr);
+  } catch (e) {
+    logger.error("Failed to parse action analysis JSON", { content, error: e });
+    // Return a plain action as fallback
+    analysis = {
+      action_summary: userAction,
+      skill_used: null,
+      skill_dc: null,
+      item_used: null,
+      resource_used: null,
+      mythic_check: null,
+      custom_table: null,
+      is_plain_action: true,
+    };
+  }
+
+  // Validate and fuzzy match the analysis against actual game state
+  const validationWarnings: string[] = [];
+
+  // Validate skill_used
+  if (analysis.skill_used) {
+    const matchResult = findStatMatch(analysis.skill_used, storyData.stats);
+    if (matchResult) {
+      if (!matchResult.isExact) {
+        validationWarnings.push(
+          `Matched skill "${analysis.skill_used}" → "${matchResult.name}"`
+        );
+      }
+      analysis.skill_used = matchResult.name;
+    } else {
+      validationWarnings.push(
+        `Skill "${analysis.skill_used}" not found, removing skill check`
+      );
+      analysis.skill_used = null;
+      analysis.skill_dc = null;
+    }
+  }
+
+  // Validate resource_used
+  if (analysis.resource_used) {
+    const matchResult = findResourceMatch(
+      analysis.resource_used,
+      storyData.resources
+    );
+    if (matchResult) {
+      if (!matchResult.isExact) {
+        validationWarnings.push(
+          `Matched resource "${analysis.resource_used}" → "${matchResult.name}"`
+        );
+      }
+      analysis.resource_used = matchResult.name;
+    } else {
+      validationWarnings.push(
+        `Resource "${analysis.resource_used}" not found, removing`
+      );
+      analysis.resource_used = null;
+    }
+  }
+
+  // Validate item_used
+  if (analysis.item_used) {
+    const matchResult = findItemMatch(analysis.item_used, storyData.inventory);
+    if (matchResult) {
+      if (!matchResult.isExact) {
+        validationWarnings.push(
+          `Matched item "${analysis.item_used}" → "${matchResult.name}"`
+        );
+      }
+      analysis.item_used = matchResult.name;
+    } else {
+      validationWarnings.push(
+        `Item "${analysis.item_used}" not found, removing`
+      );
+      analysis.item_used = null;
+    }
+  }
+
+  // Validate custom_table
+  if (analysis.custom_table && storyData.customTables) {
+    const table = storyData.customTables.find(
+      (t) => t.name.toLowerCase() === analysis.custom_table!.toLowerCase()
+    );
+    if (table) {
+      analysis.custom_table = table.name;
+    } else {
+      validationWarnings.push(
+        `Custom table "${analysis.custom_table}" not found, removing`
+      );
+      analysis.custom_table = null;
+    }
+  }
+
+  // Ensure is_plain_action is consistent
+  if (
+    !analysis.skill_used &&
+    !analysis.item_used &&
+    !analysis.resource_used &&
+    !analysis.mythic_check &&
+    !analysis.custom_table
+  ) {
+    analysis.is_plain_action = true;
+  }
+
+  logger.action("Action analysis complete", {
+    analysis,
+    validationWarnings,
+  });
+
+  return {
+    analysis,
+    meta,
+    validationWarnings,
+  };
+}
+
+/**
+ * Convert ActionAnalysis to Choice format for use with existing handleChoice logic
+ */
+export function analysisToChoice(
+  analysis: ActionAnalysis,
+  originalAction: string
+): Choice {
+  return {
+    text: originalAction,
+    skill_used: analysis.skill_used || undefined,
+    skill_dc: analysis.skill_dc || undefined,
+    item_used: analysis.item_used || undefined,
+    resource_used: analysis.resource_used || undefined,
+    mythic_check: analysis.mythic_check || undefined,
+    custom_table: analysis.custom_table || undefined,
+  };
 }

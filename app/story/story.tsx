@@ -1,5 +1,5 @@
 "use client";
-import { Choice, Choices, StoryData } from "../misc/structs";
+import { Choice, Choices, StoryData, ActionAnalysis } from "../misc/structs";
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import TTSControls from "../components/TTSControls";
@@ -20,6 +20,10 @@ interface StoryProps {
   handleChoice: () => void;
   handleSelect: (index: number) => void;
   onCustomInput?: (text: string) => void;
+  onActionSubmit?: (
+    text: string
+  ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
+  onActionConfirm?: (choice: Choice) => void;
   onRetry?: () => void;
   canRetry?: boolean;
   onUndo?: () => void;
@@ -44,6 +48,8 @@ export default function Story({
   handleChoice,
   handleSelect,
   onCustomInput,
+  onActionSubmit,
+  onActionConfirm,
   onRetry,
   canRetry,
   onUndo,
@@ -59,6 +65,17 @@ export default function Story({
   const [editMode, setEditMode] = React.useState(false);
   const [editedText, setEditedText] = React.useState("");
   const [isHovering, setIsHovering] = React.useState(false);
+
+  // Action mode state - persisted to localStorage
+  const [actionMode, setActionMode] = React.useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("actionMode") === "true";
+  });
+
+  // Persist action mode to localStorage
+  React.useEffect(() => {
+    localStorage.setItem("actionMode", actionMode.toString());
+  }, [actionMode]);
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -395,9 +412,13 @@ export default function Story({
         onSelectChoice={handleSelectChoice}
         onConfirm={handleChoice}
         onCustomInput={onCustomInput}
+        onActionSubmit={onActionSubmit}
+        onActionConfirm={onActionConfirm}
         loading={loading}
         momentumMode={momentumMode}
         onMomentumModeChange={onMomentumModeChange}
+        actionMode={actionMode}
+        onActionModeChange={setActionMode}
       />
     </div>
   );

@@ -98,7 +98,7 @@ import {
   findRelationshipMatch,
 } from "../misc/fuzzyMatch";
 import { outputToScenePart } from "../misc/ai";
-import { generateStoryTurn } from "../misc/generation";
+import { generateStoryTurn, analyzeAction } from "../misc/generation";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -2357,19 +2357,76 @@ function StoryPageContent() {
     }
   }
 
+  // Handle freeform action submission - analyze the action and return metadata
+  async function handleActionSubmit(
+    actionText: string
+  ): Promise<{ analysis: any; warnings: string[] } | null> {
+    if (!storyData) return null;
+    if (!user) {
+      addNotification("Please sign in to continue the story", "warning");
+      return null;
+    }
+
+    logger.action("Analyzing freeform action", { actionText });
+
+    try {
+      const { choicesModel } = getModelsFromPreset();
+      const result = await analyzeAction(storyData, actionText, choicesModel);
+
+      logger.ai_response("Action analysis complete", {
+        analysis: result.analysis,
+        warnings: result.validationWarnings,
+      });
+
+      return {
+        analysis: result.analysis,
+        warnings: result.validationWarnings,
+      };
+    } catch (error: any) {
+      logger.error("Action analysis failed", { error: error.message });
+      addNotification(`Analysis failed: ${error.message}`, "failure");
+      return null;
+    }
+  }
+
+  // Handle confirmed freeform action - this is called after analysis with a Choice object
+  async function handleActionConfirm(choice: Choice) {
+    if (!storyData) return;
+
+    logger.action("Freeform action confirmed", { choice });
+
+    if (!user) {
+      addNotification("Please sign in to continue the story", "warning");
+      return;
+    }
+
+    // Directly call handleChoice with the action choice
+    // We pass the choice directly to avoid state timing issues
+    handleChoiceWithAction(choice);
+  }
+
+  // Public handleChoice function - wrapper for normal choice selection
   async function handleChoice() {
+    handleChoiceWithAction();
+  }
+
+  // Internal function that handles both regular choices and freeform actions
+  async function handleChoiceWithAction(actionChoice?: Choice) {
     if (!storyData) return;
 
     // If we're resuming from YZE stress dice selection, use the pending choice
     let choice: Choice | undefined;
-    if (yzePendingChoice && yzeAwaitingStressChoice) {
+    if (actionChoice) {
+      // Direct action from freeform mode
+      choice = actionChoice;
+    } else if (yzePendingChoice && yzeAwaitingStressChoice) {
       choice = yzePendingChoice;
     } else {
       choice = choices.choices.find((c) => input[c.text]);
     }
 
     if (!choice) return;
-    const key = choices.choices.indexOf(choice);
+    const key = actionChoice ? 0 : choices.choices.indexOf(choice);
 
     logger.action("User selected choice", { choice: choice.text, index: key });
 
@@ -3546,7 +3603,7 @@ function StoryPageContent() {
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
-    let choicesComplete = false;
+    let choicesComplete = !!actionChoice; // If freeform action, choices will be skipped
 
     const checkBothComplete = () => {
       if (toolsComplete && choicesComplete) {
@@ -3578,6 +3635,7 @@ function StoryPageContent() {
             choicesModel,
             enableTools: toolCallingEnabled,
             maxToolLoops,
+            skipChoices: !!actionChoice, // Skip choices generation in freeform action mode
           },
           {
             onStoryContent: (chunk: string, fullContent: string) => {
@@ -4756,6 +4814,8 @@ function StoryPageContent() {
             handleChoice={handleChoice}
             handleSelect={handleSelect}
             onCustomInput={handleCustomInput}
+            onActionSubmit={handleActionSubmit}
+            onActionConfirm={handleActionConfirm}
             onRetry={handleRetry}
             canRetry={canRetry}
             onUndo={handleUndo}

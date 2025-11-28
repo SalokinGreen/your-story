@@ -10,7 +10,7 @@ export type ChatMessage = {
 };
 
 // Cleans text by removing problematic characters and normalizing whitespace
-function cleanString(text: string): string {
+export function cleanString(text: string): string {
   return text
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
     .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g, " ")
@@ -728,6 +728,101 @@ Example: "Take a risk <custom_table: ${
       `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?`
     ),
   });
+
+  return { messages };
+}
+
+// Stage for freeform action analysis
+export function buildActionAnalysisPrompt({
+  storyData,
+  userAction,
+}: {
+  storyData: StoryData;
+  userAction: string;
+}): { messages: ChatMessage[] } {
+  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+
+  const systemPrompt = `You analyze player actions for an interactive RPG game and determine what game mechanics apply.
+
+RESPOND WITH VALID JSON ONLY - no markdown, no explanation, just the JSON object:
+{
+  "action_summary": "brief description of what the player is trying to do",
+  "skill_used": "exact stat name from the list below, or null if no skill check needed",
+  "skill_dc": number or null (only if skill_used is set),
+  "item_used": "exact item name from inventory, or null",
+  "resource_used": "exact resource name from the list below, or null",
+  "mythic_check": "yes/no question (likelihood)" or null,
+  "custom_table": "exact table name" or null,
+  "is_plain_action": true/false (true if this is just dialogue/narration with no mechanics)
+}
+
+⚠️ EXACT NAME MATCHING - Use these EXACT names:
+
+AVAILABLE STATS (for skill_used):
+${
+  storyData.stats.length > 0
+    ? storyData.stats.map((s) => `• ${s.name}`).join("\n")
+    : "• (No stats - set skill_used to null)"
+}
+
+AVAILABLE RESOURCES (for resource_used):
+${
+  storyData.resources.length > 0
+    ? storyData.resources
+        .map((r) => `• ${r.name} (${r.value}/${r.maxValue})`)
+        .join("\n")
+    : "• (No resources - set resource_used to null)"
+}
+
+AVAILABLE ITEMS (for item_used):
+${
+  storyData.inventory.length > 0
+    ? storyData.inventory
+        .map((i) => `• ${i.name} [${i.type}] x${i.quantity}`)
+        .join("\n")
+    : "• (No items - set item_used to null)"
+}
+
+${
+  storyData.customTables && storyData.customTables.length > 0
+    ? `CUSTOM TABLES (for custom_table):\n${storyData.customTables
+        .map((t) => `• ${t.name}`)
+        .join("\n")}`
+    : ""
+}
+
+DC GUIDELINES (${rpgSystem.name}):
+${rpgSystem.aiInstructions.dcGuidelines}
+
+DECISION RULES:
+1. Simple actions (talking, walking, looking around, basic interactions) → is_plain_action: true, everything else null
+2. Challenging physical actions → appropriate physical stat + DC based on difficulty
+3. Social challenges (persuasion, deception, intimidation) → social/charisma stat if available
+4. Using a specific item the player mentions → set item_used to the exact item name
+5. Strenuous or costly actions → set resource_used to an appropriate resource
+6. Only set skill_dc if skill_used is set
+7. If the action mentions using a specific item, include it even without a skill check
+8. Be conservative with skill checks - not every action needs one`;
+
+  // Build minimal context - just recent story for situational awareness
+  const recentParts = storyData.scene.parts.slice(-4);
+  const recentContext = recentParts
+    .map((p) =>
+      p.user ? `Player: ${p.content}` : `Story: ${p.content.slice(0, 300)}...`
+    )
+    .join("\n\n");
+
+  const userMessage = `Recent story context:
+${recentContext}
+
+Player's action: "${userAction}"
+
+Analyze this action and return the JSON object.`;
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: cleanString(systemPrompt) },
+    { role: "user", content: cleanString(userMessage) },
+  ];
 
   return { messages };
 }
