@@ -565,6 +565,47 @@ const hideLoreTool: ToolSchema = {
   },
 };
 
+const updateLoreTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "update_lore",
+    description:
+      "Update an existing lore entry's content or triggers. Use this to modify lore as the story reveals more information.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Lore entry title to update (fuzzy matching supported)",
+        },
+        newTitle: {
+          type: "string",
+          description: "New title for the lore entry (optional)",
+        },
+        content: {
+          type: "string",
+          description: "New content for the lore entry (optional)",
+        },
+        on: {
+          type: "boolean",
+          description: "Whether lore is visible (optional)",
+        },
+        onTriggers: {
+          type: "array",
+          items: { type: "string" },
+          description: "New words that reveal this lore (replaces existing)",
+        },
+        offTriggers: {
+          type: "array",
+          items: { type: "string" },
+          description: "New words that hide this lore (replaces existing)",
+        },
+      },
+      required: ["title"],
+    },
+  },
+};
+
 // Plot Beat Tools
 const markBeatTool: ToolSchema = {
   type: "function",
@@ -1166,11 +1207,12 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   // Achievement (1 tool)
   triggerAchievementTool,
 
-  // Lore Management (4 tools)
+  // Lore Management (5 tools)
   createLoreTool,
   deleteLoreTool,
   showLoreTool,
   hideLoreTool,
+  updateLoreTool,
 
   // Plot Beats (5 tools)
   markBeatTool,

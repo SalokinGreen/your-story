@@ -1716,6 +1716,20 @@ function convertToolToCommand(
     case "hide_lore":
       return `/lore_hide: ${args.title}`;
 
+    case "update_lore": {
+      // Format: /lore_update: title | newTitle | content | on | onTriggers | offTriggers
+      const newTitle = args.newTitle || "";
+      const content = args.content || "";
+      const on = args.on !== undefined ? String(args.on) : "";
+      const onTriggersStr = Array.isArray(args.onTriggers)
+        ? args.onTriggers.join(",")
+        : "";
+      const offTriggersStr = Array.isArray(args.offTriggers)
+        ? args.offTriggers.join(",")
+        : "";
+      return `/lore_update: ${args.title} | ${newTitle} | ${content} | ${on} | ${onTriggersStr} | ${offTriggersStr}`;
+    }
+
     // Plot Beats
     case "mark_beat":
       return `/mark_beat: ${args.beatIndex}`;

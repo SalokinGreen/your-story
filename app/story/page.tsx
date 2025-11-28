@@ -227,6 +227,60 @@ export function processCommands(
       continue;
     }
 
+    // /modify_item: item name | description | type (for updating item properties)
+    const itemModifyPropsMatch = trimmed.match(
+      /^\/modify_item:\s*(.+?)\s*\|\s*(.+?)(?:\s*\|\s*(.+))?$/i
+    );
+    if (itemModifyPropsMatch) {
+      const itemName = itemModifyPropsMatch[1].trim();
+      const secondParam = itemModifyPropsMatch[2].trim();
+      const thirdParam = itemModifyPropsMatch[3]?.trim();
+
+      const matchResult = findItemMatch(itemName, storyData.inventory);
+      const item = matchResult?.item;
+
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched item for modification", {
+          aiProvided: itemName,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+      }
+
+      if (!item) {
+        logger.warn("Item modification failed: item not found", { itemName });
+      } else {
+        // Determine what was passed: description, type, or both
+        const validTypes = ["normal", "consumable", "story", "misc"];
+        
+        if (thirdParam && validTypes.includes(thirdParam.toLowerCase())) {
+          // Both description and type provided
+          item.description = secondParam;
+          item.type = thirdParam.toLowerCase() as "normal" | "consumable" | "story" | "misc";
+          logger.action("Item description and type updated via command", {
+            itemName: item.name,
+            description: secondParam,
+            type: thirdParam,
+          });
+        } else if (validTypes.includes(secondParam.toLowerCase())) {
+          // Only type provided
+          item.type = secondParam.toLowerCase() as "normal" | "consumable" | "story" | "misc";
+          logger.action("Item type updated via command", {
+            itemName: item.name,
+            type: secondParam,
+          });
+        } else {
+          // Only description provided
+          item.description = secondParam;
+          logger.action("Item description updated via command", {
+            itemName: item.name,
+            description: secondParam,
+          });
+        }
+      }
+      continue;
+    }
+
     // /trigger_achievement: achievement title
     const achievementMatch = trimmed.match(/^\/trigger_achievement:\s*(.+)$/i);
     if (achievementMatch) {
@@ -586,6 +640,113 @@ export function processCommands(
         logger.action("Content deleted from lore via command", {
           title: loreTitle,
           deletedText: textToDelete,
+        });
+      }
+      continue;
+    }
+
+    // /lore_delete: lore title
+    const loreDeleteEntryMatch = trimmed.match(/^\/lore_delete:\s*(.+)$/i);
+    if (loreDeleteEntryMatch) {
+      const loreTitle = loreDeleteEntryMatch[1].trim();
+      if (!storyData.lore) storyData.lore = [];
+
+      const loreIndex = storyData.lore.findIndex(
+        (l) => l.title.toLowerCase() === loreTitle.toLowerCase()
+      );
+      if (loreIndex === -1) {
+        logger.warn("Lore delete failed: entry not found", {
+          title: loreTitle,
+        });
+      } else {
+        const removed = storyData.lore.splice(loreIndex, 1)[0];
+        logger.action("Lore entry deleted via command", {
+          title: removed.title,
+        });
+      }
+      continue;
+    }
+
+    // /lore_show: lore title
+    const loreShowMatch = trimmed.match(/^\/lore_show:\s*(.+)$/i);
+    if (loreShowMatch) {
+      const loreTitle = loreShowMatch[1].trim();
+      if (!storyData.lore) storyData.lore = [];
+
+      const loreEntry = storyData.lore.find(
+        (l) => l.title.toLowerCase() === loreTitle.toLowerCase()
+      );
+      if (!loreEntry) {
+        logger.warn("Lore show failed: entry not found", { title: loreTitle });
+      } else {
+        loreEntry.on = true;
+        logger.action("Lore entry revealed via command", {
+          title: loreEntry.title,
+        });
+      }
+      continue;
+    }
+
+    // /lore_hide: lore title
+    const loreHideMatch = trimmed.match(/^\/lore_hide:\s*(.+)$/i);
+    if (loreHideMatch) {
+      const loreTitle = loreHideMatch[1].trim();
+      if (!storyData.lore) storyData.lore = [];
+
+      const loreEntry = storyData.lore.find(
+        (l) => l.title.toLowerCase() === loreTitle.toLowerCase()
+      );
+      if (!loreEntry) {
+        logger.warn("Lore hide failed: entry not found", { title: loreTitle });
+      } else {
+        loreEntry.on = false;
+        logger.action("Lore entry hidden via command", {
+          title: loreEntry.title,
+        });
+      }
+      continue;
+    }
+
+    // /lore_update: title | newTitle | content | on | onTriggers | offTriggers
+    const loreUpdateMatch = trimmed.match(
+      /^\/lore_update:\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
+    );
+    if (loreUpdateMatch) {
+      const loreTitle = loreUpdateMatch[1].trim();
+      const newTitle = loreUpdateMatch[2].trim();
+      const newContent = loreUpdateMatch[3].trim();
+      const onValue = loreUpdateMatch[4].trim().toLowerCase();
+      const onTriggers = loreUpdateMatch[5].trim();
+      const offTriggers = loreUpdateMatch[6].trim();
+
+      if (!storyData.lore) storyData.lore = [];
+
+      const loreEntry = storyData.lore.find(
+        (l) => l.title.toLowerCase() === loreTitle.toLowerCase()
+      );
+      if (!loreEntry) {
+        logger.warn("Lore update failed: entry not found", {
+          title: loreTitle,
+        });
+      } else {
+        if (newTitle) loreEntry.title = newTitle;
+        if (newContent) loreEntry.content = newContent;
+        if (onValue === "true") loreEntry.on = true;
+        else if (onValue === "false") loreEntry.on = false;
+        if (onTriggers) {
+          loreEntry.on_triggers = onTriggers
+            .split(",")
+            .map((t) => t.trim())
+            .filter((t) => t.length > 0);
+        }
+        if (offTriggers) {
+          loreEntry.off_triggers = offTriggers
+            .split(",")
+            .map((t) => t.trim())
+            .filter((t) => t.length > 0);
+        }
+        logger.action("Lore entry updated via command", {
+          title: loreEntry.title,
         });
       }
       continue;
