@@ -23,6 +23,7 @@ const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export const runtime = "nodejs";
+export const maxDuration = 60; // Allow up to 60 seconds for generation
 
 interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";

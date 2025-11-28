@@ -147,6 +147,24 @@ export const AI_MODELS = {
       "A logic and reasoning-focused model that excels at understanding and generating structured content. Ideal for scenarios requiring precise logic and tool usage.",
     bannerUrl: undefined,
   },
+  "MiniMax M2": {
+    name: "MiniMax M2",
+    original_model: "MiniMax M2",
+    model: "minimax/minimax-m2",
+    maxTokens: 204800,
+    maxOutputTokens: 4000,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.255,
+    outputPrice: 1.02,
+    finetunes: [],
+    strengths: ["cost-effective", "tool calling", "large context"],
+    weaknesses: [],
+    description:
+      "A popular and cost-effective model with large context window, suitable for tool calling and general tasks.",
+    bannerUrl: undefined,
+  },
 } as const;
 
 export interface ModelPreset {

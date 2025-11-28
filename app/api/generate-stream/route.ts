@@ -24,6 +24,7 @@ const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export const runtime = "nodejs";
+export const maxDuration = 60; // Allow up to 60 seconds for streaming
 
 interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -401,8 +402,9 @@ export async function POST(req: NextRequest) {
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
       Connection: "keep-alive",
+      "X-Accel-Buffering": "no", // Disable nginx buffering
     },
   });
 }

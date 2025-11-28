@@ -114,9 +114,6 @@ async function* parseSSEStream(
 
   const decoder = new TextDecoder();
   let buffer = "";
-  let eventCount = 0;
-
-  console.log("[SSE] Starting to parse stream");
 
   while (true) {
     const { done, value } = await reader.read();
@@ -125,7 +122,6 @@ async function* parseSSEStream(
     if (value) {
       const chunk = decoder.decode(value, { stream: true });
       buffer += chunk;
-      console.log("[SSE] Received chunk:", chunk.length, "bytes");
     }
 
     // Process all complete lines in buffer
@@ -138,43 +134,33 @@ async function* parseSSEStream(
       if (!trimmed || !trimmed.startsWith("data:")) continue;
 
       const data = trimmed.slice(5).trim();
-      if (data === "[DONE]") {
-        console.log("[SSE] Received [DONE] marker");
-        continue;
-      }
+      if (data === "[DONE]") continue;
 
       try {
         const parsed: StreamEvent = JSON.parse(data);
-        eventCount++;
-        console.log("[SSE] Parsed event #" + eventCount + ":", parsed.type, parsed.type === "done" ? "(meta received)" : "");
         yield parsed;
-      } catch (e) {
-        console.log("[SSE] Failed to parse JSON:", data.substring(0, 100));
+      } catch {
+        // Skip malformed JSON events
       }
     }
 
     // Only break AFTER processing - ensures we catch final events
     if (done) {
-      console.log("[SSE] Stream done signal received. Remaining buffer:", buffer.length, "bytes");
       // Process any remaining data in buffer after stream closes
       if (buffer.trim()) {
         const trimmed = buffer.trim();
-        console.log("[SSE] Processing remaining buffer:", trimmed.substring(0, 100));
         if (trimmed.startsWith("data:")) {
           const data = trimmed.slice(5).trim();
           if (data !== "[DONE]") {
             try {
               const parsed: StreamEvent = JSON.parse(data);
-              eventCount++;
-              console.log("[SSE] Parsed final event #" + eventCount + ":", parsed.type);
               yield parsed;
-            } catch (e) {
-              console.log("[SSE] Failed to parse final JSON:", data.substring(0, 100));
+            } catch {
+              // Skip malformed JSON events
             }
           }
         }
       }
-      console.log("[SSE] Stream parsing complete. Total events:", eventCount);
       break;
     }
   }
@@ -385,21 +371,19 @@ export async function generateStoryTurn(
 
     // Helper function for tools generation
     const runToolGeneration = async (): Promise<void> => {
-      if (!options.enableTools) {
-        console.log("[Tools] Skipping - tools not enabled");
-        return;
-      }
+      if (!options.enableTools) return;
 
-      console.log("[Tools] Starting tool generation");
       callbacks.onToolsStart?.();
       logger.action("Stage 2: Building tool prompt (parallel)");
 
       const maxToolLoops = options.maxToolLoops || 1;
       let toolLoopCount = 0;
 
+      // Fallback model for rate limits
+      const FALLBACK_TOOLS_MODEL = "MiniMax M2";
+
       while (toolLoopCount < maxToolLoops) {
         toolLoopCount++;
-        console.log("[Tools] Loop iteration:", toolLoopCount);
 
         const toolPrompt = buildToolPrompt({
           storyData,
@@ -408,61 +392,117 @@ export async function generateStoryTurn(
           existingToolResponses: allToolResponses,
         });
 
-        console.log("[Tools] Making fetch request to /api/generate-stream");
-        const toolResponse = await fetch("/api/generate-stream", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            messages: toolPrompt.messages,
-            tools: TOOL_SCHEMAS,
-            model: options.toolsModel,
-            maxTokens: 2000,
-            temperature: 0.3,
-          }),
-        });
-
-        console.log("[Tools] Fetch response status:", toolResponse.status);
-
-        if (!toolResponse.ok) {
-          const errorText = await toolResponse.text().catch(() => "");
-          throw new Error(
-            `Tool generation failed: ${toolResponse.status} - ${errorText}`
-          );
+        // Try primary model first, then fallback on rate limit
+        const modelsToTry = [options.toolsModel];
+        if (options.toolsModel !== FALLBACK_TOOLS_MODEL) {
+          modelsToTry.push(FALLBACK_TOOLS_MODEL);
         }
 
+        let lastError: Error | null = null;
+        let success = false;
         let newToolCalls: ToolCall[] = [];
-        let receivedDone = false;
 
-        console.log("[Tools] Starting to iterate SSE events");
-        for await (const event of parseSSEStream(toolResponse)) {
-          console.log("[Tools] Received event:", event.type);
-          if (event.type === "error") {
-            throw new Error(event.error || "Tool generation failed");
+        for (const currentModel of modelsToTry) {
+          if (success) break;
+
+          // Add timeout to prevent infinite hanging
+          const toolAbortController = new AbortController();
+          const toolTimeout = setTimeout(() => {
+            toolAbortController.abort();
+          }, 55000); // 55 second timeout
+
+          let toolResponse: Response;
+          try {
+            // Add cache-busting timestamp to prevent edge caching issues
+            const toolUrl = `/api/generate-stream?t=${Date.now()}&stage=tools`;
+            toolResponse = await fetch(toolUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+                "Cache-Control": "no-cache, no-store",
+              },
+              body: JSON.stringify({
+                messages: toolPrompt.messages,
+                tools: TOOL_SCHEMAS,
+                model: currentModel,
+                maxTokens: 2000,
+                temperature: 0.3,
+              }),
+              signal: toolAbortController.signal,
+              cache: "no-store",
+            });
+          } catch (fetchError: any) {
+            clearTimeout(toolTimeout);
+            lastError = fetchError;
+            continue; // Try next model
+          } finally {
+            clearTimeout(toolTimeout);
           }
-          if (event.type === "tool_calls" && event.toolCalls) {
-            newToolCalls = event.toolCalls;
-            console.log("[Tools] Received tool_calls:", newToolCalls.length);
+
+          if (!toolResponse.ok) {
+            const errorText = await toolResponse.text().catch(() => "");
+            lastError = new Error(
+              `Tool generation failed: ${toolResponse.status} - ${errorText}`
+            );
+            continue; // Try next model
           }
-          if (event.type === "done" && event.meta) {
-            receivedDone = true;
-            toolsMeta = event.meta;
-            totalTokenCost += event.meta.tokenCost;
-            finalBalance = event.meta.balance;
-            console.log("[Tools] Received done event with meta");
+
+          let hitRateLimit = false;
+
+          try {
+            for await (const event of parseSSEStream(toolResponse)) {
+              if (event.type === "error") {
+                const errorMsg = event.error || "Tool generation failed";
+                // Check if it's a rate limit error
+                if (
+                  errorMsg.includes("429") ||
+                  errorMsg.toLowerCase().includes("rate")
+                ) {
+                  hitRateLimit = true;
+                  lastError = new Error(errorMsg);
+                  break;
+                }
+                throw new Error(errorMsg);
+              }
+              if (event.type === "tool_calls" && event.toolCalls) {
+                newToolCalls = event.toolCalls;
+              }
+              if (event.type === "done" && event.meta) {
+                toolsMeta = event.meta;
+                totalTokenCost += event.meta.tokenCost;
+                finalBalance = event.meta.balance;
+              }
+            }
+          } catch (streamError: any) {
+            if (
+              streamError.message.includes("429") ||
+              streamError.message.toLowerCase().includes("rate")
+            ) {
+              hitRateLimit = true;
+              lastError = streamError;
+              continue; // Try next model
+            }
+            throw streamError; // Re-throw non-rate-limit errors
           }
+
+          if (hitRateLimit) {
+            continue; // Try next model
+          }
+
+          success = true;
         }
 
-        console.log("[Tools] Finished iterating SSE events. receivedDone:", receivedDone, "toolCalls:", newToolCalls.length);
+        // If all models failed, throw the last error
+        if (!success && lastError) {
+          throw lastError;
+        }
 
         // No more tool calls needed
         if (newToolCalls.length === 0) {
           logger.action("Tool loop complete - no more tools", {
             iterations: toolLoopCount,
           });
-          console.log("[Tools] No tool calls, breaking loop");
           break;
         }
 
@@ -470,14 +510,12 @@ export async function generateStoryTurn(
         logger.action("Executing tools locally", {
           count: newToolCalls.length,
         });
-        console.log("[Tools] Executing", newToolCalls.length, "tools locally");
         const newResponses = executeTools(newToolCalls, storyData);
 
         allToolCalls = [...allToolCalls, ...newToolCalls];
         allToolResponses = [...allToolResponses, ...newResponses];
       }
 
-      console.log("[Tools] Calling onToolsComplete callback");
       callbacks.onToolsComplete?.(
         allToolCalls,
         allToolResponses,
@@ -487,7 +525,6 @@ export async function generateStoryTurn(
           totalTokens: 0,
         }
       );
-      console.log("[Tools] Stage 2 complete");
       logger.action("Stage 2 complete", {
         toolCalls: allToolCalls.length,
         responses: allToolResponses.length,
@@ -556,12 +593,19 @@ export async function generateStoryTurn(
     };
 
     // Run tools and choices in parallel (skip choices if requested)
-    console.log("[Generation] Starting parallel tasks. skipChoices:", options.skipChoices);
+    console.log(
+      "[Generation] Starting parallel tasks. skipChoices:",
+      options.skipChoices
+    );
     const parallelTasks = [runToolGeneration()];
     if (!options.skipChoices) {
       parallelTasks.push(runChoicesGeneration());
     }
-    console.log("[Generation] Awaiting", parallelTasks.length, "parallel tasks");
+    console.log(
+      "[Generation] Awaiting",
+      parallelTasks.length,
+      "parallel tasks"
+    );
     await Promise.all(parallelTasks);
     console.log("[Generation] All parallel tasks complete");
 

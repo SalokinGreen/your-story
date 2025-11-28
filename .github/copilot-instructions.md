@@ -277,3 +277,9 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - Always validate authentication with Bearer tokens for user-context operations.
   - Use service role keys only for admin operations after verifying admin status.
   - Follow RLS patterns: NEXT_PUBLIC keys for user-scoped queries, service role for admin bypasses.
+
+## Workflow requirements
+
+- **Discussion first**: Before making any codebase changes, discuss the approach and create a plan with the user.
+- **Explicit confirmation required**: Only proceed with code changes after the user explicitly allows or confirms the proposed plan.
+- **No unsolicited edits**: Do not create, modify, or delete files without user approval.
