@@ -114,13 +114,18 @@ async function* parseSSEStream(
 
   const decoder = new TextDecoder();
   let buffer = "";
+  let eventCount = 0;
+
+  console.log("[SSE] Starting to parse stream");
 
   while (true) {
     const { done, value } = await reader.read();
 
     // Append new data to buffer if available
     if (value) {
-      buffer += decoder.decode(value, { stream: true });
+      const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
+      console.log("[SSE] Received chunk:", chunk.length, "bytes");
     }
 
     // Process all complete lines in buffer
@@ -133,33 +138,43 @@ async function* parseSSEStream(
       if (!trimmed || !trimmed.startsWith("data:")) continue;
 
       const data = trimmed.slice(5).trim();
-      if (data === "[DONE]") continue;
+      if (data === "[DONE]") {
+        console.log("[SSE] Received [DONE] marker");
+        continue;
+      }
 
       try {
         const parsed: StreamEvent = JSON.parse(data);
+        eventCount++;
+        console.log("[SSE] Parsed event #" + eventCount + ":", parsed.type, parsed.type === "done" ? "(meta received)" : "");
         yield parsed;
-      } catch {
-        // Skip malformed JSON
+      } catch (e) {
+        console.log("[SSE] Failed to parse JSON:", data.substring(0, 100));
       }
     }
 
     // Only break AFTER processing - ensures we catch final events
     if (done) {
+      console.log("[SSE] Stream done signal received. Remaining buffer:", buffer.length, "bytes");
       // Process any remaining data in buffer after stream closes
       if (buffer.trim()) {
         const trimmed = buffer.trim();
+        console.log("[SSE] Processing remaining buffer:", trimmed.substring(0, 100));
         if (trimmed.startsWith("data:")) {
           const data = trimmed.slice(5).trim();
           if (data !== "[DONE]") {
             try {
               const parsed: StreamEvent = JSON.parse(data);
+              eventCount++;
+              console.log("[SSE] Parsed final event #" + eventCount + ":", parsed.type);
               yield parsed;
-            } catch {
-              // Skip malformed JSON
+            } catch (e) {
+              console.log("[SSE] Failed to parse final JSON:", data.substring(0, 100));
             }
           }
         }
       }
+      console.log("[SSE] Stream parsing complete. Total events:", eventCount);
       break;
     }
   }
@@ -370,8 +385,12 @@ export async function generateStoryTurn(
 
     // Helper function for tools generation
     const runToolGeneration = async (): Promise<void> => {
-      if (!options.enableTools) return;
+      if (!options.enableTools) {
+        console.log("[Tools] Skipping - tools not enabled");
+        return;
+      }
 
+      console.log("[Tools] Starting tool generation");
       callbacks.onToolsStart?.();
       logger.action("Stage 2: Building tool prompt (parallel)");
 
@@ -380,6 +399,7 @@ export async function generateStoryTurn(
 
       while (toolLoopCount < maxToolLoops) {
         toolLoopCount++;
+        console.log("[Tools] Loop iteration:", toolLoopCount);
 
         const toolPrompt = buildToolPrompt({
           storyData,
@@ -388,6 +408,7 @@ export async function generateStoryTurn(
           existingToolResponses: allToolResponses,
         });
 
+        console.log("[Tools] Making fetch request to /api/generate-stream");
         const toolResponse = await fetch("/api/generate-stream", {
           method: "POST",
           headers: {
@@ -403,6 +424,8 @@ export async function generateStoryTurn(
           }),
         });
 
+        console.log("[Tools] Fetch response status:", toolResponse.status);
+
         if (!toolResponse.ok) {
           const errorText = await toolResponse.text().catch(() => "");
           throw new Error(
@@ -411,26 +434,35 @@ export async function generateStoryTurn(
         }
 
         let newToolCalls: ToolCall[] = [];
+        let receivedDone = false;
 
+        console.log("[Tools] Starting to iterate SSE events");
         for await (const event of parseSSEStream(toolResponse)) {
+          console.log("[Tools] Received event:", event.type);
           if (event.type === "error") {
             throw new Error(event.error || "Tool generation failed");
           }
           if (event.type === "tool_calls" && event.toolCalls) {
             newToolCalls = event.toolCalls;
+            console.log("[Tools] Received tool_calls:", newToolCalls.length);
           }
           if (event.type === "done" && event.meta) {
+            receivedDone = true;
             toolsMeta = event.meta;
             totalTokenCost += event.meta.tokenCost;
             finalBalance = event.meta.balance;
+            console.log("[Tools] Received done event with meta");
           }
         }
+
+        console.log("[Tools] Finished iterating SSE events. receivedDone:", receivedDone, "toolCalls:", newToolCalls.length);
 
         // No more tool calls needed
         if (newToolCalls.length === 0) {
           logger.action("Tool loop complete - no more tools", {
             iterations: toolLoopCount,
           });
+          console.log("[Tools] No tool calls, breaking loop");
           break;
         }
 
@@ -438,12 +470,14 @@ export async function generateStoryTurn(
         logger.action("Executing tools locally", {
           count: newToolCalls.length,
         });
+        console.log("[Tools] Executing", newToolCalls.length, "tools locally");
         const newResponses = executeTools(newToolCalls, storyData);
 
         allToolCalls = [...allToolCalls, ...newToolCalls];
         allToolResponses = [...allToolResponses, ...newResponses];
       }
 
+      console.log("[Tools] Calling onToolsComplete callback");
       callbacks.onToolsComplete?.(
         allToolCalls,
         allToolResponses,
@@ -453,6 +487,7 @@ export async function generateStoryTurn(
           totalTokens: 0,
         }
       );
+      console.log("[Tools] Stage 2 complete");
       logger.action("Stage 2 complete", {
         toolCalls: allToolCalls.length,
         responses: allToolResponses.length,
@@ -521,15 +556,19 @@ export async function generateStoryTurn(
     };
 
     // Run tools and choices in parallel (skip choices if requested)
+    console.log("[Generation] Starting parallel tasks. skipChoices:", options.skipChoices);
     const parallelTasks = [runToolGeneration()];
     if (!options.skipChoices) {
       parallelTasks.push(runChoicesGeneration());
     }
+    console.log("[Generation] Awaiting", parallelTasks.length, "parallel tasks");
     await Promise.all(parallelTasks);
+    console.log("[Generation] All parallel tasks complete");
 
     // ========================================
     // BUILD SCENE PART
     // ========================================
+    console.log("[Generation] Building scene part");
     const scenePart: ScenePart = {
       content: storyContent,
       imageUrl: "",
