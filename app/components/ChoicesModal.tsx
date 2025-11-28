@@ -143,7 +143,20 @@ export default function ChoicesModal({
 
   const handleActionAnalyze = async () => {
     const text = actionText.trim();
-    if (!text || !onActionSubmit || !onActionConfirm) return;
+    
+    // If no text, just send "> continue"
+    if (!text) {
+      if (onActionConfirm) {
+        const choice: Choice = {
+          text: "> continue",
+        };
+        onActionConfirm(choice);
+        onClose();
+      }
+      return;
+    }
+    
+    if (!onActionSubmit || !onActionConfirm) return;
 
     setAnalyzingAction(true);
     setShowActionBuilder(false);
@@ -478,9 +491,9 @@ export default function ChoicesModal({
               {!showActionBuilder && (
                 <button
                   onClick={handleActionAnalyze}
-                  disabled={!actionText.trim() || analyzingAction || loading}
+                  disabled={analyzingAction || loading}
                   className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                    !actionText.trim() || analyzingAction || loading
+                    analyzingAction || loading
                       ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
                       : "bg-blue-600 hover:bg-blue-500 text-white"
                   }`}
@@ -493,10 +506,15 @@ export default function ChoicesModal({
                       />
                       {analyzingAction ? "Processing..." : "Generating..."}
                     </>
-                  ) : (
+                  ) : actionText.trim() ? (
                     <>
                       <DynamicIcon name="Play" className="w-4 h-4" />
                       Act
+                    </>
+                  ) : (
+                    <>
+                      <DynamicIcon name="FastForward" className="w-4 h-4" />
+                      Continue
                     </>
                   )}
                 </button>
