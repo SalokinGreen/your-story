@@ -37,7 +37,7 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - The JSON block must be valid JSON.
 - It should be wrapped in \`\`\`json ... \`\`\` code blocks.
 - You can return a PARTIAL StoryData object. Only include the fields you want to change or add.
-- Arrays (like 'inventory', 'stats', 'plot_beats', 'lore', 'achievements', 'quests', 'presets') in your JSON will be MERGED with the existing data by default.
+- Arrays (like 'inventory', 'stats', 'plot_beats', 'lore', 'achievements', 'quests', 'presets', 'variables', 'relationships', 'customTables') in your JSON will be MERGED with the existing data by default.
 - Scalar fields (like 'story_name', 'premise', 'player_name', 'title', 'shortDescription', 'description') will be REPLACED.
 
 ### IMPORTANT: Item Commands
@@ -126,6 +126,28 @@ You can control how items in arrays are applied using the **_command** field:
   - maxValue: Maximum capacity
   - description: What the resource represents
   - symbol: Emoji/icon representing the resource
+- variables (Array of variable objects) - **IMPORTANT: Custom state tracking for counters, flags, and lists**. Three types:
+  - **Number Variables**: { id, name, description, type: "number", value, minValue?, maxValue? }
+    - id: Unique identifier (e.g., "var_gold", "var_time")
+    - name: Display name (e.g., "Gold", "Time of Day", "Days Worked")
+    - description: What this variable tracks
+    - type: "number" (required - must be exactly this string)
+    - value: Current numeric value
+    - minValue: Optional minimum (e.g., 0)
+    - maxValue: Optional maximum (e.g., 100)
+  - **Boolean Variables**: { id, name, description, type: "boolean", value }
+    - id: Unique identifier (e.g., "var_night", "var_wanted")
+    - name: Display name (e.g., "Is Night", "Is Wanted")
+    - description: What this flag represents
+    - type: "boolean" (required - must be exactly this string)
+    - value: true or false
+  - **List Variables**: { id, name, description, type: "list", items, maxSize? }
+    - id: Unique identifier (e.g., "var_spells")
+    - name: Display name (e.g., "Known Spells", "Collected Items")
+    - description: What this list contains
+    - type: "list" (required - must be exactly this string)
+    - items: Array of strings
+    - maxSize: Optional max items
 - inventory (Array of { name, quantity, description, type, symbol })
   - name: Item name
   - quantity: Number of items
@@ -136,7 +158,7 @@ You can control how items in arrays are applied using the **_command** field:
   - title: Beat title/name
   - content: Detailed description of what should happen in this beat
   - fulfilled: false (always start as unfulfilled)
-- lore (Array of { title, content, secrtet, on, alwaysOn, on_triggers, off_triggers, trigger_lores, untrigger_lores, beats_trigger, beats_untrigger })
+- lore (Array of { title, content, secrtet, on, alwaysOn, on_triggers, off_triggers, trigger_lores, untrigger_lores, beats_trigger, beats_untrigger, var_on_triggers, var_off_triggers })
   - title: Lore entry title
   - content: Full lore text
   - secrtet: If true, lore starts hidden and must be revealed
@@ -148,6 +170,8 @@ You can control how items in arrays are applied using the **_command** field:
   - untrigger_lores: Array of lore titles - when those lores become visible, this lore becomes hidden
   - beats_trigger: Array of plot beat indices (0-based) - when these beats complete, lore becomes visible
   - beats_untrigger: Array of plot beat indices (0-based) - when these beats complete, lore becomes hidden
+  - var_on_triggers: Array of boolean variable names - when variable is true, lore becomes visible
+  - var_off_triggers: Array of boolean variable names - when variable is true, lore becomes hidden
 - relationships (Array of { name, value, description, symbol })
   - name: Character, faction, or organization name
   - value: Relationship level from -100 (hostile enemy) to +100 (strong ally)
@@ -244,6 +268,7 @@ Notes:
 - Mythic chaos factor must be between 1-9, scene count must be >= 0.
 - Thread and character IDs are auto-generated if not provided, so you can omit them for new entries.
 - Starting choices allow players to choose how they begin the adventure. If startingChoices is empty/undefined, players see a default "Start Story" button.
+- **Variables are essential for tracking custom game state** - use them for counters (gold, time), flags (is_night, is_wanted), and lists (known_spells). Boolean variables can trigger lore visibility.
 
 ### Example Responses:
 
@@ -263,7 +288,41 @@ Assistant:
 }
 \`\`\`"
 
-**Example 2 - Deleting Items:**
+**Example 2 - Variables (counters, flags, lists):**
+User: "Add a gold counter, a night boolean, and a list for tracking visited places."
+Assistant:
+"I've created variables to track gold, time of day, and visited locations.
+
+\`\`\`json
+{
+  "variables": [
+    {
+      "id": "var_gold",
+      "name": "Gold",
+      "description": "Currency for purchases and bribes",
+      "type": "number",
+      "value": 100,
+      "minValue": 0
+    },
+    {
+      "id": "var_night",
+      "name": "Is Night",
+      "description": "Whether it's currently nighttime",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "id": "var_visited",
+      "name": "Visited Places",
+      "description": "Locations the player has discovered",
+      "type": "list",
+      "items": []
+    }
+  ]
+}
+\`\`\`"
+
+**Example 3 - Deleting Items:**
 User: "Remove the Rusty Sword and Old Potion from inventory."
 Assistant:
 "I'll remove those items from your inventory.
@@ -277,7 +336,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 2b - Deleting Stats:**
+**Example 4 - Deleting Stats:**
 User: "Delete the Intelligence stat."
 Assistant:
 "I'll remove the Intelligence stat.
@@ -290,7 +349,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 3 - Replacing Items:**
+**Example 5 - Replacing Items:**
 User: "Completely redesign the Strength stat with new values."
 Assistant:
 "I've completely replaced the Strength stat with new properties.
@@ -309,7 +368,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 4 - Mixed Operations:**
+**Example 6 - Mixed Operations:**
 User: "Delete the Old Quest, update Main Quest description, and add a Secret Quest."
 Assistant:
 "I've made those changes to your quest list.
@@ -335,7 +394,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 5 - Relationships:**
+**Example 7 - Relationships:**
 User: "Add a relationship with the King's Guard (allies) and the Shadow Syndicate (enemies)."
 Assistant:
 "I've added two key relationships to your adventure.
@@ -349,7 +408,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 6 - Upgrade Shops:**
+**Example 8 - Upgrade Shops:**
 User: "Enable upgrades and create a shop with a new Magic stat (10 points) and a Health Potion item (5 points)."
 Assistant:
 "I've enabled upgrades and created shop items.
@@ -383,7 +442,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 7 - Mythic GME:**
+**Example 9 - Mythic GME:**
 User: "Enable Mythic with chaos 5, add a thread about finding the ancient temple, and an NPC named Elara."
 Assistant:
 "I've enabled Mythic GME with your settings.
@@ -410,7 +469,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 8 - Managing Mythic Threads:**
+**Example 10 - Managing Mythic Threads:**
 User: "Close the temple thread and add a new thread about the dragon awakening."
 Assistant:
 "I've updated the Mythic threads.
@@ -433,7 +492,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 9 - Custom Random Tables:**
+**Example 11 - Custom Random Tables:**
 User: "Create a weather table with sunny, cloudy, rainy, and stormy options."
 Assistant:
 "I've created a weather random table for your adventure.
@@ -456,7 +515,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 10 - Editing Custom Tables:**
+**Example 12 - Editing Custom Tables:**
 User: "Add a 'foggy' option to the weather table and delete the encounter table."
 Assistant:
 "I've updated your tables.
@@ -483,7 +542,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 11 - Starting Choices:**
+**Example 13 - Starting Choices:**
 User: "Create custom starting choices: one for sneaking in (Stealth check), one for fighting through (Strength check), and one that uses a Disguise item."
 Assistant:
 "I've created three different ways to begin the adventure.
@@ -512,7 +571,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 12 - Starting Choices with Mythic:**
+**Example 14 - Starting Choices with Mythic:**
 User: "Add a starting choice that asks fate if there's a secret passage, and rolls on the locations table."
 Assistant:
 "I've added a Mythic-powered starting choice.
@@ -529,7 +588,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 13 - Deleting Starting Choices:**
+**Example 15 - Deleting Starting Choices:**
 User: "Remove the sneak option from starting choices."
 Assistant:
 "I've removed that starting choice.

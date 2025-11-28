@@ -804,6 +804,15 @@ function AdventureCreatorContent() {
       });
     }
 
+    // Check variable deletions
+    if (data.variables) {
+      data.variables.forEach((v: any) => {
+        if (v._command === "delete") {
+          deletions.push(`Variable: ${v.name}`);
+        }
+      });
+    }
+
     // Check starting choice deletions
     if ((data as any).startingChoices) {
       (data as any).startingChoices.forEach((choice: any) => {
@@ -1032,6 +1041,26 @@ function AdventureCreatorContent() {
               .substring(2, 9)}`;
           }
           return table;
+        })
+      );
+    }
+
+    // Apply variables
+    if (data.variables) {
+      setVariables(
+        applyItemChanges(
+          variables,
+          data.variables as any,
+          "variable",
+          "name"
+        ).map((v: any) => {
+          // Auto-generate ID for new variables without one
+          if (!v.id) {
+            v.id = `var_${
+              v.name?.toLowerCase().replace(/\s+/g, "_") || Date.now()
+            }`;
+          }
+          return v;
         })
       );
     }
@@ -6236,6 +6265,97 @@ function AdventureCreatorContent() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Variable Triggers (Boolean) */}
+                      {variables.filter((v) => v.type === "boolean").length >
+                        0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
+                              <DynamicIcon
+                                name="ToggleRight"
+                                className="w-4 h-4 text-cyan-500"
+                              />{" "}
+                              Variables that turn this ON (when true)
+                            </label>
+                            <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                              {variables
+                                .filter((v) => v.type === "boolean")
+                                .map((variable) => (
+                                  <label
+                                    key={variable.id}
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={(
+                                        newLore.var_on_triggers || []
+                                      ).includes(variable.name)}
+                                      onChange={(e) => {
+                                        const current =
+                                          newLore.var_on_triggers || [];
+                                        setNewLore({
+                                          ...newLore,
+                                          var_on_triggers: e.target.checked
+                                            ? [...current, variable.name]
+                                            : current.filter(
+                                                (n) => n !== variable.name
+                                              ),
+                                        });
+                                      }}
+                                      className="w-4 h-4 text-cyan-600 rounded"
+                                    />
+                                    <span className="text-xs text-white">
+                                      {variable.name}
+                                    </span>
+                                  </label>
+                                ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
+                              <DynamicIcon
+                                name="ToggleLeft"
+                                className="w-4 h-4 text-orange-500"
+                              />{" "}
+                              Variables that turn this OFF (when true)
+                            </label>
+                            <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                              {variables
+                                .filter((v) => v.type === "boolean")
+                                .map((variable) => (
+                                  <label
+                                    key={variable.id}
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={(
+                                        newLore.var_off_triggers || []
+                                      ).includes(variable.name)}
+                                      onChange={(e) => {
+                                        const current =
+                                          newLore.var_off_triggers || [];
+                                        setNewLore({
+                                          ...newLore,
+                                          var_off_triggers: e.target.checked
+                                            ? [...current, variable.name]
+                                            : current.filter(
+                                                (n) => n !== variable.name
+                                              ),
+                                        });
+                                      }}
+                                      className="w-4 h-4 text-orange-600 rounded"
+                                    />
+                                    <span className="text-xs text-white">
+                                      {variable.name}
+                                    </span>
+                                  </label>
+                                ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -6971,6 +7091,120 @@ function AdventureCreatorContent() {
                                         </div>
                                       </div>
                                     </div>
+
+                                    {/* Variable Triggers (Boolean) */}
+                                    {variables.filter(
+                                      (v) => v.type === "boolean"
+                                    ).length > 0 && (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                          <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
+                                            <DynamicIcon
+                                              name="ToggleRight"
+                                              className="w-4 h-4 text-cyan-500"
+                                            />{" "}
+                                            Variables that turn this ON (when
+                                            true)
+                                          </label>
+                                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                                            {variables
+                                              .filter(
+                                                (v) => v.type === "boolean"
+                                              )
+                                              .map((variable) => (
+                                                <label
+                                                  key={variable.id}
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                                >
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={(
+                                                      editLore.var_on_triggers ||
+                                                      []
+                                                    ).includes(variable.name)}
+                                                    onChange={(e) => {
+                                                      const current =
+                                                        editLore.var_on_triggers ||
+                                                        [];
+                                                      setEditLore({
+                                                        ...editLore,
+                                                        var_on_triggers: e
+                                                          .target.checked
+                                                          ? [
+                                                              ...current,
+                                                              variable.name,
+                                                            ]
+                                                          : current.filter(
+                                                              (n) =>
+                                                                n !==
+                                                                variable.name
+                                                            ),
+                                                      });
+                                                    }}
+                                                    className="w-4 h-4 text-cyan-600 rounded"
+                                                  />
+                                                  <span className="text-xs text-white">
+                                                    {variable.name}
+                                                  </span>
+                                                </label>
+                                              ))}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
+                                            <DynamicIcon
+                                              name="ToggleLeft"
+                                              className="w-4 h-4 text-orange-500"
+                                            />{" "}
+                                            Variables that turn this OFF (when
+                                            true)
+                                          </label>
+                                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                                            {variables
+                                              .filter(
+                                                (v) => v.type === "boolean"
+                                              )
+                                              .map((variable) => (
+                                                <label
+                                                  key={variable.id}
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                                >
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={(
+                                                      editLore.var_off_triggers ||
+                                                      []
+                                                    ).includes(variable.name)}
+                                                    onChange={(e) => {
+                                                      const current =
+                                                        editLore.var_off_triggers ||
+                                                        [];
+                                                      setEditLore({
+                                                        ...editLore,
+                                                        var_off_triggers: e
+                                                          .target.checked
+                                                          ? [
+                                                              ...current,
+                                                              variable.name,
+                                                            ]
+                                                          : current.filter(
+                                                              (n) =>
+                                                                n !==
+                                                                variable.name
+                                                            ),
+                                                      });
+                                                    }}
+                                                    className="w-4 h-4 text-orange-600 rounded"
+                                                  />
+                                                  <span className="text-xs text-white">
+                                                    {variable.name}
+                                                  </span>
+                                                </label>
+                                              ))}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -7122,6 +7356,32 @@ function AdventureCreatorContent() {
                                             `Beat ${i + 1}`
                                         )
                                         .join(", ")}
+                                    </div>
+                                  )}
+                                {entry.var_on_triggers &&
+                                  entry.var_on_triggers.length > 0 && (
+                                    <div className="text-xs text-cyan-400 mb-1">
+                                      <strong>
+                                        <DynamicIcon
+                                          name="ToggleRight"
+                                          className="inline-block w-3 h-3 mr-1"
+                                        />
+                                        Vars turning ON:
+                                      </strong>{" "}
+                                      {entry.var_on_triggers.join(", ")}
+                                    </div>
+                                  )}
+                                {entry.var_off_triggers &&
+                                  entry.var_off_triggers.length > 0 && (
+                                    <div className="text-xs text-orange-400 mb-1">
+                                      <strong>
+                                        <DynamicIcon
+                                          name="ToggleLeft"
+                                          className="inline-block w-3 h-3 mr-1"
+                                        />
+                                        Vars turning OFF:
+                                      </strong>{" "}
+                                      {entry.var_off_triggers.join(", ")}
                                     </div>
                                   )}
                               </div>

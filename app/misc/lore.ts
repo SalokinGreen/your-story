@@ -1,4 +1,4 @@
-import { StoryData } from "./structs";
+import { StoryData, BooleanVariable } from "./structs";
 import { logger } from "./logger";
 
 // Process lore triggers based on story content and fulfilled beats
@@ -33,6 +33,19 @@ export function processLoreTriggers(
     return beats.some((b) => fulfilledBeatIndices.includes(b));
   };
 
+  // Helper to check boolean variable triggers
+  const checkVarTriggers = (varNames?: string[]) => {
+    if (!varNames || varNames.length === 0 || !storyData.variables)
+      return false;
+    return varNames.some((varName) => {
+      const variable = storyData.variables?.find(
+        (v) =>
+          v.type === "boolean" && v.name.toLowerCase() === varName.toLowerCase()
+      );
+      return variable && (variable as BooleanVariable).value === true;
+    });
+  };
+
   storyData.lore.forEach((loreItem) => {
     // Enabled check (default to true if undefined)
     if (loreItem.enabled === false) {
@@ -53,6 +66,7 @@ export function processLoreTriggers(
     // Check triggers
     const hasTextOn = checkTriggers(loreItem.on_triggers);
     const hasBeatOn = checkBeats(loreItem.beats_trigger);
+    const hasVarOn = checkVarTriggers(loreItem.var_on_triggers);
 
     // Check lore triggers (referencing other lores)
     let hasLoreOn = false;
@@ -63,11 +77,12 @@ export function processLoreTriggers(
       });
     }
 
-    const shouldTurnOn = hasTextOn || hasBeatOn || hasLoreOn;
+    const shouldTurnOn = hasTextOn || hasBeatOn || hasLoreOn || hasVarOn;
 
     // Check suppressors
     const hasTextOff = checkTriggers(loreItem.off_triggers);
     const hasBeatOff = checkBeats(loreItem.beats_untrigger);
+    const hasVarOff = checkVarTriggers(loreItem.var_off_triggers);
 
     let hasLoreOff = false;
     if (loreItem.untrigger_lores && loreItem.untrigger_lores.length > 0) {
@@ -77,13 +92,14 @@ export function processLoreTriggers(
       });
     }
 
-    const shouldTurnOff = hasTextOff || hasBeatOff || hasLoreOff;
+    const shouldTurnOff = hasTextOff || hasBeatOff || hasLoreOff || hasVarOff;
 
     // Determine if any triggers are defined
     const hasAnyOnTriggersDefined =
       (loreItem.on_triggers && loreItem.on_triggers.length > 0) ||
       (loreItem.beats_trigger && loreItem.beats_trigger.length > 0) ||
-      (loreItem.trigger_lores && loreItem.trigger_lores.length > 0);
+      (loreItem.trigger_lores && loreItem.trigger_lores.length > 0) ||
+      (loreItem.var_on_triggers && loreItem.var_on_triggers.length > 0);
 
     let isActive = false;
 

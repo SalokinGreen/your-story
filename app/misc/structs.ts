@@ -69,6 +69,8 @@ export interface StoryLore {
   off_triggers?: string[]; // Word triggers to turn lore off
   trigger_lores?: string[]; // Titles of other lores that turn this one on
   untrigger_lores?: string[]; // Titles of other lores that turn this one off
+  var_on_triggers?: string[]; // Boolean variable names that turn this on when true
+  var_off_triggers?: string[]; // Boolean variable names that turn this off when true
   thumbnailUrl?: string;
   on?: boolean;
   beats_trigger?: number[];

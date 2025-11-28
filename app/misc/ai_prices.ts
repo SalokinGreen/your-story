@@ -183,7 +183,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     name: "Main",
     description: "Creative narration, powerful tools, fast choices",
     storyModel: "Deepseek Chat",
-    toolsModel: "Grok Code Fast 1",
+    toolsModel: "Deepseek Chat",
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 6, // 1 + 10 + 1
   },
@@ -192,7 +192,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     name: "Main with Brain",
     description: "Smarter than main, with reasoning capabilities",
     storyModel: "Deepseek R1",
-    toolsModel: "Grok Code Fast 1",
+    toolsModel: "Deepseek Chat",
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 13, // 2 + 10 + 1
   },
@@ -204,15 +204,6 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     toolsModel: "Grok Code Fast 1",
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 12, // 10 + 1 + 1
-  },
-  budget: {
-    id: "budget",
-    name: "Budget (Cost Effective)",
-    description: "Lower cost models for budget-conscious users",
-    storyModel: "Deepseek Chat",
-    toolsModel: "Deepseek Chat",
-    choicesModel: "Gemini 2.5 Flash Lite",
-    estimatedCost: 3, // 1 + 1 + 1
   },
   custom: {
     id: "custom",

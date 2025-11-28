@@ -143,7 +143,7 @@ export default function ChoicesModal({
 
   const handleActionAnalyze = async () => {
     const text = actionText.trim();
-    
+
     // If no text, just send "> continue"
     if (!text) {
       if (onActionConfirm) {
@@ -155,7 +155,7 @@ export default function ChoicesModal({
       }
       return;
     }
-    
+
     if (!onActionSubmit || !onActionConfirm) return;
 
     setAnalyzingAction(true);

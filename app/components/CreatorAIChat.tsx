@@ -616,6 +616,15 @@ function ChangeSummary({
       icon: "Table",
     });
   }
+  if (data.variables?.length) {
+    changes.push({
+      type: "Add/Update",
+      label: "Variables",
+      value: `${data.variables.length} variables`,
+      details: data.variables,
+      icon: "Variable",
+    });
+  }
   if (data.upgradeSettings) {
     changes.push({
       type: "Update",
