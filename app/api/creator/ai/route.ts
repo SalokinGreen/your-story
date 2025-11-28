@@ -92,13 +92,12 @@ export async function POST(req: NextRequest) {
     model: requestedModel,
   } = body;
 
-  // Model config
-  // Find model key by model string or use default
-  const modelEntry = Object.entries(AI_MODELS).find(
-    ([_, m]) => m.model === requestedModel
-  );
-  const modelKey = modelEntry ? modelEntry[0] : "Prometheus";
+  // Model config - requestedModel is the model key (e.g., "Deepseek Chat")
+  // Use getModelConfig which handles fallback to Deepseek Chat if model not found
+  const modelKey = requestedModel || "Deepseek Chat";
   const modelConfig = getModelConfig(modelKey);
+  
+  console.log("[Creator AI] Model requested:", requestedModel, "Using:", modelKey, "Provider:", modelConfig.provider);
 
   // Estimate tokens
   // Rough estimate: 4 chars per token for input
@@ -172,7 +171,7 @@ export async function POST(req: NextRequest) {
         model: modelConfig.model,
         messages: aiMessages,
         temperature: 0.7,
-        max_tokens: 12000, // Allow larger output for JSON
+        max_tokens: Math.min(modelConfig.maxOutputTokens, 8000), // Respect model limits, cap at 8000 for safety
         stream: false,
       }),
       signal: controller.signal,

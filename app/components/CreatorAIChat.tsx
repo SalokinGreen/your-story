@@ -5,7 +5,6 @@ import { ChatMessage } from "@/app/misc/ai";
 import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
 import { parseCreatorOutput } from "@/app/misc/creator_ai";
-import { AI_MODELS } from "@/app/misc/ai_prices";
 import { DynamicIcon } from "./DynamicIcon";
 
 interface CreatorAIChatProps {
@@ -58,10 +57,10 @@ export default function CreatorAIChat({
     if (typeof window !== "undefined") {
       return (
         localStorage.getItem("creatorAiModel") ||
-        AI_MODELS["Deepseek Chat"].model
+        "Deepseek Chat"
       );
     }
-    return AI_MODELS["Deepseek Chat"].model;
+    return "Deepseek Chat";
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -202,32 +201,32 @@ export default function CreatorAIChat({
               title="Select AI model"
             >
               <optgroup label="Recommended">
-                <option value={AI_MODELS["Deepseek Chat"].model}>
+                <option value="Deepseek Chat">
                   Deepseek Chat (Best)
                 </option>
-                <option value={AI_MODELS["Gemini 2.5 Flash"].model}>
+                <option value="Gemini 2.5 Flash">
                   Gemini 2.5 Flash
                 </option>
-                <option value={AI_MODELS["Mistral Medium 3.1"].model}>
+                <option value="Mistral Medium 3.1">
                   Mistral Medium 3.1
                 </option>
               </optgroup>
               <optgroup label="Advanced">
-                <option value={AI_MODELS["Deepseek R1"].model}>
+                <option value="Deepseek R1">
                   DeepSeek R1 (Reasoning)
                 </option>
-                <option value={AI_MODELS["Grok 4 Fast"].model}>
+                <option value="Grok 4 Fast">
                   Grok 4 Fast (Creative)
                 </option>
-                <option value={AI_MODELS["GLM 4.6"].model}>
+                <option value="GLM 4.6">
                   GLM 4.6 (Long Context)
                 </option>
               </optgroup>
               <optgroup label="Budget">
-                <option value={AI_MODELS["Gemini 2.5 Flash Lite"].model}>
+                <option value="Gemini 2.5 Flash Lite">
                   Gemini Flash Lite
                 </option>
-                <option value={AI_MODELS["Grok Code Fast 1"].model}>
+                <option value="Grok Code Fast 1">
                   Grok Code Fast
                 </option>
               </optgroup>
