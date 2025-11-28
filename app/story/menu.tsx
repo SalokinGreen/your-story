@@ -1624,33 +1624,41 @@ function StatsResourcesEditor({
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => moveStatUp(index)}
-                      disabled={index === 0}
-                      className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs"
-                    >
-                      <DynamicIcon name="ChevronUp" className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => moveStatDown(index)}
-                      disabled={index === localStats.length - 1}
-                      className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-xs"
-                    >
-                      <DynamicIcon name="ChevronDown" className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => startEditStat(index)}
-                      className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs"
-                    >
-                      <DynamicIcon name="Edit" className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => removeStat(index)}
-                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
-                    >
-                      <DynamicIcon name="X" className="w-4 h-4 inline mr-1" />
-                    </button>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex gap-0.5">
+                      <button
+                        onClick={() => moveStatUp(index)}
+                        disabled={index === 0}
+                        className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded flex items-center justify-center"
+                        title="Move up"
+                      >
+                        <DynamicIcon name="ChevronUp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+                      <button
+                        onClick={() => moveStatDown(index)}
+                        disabled={index === localStats.length - 1}
+                        className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded flex items-center justify-center"
+                        title="Move down"
+                      >
+                        <DynamicIcon name="ChevronDown" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+                    </div>
+                    <div className="flex gap-0.5">
+                      <button
+                        onClick={() => startEditStat(index)}
+                        className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
+                        title="Edit"
+                      >
+                        <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+                      <button
+                        onClick={() => removeStat(index)}
+                        className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
+                        title="Remove"
+                      >
+                        <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1779,36 +1787,42 @@ function StatsResourcesEditor({
                     {resource.description}
                   </div>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <button
-                    onClick={() => moveResourceUp(index)}
-                    disabled={index === 0}
-                    className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
-                    title="Move up"
-                  >
-                    <DynamicIcon name="ChevronUp" className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => moveResourceDown(index)}
-                    disabled={index === localResources.length - 1}
-                    className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
-                    title="Move down"
-                  >
-                    <DynamicIcon name="ChevronDown" className="w-5 h-5" />
-                  </button>
+                <div className="flex items-center gap-1.5">
+                  <div className="flex gap-0.5">
+                    <button
+                      onClick={() => moveResourceUp(index)}
+                      disabled={index === 0}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                      title="Move up"
+                    >
+                      <DynamicIcon name="ChevronUp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                    <button
+                      onClick={() => moveResourceDown(index)}
+                      disabled={index === localResources.length - 1}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                      title="Move down"
+                    >
+                      <DynamicIcon name="ChevronDown" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                  </div>
+                  <div className="flex gap-0.5">
+                    <button
+                      onClick={() => startEditResource(index)}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
+                      title="Edit"
+                    >
+                      <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                    <button
+                      onClick={() => removeResource(index)}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
+                      title="Remove"
+                    >
+                      <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => startEditResource(index)}
-                  className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
-                >
-                  <DynamicIcon name="Edit" className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => removeResource(index)}
-                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
-                >
-                  Remove
-                </button>
               </div>
             )
           )}
@@ -2293,36 +2307,42 @@ function QuestEditor({
                     {quest.shortDescription}
                   </div>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <button
-                    onClick={() => moveQuestUp(index)}
-                    disabled={index === 0}
-                    className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
-                    title="Move up"
-                  >
-                    <DynamicIcon name="ChevronUp" className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => moveQuestDown(index)}
-                    disabled={index === localQuests.length - 1}
-                    className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
-                    title="Move down"
-                  >
-                    <DynamicIcon name="ChevronDown" className="w-5 h-5" />
-                  </button>
+                <div className="flex items-center gap-1.5">
+                  <div className="flex gap-0.5">
+                    <button
+                      onClick={() => moveQuestUp(index)}
+                      disabled={index === 0}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                      title="Move up"
+                    >
+                      <DynamicIcon name="ChevronUp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                    <button
+                      onClick={() => moveQuestDown(index)}
+                      disabled={index === localQuests.length - 1}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                      title="Move down"
+                    >
+                      <DynamicIcon name="ChevronDown" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                  </div>
+                  <div className="flex gap-0.5">
+                    <button
+                      onClick={() => startEditQuest(index)}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
+                      title="Edit"
+                    >
+                      <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                    <button
+                      onClick={() => removeQuest(index)}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
+                      title="Remove"
+                    >
+                      <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => startEditQuest(index)}
-                  className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
-                >
-                  <DynamicIcon name="Edit" className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => removeQuest(index)}
-                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
-                >
-                  Remove
-                </button>
               </div>
             )
           )}
@@ -2576,36 +2596,42 @@ function InventoryEditor({
                   {item.description}
                 </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <button
-                  onClick={() => moveInventoryUp(index)}
-                  disabled={index === 0}
-                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
-                  title="Move up"
-                >
-                  <DynamicIcon name="ChevronUp" className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => moveInventoryDown(index)}
-                  disabled={index === localInventory.length - 1}
-                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
-                  title="Move down"
-                >
-                  <DynamicIcon name="ChevronDown" className="w-5 h-5" />
-                </button>
+              <div className="flex items-center gap-1.5">
+                <div className="flex gap-0.5">
+                  <button
+                    onClick={() => moveInventoryUp(index)}
+                    disabled={index === 0}
+                    className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                    title="Move up"
+                  >
+                    <DynamicIcon name="ChevronUp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </button>
+                  <button
+                    onClick={() => moveInventoryDown(index)}
+                    disabled={index === localInventory.length - 1}
+                    className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                    title="Move down"
+                  >
+                    <DynamicIcon name="ChevronDown" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </button>
+                </div>
+                <div className="flex gap-0.5">
+                  <button
+                    onClick={() => startEditInventoryItem(index)}
+                    className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
+                    title="Edit"
+                  >
+                    <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </button>
+                  <button
+                    onClick={() => removeItem(index)}
+                    className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
+                    title="Remove"
+                  >
+                    <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={() => startEditInventoryItem(index)}
-                className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
-              >
-                <DynamicIcon name="Edit" className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => removeItem(index)}
-                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
-              >
-                Remove
-              </button>
             </div>
           )
         )}
@@ -3312,14 +3338,15 @@ function LoreEditor({
               onDragStart={() => handleLoreDragStart(index)}
               onDragOver={(e) => handleLoreDragOver(e, index)}
               onDragEnd={handleLoreDragEnd}
-              className={`p-4 bg-blue-900/20 rounded-lg cursor-move flex items-center gap-3 ${
+              className={`p-3 sm:p-4 bg-blue-900/20 rounded-lg cursor-move ${
                 draggedLoreIndex === index ? "opacity-50" : ""
               }`}
             >
-              <span className="text-gray-400 select-none">
-                <DynamicIcon name="GripVertical" className="w-5 h-5" />
-              </span>
-              <div className="flex-1">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <span className="text-gray-400 select-none mt-1">
+                  <DynamicIcon name="GripVertical" className="w-4 h-4 sm:w-5 sm:h-5" />
+                </span>
+                <div className="flex-1 min-w-0">
                 <div className="font-medium text-white flex items-center gap-2">
                   {loreItem.secrtet && (
                     <DynamicIcon
@@ -3399,37 +3426,45 @@ function LoreEditor({
                         .join(", ")}
                     </div>
                   )}
+                </div>
+                {/* Controls - inline on desktop, wrap on mobile */}
+                <div className="flex items-center gap-1.5 sm:gap-2 mt-2 sm:mt-0 flex-wrap sm:flex-nowrap">
+                  <div className="flex gap-0.5">
+                    <button
+                      onClick={() => moveLoreUp(index)}
+                      disabled={index === 0}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                      title="Move up"
+                    >
+                      <DynamicIcon name="ChevronUp" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                    <button
+                      onClick={() => moveLoreDown(index)}
+                      disabled={index === localLore.length - 1}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
+                      title="Move down"
+                    >
+                      <DynamicIcon name="ChevronDown" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                  </div>
+                  <div className="flex gap-0.5">
+                    <button
+                      onClick={() => startEditLore(index)}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
+                      title="Edit"
+                    >
+                      <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                    <button
+                      onClick={() => removeLore(index)}
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
+                      title="Remove"
+                    >
+                      <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <button
-                  onClick={() => moveLoreUp(index)}
-                  disabled={index === 0}
-                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
-                  title="Move up"
-                >
-                  <DynamicIcon name="ChevronUp" className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => moveLoreDown(index)}
-                  disabled={index === localLore.length - 1}
-                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
-                  title="Move down"
-                >
-                  <DynamicIcon name="ChevronDown" className="w-5 h-5" />
-                </button>
-              </div>
-              <button
-                onClick={() => startEditLore(index)}
-                className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
-              >
-                <DynamicIcon name="Edit" className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => removeLore(index)}
-                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
-              >
-                Remove
-              </button>
             </div>
           )
         )}
@@ -4674,17 +4709,17 @@ export default function MenuPage({
 
       {/* Comprehensive Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          {/* Added min-h to stabilize modal height across tab switches */}
-          <div className="bg-[#0a1628] rounded-2xl shadow-2xl max-w-6xl w-full border border-blue-800/30 h-[90vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 sm:p-4">
+          {/* Full screen on mobile, constrained on desktop */}
+          <div className="bg-[#0a1628] sm:rounded-2xl shadow-2xl max-w-6xl w-full border-0 sm:border border-blue-800/30 h-full sm:h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-blue-800/30">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <DynamicIcon name="Settings" className="w-6 h-6" /> Story Editor
+            <div className="flex items-center justify-between p-3 sm:p-6 border-b border-blue-800/30">
+              <h3 className="text-base sm:text-xl font-bold text-white flex items-center gap-2">
+                <DynamicIcon name="Settings" className="w-5 h-5 sm:w-6 sm:h-6" /> Story Editor
               </h3>
               <button
                 onClick={() => setShowSettings(false)}
-                className="text-blue-300/60 hover:text-white"
+                className="p-2 text-blue-300/60 hover:text-white hover:bg-blue-900/50 rounded-lg transition-colors"
               >
                 <svg
                   className="w-6 h-6"
@@ -4704,8 +4739,8 @@ export default function MenuPage({
 
             {/* Tabs - Made sticky with background to prevent content overlap */}
             <DraggableScroll
-              className="sticky top-0 z-10 bg-[#0a1628] px-6 py-4 border-b border-blue-800/30 scrollbar-thin"
-              innerClassName="gap-3"
+              className="sticky top-0 z-10 bg-[#0a1628] px-2 sm:px-6 py-2 sm:py-4 border-b border-blue-800/30 scrollbar-thin"
+              innerClassName="gap-1.5 sm:gap-3"
             >
               {[
                 { id: "basic", label: "Basic", icon: "FileText" },
@@ -4728,21 +4763,21 @@ export default function MenuPage({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`shrink-0 h-14 px-6 text-base font-semibold rounded-xl transition-colors whitespace-nowrap flex items-center gap-3 overflow-visible ${
+                  className={`shrink-0 h-10 sm:h-14 px-3 sm:px-6 text-xs sm:text-base font-semibold rounded-lg sm:rounded-xl transition-colors whitespace-nowrap flex items-center gap-1.5 sm:gap-3 overflow-visible ${
                     activeTab === tab.id
                       ? "bg-purple-600 text-white shadow-md"
                       : "bg-blue-900/30 text-blue-200 hover:bg-blue-800/40"
                   }`}
                 >
-                  <DynamicIcon name={tab.icon} className="w-5 h-5 shrink-0" />
-                  <span className="leading-none">{tab.label}</span>
+                  <DynamicIcon name={tab.icon} className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                  <span className="leading-none hidden sm:inline">{tab.label}</span>
                 </button>
               ))}
             </DraggableScroll>
 
             {/* Content Area */}
             {/* Ensure consistent inner spacing and prevent layout shift */}
-            <div className="flex-1 overflow-y-auto px-6 pb-6 pt-8 min-h-0">
+            <div className="flex-1 overflow-y-auto px-3 sm:px-6 pb-3 sm:pb-6 pt-4 sm:pt-8 min-h-0">
               {/* Uniform top spacer (pt-8) keeps all tab bodies from touching tabs; Inventory previously appeared correct */}
               {activeTab === "basic" && (
                 <div className="mt-4">
@@ -5780,7 +5815,7 @@ export default function MenuPage({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-3 p-6 border-t border-blue-800/30">
+            <div className="flex gap-2 sm:gap-3 p-3 sm:p-6 border-t border-blue-800/30">
               <button
                 onClick={() => {
                   setSettingsForm({
@@ -5796,7 +5831,7 @@ export default function MenuPage({
                   });
                   setShowSettings(false);
                 }}
-                className="flex-1 px-4 py-3 bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 font-semibold rounded-lg transition-colors"
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 text-sm sm:text-base font-semibold rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -5805,13 +5840,14 @@ export default function MenuPage({
                   await handleSaveSettings();
                   await onSaveProgress();
                 }}
-                className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-colors flex items-center justify-center gap-1"
               >
                 <DynamicIcon
                   name="Save"
-                  className="inline-block w-4 h-4 mr-1"
+                  className="w-4 h-4"
                 />
-                Save All Changes
+                <span className="hidden sm:inline">Save All Changes</span>
+                <span className="sm:hidden">Save</span>
               </button>
             </div>
           </div>

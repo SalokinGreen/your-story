@@ -389,9 +389,7 @@ export default function ChoicesModal({
   return (
     <div
       className={`fixed inset-0 z-50 flex justify-center ${
-        actionMode
-          ? "items-start pt-4 sm:items-center sm:pt-0"
-          : "items-center"
+        actionMode ? "items-start pt-4 sm:items-center sm:pt-0" : "items-center"
       }`}
     >
       {/* Backdrop */}

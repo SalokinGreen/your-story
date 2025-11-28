@@ -205,6 +205,15 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 12, // 10 + 1 + 1
   },
+  budget: {
+    id: "budget",
+    name: "Budget (Cost Effective)",
+    description: "Lower cost models for budget-conscious users",
+    storyModel: "Deepseek Chat",
+    toolsModel: "Deepseek Chat",
+    choicesModel: "Gemini 2.5 Flash Lite",
+    estimatedCost: 3, // 1 + 1 + 1
+  },
   custom: {
     id: "custom",
     name: "Custom",
