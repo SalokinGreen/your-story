@@ -62,7 +62,10 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
     - `buildMessages` reconstructs tool_calls in assistant messages and tool role messages with proper tool_call_id linking
     - Enables AI self-reference ("I just gave you that sword") and multi-turn tool interactions
     - Tool responses marked with ✓ (success), ✗ (failure), ⚠ (partial success)
-- app/misc/ai_staged.ts: Staged generation prompt builders. Exports buildStoryPrompt(), buildToolPrompt(), buildChoicesPrompt() - each returns specialized prompts without XML wrappers. Uses 75% of available context for history, 25% for memory.
+- app/misc/ai_staged.ts: Staged generation prompt builders. Exports buildStoryPrompt(), buildToolPrompt(), buildChoicesPrompt() - each returns specialized prompts without XML wrappers.
+  - **Context-aware pruning**: buildStoryPrompt accepts `modelName` parameter and dynamically prunes oldest scene parts to fit 75% of model's context for story history, 25% for info (lore, memory, stats).
+  - Returns `{ messages, prunedParts }` where `prunedParts` indicates how many oldest parts were removed.
+  - No fixed truncation limits - uses actual model context window from ai_prices.ts.
 - app/misc/toolExecutor.ts: Executes tool calls from AI responses locally on the frontend, mapping AI tool names to XML command format. Modifies storyData directly and returns CommandResponse array with success/failure status and toolCallId linking.
 - app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter). Includes getModelConfig() helper for dynamic model selection. Exports AI_MODELS constant with 9 predefined models (Prometheus, Hades, Hermes, Hercules, Poseidon, Chronos, Athena, Zeus, Hephaestus).
 - app/misc/generation.ts: **Frontend generation orchestrator**. Exports generateStoryTurn() which handles the complete 3-stage generation flow:
@@ -170,6 +173,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Profile page: Admin controls must always be at the very bottom (see comment in profile/[userId]/page.tsx).
 - **AI Config Menu**: Model selection saved to localStorage as "aiPreset", with presets defined in MODEL_PRESETS. Custom presets allow per-stage model overrides.
 - **TTS Settings**: All TTS preferences saved to localStorage (ttsEnabled, ttsLastVoice, ttsAutoGenerate, ttsVolume, ttsCustomVoices).
+- **Hidden Messages**: AI can use ||double pipes|| syntax for hidden text (DM notes). Players can't see hidden text unless "showHiddenMessages" is enabled in localStorage. When revealed, hidden text appears with purple highlighting.
 
 ### AI API Patterns
 

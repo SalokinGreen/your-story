@@ -5678,6 +5678,42 @@ export default function MenuPage({
                       </div>
                     </label>
 
+                    {/* Show Hidden Messages Toggle */}
+                    <label className="flex items-center gap-3 p-4 bg-blue-900/20 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={
+                          typeof window !== "undefined" &&
+                          localStorage.getItem("showHiddenMessages") === "true"
+                        }
+                        onChange={(e) => {
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem(
+                              "showHiddenMessages",
+                              e.target.checked ? "true" : "false"
+                            );
+                            addNotification(
+                              e.target.checked
+                                ? "Hidden messages visible"
+                                : "Hidden messages hidden",
+                              "success"
+                            );
+                          }
+                        }}
+                        className="w-5 h-5 rounded text-purple-600"
+                      />
+                      <div>
+                        <span className="font-semibold text-white">
+                          Show Hidden Messages
+                        </span>
+                        <p className="text-sm text-blue-200/60">
+                          Reveal text wrapped in ||double pipes|| that the AI
+                          uses for internal notes. Players normally can&apos;t
+                          see these.
+                        </p>
+                      </div>
+                    </label>
+
                     <label className="flex items-center gap-3 p-4 bg-blue-900/20 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
                       <input
                         type="checkbox"

@@ -1260,16 +1260,11 @@ export function processCommands(
   }
 }
 
-// Utility: Trim scene history to prevent bloat
+// Utility: Prepare story data for saving (no truncation - pruning happens at context building time)
 function trimStoryData(data: StoryData): StoryData {
-  const MAX_PERSISTED_PARTS = 10; // Keep last 10 scene parts
-  return {
-    ...data,
-    scene: {
-      ...data.scene,
-      parts: data.scene.parts.slice(-MAX_PERSISTED_PARTS),
-    },
-  };
+  // No longer truncating parts - context-aware pruning happens in ai_staged.ts
+  // based on actual token limits (75% story history, 25% info/lore/memory)
+  return data;
 }
 
 function StoryPageContent() {

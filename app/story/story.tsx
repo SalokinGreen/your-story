@@ -66,6 +66,30 @@ export default function Story({
   const [editedText, setEditedText] = React.useState("");
   const [isHovering, setIsHovering] = React.useState(false);
 
+  // Show hidden messages setting - persisted to localStorage
+  const [showHiddenMessages, setShowHiddenMessages] = React.useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("showHiddenMessages") === "true";
+  });
+
+  // Listen for changes to showHiddenMessages in localStorage (from menu)
+  React.useEffect(() => {
+    const handleStorageChange = () => {
+      if (typeof window !== "undefined") {
+        setShowHiddenMessages(
+          localStorage.getItem("showHiddenMessages") === "true"
+        );
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    // Also check on mount and periodically for same-tab changes
+    const interval = setInterval(handleStorageChange, 500);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
   // Action mode state - persisted to localStorage
   const [actionMode, setActionMode] = React.useState(() => {
     if (typeof window === "undefined") return false;
@@ -308,7 +332,7 @@ export default function Story({
             </div>
           ) : (
             <>
-              {prettify(storyText)}
+              {prettify(storyText, true, showHiddenMessages)}
 
               {/* Edit button overlay */}
               {isHovering && onEdit && !loading && !loadingStage && (
@@ -424,7 +448,25 @@ export default function Story({
   );
 }
 
-const prettify = (text: string, animate: boolean = true) => {
+// Parse hidden text: ||hidden text|| becomes either hidden or visible based on setting
+const parseHiddenText = (text: string, showHidden: boolean): string => {
+  if (showHidden) {
+    // Show hidden text with special styling marker
+    return text.replace(/\|\|([^|]+)\|\|/g, "~~HIDDEN_START~~$1~~HIDDEN_END~~");
+  } else {
+    // Remove hidden text entirely
+    return text.replace(/\|\|[^|]+\|\|/g, "");
+  }
+};
+
+const prettify = (
+  text: string,
+  animate: boolean = true,
+  showHiddenMessages: boolean = false
+) => {
+  // Process hidden text before rendering
+  const processedText = parseHiddenText(text, showHiddenMessages);
+
   return (
     <div
       className={`prose prose-sm prose-invert max-w-none ${
@@ -433,12 +475,54 @@ const prettify = (text: string, animate: boolean = true) => {
     >
       <ReactMarkdown
         components={{
-          p: ({ node, ...props }) => (
-            <p
-              className="mb-2 leading-relaxed text-blue-50/90 last:mb-0"
-              {...props}
-            />
-          ),
+          p: ({ node, children, ...props }) => {
+            // Process children to handle hidden text markers
+            const processChildren = (
+              child: React.ReactNode
+            ): React.ReactNode => {
+              if (typeof child === "string") {
+                const parts = child.split(/(~~HIDDEN_START~~|~~HIDDEN_END~~)/);
+                let inHidden = false;
+                return parts.map((part, i) => {
+                  if (part === "~~HIDDEN_START~~") {
+                    inHidden = true;
+                    return null;
+                  }
+                  if (part === "~~HIDDEN_END~~") {
+                    inHidden = false;
+                    return null;
+                  }
+                  if (inHidden) {
+                    return (
+                      <span
+                        key={i}
+                        className="bg-purple-500/30 text-purple-200 px-1 rounded border border-purple-500/50"
+                        title="Hidden message (only visible with setting enabled)"
+                      >
+                        {part}
+                      </span>
+                    );
+                  }
+                  return part;
+                });
+              }
+              return child;
+            };
+
+            const processedChildren = React.Children.map(
+              children,
+              processChildren
+            );
+
+            return (
+              <p
+                className="mb-2 leading-relaxed text-blue-50/90 last:mb-0"
+                {...props}
+              >
+                {processedChildren}
+              </p>
+            );
+          },
           h1: ({ node, ...props }) => (
             <h1
               className="text-xl font-bold mb-2 mt-3 first:mt-0 text-white"
@@ -486,7 +570,7 @@ const prettify = (text: string, animate: boolean = true) => {
           ),
         }}
       >
-        {text}
+        {processedText}
       </ReactMarkdown>
     </div>
   );

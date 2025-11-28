@@ -316,7 +316,14 @@ export async function generateStoryTurn(
       storyData,
       userChoice,
       commandResponses,
+      modelName: options.storyModel,
     });
+
+    if (storyPrompt.prunedParts > 0) {
+      logger.action(
+        `Pruned ${storyPrompt.prunedParts} oldest scene parts to fit context`
+      );
+    }
 
     const storyResponse = await fetch("/api/generate-stream", {
       method: "POST",

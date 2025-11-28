@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { StoryData } from "../misc/structs";
-import { buildMessages, storyDataToString, ChatMessage } from "../misc/ai";
+import {
+  buildStoryPrompt,
+  buildToolPrompt,
+  buildChoicesPrompt,
+  ChatMessage,
+  buildInfoMessage,
+} from "../misc/ai_staged";
 import { DynamicIcon } from "../components/DynamicIcon";
-import { getModelConfig } from "../misc/ai_prices";
+import { getModelConfig, MODEL_PRESETS } from "../misc/ai_prices";
 
 interface ContextViewerProps {
   storyData: StoryData;
@@ -12,23 +18,70 @@ interface ContextViewerProps {
 
 export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [useRawContext, setUseRawContext] = useState(false);
+  const [activeStage, setActiveStage] = useState<"story" | "tools" | "choices">(
+    "story"
+  );
   const [contextString, setContextString] = useState("");
   const [estimatedTokens, setEstimatedTokens] = useState(0);
-  const [selectedModel, setSelectedModel] = useState("Prometheus");
+  const [activeModelName, setActiveModelName] = useState("Deepseek Chat");
+  const [activeModelConfig, setActiveModelConfig] = useState(getModelConfig("Deepseek Chat"));
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [prunedParts, setPrunedParts] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  const scrollToTop = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    }
+  };
 
   useEffect(() => {
-    // Get current model from localStorage
-    const model =
+    // Get current preset and custom model overrides from localStorage
+    const currentPreset =
       typeof window !== "undefined"
-        ? localStorage.getItem("aiModel") || "Prometheus"
-        : "Prometheus";
-    setSelectedModel(model);
+        ? localStorage.getItem("aiPreset") || "main"
+        : "main";
+    
+    const customStoryModel =
+      typeof window !== "undefined"
+        ? localStorage.getItem("aiModelStory") || ""
+        : "";
+    const customToolsModel =
+      typeof window !== "undefined"
+        ? localStorage.getItem("aiModelTools") || ""
+        : "";
+    const customChoicesModel =
+      typeof window !== "undefined"
+        ? localStorage.getItem("aiModelChoices") || ""
+        : "";
 
-    // Get model config to determine maxTokens
-    const modelConfig = getModelConfig(model);
+    // Get preset config (fallback to main if invalid)
+    const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["main"];
+    
+    // Determine effective models - use custom only if preset is "custom" AND value is set
+    const effectiveStoryModel = currentPreset === "custom" && customStoryModel ? customStoryModel : preset.storyModel;
+    const effectiveToolsModel = currentPreset === "custom" && customToolsModel ? customToolsModel : preset.toolsModel;
+    const effectiveChoicesModel = currentPreset === "custom" && customChoicesModel ? customChoicesModel : preset.choicesModel;
+
+    // Select the model based on active stage
+    const currentModel = activeStage === "story" ? effectiveStoryModel : activeStage === "tools" ? effectiveToolsModel : effectiveChoicesModel;
+    const modelConfig = getModelConfig(currentModel);
+    setActiveModelName(currentModel);
+    setActiveModelConfig(modelConfig);
+    
     const maxTokens = modelConfig.maxTokens;
 
     console.log("🔍 Context Viewer Debug:", {
@@ -37,22 +90,45 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       sceneParts: storyData.scene.parts.length,
       memoryEntries: storyData.memory.length,
       loreEntries: storyData.lore.filter((l) => l.on !== false).length,
+      activeStage,
     });
 
-    // Build messages using the same function as the API
-    const { messages: contextMessages } = buildMessages({
-      storyData,
-      userChoice: undefined,
-      useRawContext,
-      maxTokens,
-      supportsToolCalling: false, // Context viewer doesn't need tool schemas
-    });
+    // Build messages using the SAME functions as generation.ts
+    let contextMessages: ChatMessage[] = [];
+    let prunedCount = 0;
+
+    switch (activeStage) {
+      case "story":
+        const storyPrompt = buildStoryPrompt({
+          storyData,
+          userChoice: undefined,
+          modelName: effectiveStoryModel,
+        });
+        contextMessages = storyPrompt.messages;
+        prunedCount = storyPrompt.prunedParts;
+        break;
+      case "tools":
+        const toolPrompt = buildToolPrompt({
+          storyData,
+          storyContent: "(Story content from previous stage would go here)",
+        });
+        contextMessages = toolPrompt.messages;
+        break;
+      case "choices":
+        const choicesPrompt = buildChoicesPrompt({
+          storyData,
+          storyContent: "(Story content from previous stage would go here)",
+        });
+        contextMessages = choicesPrompt.messages;
+        break;
+    }
 
     setMessages(contextMessages);
+    setPrunedParts(prunedCount);
 
-    // Build context string
-    const contextStr = storyDataToString(storyData);
-    setContextString(contextStr);
+    // Build info string for display
+    const infoStr = buildInfoMessage(storyData);
+    setContextString(infoStr);
 
     // Estimate tokens (rough approximation: 1 token ≈ 4 characters)
     const totalChars = contextMessages.reduce(
@@ -63,19 +139,18 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     setEstimatedTokens(estimatedTokenCount);
 
     console.log("📊 Context Statistics:", {
+      stage: activeStage,
       totalMessages: contextMessages.length,
       totalChars,
       estimatedTokens: estimatedTokenCount,
       utilizationPercent:
         ((estimatedTokenCount / maxTokens) * 100).toFixed(1) + "%",
       availableSceneParts: storyData.scene.parts.length,
-      includedSceneParts: contextMessages.filter(
-        (m) => m.role !== "system" && m !== contextMessages[1]
-      ).length,
-      reservedTokens: 2000,
-      availableAfterReserve: maxTokens - 2000,
-      allocatedToMemory: Math.floor((maxTokens - 2000) * 0.25),
-      allocatedToStoryParts: Math.floor((maxTokens - 2000) * 0.75),
+      includedSceneParts:
+        contextMessages.filter(
+          (m) => m.role === "user" || m.role === "assistant"
+        ).length - 1, // Subtract the info message
+      prunedParts: prunedCount,
       messagesBreakdown: contextMessages.map((msg, i) => ({
         index: i,
         role: msg.role,
@@ -86,7 +161,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           (msg.content.length > 100 ? "..." : ""),
       })),
     });
-  }, [storyData, useRawContext]);
+  }, [storyData, activeStage]);
 
   const formatRole = (role: ChatMessage["role"]) => {
     switch (role) {
@@ -96,6 +171,8 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         return "USER";
       case "assistant":
         return "ASSISTANT";
+      case "tool":
+        return "TOOL";
     }
   };
 
@@ -107,6 +184,8 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         return "text-blue-600 dark:text-blue-400";
       case "assistant":
         return "text-green-600 dark:text-green-400";
+      case "tool":
+        return "text-orange-600 dark:text-orange-400";
       default:
         return "text-gray-600 dark:text-gray-400";
     }
@@ -120,6 +199,8 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         return "bg-blue-50 dark:bg-blue-900/20";
       case "assistant":
         return "bg-green-50 dark:bg-green-900/20";
+      case "tool":
+        return "bg-orange-50 dark:bg-orange-900/20";
       default:
         return "bg-gray-50 dark:bg-gray-900/20";
     }
@@ -135,7 +216,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `context-${Date.now()}.json`;
+    a.download = `context-${activeStage}-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -148,12 +229,10 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `context-${Date.now()}.txt`;
+    a.download = `context-${activeStage}-${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const modelConfig = getModelConfig(selectedModel);
 
   return (
     <div className="flex flex-col h-[calc(100vh-200px)] bg-white dark:bg-blue-950 rounded-lg shadow-lg overflow-hidden">
@@ -195,8 +274,82 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           </div>
         </div>
 
+        {/* Stage Selector Tabs */}
+        <div className="flex gap-1 bg-gray-200 dark:bg-gray-800 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveStage("story")}
+            className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
+              activeStage === "story"
+                ? "bg-white dark:bg-blue-950 text-purple-600 dark:text-purple-400 shadow"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            }`}
+          >
+            <DynamicIcon name="BookOpen" className="w-3 h-3 inline mr-1" />
+            Story
+          </button>
+          <button
+            onClick={() => setActiveStage("tools")}
+            className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
+              activeStage === "tools"
+                ? "bg-white dark:bg-blue-950 text-orange-600 dark:text-orange-400 shadow"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            }`}
+          >
+            <DynamicIcon name="Wrench" className="w-3 h-3 inline mr-1" />
+            Tools
+          </button>
+          <button
+            onClick={() => setActiveStage("choices")}
+            className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
+              activeStage === "choices"
+                ? "bg-white dark:bg-blue-950 text-blue-600 dark:text-blue-400 shadow"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            }`}
+          >
+            <DynamicIcon name="ListChecks" className="w-3 h-3 inline mr-1" />
+            Choices
+          </button>
+        </div>
+
         {showInfo && (
           <>
+            {/* Stage Description */}
+            <div className="text-xs p-2 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+              {activeStage === "story" && (
+                <>
+                  <strong>Story Stage:</strong> Conversation history sent to
+                  generate narrative prose. Uses 75% of context for story
+                  history, 25% for info (lore, memory, stats).
+                  {prunedParts > 0 ? (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      {" "}
+                      Pruned {prunedParts} oldest parts to fit {activeModelName}'s
+                      context.
+                    </span>
+                  ) : (
+                    <span className="text-green-600 dark:text-green-400">
+                      {" "}
+                      All {storyData.scene.parts.length} parts included.
+                    </span>
+                  )}
+                </>
+              )}
+              {activeStage === "tools" && (
+                <>
+                  <strong>Tools Stage:</strong> Last 20 scene parts + new story
+                  content. AI analyzes what game state changes to make (items,
+                  stats, memory, etc.).
+                </>
+              )}
+              {activeStage === "choices" && (
+                <>
+                  <strong>Choices Stage:</strong> Last 8 scene parts + new story
+                  content. AI generates player choices with skill checks and
+                  mechanics.
+                </>
+              )}
+            </div>
+
             {/* Stats and Options */}
             <div className="flex flex-wrap gap-2 items-center text-xs sm:text-sm">
               <div className="px-2 sm:px-3 py-1 bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
@@ -209,7 +362,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
               </div>
               <div className="px-2 sm:px-3 py-1 bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
                 <span className="text-gray-600 dark:text-gray-400">
-                  Tokens:
+                  ~Tokens:
                 </span>{" "}
                 <span className="font-semibold text-gray-900 dark:text-white">
                   {estimatedTokens.toLocaleString()}
@@ -217,24 +370,37 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
               </div>
               <div className="px-2 sm:px-3 py-1 bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
                 <span className="text-gray-600 dark:text-gray-400">
+                  Scene Parts:
+                </span>{" "}
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {storyData.scene.parts.length}
+                </span>
+                {activeStage === "story" && prunedParts > 0 && (
+                  <span className="text-amber-600 dark:text-amber-400 ml-1">
+                    (-{prunedParts})
+                  </span>
+                )}
+              </div>
+              <div className="px-2 sm:px-3 py-1 bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
+                <span className="text-gray-600 dark:text-gray-400">
                   Context:
                 </span>{" "}
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {(modelConfig.maxTokens / 1000).toFixed(0)}K
+                  {(activeModelConfig.maxTokens / 1000).toFixed(0)}K
                 </span>
               </div>
               <div
                 className={`px-2 sm:px-3 py-1 rounded border text-xs ${
-                  estimatedTokens > modelConfig.maxTokens * 0.9
+                  estimatedTokens > activeModelConfig.maxTokens * 0.9
                     ? "bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-700 dark:text-red-400"
-                    : estimatedTokens > modelConfig.maxTokens * 0.7
+                    : estimatedTokens > activeModelConfig.maxTokens * 0.7
                     ? "bg-yellow-100 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400"
                     : "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-700 dark:text-green-400"
                 }`}
               >
-                {estimatedTokens > modelConfig.maxTokens * 0.9
+                {estimatedTokens > activeModelConfig.maxTokens * 0.9
                   ? "⚠️ Near Limit"
-                  : estimatedTokens > modelConfig.maxTokens * 0.7
+                  : estimatedTokens > activeModelConfig.maxTokens * 0.7
                   ? "⚡ High Usage"
                   : "✓ Normal"}
               </div>
@@ -242,17 +408,6 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
 
             {/* Toggles */}
             <div className="flex flex-wrap gap-2 sm:gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useRawContext}
-                  onChange={(e) => setUseRawContext(e.target.checked)}
-                  className="w-4 h-4 rounded"
-                />
-                <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">
-                  Use Raw AI Output
-                </span>
-              </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -301,16 +456,19 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
 
             <div className="text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
               <DynamicIcon name="Info" className="w-3 h-3 inline mr-1" />
-              This shows the exact context sent to the AI. The first USER
-              message contains all game state. Scene parts are trimmed to fit
-              75% context allocation.
+              This shows the exact context sent to the AI for each generation
+              stage. Story stage includes all history; Tools/Choices stages are
+              truncated.
             </div>
           </>
         )}
       </div>
 
       {/* Messages List */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 relative"
+      >
         {showRawJSON ? (
           <pre className="bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 rounded text-xs overflow-x-auto text-gray-800 dark:text-gray-200 font-mono mx-2 sm:mx-4">
             {JSON.stringify(messages, null, 2)}
@@ -364,6 +522,24 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             </div>
           ))
         )}
+      </div>
+
+      {/* Floating scroll buttons */}
+      <div className="absolute bottom-4 right-6 flex flex-col gap-2">
+        <button
+          onClick={scrollToTop}
+          className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-colors"
+          title="Scroll to top"
+        >
+          <DynamicIcon name="ChevronUp" className="w-5 h-5" />
+        </button>
+        <button
+          onClick={scrollToBottom}
+          className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-colors"
+          title="Scroll to bottom"
+        >
+          <DynamicIcon name="ChevronDown" className="w-5 h-5" />
+        </button>
       </div>
     </div>
   );

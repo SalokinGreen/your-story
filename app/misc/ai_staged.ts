@@ -1,6 +1,7 @@
 import { StoryData, Choice, CommandResponse } from "@/app/misc/structs";
 import { getRPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
+import { getModelConfig } from "@/app/misc/ai_prices";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -8,6 +9,11 @@ export type ChatMessage = {
   tool_calls?: any[];
   tool_call_id?: string;
 };
+
+// Estimate tokens from text (rough approximation: ~4 chars per token)
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
 
 // Cleans text by removing problematic characters and normalizing whitespace
 export function cleanString(text: string): string {
@@ -251,16 +257,27 @@ ${
 }
 
 // Stage 1: Story narration only
+// Uses 75% of available context for story history, 25% for info (lore, memory, stats, etc.)
 export function buildStoryPrompt({
   storyData,
   userChoice,
   commandResponses,
+  modelName = "Deepseek Chat",
 }: {
   storyData: StoryData;
   userChoice?: string;
   commandResponses?: CommandResponse[];
-}): { messages: ChatMessage[] } {
+  modelName?: string;
+}): { messages: ChatMessage[]; prunedParts: number } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+
+  // Get model's context limit
+  const modelConfig = getModelConfig(modelName);
+  const maxContextTokens = modelConfig.maxTokens - modelConfig.maxOutputTokens;
+
+  // Allocate 75% for story history, 25% for info (system prompt + info message)
+  const storyBudget = Math.floor(maxContextTokens * 0.75);
+  const infoBudget = Math.floor(maxContextTokens * 0.25);
 
   const systemPrompt = `You are a creative narrative engine for an interactive text-based adventure game.
 Your role is to write ONLY the story prose - no game mechanics, no choices, no commands.
@@ -275,6 +292,14 @@ Writing Guidelines:
 - DO NOT include choices, game mechanics, or commands - ONLY write narrative prose
 - DO NOT worry about triggering achievements or updating game state - focus purely on storytelling
 
+Hidden Text (DM Notes):
+- Use ||double pipes|| to hide text from the player: ||this text is hidden||
+- Players CANNOT see hidden text - it's completely invisible to them unless they enable a special setting
+- Use hidden text for: foreshadowing, NPC true motives, secret information, future plot hints, or notes for yourself
+- Example: "The merchant smiles warmly. ||He's actually planning to rob you tonight.||"
+- Important: If hidden information becomes relevant, you MUST reveal it in regular text - the player can't act on what they can't see
+- Hidden text persists in conversation history, so you can reference your own hidden notes later
+
 ${
   commandResponses && commandResponses.length > 0
     ? `\nCommand Feedback from previous actions:\n${formatResponsesForAI(
@@ -284,38 +309,83 @@ ${
 }`;
 
   const infoMessage = buildInfoMessage(storyData);
+  const cleanedSystemPrompt = cleanString(systemPrompt);
+  const cleanedInfoMessage = cleanString(infoMessage);
+
+  // Calculate info tokens (system prompt + info message)
+  const infoTokens =
+    estimateTokens(cleanedSystemPrompt) + estimateTokens(cleanedInfoMessage);
+
+  // If info exceeds its budget, we still include it but reduce story budget
+  const actualStoryBudget = Math.max(
+    storyBudget,
+    maxContextTokens - infoTokens - 1000
+  ); // Keep 1000 tokens buffer
 
   const messages: ChatMessage[] = [
-    { role: "system", content: cleanString(systemPrompt) },
-    { role: "user", content: cleanString(infoMessage) },
+    { role: "system", content: cleanedSystemPrompt },
+    { role: "user", content: cleanedInfoMessage },
   ];
 
-  // Add conversation history with full context
+  // Build story history messages (we'll prune from the front if needed)
+  const historyMessages: ChatMessage[] = [];
   for (const part of storyData.scene.parts) {
     if (part.user) {
-      messages.push({
+      historyMessages.push({
         role: "user",
         content: cleanString(part.content),
       });
     } else {
       // For story generation, we only need the narrative content, not tool calls/responses
       const assistantContent = part.raw || part.content;
-      messages.push({
+      historyMessages.push({
         role: "assistant",
         content: cleanString(assistantContent),
       });
     }
   }
 
-  // Add user choice if present
+  // Add user choice to history if present
   if (userChoice) {
-    messages.push({
+    historyMessages.push({
       role: "user",
       content: cleanString(`Player chose: ${userChoice}`),
     });
   }
 
-  return { messages };
+  // Calculate tokens for each history message
+  const historyTokens = historyMessages.map((m) => estimateTokens(m.content));
+  const totalHistoryTokens = historyTokens.reduce((sum, t) => sum + t, 0);
+
+  // Prune from the front (oldest first) if over budget
+  let prunedParts = 0;
+  let currentTokens = totalHistoryTokens;
+  let startIndex = 0;
+
+  while (
+    currentTokens > actualStoryBudget &&
+    startIndex < historyMessages.length - 2
+  ) {
+    // Always keep at least the last 2 messages for context
+    currentTokens -= historyTokens[startIndex];
+    startIndex++;
+    prunedParts++;
+  }
+
+  // Add the (possibly pruned) history
+  const prunedHistory = historyMessages.slice(startIndex);
+  messages.push(...prunedHistory);
+
+  if (prunedParts > 0) {
+    console.log(
+      `[buildStoryPrompt] Pruned ${prunedParts} oldest parts to fit context budget. Kept ${prunedHistory.length} parts.`
+    );
+    console.log(
+      `[buildStoryPrompt] Token budget: ${actualStoryBudget}, Used: ${currentTokens}, Info: ${infoTokens}`
+    );
+  }
+
+  return { messages, prunedParts };
 }
 
 // Stage 2a: Tool calls / game state changes

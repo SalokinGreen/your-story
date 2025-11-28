@@ -184,6 +184,14 @@ Item Types:
 - story: Gives advantage when used. Never breaks and never gets consumed. Important quest items.
 - misc: Doesn't give advantage, but prevents disadvantage from not having an item. Never breaks or gets consumed.
 
+Hidden Text (DM Notes):
+- Use ||double pipes|| to hide text from the player: ||this text is hidden||
+- Players CANNOT see hidden text - it's completely invisible to them unless they enable a special setting
+- Use hidden text for: foreshadowing, NPC true motives, secret information, future plot hints, or notes for yourself
+- Example: "The merchant smiles warmly. ||He's actually planning to rob you tonight.||"
+- Important: If hidden information becomes relevant, you MUST reveal it in regular text - the player can't act on what they can't see
+- Hidden text persists in conversation history, so you can reference your own hidden notes later
+
 ${
   supportsToolCalling
     ? `## TOOL CALLING
