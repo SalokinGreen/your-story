@@ -201,6 +201,42 @@ export const AI_MODELS = {
       "A powerful model from Qwen, suitable for a variety of tasks including storytelling and content generation.",
     bannerUrl: undefined,
   },
+  "Qwen 3 Next 80b": {
+    name: "Qwen 3 Next 80B",
+    original_model: "qwen/qwen3-next-80b-a3b-instruct",
+    model: "qwen/qwen3-next-80b-a3b-instruct",
+    maxTokens: 250000,
+    maxOutputTokens: 8000,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    cost: 5,
+    inputPrice: 0.1,
+    outputPrice: 0.8,
+    finetunes: [],
+    strengths: ["powerful", "long context"],
+    weaknesses: ["price"],
+    description:
+      "The largest Qwen model, excelling in handling long contexts and delivering high-quality content generation.",
+    bannerUrl: undefined,
+  },
+  "Qwen 3 235B A22B Instruct": {
+    name: "Qwen 3 235B A22B Instruct",
+    original_model: "qwen/qwen3-235b-a22b-2507",
+    model: "qwen/qwen3-235b-a22b-2507",
+    maxTokens: 131000,
+    maxOutputTokens: 8000,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.072,
+    outputPrice: 0.464,
+    finetunes: [],
+    strengths: ["powerful", "cost-effective"],
+    weaknesses: ["logic"],
+    description:
+      "A powerful and cost-effective model from Qwen, suitable for a variety of tasks including storytelling and content generation.",
+    bannerUrl: undefined,
+  },
 } as const;
 
 export interface ModelPreset {
@@ -251,7 +287,24 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     choicesModel: "microsoft/phi-4",
     estimatedCost: 5, // 1 + 1 + 1
   },
-
+  clusterFour: {
+    id: "clusterFour",
+    name: "Cluster Moses",
+    description: "Balanced performance and cost-effectiveness",
+    storyModel: "Qwen 3 Next 80b",
+    toolsModel: "Deepseek Chat",
+    choicesModel: "microsoft/phi-4",
+    estimatedCost: 7, // 5 + 1 + 1
+  },
+  clusterFive: {
+    id: "clusterFive",
+    name: "Cluster Goliath",
+    description: "Maximum power for the most demanding adventures",
+    storyModel: "Qwen 3 235B A22B Instruct",
+    toolsModel: "Deepseek Chat",
+    choicesModel: "microsoft/phi-4",
+    estimatedCost: 3, // 1 + 1 + 1
+  },
   custom: {
     id: "custom",
     name: "Custom",
