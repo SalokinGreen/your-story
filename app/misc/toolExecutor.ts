@@ -236,6 +236,79 @@ export function executeTools(
         continue;
       }
 
+      // Special handling for list_inactive_lore (query tool - returns data directly)
+      if (toolCall.function.name === "list_inactive_lore") {
+        logger.action("Special handling: list_inactive_lore", { toolCallId: toolId });
+        
+        if (!storyData.lore || storyData.lore.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: true,
+            message: "No lore entries defined in this adventure.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Find inactive lore (not revealed, not always-on, on=false or no triggers matched)
+        const currentPartIndex = storyData.scene.parts.length;
+        const inactiveLore = storyData.lore.filter((l) => {
+          if (l.enabled === false) return false; // Completely disabled in editor
+          if (l.alwaysOn) return false; // Always visible, not "inactive"
+          
+          // Check if already revealed via show_lore
+          const wasRevealed = storyData.scene.parts.some(
+            (p) => p.revealedLore?.some(title => title.toLowerCase() === l.title.toLowerCase())
+          );
+          if (wasRevealed) return false;
+          
+          // Check standard activation
+          if (l.on === true) {
+            // If recently triggered, it's active
+            if (l.lastTriggeredIndex && currentPartIndex - l.lastTriggeredIndex <= 15) {
+              return false;
+            }
+          }
+          
+          // If we get here, lore is inactive
+          return true;
+        });
+
+        if (inactiveLore.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: true,
+            message: "All lore entries are currently active/visible. No hidden lore available.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Format inactive lore for AI
+        const loreList = inactiveLore.map((l) => {
+          const preview = l.content.length > 80 ? l.content.substring(0, 77) + "..." : l.content;
+          return `- ${l.title}: ${preview}`;
+        }).join("\n");
+
+        const successMsg = `Inactive/Hidden Lore Entries (${inactiveLore.length}):\n${loreList}\n\nUse show_lore({ title: "..." }) to reveal any of these to the player.`;
+        
+        logger.action(`Tool call succeeded: list_inactive_lore found ${inactiveLore.length} entries`, {
+          toolCallId: toolId,
+          count: inactiveLore.length,
+        });
+        
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: successMsg,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
       // Special handling for variable management tools
       if (
         [
@@ -1715,6 +1788,9 @@ function convertToolToCommand(
 
     case "hide_lore":
       return `/lore_hide: ${args.title}`;
+
+    case "list_inactive_lore":
+      return null; // Handled directly in executeTools
 
     case "update_lore": {
       // Format: /lore_update: title | newTitle | content | on | onTriggers | offTriggers

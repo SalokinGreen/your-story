@@ -565,6 +565,20 @@ const hideLoreTool: ToolSchema = {
   },
 };
 
+const listInactiveLoreTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "list_inactive_lore",
+    description:
+      "List all inactive/hidden lore entries that can be revealed. Use this to discover what lore exists before calling show_lore. Returns titles and brief descriptions of hidden lore.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+};
+
 const updateLoreTool: ToolSchema = {
   type: "function",
   function: {
@@ -1207,12 +1221,13 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   // Achievement (1 tool)
   triggerAchievementTool,
 
-  // Lore Management (5 tools)
+  // Lore Management (6 tools)
   createLoreTool,
   deleteLoreTool,
   showLoreTool,
   hideLoreTool,
   updateLoreTool,
+  listInactiveLoreTool,
 
   // Plot Beats (5 tools)
   markBeatTool,

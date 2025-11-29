@@ -84,13 +84,22 @@ export function buildInfoMessage(storyData: StoryData): string {
         .join("\n")}`
     : "";
 
-  // Build lore section - only send always-on lore or recently triggered lore (last 10 parts)
+  // Build lore section - only send always-on lore, recently triggered lore, or manually revealed lore
   const currentPartIndex = storyData.scene.parts.length;
   const activeLore = storyData.lore.filter((l) => {
-    if (l.on === false || l.enabled === false) return false; // Explicitly disabled
+    if (l.enabled === false) return false; // Explicitly disabled in editor
     if (l.alwaysOn) return true; // Always include always-on lore
+    
+    // Check if manually revealed via show_lore command in any scene part
+    const wasRevealed = storyData.scene.parts.some(
+      (p) => p.revealedLore?.some(title => title.toLowerCase() === l.title.toLowerCase())
+    );
+    if (wasRevealed) return true;
+    
+    // Standard trigger-based logic
+    if (l.on === false) return false; // Explicitly turned off
     if (!l.lastTriggeredIndex) return l.on === true; // Fallback for old lore without tracking
-    return currentPartIndex - l.lastTriggeredIndex <= 15; // Only recent triggers (last 10 parts)
+    return currentPartIndex - l.lastTriggeredIndex <= 15; // Only recent triggers (last 15 parts)
   });
   const loreSection = activeLore.length
     ? `Lore:\n${activeLore
@@ -511,6 +520,8 @@ Lore Guidelines:
 - Set on=false for lore that should be hidden until triggered
 - Only use on=true (no triggers) for lore that should be visible from the start
 - Example: create_lore(title="Undead Horde", content="...", on=false, onTriggers=["zombie", "zombies", "undead", "Undead"])
+- To reveal existing hidden lore: first call list_inactive_lore() to see what's available, then show_lore({ title: "..." })
+- show_lore uses fuzzy matching - close approximations of titles will work
 
 Condition/Affliction Guidelines:
 - ONLY add conditions when: (1) player FAILS a skill check with consequences, or (2) it makes strong narrative sense (ambush, trap, curse, etc.)

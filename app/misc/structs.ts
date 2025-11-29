@@ -93,6 +93,7 @@ export interface ScenePart {
   commands?: string[]; // Legacy: XML commands
   toolCalls?: any[]; // Tool calls made by AI (OpenAI/DeepSeek format)
   toolResponses?: CommandResponse[]; // Execution results of tool calls
+  revealedLore?: string[]; // Lore titles manually revealed by AI in this part
   endChapter?: boolean;
   endStory?: boolean;
   gameOver?: boolean;

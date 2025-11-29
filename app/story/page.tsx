@@ -97,6 +97,7 @@ import {
   findAchievementMatch,
   findQuestMatch,
   findRelationshipMatch,
+  findLoreMatch,
 } from "../misc/fuzzyMatch";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn, analyzeAction } from "../misc/generation";
@@ -681,15 +682,27 @@ export function processCommands(
       const loreTitle = loreShowMatch[1].trim();
       if (!storyData.lore) storyData.lore = [];
 
-      const loreEntry = storyData.lore.find(
-        (l) => l.title.toLowerCase() === loreTitle.toLowerCase()
-      );
-      if (!loreEntry) {
+      const matchResult = findLoreMatch(loreTitle, storyData.lore);
+      if (!matchResult) {
         logger.warn("Lore show failed: entry not found", { title: loreTitle });
       } else {
+        const loreEntry = matchResult.item;
         loreEntry.on = true;
+        loreEntry.lastTriggeredIndex = storyData.scene.parts.length;
+        
+        // Add to revealedLore on the last scene part (or create one if needed)
+        const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
+        if (lastPart) {
+          if (!lastPart.revealedLore) lastPart.revealedLore = [];
+          if (!lastPart.revealedLore.includes(loreEntry.title)) {
+            lastPart.revealedLore.push(loreEntry.title);
+          }
+        }
+        
         logger.action("Lore entry revealed via command", {
           title: loreEntry.title,
+          matchedFrom: loreTitle,
+          score: matchResult.score,
         });
       }
       continue;
@@ -701,15 +714,16 @@ export function processCommands(
       const loreTitle = loreHideMatch[1].trim();
       if (!storyData.lore) storyData.lore = [];
 
-      const loreEntry = storyData.lore.find(
-        (l) => l.title.toLowerCase() === loreTitle.toLowerCase()
-      );
-      if (!loreEntry) {
+      const matchResult = findLoreMatch(loreTitle, storyData.lore);
+      if (!matchResult) {
         logger.warn("Lore hide failed: entry not found", { title: loreTitle });
       } else {
+        const loreEntry = matchResult.item;
         loreEntry.on = false;
         logger.action("Lore entry hidden via command", {
           title: loreEntry.title,
+          matchedFrom: loreTitle,
+          score: matchResult.score,
         });
       }
       continue;
