@@ -165,11 +165,11 @@ export const AI_MODELS = {
       "A popular and cost-effective model with large context window, suitable for tool calling and general tasks.",
     bannerUrl: undefined,
   },
-  "microsoft/phi-3.5-mini-128k-instruct": {
-    name: "Phi 3.5 Mini 128k Instruct",
-    original_model: "microsoft/phi-3.5-mini-128k-instruct",
-    model: "microsoft/phi-3.5-mini-128k-instruct",
-    maxTokens: 128000,
+  "microsoft/phi-4": {
+    name: "Phi 4",
+    original_model: "microsoft/phi-4",
+    model: "microsoft/phi-4",
+    maxTokens: 160000,
     maxOutputTokens: 4000,
     provider: "openrouter",
     supportsToolCalling: true,
@@ -181,24 +181,6 @@ export const AI_MODELS = {
     weaknesses: ["logic"],
     description:
       "A small-sized model from Mistral, offering a balance between performance and cost, suitable for story generation..",
-    bannerUrl: undefined,
-  },
-  "baidu/ernie-4.5-21b-a3b-thinking": {
-    name: "ERNIE 4.5 21B A3B Thinking",
-    original_model: "baidu/ernie-4.5-21b-a3b-thinking",
-    model: "baidu/ernie-4.5-21b-a3b-thinking",
-    maxTokens: 131000,
-    maxOutputTokens: 8000,
-    provider: "openrouter",
-    supportsToolCalling: true,
-    cost: 1,
-    inputPrice: 0.056,
-    outputPrice: 0.224,
-    finetunes: [],
-    strengths: ["powerful", "cost-effective"],
-    weaknesses: ["logic"],
-    description:
-      "A powerful model from Baidu, suitable for a variety of tasks including storytelling and content generation.",
     bannerUrl: undefined,
   },
   "qwen/qwen3-vl-30b-a3b-instruct": {
@@ -217,24 +199,6 @@ export const AI_MODELS = {
     weaknesses: ["logic"],
     description:
       "A powerful model from Qwen, suitable for a variety of tasks including storytelling and content generation.",
-    bannerUrl: undefined,
-  },
-  "thedrummer/cydonia-24b-v4.1": {
-    name: "Cydonia 24B v4.1",
-    original_model: "thedrummer/cydonia-24b-v4.1",
-    model: "thedrummer/cydonia-24b-v4.1",
-    maxTokens: 131000,
-    maxOutputTokens: 4000,
-    provider: "openrouter",
-    supportsToolCalling: true,
-    cost: 1,
-    inputPrice: 0.3,
-    outputPrice: 0.5,
-    finetunes: [],
-    strengths: ["powerful", "cost-effective"],
-    weaknesses: ["logic"],
-    description:
-      "A powerful model from TheDrummer, suitable for a variety of tasks including storytelling and content generation.",
     bannerUrl: undefined,
   },
 } as const;
@@ -277,33 +241,17 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 12, // 10 + 1 + 1
   },
-  clusterOne: {
-    id: "clusterOne",
-    name: "Cluster One",
-    description: "Balanced performance with cost efficiency",
-    storyModel: "baidu/ernie-4.5-21b-a3b-thinking",
-    toolsModel: "Deepseek Chat",
-    choicesModel: "microsoft/phi-3.5-mini-128k-instruct",
-    estimatedCost: 5, // 1 + 1 + 1
-  },
+
   clusterTwo: {
     id: "clusterTwo",
-    name: "Cluster Two",
+    name: "Cluster David",
     description: "High performance with advanced capabilities",
     storyModel: "qwen/qwen3-vl-30b-a3b-instruct",
     toolsModel: "Deepseek Chat",
-    choicesModel: "microsoft/phi-3.5-mini-128k-instruct",
+    choicesModel: "microsoft/phi-4",
     estimatedCost: 5, // 1 + 1 + 1
   },
-  clusterThree: {
-    id: "clusterThree",
-    name: "Cluster Three",
-    description: "Powerful generation with large context handling",
-    storyModel: "thedrummer/cydonia-24b-v4.1",
-    toolsModel: "Deepseek Chat",
-    choicesModel: "microsoft/phi-3.5-mini-128k-instruct",
-    estimatedCost: 5, // 1 + 1 + 1
-  },
+
   custom: {
     id: "custom",
     name: "Custom",
