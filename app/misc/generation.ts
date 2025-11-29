@@ -46,6 +46,7 @@ export interface GenerationOptions {
   enableTools: boolean;
   maxToolLoops?: number;
   skipChoices?: boolean;
+  customMaxContext?: number;
 }
 
 export interface GenerationCallbacks {
@@ -330,6 +331,7 @@ export async function generateStoryTurn(
       userChoice,
       commandResponses,
       modelName: options.storyModel,
+      customMaxContext: options.customMaxContext,
     });
 
     if (storyPrompt.prunedParts > 0) {

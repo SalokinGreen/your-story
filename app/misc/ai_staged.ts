@@ -340,17 +340,30 @@ export function buildStoryPrompt({
   userChoice,
   commandResponses,
   modelName = "Deepseek Chat",
+  customMaxContext,
 }: {
   storyData: StoryData;
   userChoice?: string;
   commandResponses?: CommandResponse[];
   modelName?: string;
+  customMaxContext?: number;
 }): { messages: ChatMessage[]; prunedParts: number } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
   // Get model's context limit
   const modelConfig = getModelConfig(modelName);
-  const maxContextTokens = modelConfig.maxTokens - modelConfig.maxOutputTokens;
+  let effectiveMaxTokens = modelConfig.maxTokens;
+
+  // Apply custom max context if set and smaller than model's limit
+  if (
+    customMaxContext &&
+    customMaxContext > 0 &&
+    customMaxContext < effectiveMaxTokens
+  ) {
+    effectiveMaxTokens = customMaxContext;
+  }
+
+  const maxContextTokens = effectiveMaxTokens - modelConfig.maxOutputTokens;
 
   // Allocate 75% for story history, 25% for info (system prompt + info message)
   const storyBudget = Math.floor(maxContextTokens * 0.75);

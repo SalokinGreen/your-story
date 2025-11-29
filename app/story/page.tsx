@@ -2405,6 +2405,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? parseInt(localStorage.getItem("maxToolLoops") || "1", 10)
           : 1;
+      const customMaxContext =
+        typeof window !== "undefined"
+          ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
+          : 36000;
 
       // Track parallel completion of tools and choices
       let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -2425,6 +2429,7 @@ function StoryPageContent() {
           choicesModel,
           enableTools: toolCallingEnabled,
           maxToolLoops,
+          customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -4236,6 +4241,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("maxToolLoops") || "1", 10)
         : 1;
+    const customMaxContext =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
+        : 36000;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -4271,6 +4280,8 @@ function StoryPageContent() {
             choicesModel,
             enableTools: toolCallingEnabled,
             maxToolLoops,
+            customMaxContext:
+              customMaxContext > 0 ? customMaxContext : undefined,
             skipChoices: !!actionChoice, // Skip choices generation in freeform action mode
           },
           {
@@ -4506,6 +4517,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("maxToolLoops") || "1", 10)
         : 1;
+    const customMaxContext =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
+        : 36000;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -4527,6 +4542,7 @@ function StoryPageContent() {
           choicesModel,
           enableTools: toolCallingEnabled,
           maxToolLoops,
+          customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {

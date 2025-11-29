@@ -418,20 +418,26 @@ export function estimateGenerationCost(
  * @param storyModel - Model key for story generation
  * @param toolsModel - Model key for tools stage
  * @param choicesModel - Model key for choices stage
+ * @param contextSize - Optional custom context size in tokens (default 120000)
  * @returns Estimated total cost in coins
  */
 export function estimateFullTurnCost(
   storyModel: string,
   toolsModel: string,
-  choicesModel: string
+  choicesModel: string,
+  contextSize: number = 120000
 ): number {
-  // Typical token usage per stage at ~120k story context
-  // Story: ~120k input (full context + system prompt), ~1.5k output
-  // Tools: ~30k input (trimmed context), ~500 output
-  // Choices: ~20k input (trimmed context), ~300 output
-  const storyCost = calculateTokenCost(storyModel, 120000, 1500);
-  const toolsCost = calculateTokenCost(toolsModel, 30000, 500);
-  const choicesCost = calculateTokenCost(choicesModel, 20000, 300);
+  // Scale context usage based on provided size
+  // Story: full context + system prompt, ~1.5k output
+  // Tools: ~25% of story context, ~500 output
+  // Choices: ~17% of story context, ~300 output
+  const storyInputTokens = contextSize;
+  const toolsInputTokens = Math.floor(contextSize * 0.25);
+  const choicesInputTokens = Math.floor(contextSize * 0.17);
+
+  const storyCost = calculateTokenCost(storyModel, storyInputTokens, 1500);
+  const toolsCost = calculateTokenCost(toolsModel, toolsInputTokens, 500);
+  const choicesCost = calculateTokenCost(choicesModel, choicesInputTokens, 300);
 
   return storyCost + toolsCost + choicesCost;
 }
@@ -533,9 +539,13 @@ export function getModelConfig(modelKey: string): AIModelConfig {
 /**
  * Get the dynamic estimated cost for a preset
  * @param presetId - The preset ID from MODEL_PRESETS
+ * @param contextSize - Optional custom context size in tokens
  * @returns Estimated cost in coins for a full turn
  */
-export function getPresetEstimatedCost(presetId: string): number {
+export function getPresetEstimatedCost(
+  presetId: string,
+  contextSize?: number
+): number {
   const preset = MODEL_PRESETS[presetId];
   if (!preset) {
     return MINIMUM_COST;
@@ -543,7 +553,8 @@ export function getPresetEstimatedCost(presetId: string): number {
   return estimateFullTurnCost(
     preset.storyModel,
     preset.toolsModel,
-    preset.choicesModel
+    preset.choicesModel,
+    contextSize
   );
 }
 
@@ -552,12 +563,19 @@ export function getPresetEstimatedCost(presetId: string): number {
  * @param storyModel - Model key for story stage
  * @param toolsModel - Model key for tools stage
  * @param choicesModel - Model key for choices stage
+ * @param contextSize - Optional custom context size in tokens
  * @returns Estimated cost in coins for a full turn
  */
 export function getCustomEstimatedCost(
   storyModel: string,
   toolsModel: string,
-  choicesModel: string
+  choicesModel: string,
+  contextSize?: number
 ): number {
-  return estimateFullTurnCost(storyModel, toolsModel, choicesModel);
+  return estimateFullTurnCost(
+    storyModel,
+    toolsModel,
+    choicesModel,
+    contextSize
+  );
 }

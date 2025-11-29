@@ -98,6 +98,13 @@ function AIModelSelector({
     }
     return 1;
   });
+  const [customMaxContext, setCustomMaxContext] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("customMaxContext");
+      return stored ? parseInt(stored, 10) : 36000; // Default 36K for new users
+    }
+    return 36000;
+  });
 
   // Model configuration for custom preset
   const [showModelConfig, setShowModelConfig] = useState(false);
@@ -330,15 +337,21 @@ function AIModelSelector({
       ? choicesModel
       : preset.choicesModel;
 
+  // Get effective context size for cost calculation
+  // Use custom context if set and positive, otherwise use default (120k)
+  const effectiveContextSize =
+    customMaxContext > 0 ? customMaxContext : undefined;
+
   // Calculate dynamic estimated cost based on actual models being used
   const estimatedCost =
     currentPreset === "custom"
       ? getCustomEstimatedCost(
           effectiveStoryModel,
           effectiveToolsModel,
-          effectiveChoicesModel
+          effectiveChoicesModel,
+          effectiveContextSize
         )
-      : getPresetEstimatedCost(currentPreset);
+      : getPresetEstimatedCost(currentPreset, effectiveContextSize);
 
   const handlePresetChange = (newPreset: string) => {
     if (typeof window !== "undefined") {
@@ -404,10 +417,108 @@ function AIModelSelector({
         >
           {Object.entries(MODEL_PRESETS).map(([key, presetConfig]) => (
             <option key={key} value={key}>
-              {presetConfig.name} - ~{getPresetEstimatedCost(key)} coins
+              {presetConfig.name} - ~
+              {getPresetEstimatedCost(key, effectiveContextSize)} coins
             </option>
           ))}
         </select>
+
+        {/* Context Size Slider */}
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-200">
+              Memory Size
+            </span>
+            <span className="text-sm text-purple-300 font-medium">
+              {customMaxContext === 0
+                ? "Model Default"
+                : customMaxContext === -1
+                ? "Custom"
+                : `${(customMaxContext / 1000).toFixed(0)}K tokens`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-green-400 whitespace-nowrap">
+              💰 Cheap
+            </span>
+            <div className="flex-1 relative">
+              {/* Slider track with gradient */}
+              <div className="h-2 rounded-full bg-linear-to-r from-green-600 via-yellow-500 to-purple-600" />
+              {/* Tick marks */}
+              <div className="absolute top-0 left-0 right-0 h-2 flex justify-between px-0">
+                {[8000, 16000, 36000, 72000, 120000, 200000, -1].map(
+                  (val, i) => (
+                    <button
+                      key={val}
+                      onClick={() => {
+                        const newValue = val === -1 ? -1 : val;
+                        setCustomMaxContext(newValue);
+                        if (typeof window !== "undefined") {
+                          localStorage.setItem(
+                            "customMaxContext",
+                            String(newValue)
+                          );
+                        }
+                      }}
+                      className={`w-4 h-4 rounded-full border-2 -mt-1 transition-all ${
+                        customMaxContext === val ||
+                        (customMaxContext === 0 && val === 200000)
+                          ? "bg-white border-white scale-125 shadow-lg"
+                          : "bg-blue-900/80 border-blue-400/50 hover:border-white hover:scale-110"
+                      }`}
+                      title={
+                        val === -1
+                          ? "Custom"
+                          : val === 0
+                          ? "Default"
+                          : `${(val / 1000).toFixed(0)}K`
+                      }
+                    />
+                  )
+                )}
+              </div>
+              {/* Labels under ticks */}
+              <div className="flex justify-between mt-3 text-[10px] text-blue-300/70">
+                <span>8K</span>
+                <span>16K</span>
+                <span>36K</span>
+                <span>72K</span>
+                <span>120K</span>
+                <span>200K</span>
+                <span>⚙️</span>
+              </div>
+            </div>
+            <span className="text-xs text-purple-400 whitespace-nowrap">
+              🧠 Memory
+            </span>
+          </div>
+          {/* Custom input when Custom is selected */}
+          {customMaxContext === -1 && (
+            <div className="flex items-center gap-2 mt-2 pl-16">
+              <input
+                type="number"
+                value={customMaxContext === -1 ? "" : customMaxContext}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10) || 0;
+                  if (val > 0) {
+                    setCustomMaxContext(val);
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem("customMaxContext", String(val));
+                    }
+                  }
+                }}
+                min="1000"
+                step="1000"
+                placeholder="Enter tokens..."
+                className="w-32 px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <span className="text-xs text-blue-300/50">tokens</span>
+            </div>
+          )}
+          <p className="text-xs text-blue-300/50 mt-1">
+            Lower = cheaper & faster • Higher = better story memory
+          </p>
+        </div>
 
         {/* Advanced Settings / BYOK Section */}
         {showAdvanced && (
