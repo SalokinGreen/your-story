@@ -148,12 +148,27 @@ You can control how items in arrays are applied using the **_command** field:
     - type: "list" (required - must be exactly this string)
     - items: Array of strings
     - maxSize: Optional max items
-- inventory (Array of { name, quantity, description, type, symbol })
+- inventory (Array of { name, quantity, description, type, symbol, grade, durability, maxDurability })
   - name: Item name
   - quantity: Number of items
   - description: Item description
   - type: "normal" (advantage, breaks on fail), "consumable" (advantage, consumed on use), "story" (advantage, never breaks/consumed), "misc" (prevents disadvantage, never breaks/consumed)
   - symbol: Emoji/icon representing the item
+  - grade: Item quality tier - "common" (dur 8, +0 bonus), "uncommon" (dur 13, +1), "rare" (dur 20, +2), "epic" (dur 30, +3), "legendary" (dur 50, +4), "mythic" (infinite dur, +5)
+  - durability: Current durability points (auto-set from grade if omitted)
+  - maxDurability: Maximum durability (auto-set from grade if omitted)
+- abilities (Array of { name, description, grade, cost, cooldown, currentCooldown, stat, symbol })
+  - name: Ability name (e.g., "Fireball", "Power Attack", "Healing Touch")
+  - description: What the ability does
+  - grade: Skill tier - "novice" (+0 bonus), "apprentice" (+1), "adept" (+2), "expert" (+3), "master" (+4), "legendary" (+5)
+  - cost: Array of { type, name, amount } - costs to use the ability
+    - type: "resource" (deducts from a resource) or "variable" (deducts from a number variable)
+    - name: Name of the resource/variable to deduct from
+    - amount: How much to deduct
+  - cooldown: Turns until ability can be used again after use (0 = no cooldown)
+  - currentCooldown: Current cooldown remaining (usually 0 for new abilities)
+  - stat: Optional stat name this ability is associated with (for skill checks)
+  - symbol: Emoji/icon representing the ability
 - plot_beats (Array of { title, content, fulfilled })
   - title: Beat title/name
   - content: Detailed description of what should happen in this beat
@@ -190,7 +205,7 @@ You can control how items in arrays are applied using the **_command** field:
   - points: Points awarded upon completion
   - active: Whether quest is currently visible/active
   - fulfilled: Whether quest has been completed
-- presets (Array of { id, name, description, icon, playerName, playerSummary, stats, resources, inventory, authorNotes })
+- presets (Array of { id, name, description, icon, playerName, playerSummary, stats, resources, inventory, abilities, authorNotes })
   - id: Unique identifier (use "preset-" + timestamp for new ones)
   - name: Preset display name
   - description: What this preset/build represents
@@ -201,12 +216,14 @@ You can control how items in arrays are applied using the **_command** field:
   - stats: Array of starting stats for this preset
   - resources: Array of starting resources for this preset
   - inventory: Array of starting items for this preset
+  - abilities: Array of starting abilities for this preset
   - authorNotes: Private notes about this preset
 - upgradeSettings (Object with upgrade shop configuration)
   - enabled: Boolean - master toggle for the entire upgrade system
   - statShopEnabled: Boolean - whether stat shop is available
   - resourceShopEnabled: Boolean - whether resource shop is available
   - itemShopEnabled: Boolean - whether item shop is available
+  - abilityShopEnabled: Boolean - whether ability shop is available
   - statShop: Array of { name, description, symbol, startingValue, cost } - new stats players can unlock
     - name: Name of the new stat to unlock
     - description: What the stat represents
@@ -220,13 +237,23 @@ You can control how items in arrays are applied using the **_command** field:
     - startingValue: Initial current value when unlocked
     - startingMaxValue: Initial maximum value when unlocked
     - cost: Progression points required to unlock
-  - itemShop: Array of { name, description, type, symbol, quantity, cost } - items players can purchase
+  - itemShop: Array of { name, description, type, symbol, quantity, cost, grade } - items players can purchase
     - name: Item name
     - description: Item description
     - type: "normal" | "consumable" | "story" | "misc"
     - symbol: Emoji/icon representing the item
     - quantity: How many of this item to grant
     - cost: Progression points required to purchase
+    - grade: Optional item grade - "common", "uncommon", "rare", "epic", "legendary", "mythic" (default: "common")
+  - abilityShop: Array of { name, description, grade, cost, abilityCost, cooldown, stat, symbol } - abilities players can unlock
+    - name: Ability name
+    - description: What the ability does
+    - grade: "novice", "apprentice", "adept", "expert", "master", "legendary"
+    - cost: Progression points required to unlock
+    - abilityCost: Array of { type, name, amount } - resource/variable costs to use
+    - cooldown: Turns until can be used again (0 = no cooldown)
+    - stat: Optional associated stat
+    - symbol: Emoji/icon
 - mythicState (Object with Mythic GME state - if provided, Mythic system will be enabled for this adventure)
   - chaosFactor: Number 1-9 representing narrative chaos/unpredictability
   - sceneCount: Number >= 0 tracking scenes played
@@ -246,7 +273,7 @@ You can control how items in arrays are applied using the **_command** field:
   - entries: Array of { text, weight } - possible results when rolling on the table
     - text: The result text that will be shown/used
     - weight: Probability weight (higher numbers = more likely to be selected). Default is 1.
-- startingChoices (Array of { text, intro_override, skill_used, skill_dc, resource_used, item_used, item_loss, mythic_check, mythic_context_only, mythic_table, custom_table }) - Custom starting choices instead of default "Start Story" button
+- startingChoices (Array of { text, intro_override, skill_used, skill_dc, resource_used, item_used, item_loss, ability_used, mythic_check, mythic_context_only, mythic_table, custom_table }) - Custom starting choices instead of default "Start Story" button
   - text: The choice text displayed to player (required)
   - intro_override: Optional alternate intro text for this path (if empty, uses main intro)
   - skill_used: Optional skill name for skill check on this choice
@@ -254,6 +281,7 @@ You can control how items in arrays are applied using the **_command** field:
   - resource_used: Optional resource name for resource cost
   - item_used: Optional item name that this choice requires
   - item_loss: Boolean - whether the item is consumed when used (default false)
+  - ability_used: Optional ability name to use on this choice (will check/deduct costs and apply cooldown)
   - mythic_check: Optional Mythic fate check question in format "Question (Likelihood)" e.g., "Is the guard asleep? (Likely)"
   - mythic_context_only: Boolean - when true with skill_used, mythic provides context only (doesn't override skill check result)
   - mythic_table: Optional Mythic table to roll on (e.g., "action", "subject", "character_descriptors", "locations", "plot_twists")
@@ -272,7 +300,7 @@ Notes:
 
 ### Example Responses:
 
-**Example 1 - Adding Items:**
+**Example 1 - Adding Items with Grades:**
 User: "Create a fire sword item and a strength stat."
 Assistant:
 "Here is a fire sword and a strength stat for your game.
@@ -283,12 +311,44 @@ Assistant:
     { "name": "Strength", "value": 10, "description": "Physical power", "symbol": "💪" }
   ],
   "inventory": [
-    { "name": "Fire Sword", "quantity": 1, "description": "A blade wreathed in eternal flame.", "type": "normal", "symbol": "⚔️" }
+    { "name": "Fire Sword", "quantity": 1, "description": "A blade wreathed in eternal flame.", "type": "normal", "symbol": "⚔️", "grade": "rare" }
   ]
 }
 \`\`\`"
 
-**Example 2 - Variables (counters, flags, lists):**
+**Example 2 - Adding Abilities:**
+User: "Create a Fireball spell that costs 10 Mana and a basic Kick ability."
+Assistant:
+"I've created two abilities for your adventure.
+
+\`\`\`json
+{
+  "abilities": [
+    {
+      "name": "Fireball",
+      "description": "Hurl a ball of fire at enemies, dealing massive damage",
+      "grade": "adept",
+      "cost": [{ "type": "resource", "name": "Mana", "amount": 10 }],
+      "cooldown": 2,
+      "currentCooldown": 0,
+      "stat": "Intelligence",
+      "symbol": "🔥"
+    },
+    {
+      "name": "Kick",
+      "description": "A powerful kick to knock enemies back",
+      "grade": "novice",
+      "cost": [],
+      "cooldown": 0,
+      "currentCooldown": 0,
+      "stat": "Strength",
+      "symbol": "🦶"
+    }
+  ]
+}
+\`\`\`"
+
+**Example 3 - Variables (counters, flags, lists):**
 User: "Add a gold counter, a night boolean, and a list for tracking visited places."
 Assistant:
 "I've created variables to track gold, time of day, and visited locations.
@@ -322,7 +382,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 3 - Deleting Items:**
+**Example 4 - Deleting Items:**
 User: "Remove the Rusty Sword and Old Potion from inventory."
 Assistant:
 "I'll remove those items from your inventory.
@@ -336,7 +396,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 4 - Deleting Stats:**
+**Example 5 - Deleting Stats:**
 User: "Delete the Intelligence stat."
 Assistant:
 "I'll remove the Intelligence stat.
@@ -349,7 +409,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 5 - Replacing Items:**
+**Example 6 - Replacing Items:**
 User: "Completely redesign the Strength stat with new values."
 Assistant:
 "I've completely replaced the Strength stat with new properties.
@@ -368,7 +428,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 6 - Mixed Operations:**
+**Example 7 - Mixed Operations:**
 User: "Delete the Old Quest, update Main Quest description, and add a Secret Quest."
 Assistant:
 "I've made those changes to your quest list.
@@ -394,7 +454,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 7 - Relationships:**
+**Example 8 - Relationships:**
 User: "Add a relationship with the King's Guard (allies) and the Shadow Syndicate (enemies)."
 Assistant:
 "I've added two key relationships to your adventure.
@@ -408,7 +468,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 8 - Upgrade Shops:**
+**Example 9 - Upgrade Shops:**
 User: "Enable upgrades and create a shop with a new Magic stat (10 points) and a Health Potion item (5 points)."
 Assistant:
 "I've enabled upgrades and created shop items.
@@ -442,7 +502,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 9 - Mythic GME:**
+**Example 10 - Mythic GME:**
 User: "Enable Mythic with chaos 5, add a thread about finding the ancient temple, and an NPC named Elara."
 Assistant:
 "I've enabled Mythic GME with your settings.
@@ -469,7 +529,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 10 - Managing Mythic Threads:**
+**Example 11 - Managing Mythic Threads:**
 User: "Close the temple thread and add a new thread about the dragon awakening."
 Assistant:
 "I've updated the Mythic threads.
@@ -492,7 +552,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 11 - Custom Random Tables:**
+**Example 12 - Custom Random Tables:**
 User: "Create a weather table with sunny, cloudy, rainy, and stormy options."
 Assistant:
 "I've created a weather random table for your adventure.
@@ -515,7 +575,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 12 - Editing Custom Tables:**
+**Example 13 - Editing Custom Tables:**
 User: "Add a 'foggy' option to the weather table and delete the encounter table."
 Assistant:
 "I've updated your tables.
@@ -542,7 +602,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 13 - Starting Choices:**
+**Example 14 - Starting Choices:**
 User: "Create custom starting choices: one for sneaking in (Stealth check), one for fighting through (Strength check), and one that uses a Disguise item."
 Assistant:
 "I've created three different ways to begin the adventure.
@@ -571,7 +631,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 14 - Starting Choices with Mythic:**
+**Example 15 - Starting Choices with Mythic:**
 User: "Add a starting choice that asks fate if there's a secret passage, and rolls on the locations table."
 Assistant:
 "I've added a Mythic-powered starting choice.
@@ -588,7 +648,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 15 - Deleting Starting Choices:**
+**Example 16 - Deleting Starting Choices:**
 User: "Remove the sneak option from starting choices."
 Assistant:
 "I've removed that starting choice.

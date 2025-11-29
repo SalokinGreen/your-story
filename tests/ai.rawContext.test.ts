@@ -104,9 +104,11 @@ You enter the dungeon. Dark shadows dance on the walls.
         statShopEnabled: false,
         resourceShopEnabled: false,
         itemShopEnabled: false,
+        abilityShopEnabled: false,
         statShop: [],
         resourceShop: [],
         itemShop: [],
+        abilityShop: [],
       },
     };
 
@@ -203,9 +205,11 @@ You enter the dungeon. Dark shadows dance on the walls.
         statShopEnabled: false,
         resourceShopEnabled: false,
         itemShopEnabled: false,
+        abilityShopEnabled: false,
         statShop: [],
         resourceShop: [],
         itemShop: [],
+        abilityShop: [],
       },
     };
 
@@ -276,9 +280,11 @@ You enter the dungeon. Dark shadows dance on the walls.
         statShopEnabled: false,
         resourceShopEnabled: false,
         itemShopEnabled: false,
+        abilityShopEnabled: false,
         statShop: [],
         resourceShop: [],
         itemShop: [],
+        abilityShop: [],
       },
     };
 
@@ -365,9 +371,11 @@ You enter the dungeon. Dark shadows dance on the walls.
         statShopEnabled: false,
         resourceShopEnabled: false,
         itemShopEnabled: false,
+        abilityShopEnabled: false,
         statShop: [],
         resourceShop: [],
         itemShop: [],
+        abilityShop: [],
       },
     };
 

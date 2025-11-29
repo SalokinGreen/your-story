@@ -887,10 +887,10 @@ function AIModelSelector({
                               {model.name}
                             </p>
                             <p className="text-xs text-blue-200/60">
-                              {model.modelId} � {model.contextSize} tokens
+                              {model.modelId} • {model.contextSize} tokens
                               {(model.inputPrice || model.outputPrice) && (
                                 <span className="ml-1">
-                                  � ${model.inputPrice || 0}/
+                                  • ${model.inputPrice || 0}/
                                   {model.outputPrice || 0} per M
                                 </span>
                               )}
@@ -3628,7 +3628,7 @@ function LoreEditor({
                     />
                     <p className="mt-1 text-xs text-blue-300/50">
                       Shown in lore list and detail if provided (ideal
-                      ~320�180px, max 5MB).
+                      ~320x180px, max 5MB).
                     </p>
                     <div className="mt-2 flex items-center gap-2">
                       <input
@@ -3790,7 +3790,7 @@ function LoreEditor({
                               }
                               className="hover:text-green-900 dark:hover:text-green-100"
                             >
-                              �
+                              ×
                             </button>
                           </span>
                         ))}
@@ -3852,7 +3852,7 @@ function LoreEditor({
                               }
                               className="hover:text-red-900 dark:hover:text-red-100"
                             >
-                              �
+                              ×
                             </button>
                           </span>
                         ))}
@@ -7319,13 +7319,13 @@ export default function MenuPage({
                       </h5>
                       <ul className="text-sm text-blue-300 space-y-1">
                         <li>
-                          � Press Play button in the story view to hear
+                          • Press Play button in the story view to hear
                           narration
                         </li>
-                        <li>� Audio is generated once and saved for replay</li>
-                        <li>� Voice and volume settings are saved locally</li>
+                        <li>• Audio is generated once and saved for replay</li>
+                        <li>• Voice and volume settings are saved locally</li>
                         <li>
-                          � New story content generates new audio automatically
+                          • New story content generates new audio automatically
                           if enabled
                         </li>
                       </ul>

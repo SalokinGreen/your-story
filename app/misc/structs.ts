@@ -25,12 +25,21 @@ export interface Resource {
   custom_symbol_url?: string;
 }
 
+// Item grade types (rarity tiers)
+export type ItemGrade =
+  | "common"
+  | "uncommon"
+  | "rare"
+  | "epic"
+  | "legendary"
+  | "mythic";
+
 export interface InventoryItem {
   name: string;
   quantity: number;
   description: string;
   type: "normal" | "consumable" | "story" | "misc";
-  grade?: "common" | "uncommon" | "rare" | "epic" | "legendary" | "mythic"; // Item rarity tier
+  grade?: ItemGrade; // Item rarity tier
   durability?: number; // Current durability
   maxDurability?: number; // Max durability (based on grade)
   stat?: string;
@@ -366,9 +375,11 @@ export interface UpgradeSettings {
   statShopEnabled: boolean; // Allow purchasing new stats from shop
   resourceShopEnabled: boolean; // Allow purchasing new resources from shop
   itemShopEnabled: boolean; // Allow purchasing items from shop
+  abilityShopEnabled: boolean; // Allow purchasing abilities from shop
   statShop: ShopStat[]; // Stats available for purchase
   resourceShop: ShopResource[]; // Resources available for purchase
   itemShop: ShopItem[]; // Items available for purchase
+  abilityShop: ShopAbility[]; // Abilities available for purchase
 }
 
 // Shop items interfaces
@@ -398,6 +409,18 @@ export interface ShopItem {
   type: "normal" | "consumable" | "story" | "misc";
   quantity: number;
   cost: number; // Points cost to purchase
+  grade?: ItemGrade; // Optional item grade
+}
+
+export interface ShopAbility {
+  name: string;
+  description: string;
+  symbol: string;
+  grade: AbilityGrade;
+  cost: number; // Points cost to unlock
+  abilityCost: AbilityCost[]; // Resource/variable costs to use the ability
+  cooldown?: number; // Turns until can be used again
+  stat?: string; // Associated stat (optional)
 }
 
 // Default upgrade settings
@@ -415,9 +438,11 @@ export const DEFAULT_UPGRADE_SETTINGS: UpgradeSettings = {
   statShopEnabled: false,
   resourceShopEnabled: false,
   itemShopEnabled: false,
+  abilityShopEnabled: false,
   statShop: [],
   resourceShop: [],
   itemShop: [],
+  abilityShop: [],
 };
 
 // Point system costs (legacy - kept for backward compatibility)

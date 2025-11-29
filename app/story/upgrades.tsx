@@ -4,7 +4,9 @@ import {
   StoryData,
   UPGRADE_COSTS,
   DEFAULT_UPGRADE_SETTINGS,
+  ShopAbility,
 } from "../misc/structs";
+import { ABILITY_GRADE_CONFIG, getAbilityBonus } from "../misc/abilitySystem";
 import { getSystemUpgradeDefaults } from "../misc/rpgSystems";
 import { useState } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
@@ -156,6 +158,29 @@ export default function UpgradesPage({
           quantity: shopItem.quantity,
         });
       }
+    });
+  };
+
+  const handleBuyShopAbility = (shopAbility: ShopAbility) => {
+    // Check if already owned
+    if (storyData.abilities?.some((a) => a.name === shopAbility.name)) {
+      return; // Already owned
+    }
+
+    onPurchase(shopAbility.cost, () => {
+      if (!storyData.abilities) {
+        storyData.abilities = [];
+      }
+      storyData.abilities.push({
+        name: shopAbility.name,
+        description: shopAbility.description,
+        symbol: shopAbility.symbol,
+        grade: shopAbility.grade,
+        cost: shopAbility.abilityCost,
+        cooldown: shopAbility.cooldown,
+        currentCooldown: 0,
+        stat: shopAbility.stat,
+      });
     });
   };
 
@@ -632,6 +657,118 @@ export default function UpgradesPage({
                       </button>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+          {/* Ability Shop */}
+          {upgradeSettings.abilityShopEnabled &&
+            upgradeSettings.abilityShop &&
+            upgradeSettings.abilityShop.length > 0 && (
+              <div className="p-6 rounded-lg bg-violet-900/30 border border-violet-700/40">
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
+                  <DynamicIcon
+                    name="Sparkles"
+                    className="w-8 h-8 text-violet-400"
+                  />
+                  Ability Shop
+                </h3>
+                <p className="text-sm text-violet-200/60 mb-4">
+                  Unlock new abilities and techniques
+                </p>
+
+                <div className="space-y-3">
+                  {upgradeSettings.abilityShop.map((shopAbility, index) => {
+                    const alreadyOwned = storyData.abilities?.some(
+                      (a) => a.name === shopAbility.name
+                    );
+                    const gradeConfig = ABILITY_GRADE_CONFIG[shopAbility.grade];
+                    return (
+                      <div
+                        key={index}
+                        className={`flex items-center justify-between p-4 rounded-lg border-2 ${
+                          alreadyOwned
+                            ? "bg-blue-900/20 border-blue-800/30 opacity-60"
+                            : "bg-violet-900/20 border-violet-700/40"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <DynamicIcon
+                            name={shopAbility.symbol}
+                            className="w-8 h-8 text-violet-400"
+                          />
+                          <div>
+                            <p className="font-bold text-white">
+                              {shopAbility.name}
+                              {alreadyOwned && (
+                                <span className="ml-2 text-xs text-green-400">
+                                  <DynamicIcon
+                                    name="Check"
+                                    className="inline-block w-3 h-3"
+                                  />{" "}
+                                  Owned
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-violet-200/60">
+                              {shopAbility.description}
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              <span
+                                className="text-xs px-2 py-0.5 rounded-full"
+                                style={{
+                                  backgroundColor: `${gradeConfig.color}30`,
+                                  color: gradeConfig.color,
+                                }}
+                              >
+                                {gradeConfig.label} (+
+                                {getAbilityBonus(
+                                  {
+                                    name: shopAbility.name,
+                                    description: shopAbility.description,
+                                    grade: shopAbility.grade,
+                                    cost: [],
+                                    symbol: "",
+                                  },
+                                  storyData.rpgSystem || "3d6"
+                                )}
+                                )
+                              </span>
+                              {shopAbility.cooldown &&
+                                shopAbility.cooldown > 0 && (
+                                  <span className="text-xs px-2 py-0.5 bg-blue-800/50 text-blue-200 rounded-full">
+                                    {shopAbility.cooldown} turn cooldown
+                                  </span>
+                                )}
+                              {shopAbility.abilityCost &&
+                                shopAbility.abilityCost.length > 0 && (
+                                  <span className="text-xs px-2 py-0.5 bg-red-800/50 text-red-200 rounded-full">
+                                    Cost:{" "}
+                                    {shopAbility.abilityCost
+                                      .map((c) => `${c.amount} ${c.name}`)
+                                      .join(", ")}
+                                  </span>
+                                )}
+                              {shopAbility.stat && (
+                                <span className="text-xs px-2 py-0.5 bg-cyan-800/50 text-cyan-200 rounded-full">
+                                  {shopAbility.stat}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleBuyShopAbility(shopAbility)}
+                          disabled={
+                            alreadyOwned || storyData.points < shopAbility.cost
+                          }
+                          className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:bg-blue-800/50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+                        >
+                          {alreadyOwned ? "Owned" : `${shopAbility.cost} pts`}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

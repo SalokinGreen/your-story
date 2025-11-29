@@ -84,9 +84,11 @@ describe("processCommands", () => {
         statShopEnabled: false,
         resourceShopEnabled: false,
         itemShopEnabled: false,
+        abilityShopEnabled: false,
         statShop: [],
         resourceShop: [],
         itemShop: [],
+        abilityShop: [],
       },
     };
   });

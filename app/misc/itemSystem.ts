@@ -4,16 +4,10 @@
  * Handles item grades, durability, and bonuses across different RPG systems.
  */
 
-import { InventoryItem } from "./structs";
+import { InventoryItem, ItemGrade } from "./structs";
 
-// Item grade types
-export type ItemGrade =
-  | "common"
-  | "uncommon"
-  | "rare"
-  | "epic"
-  | "legendary"
-  | "mythic";
+// Re-export types for convenience
+export type { ItemGrade } from "./structs";
 
 // Grade order constant for iteration
 export const GRADE_ORDER: ItemGrade[] = [
