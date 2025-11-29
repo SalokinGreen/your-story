@@ -110,6 +110,7 @@ export interface Choice {
   mythic_context_only?: boolean; // When true with skill_used, mythic provides context only and doesn't override skill check result
   mythic_table?: string; // Element category name e.g., "character_descriptors", "locations"
   custom_table?: string; // Name or ID of custom table to roll on
+  stt_input?: boolean; // True if text was input via speech-to-text (may contain transcription errors)
 }
 export interface Scene {
   parts: ScenePart[];

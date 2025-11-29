@@ -65,6 +65,8 @@ function AIModelSelector({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [openRouterKey, setOpenRouterKey] = useState("");
   const [speechifyKey, setSpeechifyKey] = useState("");
+  const [deepgramKey, setDeepgramKey] = useState("");
+  const [sttEnabled, setSttEnabled] = useState(true);
   const [byokEnabled, setByokEnabled] = useState(false);
   const [isSubscriber, setIsSubscriber] = useState(false);
   const [toolCallingEnabled, setToolCallingEnabled] = useState(() => {
@@ -126,6 +128,8 @@ function AIModelSelector({
       if (typeof window !== "undefined") {
         setOpenRouterKey(localStorage.getItem("openRouterKey") || "");
         setSpeechifyKey(localStorage.getItem("speechifyKey") || "");
+        setDeepgramKey(localStorage.getItem("deepgramKey") || "");
+        setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
         const toolCalling = localStorage.getItem("toolCallingEnabled");
         if (toolCalling !== null) {
           setToolCallingEnabled(toolCalling !== "false");
@@ -262,6 +266,8 @@ function AIModelSelector({
     if (typeof window !== "undefined") {
       localStorage.setItem("openRouterKey", openRouterKey);
       localStorage.setItem("speechifyKey", speechifyKey);
+      localStorage.setItem("deepgramKey", deepgramKey);
+      localStorage.setItem("sttEnabled", sttEnabled.toString());
     }
 
     const { error } = await updateUserSettings(
@@ -689,7 +695,7 @@ function AIModelSelector({
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                  Speechify API Key
+                  Speechify API Key (TTS)
                 </label>
                 <input
                   type={showKeys ? "text" : "password"}
@@ -698,6 +704,43 @@ function AIModelSelector({
                   placeholder="speechify-..."
                   className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm font-mono"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                  Deepgram API Key (STT)
+                </label>
+                <input
+                  type={showKeys ? "text" : "password"}
+                  value={deepgramKey}
+                  onChange={(e) => setDeepgramKey(e.target.value)}
+                  placeholder="deepgram-..."
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Speech-to-Text Settings */}
+            <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-600">
+              <h4 className="text-sm font-bold text-white">Speech-to-Text</h4>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm text-blue-200">Enable STT</p>
+                  <p className="text-xs text-gray-400">
+                    Show microphone button for voice input (2 tokens per use)
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSttEnabled(!sttEnabled)}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    sttEnabled ? "bg-green-600" : "bg-gray-600"
+                  }`}
+                >
+                  <div
+                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                      sttEnabled ? "left-7" : "left-1"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
 

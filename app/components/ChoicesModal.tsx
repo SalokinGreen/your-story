@@ -9,6 +9,7 @@ import {
   findItemMatch,
 } from "../misc/fuzzyMatch";
 import { getRPGSystem } from "../misc/rpgSystems";
+import STTButton from "./STTButton";
 
 interface ChoicesModalProps {
   isOpen: boolean;
@@ -55,6 +56,8 @@ export default function ChoicesModal({
   const [actionText, setActionText] = useState("");
   const [analyzingAction, setAnalyzingAction] = useState(false);
   const [showActionBuilder, setShowActionBuilder] = useState(false);
+  const [sttUsed, setSttUsed] = useState(false);
+  const [sttEnabled, setSttEnabled] = useState(false);
 
   // Action builder state
   const [builderSkill, setBuilderSkill] = useState("");
@@ -79,6 +82,14 @@ export default function ChoicesModal({
     }
   }, [isOpen, actionMode]);
 
+  // Check STT settings on mount/open
+  useEffect(() => {
+    if (isOpen) {
+      const enabled = localStorage.getItem("sttEnabled") !== "false";
+      setSttEnabled(enabled);
+    }
+  }, [isOpen]);
+
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -92,6 +103,7 @@ export default function ChoicesModal({
       setBuilderItem("");
       setBuilderResource("");
       setBuilderPlain(true);
+      setSttUsed(false);
     }
   }, [isOpen, rpgSystem.dc.medium]);
 
@@ -141,14 +153,18 @@ export default function ChoicesModal({
     }
   };
 
-  const handleActionAnalyze = async () => {
-    const text = actionText.trim();
+  const handleActionAnalyze = async (
+    overrideText?: string,
+    isStt?: boolean
+  ) => {
+    const text = (overrideText ?? actionText).trim();
+    const usedStt = isStt ?? sttUsed;
 
     // If no text, just send "> continue"
     if (!text) {
       if (onActionConfirm) {
         const choice: Choice = {
-          text: "> continue",
+          text: "continue",
         };
         onActionConfirm(choice);
         onClose();
@@ -165,7 +181,7 @@ export default function ChoicesModal({
       if (result) {
         // Directly submit the action without requiring confirmation
         const choice: Choice = {
-          text: actionText,
+          text: text,
           skill_used: result.analysis.skill_used || undefined,
           skill_dc: result.analysis.skill_dc || undefined,
           item_used: result.analysis.item_used || undefined,
@@ -173,6 +189,7 @@ export default function ChoicesModal({
           mythic_check: result.analysis.mythic_check || undefined,
           mythic_table: result.analysis.mythic_table || undefined,
           custom_table: result.analysis.custom_table || undefined,
+          stt_input: usedStt || undefined,
         };
         onActionConfirm(choice);
         onClose();
@@ -193,6 +210,7 @@ export default function ChoicesModal({
 
     const choice: Choice = {
       text: actionText,
+      stt_input: sttUsed || undefined,
     };
 
     if (!builderPlain) {
@@ -461,26 +479,49 @@ export default function ChoicesModal({
             <div className="space-y-3">
               {/* Action Input */}
               <div className="space-y-2">
-                <textarea
-                  ref={actionTextareaRef}
-                  value={actionText}
-                  onChange={(e) => {
-                    setActionText(e.target.value);
-                    setShowActionBuilder(false);
-                  }}
-                  placeholder="Describe your action... (e.g., 'I kick the door open' or 'I try to convince the guard to let us pass')"
-                  rows={3}
-                  disabled={analyzingAction || loading}
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-800/30 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && e.ctrlKey && actionText.trim()) {
-                      e.preventDefault();
-                      handleActionAnalyze();
-                    }
-                  }}
-                />
+                <div className="flex gap-2">
+                  <textarea
+                    ref={actionTextareaRef}
+                    value={actionText}
+                    onChange={(e) => {
+                      setActionText(e.target.value);
+                      setShowActionBuilder(false);
+                      setSttUsed(false);
+                    }}
+                    placeholder="Describe your action... (e.g., 'I kick the door open' or 'I try to convince the guard to let us pass')"
+                    rows={3}
+                    disabled={analyzingAction || loading}
+                    className="flex-1 px-3 py-2 bg-blue-950/50 border border-blue-800/30 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && e.ctrlKey && actionText.trim()) {
+                        e.preventDefault();
+                        handleActionAnalyze(undefined, undefined);
+                      }
+                    }}
+                  />
+                  {/* STT Button */}
+                  {sttEnabled && (
+                    <div className="flex flex-col justify-center">
+                      <STTButton
+                        onTranscript={(text) => {
+                          setActionText(text);
+                          setSttUsed(true);
+                          setShowActionBuilder(false);
+                          // Submit directly with the transcript text (don't wait for state)
+                          handleActionAnalyze(text, true);
+                        }}
+                        disabled={analyzingAction || loading}
+                      />
+                    </div>
+                  )}
+                </div>
                 <p className="text-xs text-blue-200/40">
                   {actionText.length} characters • Ctrl+Enter to act
+                  {sttUsed && (
+                    <span className="ml-2 text-amber-400">
+                      • Voice input (may contain errors)
+                    </span>
+                  )}
                 </p>
               </div>
 
@@ -490,7 +531,7 @@ export default function ChoicesModal({
               {/* Act Button */}
               {!showActionBuilder && (
                 <button
-                  onClick={handleActionAnalyze}
+                  onClick={() => handleActionAnalyze()}
                   disabled={analyzingAction || loading}
                   className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
                     analyzingAction || loading

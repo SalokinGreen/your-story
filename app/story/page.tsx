@@ -252,11 +252,15 @@ export function processCommands(
       } else {
         // Determine what was passed: description, type, or both
         const validTypes = ["normal", "consumable", "story", "misc"];
-        
+
         if (thirdParam && validTypes.includes(thirdParam.toLowerCase())) {
           // Both description and type provided
           item.description = secondParam;
-          item.type = thirdParam.toLowerCase() as "normal" | "consumable" | "story" | "misc";
+          item.type = thirdParam.toLowerCase() as
+            | "normal"
+            | "consumable"
+            | "story"
+            | "misc";
           logger.action("Item description and type updated via command", {
             itemName: item.name,
             description: secondParam,
@@ -264,7 +268,11 @@ export function processCommands(
           });
         } else if (validTypes.includes(secondParam.toLowerCase())) {
           // Only type provided
-          item.type = secondParam.toLowerCase() as "normal" | "consumable" | "story" | "misc";
+          item.type = secondParam.toLowerCase() as
+            | "normal"
+            | "consumable"
+            | "story"
+            | "misc";
           logger.action("Item type updated via command", {
             itemName: item.name,
             type: secondParam,
@@ -3867,6 +3875,10 @@ function StoryPageContent() {
     let text = "";
     if (choiceDetails.length > 0) {
       text = choiceDetails.join("\n") + "\n";
+    }
+    // Add STT disclaimer if voice input was used
+    if (choice.stt_input) {
+      text += "[Voice Input - may contain transcription errors]\n";
     }
     text += ">" + choice.text;
     console.log("Final choice text:", text);
