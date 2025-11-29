@@ -37,7 +37,8 @@ export default function TTSControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const savedAudioBlobRef = useRef<Blob | null>(null);
   const lastTextRef = useRef<string>("");
-  const autoGenerateTriggeredRef = useRef<boolean>(false);
+  const isGeneratingRef = useRef<boolean>(false);
+  const pendingAutoGenerateRef = useRef<boolean>(false);
 
   const ttsEnabled = isTTSEnabled();
 
@@ -49,7 +50,7 @@ export default function TTSControls({
   }, []);
 
   const handlePlay = useCallback(async () => {
-    if (disabled || !text.trim()) return;
+    if (disabled || !text.trim() || isGeneratingRef.current) return;
 
     const selectedVoice = getSelectedVoice();
     const volume = getVolume();
@@ -84,6 +85,7 @@ export default function TTSControls({
     }
 
     try {
+      isGeneratingRef.current = true;
       setIsLoading(true);
 
       const token = await getAuthToken();
@@ -156,14 +158,16 @@ export default function TTSControls({
       addNotification(error.message || "Failed to generate speech", "failure");
     } finally {
       setIsLoading(false);
+      isGeneratingRef.current = false;
     }
   }, [disabled, text, isPaused, audioUrl, addNotification]);
 
-  // Handle text changes - clear audio and trigger auto-generate
+  // Handle text changes - clear audio and mark pending auto-generate
   useEffect(() => {
     if (text !== lastTextRef.current) {
       lastTextRef.current = text;
 
+      // Stop and clear existing audio
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -175,34 +179,25 @@ export default function TTSControls({
       savedAudioBlobRef.current = null;
       setIsPlaying(false);
       setIsPaused(false);
-      autoGenerateTriggeredRef.current = false;
 
+      // Mark that we should auto-generate when conditions are met
       const autoGenerate = localStorage.getItem("ttsAutoGenerate") === "true";
-      if (
-        autoGenerate &&
-        text.trim() &&
-        ttsEnabled &&
-        !autoGenerateTriggeredRef.current
-      ) {
-        autoGenerateTriggeredRef.current = true;
-        const timer = setTimeout(() => {
-          handlePlay();
-        }, 500);
-        return () => clearTimeout(timer);
+      if (autoGenerate && text.trim() && ttsEnabled) {
+        pendingAutoGenerateRef.current = true;
       }
     }
-  }, [text, disabled, ttsEnabled, handlePlay, audioUrl]);
+  }, [text, ttsEnabled, audioUrl]);
 
-  // Fallback auto-generate when loading finishes
+  // Trigger auto-generate when not disabled and pending
   useEffect(() => {
     if (
       !disabled &&
+      pendingAutoGenerateRef.current &&
+      !isGeneratingRef.current &&
       text.trim() &&
-      ttsEnabled &&
-      localStorage.getItem("ttsAutoGenerate") === "true" &&
-      !autoGenerateTriggeredRef.current
+      ttsEnabled
     ) {
-      autoGenerateTriggeredRef.current = true;
+      pendingAutoGenerateRef.current = false;
       const timer = setTimeout(() => {
         handlePlay();
       }, 500);

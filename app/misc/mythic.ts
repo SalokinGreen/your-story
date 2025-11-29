@@ -5668,6 +5668,14 @@ export function generateElement(category: ElementCategory): {
   category: ElementCategory;
 } {
   const table = ELEMENT_TABLES[category];
+  if (!table) {
+    console.error(`Unknown element category: ${category}`);
+    return {
+      element: `Unknown category: ${category}`,
+      roll: 0,
+      category,
+    };
+  }
   const roll = rollD100();
   const index = Math.min(roll - 1, table.length - 1);
 
