@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
 
     // Check if this request is from the adventure author by validating auth token
     const authHeader = request.headers.get("authorization");
-    console.log("Auth header:", authHeader ? "present" : "missing");
     let isAuthor = false;
     let authenticatedUserId: string | null = null;
 
@@ -44,18 +43,10 @@ export async function GET(request: NextRequest) {
           data: { user },
           error: authError,
         } = await authenticatedSupabase.auth.getUser();
-        console.log(
-          "Auth user:",
-          user?.id,
-          "Requested userId:",
-          userId,
-          "Auth error:",
-          authError
-        );
         authenticatedUserId = user?.id || null;
         isAuthor = user?.id === userId;
       } catch (error) {
-        console.error("Auth check error:", error);
+        // Auth check failed silently
       }
     }
 
@@ -65,7 +56,6 @@ export async function GET(request: NextRequest) {
     let query = supabase.from("adventures").select("*");
 
     // Filter by user's own adventures or published public ones
-    console.log("isAuthor:", isAuthor, "userId:", userId);
     if (userId && isAuthor) {
       // Show ALL of the authenticated user's own adventures (including private/hidden)
       query = query.eq("author_id", userId);
@@ -136,18 +126,8 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("Error fetching adventures:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
-    console.log(
-      `Found ${data.length} adventures for query. Visibilities:`,
-      data.map((a) => ({
-        title: a.title,
-        visibility: a.visibility,
-        published: a.is_published,
-      }))
-    );
 
     // Transform database format to frontend format
     const adventures = data.map((item: any) => ({

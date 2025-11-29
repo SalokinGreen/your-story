@@ -1,409 +1,114 @@
-"use client";
-
-import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
-import { useAuth } from "./misc/AuthContext";
-import AuthForm from "./components/AuthForm";
-import { supabase } from "./misc/supabase";
-import { Adventure } from "./misc/structs";
+import Link from "next/link";
 import {
-  MODEL_PRESETS,
-  getPresetCostBreakdown,
-} from "./misc/ai_prices";
-import { DynamicIcon } from "./components/DynamicIcon";
-import { DraggableScroll } from "./components/DraggableScroll";
+  BookOpen,
+  Dices,
+  TrendingUp,
+  Wand2,
+  Volume2,
+  Heart,
+  Users,
+  Smartphone,
+  Compass,
+  MessageSquare,
+  Sparkles,
+  Bot,
+  Palette,
+  Shield,
+  Zap,
+} from "lucide-react";
 
-// Roadmap data
+// Import client components
+import LandingAuthSection from "./components/LandingAuthSection";
+import QuickStartGenres from "./components/QuickStartGenres";
+import PopularAdventures from "./components/PopularAdventures";
+import InfoTabs from "./components/InfoTabs";
+
+// Roadmap data - static, server-rendered
 const road_map = [
   {
     title: "Core Story Engine",
     description: "AI-powered narrative generation with branching choices",
     status: "done" as const,
-    icon: "BookOpen",
+    Icon: BookOpen,
   },
   {
     title: "RPG Systems",
     description: "8 dice systems including PbtA, Fate, YZE, and more",
     status: "done" as const,
-    icon: "Dices",
+    Icon: Dices,
   },
   {
     title: "Character Progression",
     description: "Stats, inventory, achievements, and skill checks",
     status: "done" as const,
-    icon: "TrendingUp",
+    Icon: TrendingUp,
   },
   {
     title: "Adventure Creator",
     description: "Full-featured editor for custom adventures",
     status: "done" as const,
-    icon: "Wand2",
+    Icon: Wand2,
   },
   {
     title: "Voice Narration",
     description: "Text-to-speech with custom voice support",
     status: "done" as const,
-    icon: "Volume2",
+    Icon: Volume2,
   },
   {
     title: "Relationships",
     description: "NPC relationship tracking and dynamics",
     status: "wip" as const,
-    icon: "Heart",
+    Icon: Heart,
   },
   {
     title: "Multiplayer",
     description: "Collaborative storytelling sessions",
     status: "planned" as const,
-    icon: "Users",
+    Icon: Users,
   },
   {
     title: "Mobile App",
     description: "Native iOS and Android apps",
     status: "planned" as const,
-    icon: "Smartphone",
+    Icon: Smartphone,
   },
 ];
 
-// Genre quick starts
-const genres = [
-  { name: "Fantasy", icon: "Sword", color: "from-purple-500 to-indigo-600" },
-  { name: "Sci-Fi", icon: "Rocket", color: "from-cyan-500 to-blue-600" },
-  { name: "Horror", icon: "Ghost", color: "from-red-500 to-rose-700" },
-  { name: "Mystery", icon: "Search", color: "from-amber-500 to-orange-600" },
-  { name: "Romance", icon: "Heart", color: "from-pink-500 to-rose-500" },
-  { name: "Western", icon: "Sun", color: "from-yellow-500 to-amber-600" },
-];
-
-// How it works steps
+// How it works steps - static
 const steps = [
   {
-    icon: "Compass",
+    Icon: Compass,
     title: "Choose",
     description: "Pick an adventure or create your own",
   },
   {
-    icon: "MessageSquare",
+    Icon: MessageSquare,
     title: "Play",
     description: "Make choices, roll dice, shape the story",
   },
   {
-    icon: "Sparkles",
+    Icon: Sparkles,
     title: "Experience",
     description: "AI crafts unique narratives just for you",
   },
 ];
 
-// Features
+// Features - static
 const features = [
-  { icon: "Bot", label: "9 AI Models" },
-  { icon: "Dices", label: "8 RPG Systems" },
-  { icon: "Volume2", label: "Voice Narration" },
-  { icon: "Palette", label: "Custom Adventures" },
-  { icon: "Shield", label: "Private Stories" },
-  { icon: "Zap", label: "Fast Generation" },
+  { Icon: Bot, label: "9 AI Models" },
+  { Icon: Dices, label: "8 RPG Systems" },
+  { Icon: Volume2, label: "Voice Narration" },
+  { Icon: Palette, label: "Custom Adventures" },
+  { Icon: Shield, label: "Private Stories" },
+  { Icon: Zap, label: "Fast Generation" },
 ];
-
-// Coin packages (1 coin = $0.001)
-const packages = [
-  { name: "Basic", cost: 4.99, coins: 4990, bonus: 500, savings: 10 },
-  { name: "Standard", cost: 9.99, coins: 9990, bonus: 1500, savings: 15 },
-  { name: "Premium", cost: 19.99, coins: 19990, bonus: 4000, savings: 20 },
-  { name: "Ultimate", cost: 49.99, coins: 49990, bonus: 12500, savings: 25 },
-];
-
-// Preset icons and colors
-const PRESET_STYLES: Record<
-  string,
-  { icon: string; gradient: string; accent: string }
-> = {
-  main: {
-    icon: "Sparkles",
-    gradient: "from-blue-500 to-purple-600",
-    accent: "blue",
-  },
-  mainBrain: {
-    icon: "Brain",
-    gradient: "from-purple-500 to-pink-600",
-    accent: "purple",
-  },
-  speed: {
-    icon: "Zap",
-    gradient: "from-amber-500 to-orange-600",
-    accent: "amber",
-  },
-  custom: {
-    icon: "Settings",
-    gradient: "from-gray-500 to-slate-600",
-    accent: "gray",
-  },
-};
-
-// InfoTabs Component - Elegant preset-focused version
-function InfoTabs() {
-  const [activeTab, setActiveTab] = useState<"presets" | "coins" | "byok">(
-    "presets"
-  );
-  const [expandedPreset, setExpandedPreset] = useState<string | null>(null);
-
-  return (
-    <div className="w-full max-w-4xl mx-auto">
-      {/* Tab Navigation */}
-      <div className="flex justify-center mb-4">
-        <div className="inline-flex bg-blue-950/50 rounded-lg p-1 border border-blue-800/30 gap-1">
-          <button
-            onClick={() => setActiveTab("presets")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-              activeTab === "presets"
-                ? "bg-blue-600 text-white"
-                : "text-blue-200/60 hover:text-blue-200"
-            }`}
-          >
-            <DynamicIcon name="Layers" className="w-4 h-4" /> AI Presets
-          </button>
-          <button
-            onClick={() => setActiveTab("coins")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-              activeTab === "coins"
-                ? "bg-blue-600 text-white"
-                : "text-blue-200/60 hover:text-blue-200"
-            }`}
-          >
-            <DynamicIcon name="Coins" className="w-4 h-4" /> Coins
-          </button>
-          <button
-            onClick={() => setActiveTab("byok")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-              activeTab === "byok"
-                ? "bg-blue-600 text-white"
-                : "text-blue-200/60 hover:text-blue-200"
-            }`}
-          >
-            <DynamicIcon name="Key" className="w-4 h-4" /> BYOK
-          </button>
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      <div className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-4">
-        {activeTab === "presets" && (
-          <div className="space-y-4">
-            <p className="text-center text-sm text-blue-200/60 mb-4">
-              Choose an AI preset that matches your playstyle
-            </p>
-            <div className="flex flex-wrap justify-center gap-4">
-              {Object.entries(MODEL_PRESETS)
-                .filter(([key]) => key !== "custom")
-                .map(([key, preset]) => {
-                  const style = PRESET_STYLES[key] || PRESET_STYLES.main;
-                  const isExpanded = expandedPreset === key;
-                  const costBreakdown = getPresetCostBreakdown(key);
-
-                  return (
-                    <div
-                      key={key}
-                      className={`relative bg-blue-950/50 rounded-xl border transition-all cursor-pointer overflow-hidden w-full sm:w-64 ${
-                        isExpanded
-                          ? "border-blue-500 ring-2 ring-blue-500/30"
-                          : "border-blue-800/30 hover:border-blue-600/50"
-                      }`}
-                      onClick={() =>
-                        setExpandedPreset(isExpanded ? null : key)
-                      }
-                    >
-                      {/* Gradient header */}
-                      <div
-                        className={`h-2 bg-linear-to-r ${style.gradient}`}
-                      />
-
-                      <div className="p-4">
-                        {/* Icon and name */}
-                        <div className="flex items-center gap-3 mb-3">
-                          <div
-                            className={`w-10 h-10 rounded-lg bg-linear-to-br ${style.gradient} flex items-center justify-center shadow-lg`}
-                          >
-                            <DynamicIcon
-                              name={style.icon}
-                              className="w-5 h-5 text-white"
-                            />
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-white">
-                              {preset.name}
-                            </h3>
-                            <p className="text-xs text-blue-200/50">
-                              ~{costBreakdown.generationCost} coins/turn
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Description */}
-                        <p className="text-sm text-blue-200/70 mb-3">
-                          {preset.description}
-                        </p>
-
-                        {/* Expanded details */}
-                        {isExpanded && (
-                          <div className="pt-3 border-t border-blue-800/30 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-blue-200/50 w-16">
-                                Story:
-                              </span>
-                              <span className="text-white font-medium">
-                                {preset.storyModel}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-blue-200/50 w-16">
-                                Tools:
-                              </span>
-                              <span className="text-white font-medium">
-                                {preset.toolsModel}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-blue-200/50 w-16">
-                                Choices:
-                              </span>
-                              <span className="text-white font-medium">
-                                {preset.choicesModel}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Expand indicator */}
-                        <div className="flex justify-center mt-2">
-                          <DynamicIcon
-                            name={isExpanded ? "ChevronUp" : "ChevronDown"}
-                            className="w-4 h-4 text-blue-200/40"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-
-            {/* Custom preset note */}
-            <div className="text-center pt-2">
-              <p className="text-xs text-blue-200/40">
-                <DynamicIcon
-                  name="Settings"
-                  className="w-3 h-3 inline mr-1"
-                />
-                Custom preset available in-game for full model control
-              </p>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "coins" && (
-          <div className="space-y-4 max-w-2xl mx-auto">
-            {/* Average cost info */}
-            <div className="bg-blue-900/30 rounded-lg p-3 text-center border border-blue-700/30">
-              <p className="text-sm text-blue-200/60 mb-1">
-                Average cost per turn
-              </p>
-              <p className="text-2xl font-bold text-white">
-                ~{getPresetCostBreakdown("main").generationCost} coins
-              </p>
-              <p className="text-xs text-blue-200/40 mt-1">
-                Based on 120k context • Main preset
-              </p>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {packages.map((pkg, index) => (
-                <div
-                  key={pkg.name}
-                  className={`bg-blue-950/50 rounded-lg p-3 border transition-colors ${
-                    index === 2
-                      ? "border-purple-500 ring-1 ring-purple-500/50"
-                      : "border-blue-800/30 hover:border-blue-600/50"
-                  }`}
-                >
-                  <div className="text-center">
-                    <h3 className="text-sm font-semibold text-white">
-                      {pkg.name}
-                    </h3>
-                    <div className="text-2xl font-bold text-white mt-1">
-                      ${pkg.cost}
-                    </div>
-                    <div className="text-lg text-blue-200">
-                      {pkg.coins + pkg.bonus}
-                    </div>
-                    <div className="text-xs text-blue-200/40">coins</div>
-                    {pkg.savings > 0 && (
-                      <span className="inline-block mt-2 px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded-full">
-                        Save {pkg.savings}%
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === "byok" && (
-          <div className="text-center py-4">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <DynamicIcon name="Key" className="w-6 h-6 text-purple-400" />
-              <span className="text-xl font-bold text-white">$10/month</span>
-            </div>
-            <p className="text-sm text-blue-200/60 mb-3">
-              Use your own OpenRouter & Speechify keys for unlimited generations
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded flex items-center gap-1">
-                <DynamicIcon name="Check" className="w-3 h-3" /> 100+ AI Models
-              </span>
-              <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded flex items-center gap-1">
-                <DynamicIcon name="Check" className="w-3 h-3" /> Unlimited TTS
-              </span>
-              <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded flex items-center gap-1">
-                <DynamicIcon name="Check" className="w-3 h-3" /> Full Control
-              </span>
-            </div>
-            <p className="text-xs text-blue-200/40 mt-3">Coming Soon</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 export default function Home() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-  const [popularToday, setPopularToday] = useState<Adventure[]>([]);
-  const [loadingPopular, setLoadingPopular] = useState(true);
-  const [showAuth, setShowAuth] = useState(false);
-
-  // Fetch top 6 most popular adventures
-  useEffect(() => {
-    const fetchPopular = async () => {
-      try {
-        const response = await fetch(
-          "/api/adventures?sortBy=popularity&limit=6"
-        );
-        if (!response.ok) throw new Error("Failed to fetch");
-        const { adventures } = await response.json();
-        setPopularToday(adventures);
-      } catch (error) {
-        console.error("Error fetching popular adventures:", error);
-      } finally {
-        setLoadingPopular(false);
-      }
-    };
-    fetchPopular();
-  }, []);
-
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
       <main className="max-w-6xl mx-auto px-4 py-6">
-        {/* Compact Hero */}
+        {/* Hero - Static server-rendered */}
         <div className="text-center mb-8">
           <h1 className="text-4xl sm:text-5xl font-bold mb-3 bg-linear-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
             Your Story
@@ -413,198 +118,17 @@ export default function Home() {
             adventure
           </p>
 
-          {/* Auth Section - Inline */}
-          {!loading && (
-            <div className="flex flex-wrap justify-center gap-3 mb-6">
-              {user ? (
-                <>
-                  <button
-                    onClick={() => router.push("/library")}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 text-sm"
-                  >
-                    <DynamicIcon name="Library" className="w-4 h-4" /> Library
-                  </button>
-                  <button
-                    onClick={() => router.push("/creator")}
-                    className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 text-sm"
-                  >
-                    <DynamicIcon name="Wand2" className="w-4 h-4" /> Create
-                  </button>
-                  <button
-                    onClick={() => router.push("/explorer")}
-                    className="px-5 py-2 bg-blue-950/80 hover:bg-blue-900/80 text-blue-200 font-medium rounded-lg border border-blue-800/30 transition-colors flex items-center gap-2 text-sm"
-                  >
-                    <DynamicIcon name="Compass" className="w-4 h-4" /> Explore
-                  </button>
-                  <button
-                    onClick={() => router.push(`/profile/${user.id}`)}
-                    className="px-5 py-2 bg-blue-950/80 hover:bg-blue-900/80 text-blue-200 font-medium rounded-lg border border-blue-800/30 transition-colors flex items-center gap-2 text-sm"
-                  >
-                    <DynamicIcon name="User" className="w-4 h-4" /> Profile
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await supabase.auth.signOut();
-                      router.push("/");
-                    }}
-                    className="px-5 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-300 font-medium rounded-lg border border-red-500/30 transition-colors flex items-center gap-2 text-sm"
-                  >
-                    <DynamicIcon name="LogOut" className="w-4 h-4" /> Logout
-                  </button>
-                </>
-              ) : (
-                <>
-                  {showAuth ? (
-                    <div className="w-full max-w-md bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
-                      <AuthForm />
-                      <button
-                        onClick={() => setShowAuth(false)}
-                        className="mt-3 text-sm text-blue-200/40 hover:text-blue-200/60"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => setShowAuth(true)}
-                        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-                      >
-                        Sign In
-                      </button>
-                      <button
-                        onClick={() => router.push("/explorer")}
-                        className="px-6 py-2.5 bg-blue-950/80 hover:bg-blue-900/80 text-blue-200 font-medium rounded-lg border border-blue-800/30 transition-colors"
-                      >
-                        Browse Adventures
-                      </button>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+          {/* Auth Section - Client component */}
+          <LandingAuthSection />
         </div>
 
-        {/* Quick Start Genres */}
-        <div className="mb-8">
-          <h2 className="text-sm font-medium text-blue-200/40 uppercase tracking-wider mb-3 text-center">
-            Quick Start
-          </h2>
-          <div className="flex flex-wrap justify-center gap-2">
-            {genres.map((genre) => (
-              <button
-                key={genre.name}
-                onClick={() =>
-                  router.push(`/explorer?genre=${genre.name.toLowerCase()}`)
-                }
-                className="px-4 py-2 bg-blue-950/50 hover:bg-blue-900/50 text-blue-200 rounded-lg border border-blue-800/30 transition-all hover:border-blue-600/50 flex items-center gap-2"
-              >
-                <DynamicIcon name={genre.icon} className="w-4 h-4" />
-                {genre.name}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Quick Start Genres - Client component */}
+        <QuickStartGenres />
 
-        {/* Featured Adventures */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-              <DynamicIcon name="Flame" className="w-5 h-5 text-orange-400" />
-              Popular
-            </h2>
-            <button
-              onClick={() => router.push("/explorer")}
-              className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
-            >
-              View all <DynamicIcon name="ChevronRight" className="w-4 h-4" />
-            </button>
-          </div>
+        {/* Featured Adventures - Client component with cached API */}
+        <PopularAdventures />
 
-          <DraggableScroll className="flex gap-3 pb-2 -mx-4 px-4">
-            {loadingPopular ? (
-              Array(6)
-                .fill(0)
-                .map((_, i) => (
-                  <div
-                    key={i}
-                    className="shrink-0 w-64 bg-blue-950/50 rounded-xl border border-blue-800/30 overflow-hidden animate-pulse"
-                  >
-                    <div className="h-32 bg-blue-900/50" />
-                    <div className="p-3 space-y-2">
-                      <div className="h-4 bg-blue-900/50 rounded w-3/4" />
-                      <div className="h-3 bg-blue-900/50 rounded w-full" />
-                    </div>
-                  </div>
-                ))
-            ) : popularToday.length === 0 ? (
-              <div className="w-full text-center py-8 text-blue-200/40">
-                No adventures yet. Be the first to create one!
-              </div>
-            ) : (
-              popularToday.map((adventure, index) => (
-                <div
-                  key={adventure.id}
-                  onClick={() => router.push(`/explorer/${adventure.id}`)}
-                  className="shrink-0 w-64 bg-blue-950/50 rounded-xl border border-blue-800/30 overflow-hidden cursor-pointer hover:border-blue-600/50 transition-all group"
-                >
-                  {adventure.thumbnailUrl ? (
-                    <div className="h-32 relative overflow-hidden">
-                      <Image
-                        src={adventure.thumbnailUrl}
-                        alt={adventure.title}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform"
-                        sizes="256px"
-                      />
-                    </div>
-                  ) : (
-                    <div
-                      className={`h-32 bg-linear-to-br ${
-                        index % 3 === 0
-                          ? "from-blue-500/30 to-purple-500/30"
-                          : index % 3 === 1
-                          ? "from-purple-500/30 to-pink-500/30"
-                          : "from-pink-500/30 to-orange-500/30"
-                      } flex items-center justify-center`}
-                    >
-                      <DynamicIcon
-                        name="BookOpen"
-                        className="w-10 h-10 text-white/30"
-                      />
-                    </div>
-                  )}
-                  <div className="p-3">
-                    <h3 className="font-medium text-white text-sm line-clamp-1 mb-1">
-                      {adventure.title}
-                    </h3>
-                    <p className="text-xs text-blue-200/40 line-clamp-1 mb-2">
-                      {adventure.shortDescription}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-yellow-400 flex items-center gap-0.5">
-                        <DynamicIcon
-                          name="Star"
-                          className="w-3 h-3 fill-current"
-                        />
-                        {adventure.rating?.toFixed(1) || "-"}
-                      </span>
-                      <span className="text-blue-200/40">
-                        {adventure.playCount >= 1000
-                          ? `${(adventure.playCount / 1000).toFixed(1)}k`
-                          : adventure.playCount}{" "}
-                        plays
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </DraggableScroll>
-        </div>
-
-        {/* How It Works */}
+        {/* How It Works - Static server-rendered */}
         <div className="mb-8">
           <h2 className="text-sm font-medium text-blue-200/40 uppercase tracking-wider mb-4 text-center">
             How It Works
@@ -613,10 +137,7 @@ export default function Home() {
             {steps.map((step, i) => (
               <div key={i} className="text-center">
                 <div className="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center mx-auto mb-2">
-                  <DynamicIcon
-                    name={step.icon}
-                    className="w-6 h-6 text-blue-400"
-                  />
+                  <step.Icon className="w-6 h-6 text-blue-400" />
                 </div>
                 <h3 className="font-medium text-white text-sm mb-1">
                   {step.title}
@@ -627,7 +148,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Features Pills */}
+        {/* Features Pills - Static server-rendered */}
         <div className="mb-8">
           <div className="flex flex-wrap justify-center gap-2">
             {features.map((feature, i) => (
@@ -635,19 +156,19 @@ export default function Home() {
                 key={i}
                 className="px-3 py-1.5 bg-blue-950/30 text-blue-200/60 rounded-full text-xs flex items-center gap-1.5 border border-blue-800/20"
               >
-                <DynamicIcon name={feature.icon} className="w-3.5 h-3.5" />
+                <feature.Icon className="w-3.5 h-3.5" />
                 {feature.label}
               </span>
             ))}
           </div>
         </div>
 
-        {/* Roadmap - Compact Horizontal */}
+        {/* Roadmap - Static server-rendered with horizontal scroll */}
         <div className="mb-8">
           <h2 className="text-sm font-medium text-blue-200/40 uppercase tracking-wider mb-4 text-center">
             Roadmap
           </h2>
-          <DraggableScroll className="flex gap-3 pb-2 -mx-4 px-4">
+          <div className="flex gap-3 pb-2 -mx-4 px-4 overflow-x-auto scrollbar-hide">
             {road_map.map((item, i) => (
               <div
                 key={i}
@@ -660,8 +181,7 @@ export default function Home() {
                 }`}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <DynamicIcon
-                    name={item.icon}
+                  <item.Icon
                     className={`w-4 h-4 ${
                       item.status === "done"
                         ? "text-green-400"
@@ -694,33 +214,31 @@ export default function Home() {
                 </p>
               </div>
             ))}
-          </DraggableScroll>
+          </div>
         </div>
 
-        {/* Info Tabs - Models/Coins/BYOK */}
-        <div className="mb-8">
-          <InfoTabs />
-        </div>
+        {/* Info Tabs - Client component */}
+        <InfoTabs />
 
-        {/* Footer */}
+        {/* Footer - Static server-rendered */}
         <footer className="text-center pt-4 border-t border-blue-800/20">
           <p className="text-xs text-blue-200/30">
             © 2025 Your Story • AI-powered interactive fiction
           </p>
           <div className="mt-2 flex justify-center gap-4">
-            <button
-              onClick={() => router.push("/terms")}
+            <Link
+              href="/terms"
               className="text-xs text-blue-200/40 hover:text-blue-200/60 transition-colors"
             >
               Terms of Service
-            </button>
+            </Link>
             <span className="text-blue-200/20">•</span>
-            <button
-              onClick={() => router.push("/privacy")}
+            <Link
+              href="/privacy"
               className="text-xs text-blue-200/40 hover:text-blue-200/60 transition-colors"
             >
               Privacy Policy
-            </button>
+            </Link>
           </div>
         </footer>
       </main>
