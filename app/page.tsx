@@ -8,8 +8,7 @@ import AuthForm from "./components/AuthForm";
 import { supabase } from "./misc/supabase";
 import { Adventure } from "./misc/structs";
 import {
-  AI_MODELS,
-  AIModelKey,
+  MODEL_PRESETS,
   getPresetCostBreakdown,
 } from "./misc/ai_prices";
 import { DynamicIcon } from "./components/DynamicIcon";
@@ -114,11 +113,39 @@ const packages = [
   { name: "Ultimate", cost: 49.99, coins: 49990, bonus: 12500, savings: 25 },
 ];
 
-// InfoTabs Component - Compact version
+// Preset icons and colors
+const PRESET_STYLES: Record<
+  string,
+  { icon: string; gradient: string; accent: string }
+> = {
+  main: {
+    icon: "Sparkles",
+    gradient: "from-blue-500 to-purple-600",
+    accent: "blue",
+  },
+  mainBrain: {
+    icon: "Brain",
+    gradient: "from-purple-500 to-pink-600",
+    accent: "purple",
+  },
+  speed: {
+    icon: "Zap",
+    gradient: "from-amber-500 to-orange-600",
+    accent: "amber",
+  },
+  custom: {
+    icon: "Settings",
+    gradient: "from-gray-500 to-slate-600",
+    accent: "gray",
+  },
+};
+
+// InfoTabs Component - Elegant preset-focused version
 function InfoTabs() {
-  const [activeTab, setActiveTab] = useState<"models" | "coins" | "byok">(
-    "models"
+  const [activeTab, setActiveTab] = useState<"presets" | "coins" | "byok">(
+    "presets"
   );
+  const [expandedPreset, setExpandedPreset] = useState<string | null>(null);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -126,14 +153,14 @@ function InfoTabs() {
       <div className="flex justify-center mb-4">
         <div className="inline-flex bg-blue-950/50 rounded-lg p-1 border border-blue-800/30 gap-1">
           <button
-            onClick={() => setActiveTab("models")}
+            onClick={() => setActiveTab("presets")}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-              activeTab === "models"
+              activeTab === "presets"
                 ? "bg-blue-600 text-white"
                 : "text-blue-200/60 hover:text-blue-200"
             }`}
           >
-            <DynamicIcon name="Bot" className="w-4 h-4" /> Models
+            <DynamicIcon name="Layers" className="w-4 h-4" /> AI Presets
           </button>
           <button
             onClick={() => setActiveTab("coins")}
@@ -158,40 +185,117 @@ function InfoTabs() {
         </div>
       </div>
 
-      {/* Tab Content - Compact */}
+      {/* Tab Content */}
       <div className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-4">
-        {activeTab === "models" && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {Object.entries(AI_MODELS).map(([key, model]) => (
-              <div
-                key={key}
-                className="bg-blue-950/50 rounded-lg p-3 border border-blue-800/30 hover:border-blue-600/50 transition-colors"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                    {model.cost}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">
-                      {model.name}
-                    </h3>
-                    <p className="text-xs text-blue-200/40">
-                      {(model.maxTokens / 1000).toFixed(0)}K tokens
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {model.strengths.slice(0, 2).map((s, i) => (
-                    <span
-                      key={i}
-                      className="px-1.5 py-0.5 bg-green-500/20 text-green-300 text-xs rounded"
+        {activeTab === "presets" && (
+          <div className="space-y-4">
+            <p className="text-center text-sm text-blue-200/60 mb-4">
+              Choose an AI preset that matches your playstyle
+            </p>
+            <div className="flex flex-wrap justify-center gap-4">
+              {Object.entries(MODEL_PRESETS)
+                .filter(([key]) => key !== "custom")
+                .map(([key, preset]) => {
+                  const style = PRESET_STYLES[key] || PRESET_STYLES.main;
+                  const isExpanded = expandedPreset === key;
+                  const costBreakdown = getPresetCostBreakdown(key);
+
+                  return (
+                    <div
+                      key={key}
+                      className={`relative bg-blue-950/50 rounded-xl border transition-all cursor-pointer overflow-hidden w-full sm:w-64 ${
+                        isExpanded
+                          ? "border-blue-500 ring-2 ring-blue-500/30"
+                          : "border-blue-800/30 hover:border-blue-600/50"
+                      }`}
+                      onClick={() =>
+                        setExpandedPreset(isExpanded ? null : key)
+                      }
                     >
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
+                      {/* Gradient header */}
+                      <div
+                        className={`h-2 bg-linear-to-r ${style.gradient}`}
+                      />
+
+                      <div className="p-4">
+                        {/* Icon and name */}
+                        <div className="flex items-center gap-3 mb-3">
+                          <div
+                            className={`w-10 h-10 rounded-lg bg-linear-to-br ${style.gradient} flex items-center justify-center shadow-lg`}
+                          >
+                            <DynamicIcon
+                              name={style.icon}
+                              className="w-5 h-5 text-white"
+                            />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white">
+                              {preset.name}
+                            </h3>
+                            <p className="text-xs text-blue-200/50">
+                              ~{costBreakdown.generationCost} coins/turn
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        <p className="text-sm text-blue-200/70 mb-3">
+                          {preset.description}
+                        </p>
+
+                        {/* Expanded details */}
+                        {isExpanded && (
+                          <div className="pt-3 border-t border-blue-800/30 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-blue-200/50 w-16">
+                                Story:
+                              </span>
+                              <span className="text-white font-medium">
+                                {preset.storyModel}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-blue-200/50 w-16">
+                                Tools:
+                              </span>
+                              <span className="text-white font-medium">
+                                {preset.toolsModel}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-blue-200/50 w-16">
+                                Choices:
+                              </span>
+                              <span className="text-white font-medium">
+                                {preset.choicesModel}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Expand indicator */}
+                        <div className="flex justify-center mt-2">
+                          <DynamicIcon
+                            name={isExpanded ? "ChevronUp" : "ChevronDown"}
+                            className="w-4 h-4 text-blue-200/40"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Custom preset note */}
+            <div className="text-center pt-2">
+              <p className="text-xs text-blue-200/40">
+                <DynamicIcon
+                  name="Settings"
+                  className="w-3 h-3 inline mr-1"
+                />
+                Custom preset available in-game for full model control
+              </p>
+            </div>
           </div>
         )}
 
