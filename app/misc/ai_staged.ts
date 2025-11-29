@@ -63,13 +63,17 @@ export function buildInfoMessage(storyData: StoryData): string {
         .join("\n")}`
     : "";
 
-  // Build inventory section
+  // Build inventory section with grade and durability info
   const inventorySection = storyData.inventory.length
     ? `Inventory:\n${storyData.inventory
         .map((i) => {
           const typeLabel = i.type ? ` [${i.type}]` : "";
+          const gradeLabel = i.grade ? ` (${i.grade})` : "";
+          const durabilityInfo = i.type !== "consumable" && i.grade !== "mythic" 
+            ? ` [dur: ${i.durability ?? "?"}/${i.maxDurability ?? "?"}]`
+            : i.grade === "mythic" ? " [dur: ∞]" : "";
           const desc = i.description ? ` - ${i.description}` : "";
-          return `- ${i.name}${typeLabel} x${i.quantity}${desc}`;
+          return `- ${i.name}${gradeLabel}${typeLabel}${durabilityInfo} x${i.quantity}${desc}`;
         })
         .join("\n")}`
     : "Inventory: Empty";
@@ -1079,7 +1083,13 @@ AVAILABLE ITEMS (for item_used):
 ${
   storyData.inventory.length > 0
     ? storyData.inventory
-        .map((i) => `• ${i.name} [${i.type}] x${i.quantity}`)
+        .map((i) => {
+          const gradeLabel = i.grade ? `(${i.grade})` : "";
+          const durInfo = i.type !== "consumable" && i.grade !== "mythic"
+            ? ` dur:${i.durability ?? "?"}/${i.maxDurability ?? "?"}`
+            : i.grade === "mythic" ? " dur:∞" : "";
+          return `• ${i.name} ${gradeLabel}[${i.type}]${durInfo} x${i.quantity}`;
+        })
         .join("\n")
     : "• (No items - set item_used to null)"
 }

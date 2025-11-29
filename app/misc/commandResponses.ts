@@ -394,9 +394,9 @@ export function executeCommandWithResponse(
     }
   }
 
-  // /add_item: item name | description | type | quantity
+  // /add_item: item name | description | type | quantity | grade (optional)
   const addItemMatch = trimmed.match(
-    /^\/add_item:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(normal|consumable|story|misc)\s*\|\s*(\d+)$/i
+    /^\/add_item:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(normal|consumable|story|misc)\s*\|\s*(\d+)(?:\s*\|\s*(common|uncommon|rare|epic|legendary|mythic))?$/i
   );
   if (addItemMatch) {
     const itemName = addItemMatch[1].trim();
@@ -407,6 +407,24 @@ export function executeCommandWithResponse(
       | "story"
       | "misc";
     const quantity = parseInt(addItemMatch[4], 10);
+    const grade = (addItemMatch[5]?.trim().toLowerCase() || "common") as
+      | "common"
+      | "uncommon"
+      | "rare"
+      | "epic"
+      | "legendary"
+      | "mythic";
+
+    // Get max durability based on grade
+    const gradeMaxDurability: Record<string, number> = {
+      common: 3,
+      uncommon: 5,
+      rare: 8,
+      epic: 12,
+      legendary: 20,
+      mythic: Infinity,
+    };
+    const maxDurability = gradeMaxDurability[grade] || 3;
 
     const existingItem = storyData.inventory.find((i) => i.name === itemName);
     if (existingItem) {
@@ -430,6 +448,9 @@ export function executeCommandWithResponse(
       quantity: quantity,
       description: description,
       type: itemType,
+      grade: grade,
+      durability: maxDurability === Infinity ? Infinity : maxDurability,
+      maxDurability: maxDurability,
       stat: "",
       resource: "",
       symbol: "??",
@@ -438,12 +459,15 @@ export function executeCommandWithResponse(
       itemName,
       quantity,
       type: itemType,
+      grade,
+      durability: maxDurability,
     });
 
+    const gradeLabel = grade.charAt(0).toUpperCase() + grade.slice(1);
     return {
       command: trimmed,
       success: true,
-      message: `Added ${quantity} ${itemName} to inventory`,
+      message: `Added ${quantity} ${gradeLabel} ${itemName} to inventory${grade !== "mythic" ? ` (${maxDurability} durability)` : " (unbreakable)"}`,
       timestamp,
     };
   }
@@ -634,6 +658,292 @@ export function executeCommandWithResponse(
       command: trimmed,
       success: true,
       message: `Transformed ${oldItem.name} → ${newItemName} (×${quantity})${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
+  // /repair_item: item name | amount (optional - omit for full repair)
+  const repairItemMatch = trimmed.match(
+    /^\/repair_item:\s*(.+?)(?:\s*\|\s*(\d+))?$/i
+  );
+  if (repairItemMatch) {
+    const itemName = repairItemMatch[1].trim();
+    const repairAmount = repairItemMatch[2] ? parseInt(repairItemMatch[2], 10) : null;
+
+    const matchResult = findItemMatch(itemName, storyData.inventory);
+    const item = matchResult?.item;
+
+    if (!item) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Item "${itemName}" not found in inventory`,
+        timestamp,
+      };
+    }
+
+    // Can't repair mythic items (they have infinite durability)
+    if (item.grade === "mythic") {
+      return {
+        command: trimmed,
+        success: "partial" as const,
+        message: `${item.name} is a Mythic item with infinite durability - no repair needed`,
+        timestamp,
+      };
+    }
+
+    // Get max durability based on grade
+    const gradeMaxDurability: Record<string, number> = {
+      common: 3, uncommon: 5, rare: 8, epic: 12, legendary: 20, mythic: Infinity,
+    };
+    const maxDurability = item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
+    const currentDurability = item.durability ?? maxDurability;
+    
+    // Full repair if no amount specified
+    const targetDurability = repairAmount !== null 
+      ? Math.min(maxDurability, currentDurability + repairAmount)
+      : maxDurability;
+    const actualRepaired = targetDurability - currentDurability;
+
+    item.durability = targetDurability;
+    item.maxDurability = maxDurability;
+
+    logger.action("Item repaired via command response", {
+      itemName: item.name,
+      repairAmount: actualRepaired,
+      newDurability: targetDurability,
+      maxDurability,
+    });
+
+    const fuzzyNote = matchResult && !matchResult.isExact
+      ? ` (matched "${itemName}" → "${item.name}")`
+      : "";
+
+    if (actualRepaired === 0) {
+      return {
+        command: trimmed,
+        success: "partial" as const,
+        message: `${item.name} already at full durability (${targetDurability}/${maxDurability})${fuzzyNote}`,
+        timestamp,
+      };
+    }
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Repaired ${item.name}: +${actualRepaired} durability (${targetDurability}/${maxDurability})${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
+  // /damage_item: item name | amount
+  const damageItemMatch = trimmed.match(
+    /^\/damage_item:\s*(.+?)\s*\|\s*(\d+)$/i
+  );
+  if (damageItemMatch) {
+    const itemName = damageItemMatch[1].trim();
+    const damageAmount = parseInt(damageItemMatch[2], 10);
+
+    const matchResult = findItemMatch(itemName, storyData.inventory);
+    const item = matchResult?.item;
+
+    if (!item) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Item "${itemName}" not found in inventory`,
+        timestamp,
+      };
+    }
+
+    // Can't damage mythic items
+    if (item.grade === "mythic") {
+      return {
+        command: trimmed,
+        success: "partial" as const,
+        message: `${item.name} is a Mythic item and cannot be damaged`,
+        timestamp,
+      };
+    }
+
+    // Get max durability based on grade
+    const gradeMaxDurability: Record<string, number> = {
+      common: 3, uncommon: 5, rare: 8, epic: 12, legendary: 20, mythic: Infinity,
+    };
+    const maxDurability = item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
+    const currentDurability = item.durability ?? maxDurability;
+    
+    const newDurability = Math.max(0, currentDurability - damageAmount);
+    const actualDamage = currentDurability - newDurability;
+    item.durability = newDurability;
+    item.maxDurability = maxDurability;
+
+    const fuzzyNote = matchResult && !matchResult.isExact
+      ? ` (matched "${itemName}" → "${item.name}")`
+      : "";
+
+    // Check if item broke (story items never break)
+    if (newDurability <= 0 && item.type !== "story") {
+      // Remove the item
+      storyData.inventory = storyData.inventory.filter(i => i.name !== item.name);
+      
+      logger.action("Item broke from damage via command response", {
+        itemName: item.name,
+        damageAmount: actualDamage,
+      });
+
+      return {
+        command: trimmed,
+        success: true,
+        message: `${item.name} took ${actualDamage} damage and broke!${fuzzyNote}`,
+        timestamp,
+      };
+    }
+
+    logger.action("Item damaged via command response", {
+      itemName: item.name,
+      damageAmount: actualDamage,
+      newDurability,
+      maxDurability,
+    });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `${item.name} took ${actualDamage} damage (${newDurability}/${maxDurability})${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
+  // /upgrade_item: item name | new_grade
+  const upgradeItemMatch = trimmed.match(
+    /^\/upgrade_item:\s*(.+?)\s*\|\s*(uncommon|rare|epic|legendary|mythic)$/i
+  );
+  if (upgradeItemMatch) {
+    const itemName = upgradeItemMatch[1].trim();
+    const newGrade = upgradeItemMatch[2].trim().toLowerCase() as
+      | "uncommon"
+      | "rare"
+      | "epic"
+      | "legendary"
+      | "mythic";
+
+    const matchResult = findItemMatch(itemName, storyData.inventory);
+    const item = matchResult?.item;
+
+    if (!item) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Item "${itemName}" not found in inventory`,
+        timestamp,
+      };
+    }
+
+    const gradeOrder = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
+    const currentGradeIndex = gradeOrder.indexOf(item.grade || "common");
+    const newGradeIndex = gradeOrder.indexOf(newGrade);
+
+    if (newGradeIndex <= currentGradeIndex) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Cannot downgrade ${item.name} from ${item.grade || "common"} to ${newGrade}`,
+        timestamp,
+      };
+    }
+
+    // Get new max durability
+    const gradeMaxDurability: Record<string, number> = {
+      common: 3, uncommon: 5, rare: 8, epic: 12, legendary: 20, mythic: Infinity,
+    };
+    const oldMaxDurability = item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
+    const newMaxDurability = gradeMaxDurability[newGrade];
+    
+    // Calculate durability ratio to scale up proportionally
+    const currentDurability = item.durability ?? oldMaxDurability;
+    const durabilityRatio = oldMaxDurability > 0 ? currentDurability / oldMaxDurability : 1;
+    const newDurability = newGrade === "mythic" ? Infinity : Math.ceil(newMaxDurability * durabilityRatio);
+
+    const oldGrade = item.grade || "common";
+    item.grade = newGrade;
+    item.durability = newDurability;
+    item.maxDurability = newMaxDurability;
+
+    logger.action("Item upgraded via command response", {
+      itemName: item.name,
+      oldGrade,
+      newGrade,
+      oldMaxDurability,
+      newMaxDurability,
+      newDurability,
+    });
+
+    const fuzzyNote = matchResult && !matchResult.isExact
+      ? ` (matched "${itemName}" → "${item.name}")`
+      : "";
+    const newGradeLabel = newGrade.charAt(0).toUpperCase() + newGrade.slice(1);
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Upgraded ${item.name} to ${newGradeLabel}!${newGrade !== "mythic" ? ` Max durability: ${newMaxDurability}` : " (now unbreakable)"}${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
+  // /set_item_durability: item name | durability
+  const setDurabilityMatch = trimmed.match(
+    /^\/set_item_durability:\s*(.+?)\s*\|\s*(\d+)$/i
+  );
+  if (setDurabilityMatch) {
+    const itemName = setDurabilityMatch[1].trim();
+    const newDurability = parseInt(setDurabilityMatch[2], 10);
+
+    const matchResult = findItemMatch(itemName, storyData.inventory);
+    const item = matchResult?.item;
+
+    if (!item) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Item "${itemName}" not found in inventory`,
+        timestamp,
+      };
+    }
+
+    if (item.grade === "mythic") {
+      return {
+        command: trimmed,
+        success: "partial" as const,
+        message: `${item.name} is a Mythic item with infinite durability`,
+        timestamp,
+      };
+    }
+
+    const gradeMaxDurability: Record<string, number> = {
+      common: 3, uncommon: 5, rare: 8, epic: 12, legendary: 20, mythic: Infinity,
+    };
+    const maxDurability = item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
+    const cappedDurability = Math.min(newDurability, maxDurability);
+
+    item.durability = cappedDurability;
+    item.maxDurability = maxDurability;
+
+    logger.action("Item durability set via command response", {
+      itemName: item.name,
+      newDurability: cappedDurability,
+      maxDurability,
+    });
+
+    const fuzzyNote = matchResult && !matchResult.isExact
+      ? ` (matched "${itemName}" → "${item.name}")`
+      : "";
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Set ${item.name} durability to ${cappedDurability}/${maxDurability}${fuzzyNote}`,
       timestamp,
     };
   }

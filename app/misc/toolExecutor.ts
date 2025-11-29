@@ -63,6 +63,10 @@ const STATE_CHANGE_TOOLS = new Set([
   "modify_item",
   "break_item",
   "consume_item",
+  "repair_item",
+  "damage_item",
+  "upgrade_item",
+  "set_item_durability",
   // Conditions
   "add_condition",
   "upgrade_condition",
@@ -1808,26 +1812,48 @@ function convertToolToCommand(
 
     // Item Management
     case "add_item":
+      // Include grade if specified
+      if (args.grade) {
+        return `/add_item: ${args.name} | ${args.description} | ${args.type} | ${args.quantity} | ${args.grade}`;
+      }
       return `/add_item: ${args.name} | ${args.description} | ${args.type} | ${args.quantity}`;
 
     case "remove_item":
       return `/remove_item: ${args.name} | ${args.quantity}`;
 
     case "modify_item":
-      if (args.description && args.type) {
+      // Handle new grade and durability parameters
+      if (args.durability !== undefined) {
+        return `/set_item_durability: ${args.name} | ${args.durability}`;
+      } else if (args.grade) {
+        return `/upgrade_item: ${args.name} | ${args.grade}`;
+      } else if (args.description && args.type) {
         return `/modify_item: ${args.name} | ${args.description} | ${args.type}`;
       } else if (args.description) {
         return `/modify_item: ${args.name} | ${args.description}`;
       } else if (args.type) {
         return `/modify_item: ${args.name} | ${args.type}`;
       }
-      return `/add_item: ${args.name}`; // Fallback
+      return null; // No valid modifications specified
 
     case "break_item":
       return `/break_item: ${args.name}`;
 
     case "consume_item":
       return `/consume_item: ${args.name}`;
+
+    case "repair_item":
+      // Amount is optional - omit for full repair
+      if (args.amount !== undefined) {
+        return `/repair_item: ${args.name} | ${args.amount}`;
+      }
+      return `/repair_item: ${args.name}`;
+
+    case "damage_item":
+      return `/damage_item: ${args.name} | ${args.amount}`;
+
+    case "upgrade_item":
+      return `/upgrade_item: ${args.name} | ${args.newGrade}`;
 
     // Resource Management
     case "adjust_resource":

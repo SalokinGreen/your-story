@@ -12,6 +12,7 @@ import {
 import { DynamicIcon } from "../components/DynamicIcon";
 import { useState } from "react";
 import { getRPGSystem } from "../misc/rpgSystems";
+import { GRADE_CONFIG, getMaxDurability, ItemGrade } from "../misc/itemSystem";
 
 type StatsTab =
   | "stats"
@@ -438,39 +439,88 @@ export default function StatsPage(storyData: StoryData) {
               </h3>
               {storyData.inventory.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {storyData.inventory.map((item, index) => (
-                    <div
-                      key={index}
-                      className="flex flex-row items-center gap-2.5 p-3 rounded-lg bg-purple-500/10 border border-purple-500/30"
-                    >
-                      <div className="shrink-0">
-                        <DynamicIcon
-                          name={item.symbol}
-                          className="w-6 h-6 text-purple-400"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-row items-baseline justify-between">
-                          <span className="font-medium text-sm text-white truncate">
-                            {item.name}
-                          </span>
-                          <span className="font-bold text-sm text-purple-400 ml-2">
-                            ×{item.quantity}
-                          </span>
+                  {storyData.inventory.map((item, index) => {
+                    const grade = (item.grade || "common") as ItemGrade;
+                    const gradeConfig = GRADE_CONFIG[grade];
+                    const maxDurability = item.maxDurability || getMaxDurability(grade);
+                    const durability = item.durability ?? maxDurability;
+                    const durabilityPercent = grade === "mythic" ? 100 : Math.round((durability / maxDurability) * 100);
+                    const isLowDurability = durabilityPercent <= 33 && grade !== "mythic";
+                    
+                    return (
+                      <div
+                        key={index}
+                        className="flex flex-row items-center gap-2.5 p-3 rounded-lg border"
+                        style={{
+                          backgroundColor: `${gradeConfig.color}10`,
+                          borderColor: `${gradeConfig.color}40`,
+                        }}
+                      >
+                        <div className="shrink-0">
+                          <DynamicIcon
+                            name={item.symbol}
+                            className="w-6 h-6"
+                            style={{ color: gradeConfig.color }}
+                          />
                         </div>
-                        {item.description && (
-                          <p className="text-xs text-blue-200/40 line-clamp-1 mt-0.5">
-                            {item.description}
-                          </p>
-                        )}
-                        {item.type && (
-                          <span className="inline-block mt-1 px-1.5 py-0.5 text-xs rounded bg-purple-500/20 text-purple-300 font-medium">
-                            {item.type}
-                          </span>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-row items-baseline justify-between">
+                            <span className="font-medium text-sm text-white truncate">
+                              {item.name}
+                            </span>
+                            <span className="font-bold text-sm ml-2" style={{ color: gradeConfig.color }}>
+                              ×{item.quantity}
+                            </span>
+                          </div>
+                          {item.description && (
+                            <p className="text-xs text-blue-200/40 line-clamp-1 mt-0.5">
+                              {item.description}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            {/* Grade badge */}
+                            <span
+                              className="inline-block px-1.5 py-0.5 text-xs rounded font-medium"
+                              style={{
+                                backgroundColor: `${gradeConfig.color}30`,
+                                color: gradeConfig.color,
+                              }}
+                            >
+                              {gradeConfig.label}
+                            </span>
+                            {/* Type badge */}
+                            {item.type && (
+                              <span className="inline-block px-1.5 py-0.5 text-xs rounded bg-purple-500/20 text-purple-300 font-medium">
+                                {item.type}
+                              </span>
+                            )}
+                          </div>
+                          {/* Durability bar */}
+                          {item.type !== "consumable" && (
+                            <div className="mt-1.5">
+                              <div className="flex items-center justify-between text-xs mb-0.5">
+                                <span className="text-blue-200/40">Durability</span>
+                                <span className={isLowDurability ? "text-red-400" : "text-blue-200/60"}>
+                                  {grade === "mythic" ? "∞" : `${durability}/${maxDurability}`}
+                                </span>
+                              </div>
+                              {grade !== "mythic" && (
+                                <div className="h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full transition-all"
+                                    style={{
+                                      width: `${durabilityPercent}%`,
+                                      backgroundColor: isLowDurability ? "#ef4444" : gradeConfig.color,
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-4 text-center rounded-lg bg-blue-900/30 border border-blue-800/30">

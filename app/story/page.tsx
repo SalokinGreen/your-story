@@ -7,6 +7,7 @@ import {
   Choices,
   Choice,
   Resource,
+  InventoryItem,
   UPGRADE_COSTS,
   Preset,
   CommandResponse,
@@ -24,6 +25,14 @@ import {
   type Likelihood,
   type ElementCategory,
 } from "../misc/mythic";
+import {
+  applyDurabilityLoss,
+  getItemBonus,
+  getMaxDurability,
+  getDurabilityDisplay,
+  GRADE_CONFIG,
+  ItemGrade,
+} from "../misc/itemSystem";
 import { MODEL_PRESETS } from "../misc/ai_prices";
 import Story from "./story";
 import StatsPage from "./stats";
@@ -2823,6 +2832,12 @@ function StoryPageContent() {
     let itemQuantityBefore = 0;
     let itemQuantityAfter = 0;
     let itemBroken = false;
+    let itemDurabilityBefore = 0;
+    let itemDurabilityAfter = 0;
+    let itemMaxDurability = 0;
+    let itemGradeBonus = 0;
+    let itemGradeLabel = ""; // Track grade label before item might be removed
+    let itemType = "normal"; // Track item type before removal
     let resourceUsedBefore = 0;
     let resourceUsedAfter = 0;
     let insufficientResource = false;
@@ -2850,7 +2865,10 @@ function StoryPageContent() {
     if (choice.item_used) {
       // Try fuzzy matching first
       const matchResult = findItemMatch(choice.item_used, storyData.inventory);
-      const item = matchResult?.item;
+      // Get the actual typed item from inventory (fuzzy match returns generic type)
+      const item: InventoryItem | undefined = matchResult 
+        ? storyData.inventory.find(i => i.name === matchResult.name)
+        : undefined;
       const item_exists = item !== undefined;
 
       // Log fuzzy match result
@@ -2872,27 +2890,40 @@ function StoryPageContent() {
 
       if (item_exists && item) {
         itemQuantityBefore = item.quantity;
-        const itemType = item.type || "normal";
+        itemType = item.type || "normal";
+        
+        // Track grade label before item might be removed
+        itemGradeLabel = item.grade ? ` [${GRADE_CONFIG[item.grade].label}]` : "";
+        
+        // Track durability info for display
+        const durabilityInfo = getDurabilityDisplay(item);
+        itemDurabilityBefore = durabilityInfo.current;
+        itemMaxDurability = durabilityInfo.max;
+        itemDurabilityAfter = itemDurabilityBefore; // Will be updated after skill check
+        
+        // Get item grade bonus for this RPG system
+        itemGradeBonus = getItemBonus(item, rpgSystem.id);
 
         //Handle advantage based on item type
         if (itemType === "misc") {
           //Misc items don't give advantage, but prevent disadvantage
           addNotification(
-            `Used item: ${choice.item_used} (No disadvantage)`,
+            `Used item: ${choice.item_used}${itemGradeLabel} (No disadvantage)`,
             "info"
           );
         } else {
           //Normal, consumable, and story items give advantage
           advantageCount++;
           advantageSources.push(choice.item_used);
+          const bonusText = itemGradeBonus > 0 ? ` +${itemGradeBonus}` : "";
           addNotification(
-            `Used item: ${choice.item_used} (Advantage!)`,
+            `Used item: ${choice.item_used}${itemGradeLabel} (Advantage${bonusText}!)`,
             "info"
           );
         }
 
         // Handle item consumption based on type
-        // Consumable: Always consumed when used
+        // Consumable: Always consumed when used (durability doesn't apply)
         if (itemType === "consumable") {
           const itemIndex = storyData.inventory.findIndex(
             (i) => i.name === choice.item_used
@@ -2908,7 +2939,7 @@ function StoryPageContent() {
             }
           }
         } else {
-          //Normal,story,misc:Notconsumedonuse(butnormalcanbreakonfailure)
+          //Normal,story,misc: Durability is reduced on use (handled after skill check)
           itemQuantityAfter = itemQuantityBefore;
         }
       } else {
@@ -3709,6 +3740,59 @@ function StoryPageContent() {
                 }
               }
             }
+
+            // Apply durability loss on success (-1 durability) for non-consumable items
+            if (choice.item_used) {
+              const item = storyData.inventory.find(
+                (i) => i.name === choice.item_used
+              );
+              const itemType = item?.type || "normal";
+
+              // Consumables don't have durability (they're already consumed)
+              // Story and misc items use durability system
+              if (item && itemType !== "consumable") {
+                const durabilityResult = applyDurabilityLoss(item, false);
+                itemDurabilityAfter = durabilityResult.newDurability;
+                
+                if (durabilityResult.broken) {
+                  // Item broke from durability loss
+                  itemBroken = true;
+                  const itemIndex = storyData.inventory.findIndex(
+                    (i) => i.name === choice.item_used
+                  );
+                  if (itemIndex !== -1) {
+                    if (storyData.inventory[itemIndex].quantity > 1) {
+                      storyData.inventory[itemIndex].quantity--;
+                      // Reset durability for remaining items
+                      const maxDur = getMaxDurability(item.grade || "common");
+                      storyData.inventory[itemIndex].durability = maxDur;
+                      itemQuantityAfter = storyData.inventory[itemIndex].quantity;
+                    } else {
+                      storyData.inventory.splice(itemIndex, 1);
+                      itemQuantityAfter = 0;
+                    }
+                  }
+                  logger.action("Item broke from durability (Success)", {
+                    item: choice.item_used,
+                    durabilityBefore: itemDurabilityBefore,
+                    durabilityAfter: 0,
+                  });
+                } else {
+                  // Update durability on the item
+                  const itemIndex = storyData.inventory.findIndex(
+                    (i) => i.name === choice.item_used
+                  );
+                  if (itemIndex !== -1) {
+                    storyData.inventory[itemIndex].durability = durabilityResult.newDurability;
+                  }
+                  logger.action("Item durability reduced (Success)", {
+                    item: choice.item_used,
+                    durabilityBefore: itemDurabilityBefore,
+                    durabilityAfter: durabilityResult.newDurability,
+                  });
+                }
+              }
+            }
           } else {
             skillCheckResult = "failure";
 
@@ -3734,33 +3818,54 @@ function StoryPageContent() {
               });
             }
 
-            // Handle item breakage on failure (only for 'normal' type items)
+            // Handle item durability on failure (-2 durability for non-consumable items)
             if (choice.item_used) {
               const item = storyData.inventory.find(
                 (i) => i.name === choice.item_used
               );
               const itemType = item?.type || "normal";
 
-              // Only normal items break on failure (not consumable, story, or misc)
-              if (itemType === "normal" && item) {
-                const itemIndex = storyData.inventory.findIndex(
-                  (i) => i.name === choice.item_used
-                );
-                if (
-                  itemIndex !== -1 &&
-                  itemQuantityAfter === itemQuantityBefore
-                ) {
-                  // Only break if not already consumed
-                  if (storyData.inventory[itemIndex].quantity > 1) {
-                    storyData.inventory[itemIndex].quantity--;
-                    itemQuantityAfter = storyData.inventory[itemIndex].quantity;
-                  } else {
-                    storyData.inventory.splice(itemIndex, 1);
-                    itemQuantityAfter = 0;
-                    itemBroken = true;
+              // Consumables don't have durability (they're already consumed)
+              // Normal, story, and misc items use durability system
+              if (item && itemType !== "consumable") {
+                const durabilityResult = applyDurabilityLoss(item, true);
+                itemDurabilityAfter = durabilityResult.newDurability;
+                
+                if (durabilityResult.broken) {
+                  // Item broke from durability loss
+                  itemBroken = true;
+                  const itemIndex = storyData.inventory.findIndex(
+                    (i) => i.name === choice.item_used
+                  );
+                  if (itemIndex !== -1) {
+                    if (storyData.inventory[itemIndex].quantity > 1) {
+                      storyData.inventory[itemIndex].quantity--;
+                      // Reset durability for remaining items
+                      const maxDur = getMaxDurability(item.grade || "common");
+                      storyData.inventory[itemIndex].durability = maxDur;
+                      itemQuantityAfter = storyData.inventory[itemIndex].quantity;
+                    } else {
+                      storyData.inventory.splice(itemIndex, 1);
+                      itemQuantityAfter = 0;
+                    }
                   }
-                  logger.action("Item broken (Failure)", {
+                  logger.action("Item broke from durability (Failure)", {
                     item: choice.item_used,
+                    durabilityBefore: itemDurabilityBefore,
+                    durabilityAfter: 0,
+                  });
+                } else {
+                  // Update durability on the item
+                  const itemIndex = storyData.inventory.findIndex(
+                    (i) => i.name === choice.item_used
+                  );
+                  if (itemIndex !== -1) {
+                    storyData.inventory[itemIndex].durability = durabilityResult.newDurability;
+                  }
+                  logger.action("Item durability reduced (Failure)", {
+                    item: choice.item_used,
+                    durabilityBefore: itemDurabilityBefore,
+                    durabilityAfter: durabilityResult.newDurability,
                   });
                 }
               }
@@ -3824,17 +3929,39 @@ function StoryPageContent() {
 
     //Builditemusageline
     if (choice.item_used && itemQuantityBefore > 0) {
+      // Use pre-tracked grade and type (item might be removed from inventory)
+      const bonusText = itemGradeBonus > 0 ? ` +${itemGradeBonus}` : "";
+      
       if (itemBroken) {
+        // Item broke (durability hit 0)
         choiceDetails.push(
-          `[Item Used: ${choice.item_used}; x${itemQuantityBefore}? broken]`
+          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore} → broken]`
         );
-      } else if (choice.item_loss) {
+      } else if (itemType === "consumable") {
+        // Consumable items show quantity change
+        if (itemQuantityAfter !== itemQuantityBefore) {
+          choiceDetails.push(
+            `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore} → ${itemQuantityAfter}]`
+          );
+        } else {
+          choiceDetails.push(
+            `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore}]`
+          );
+        }
+      } else if (itemDurabilityBefore > 0 && itemDurabilityAfter !== itemDurabilityBefore) {
+        // Non-consumable items show durability change
         choiceDetails.push(
-          `[Item Used: ${choice.item_used}; x${itemQuantityBefore}? ${itemQuantityAfter}]`
+          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; Durability ${itemDurabilityBefore}/${itemMaxDurability} → ${itemDurabilityAfter}/${itemMaxDurability}]`
+        );
+      } else if (itemMaxDurability === Infinity || itemMaxDurability === -1) {
+        // Mythic items have infinite durability
+        choiceDetails.push(
+          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; Durability ∞]`
         );
       } else {
+        // No durability change (or item has no durability tracking)
         choiceDetails.push(
-          `[Item Used: ${choice.item_used}; x${itemQuantityBefore}]`
+          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore}]`
         );
       }
     }

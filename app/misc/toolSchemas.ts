@@ -140,7 +140,7 @@ const addItemTool: ToolSchema = {
   function: {
     name: "add_item",
     description:
-      "Add an item to player's inventory. Item types: normal (advantage on use, breaks on fail), consumable (advantage on use, consumed immediately), story (advantage on use, never breaks), misc (prevents disadvantage, never breaks)",
+      "Add an item to player's inventory. Item types: normal (has durability, breaks when depleted), consumable (one-use, consumed immediately), story (quest item, tracks durability but never breaks), misc (prevents disadvantage, tracks durability). Grades: common (3 dur), uncommon (5 dur, +bonus), rare (8 dur, +bonus), epic (12 dur, +bonus), legendary (20 dur, +bonus), mythic (infinite dur, +max bonus)",
     parameters: {
       type: "object",
       properties: {
@@ -156,7 +156,13 @@ const addItemTool: ToolSchema = {
           type: "string",
           enum: ["normal", "consumable", "story", "misc"],
           description:
-            "Item type: normal (breaks on fail), consumable (one-use), story (quest item, never breaks), misc (prevents disadvantage only)",
+            "Item type: normal (breaks when durability depleted), consumable (one-use), story (quest item, never breaks), misc (prevents disadvantage only)",
+        },
+        grade: {
+          type: "string",
+          enum: ["common", "uncommon", "rare", "epic", "legendary", "mythic"],
+          description:
+            "Item grade/rarity. Affects durability and bonus: common (3 dur, +0), uncommon (5 dur, small bonus), rare (8 dur, medium bonus), epic (12 dur, good bonus), legendary (20 dur, great bonus), mythic (infinite dur, max bonus). Default: common",
         },
         quantity: {
           type: "number",
@@ -196,7 +202,7 @@ const modifyItemTool: ToolSchema = {
   type: "function",
   function: {
     name: "modify_item",
-    description: "Change an existing item's description or type",
+    description: "Change an existing item's description, type, grade, or durability",
     parameters: {
       type: "object",
       properties: {
@@ -212,6 +218,16 @@ const modifyItemTool: ToolSchema = {
           type: "string",
           enum: ["normal", "consumable", "story", "misc"],
           description: "New item type (optional)",
+        },
+        grade: {
+          type: "string",
+          enum: ["common", "uncommon", "rare", "epic", "legendary", "mythic"],
+          description: "New item grade (optional) - upgrading increases max durability",
+        },
+        durability: {
+          type: "number",
+          description: "Set specific durability value (optional) - for repairs or damage",
+          minimum: 0,
         },
       },
       required: ["name"],
@@ -234,6 +250,75 @@ const breakItemTool: ToolSchema = {
         },
       },
       required: ["name"],
+    },
+  },
+};
+
+const repairItemTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "repair_item",
+    description: "Repair an item, restoring its durability. Use for narrative repairs (blacksmith, magic, resting, etc.)",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Item name (fuzzy matching supported)",
+        },
+        amount: {
+          type: "number",
+          description: "Amount of durability to restore. If omitted, fully repairs the item.",
+          minimum: 1,
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
+const damageItemTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "damage_item",
+    description: "Damage an item, reducing its durability. Use for narrative damage (acid, fire, wear, etc.). Item breaks if durability reaches 0.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Item name (fuzzy matching supported)",
+        },
+        amount: {
+          type: "number",
+          description: "Amount of durability to remove",
+          minimum: 1,
+        },
+      },
+      required: ["name", "amount"],
+    },
+  },
+};
+
+const upgradeItemTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "upgrade_item",
+    description: "Upgrade an item's grade/rarity. Use for crafting, enchanting, or narrative upgrades. Increases max durability and bonuses.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Item name (fuzzy matching supported)",
+        },
+        newGrade: {
+          type: "string",
+          enum: ["uncommon", "rare", "epic", "legendary", "mythic"],
+          description: "The new grade to upgrade to (must be higher than current grade)",
+        },
+      },
+      required: ["name", "newGrade"],
     },
   },
 };
@@ -1200,12 +1285,15 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   updateQuestTool,
   deleteQuestTool,
 
-  // Item Management (5 tools)
+  // Item Management (8 tools)
   addItemTool,
   removeItemTool,
   modifyItemTool,
   breakItemTool,
   consumeItemTool,
+  repairItemTool,
+  damageItemTool,
+  upgradeItemTool,
 
   // Resource Management (4 tools)
   adjustResourceTool,

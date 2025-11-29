@@ -44,6 +44,7 @@ import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { IconPicker } from "@/app/components/IconPicker";
 import { CustomTablesEditor } from "@/app/components/CustomTablesEditor";
 import { DraggableScroll } from "@/app/components/DraggableScroll";
+import { GRADE_CONFIG, getMaxDurability, ItemGrade, GRADE_ORDER } from "@/app/misc/itemSystem";
 import {
   saveLocalAdventure,
   getLocalAdventure,
@@ -1348,6 +1349,9 @@ function AdventureCreatorContent() {
     description: "",
     type: "misc",
     symbol: "Package",
+    grade: "common",
+    durability: 3,
+    maxDurability: 3,
   });
   const [draggedInventoryIndex, setDraggedInventoryIndex] = useState<
     number | null
@@ -1894,6 +1898,9 @@ function AdventureCreatorContent() {
         description: "",
         type: "misc",
         symbol: "Package",
+        grade: "common",
+        durability: 3,
+        maxDurability: 3,
       });
     }
   };
@@ -5567,11 +5574,57 @@ function AdventureCreatorContent() {
                             }
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                           >
-                            <option value="weapon">Weapon</option>
-                            <option value="armor">Armor</option>
+                            <option value="normal">Normal</option>
                             <option value="consumable">Consumable</option>
+                            <option value="story">Story</option>
                             <option value="misc">Misc</option>
                           </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Grade
+                          </label>
+                          <select
+                            value={editInventoryItem.grade || "common"}
+                            onChange={(e) => {
+                              const newGrade = e.target.value as ItemGrade;
+                              const maxDur = getMaxDurability(newGrade);
+                              setEditInventoryItem({
+                                ...editInventoryItem,
+                                grade: newGrade,
+                                maxDurability: maxDur,
+                                durability: Math.min(editInventoryItem.durability || maxDur, maxDur),
+                              });
+                            }}
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
+                            style={{ color: GRADE_CONFIG[editInventoryItem.grade as ItemGrade || "common"].color }}
+                          >
+                            {GRADE_ORDER.map((g) => (
+                              <option key={g} value={g} style={{ color: GRADE_CONFIG[g].color }}>
+                                {GRADE_CONFIG[g].label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Durability {editInventoryItem.grade === "mythic" ? "(∞)" : `(max ${getMaxDurability(editInventoryItem.grade as ItemGrade || "common")})`}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max={getMaxDurability(editInventoryItem.grade as ItemGrade || "common")}
+                            value={editInventoryItem.grade === "mythic" ? "" : (editInventoryItem.durability ?? getMaxDurability(editInventoryItem.grade as ItemGrade || "common"))}
+                            onChange={(e) =>
+                              setEditInventoryItem({
+                                ...editInventoryItem,
+                                durability: Math.max(0, Math.min(parseInt(e.target.value) || 0, getMaxDurability(editInventoryItem.grade as ItemGrade || "common"))),
+                              })
+                            }
+                            disabled={editInventoryItem.grade === "mythic"}
+                            placeholder={editInventoryItem.grade === "mythic" ? "∞" : "Durability"}
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm disabled:opacity-50"
+                          />
                         </div>
                         <div className="sm:col-span-2">
                           <label className="block text-xs font-semibold text-blue-300 mb-1">
@@ -5618,29 +5671,69 @@ function AdventureCreatorContent() {
                       onDragStart={() => handleInventoryDragStart(index)}
                       onDragOver={(e) => handleInventoryDragOver(e, index)}
                       onDragEnd={handleInventoryDragEnd}
-                      className="flex items-center gap-3 p-4 bg-purple-900/20 rounded-lg border border-purple-800/50 cursor-move hover:bg-purple-800/30 transition-colors"
+                      className="flex items-center gap-3 p-4 rounded-lg border cursor-move hover:opacity-80 transition-colors"
                       style={{
                         opacity: draggedInventoryIndex === index ? 0.5 : 1,
+                        backgroundColor: `${GRADE_CONFIG[item.grade as ItemGrade || "common"].color}15`,
+                        borderColor: `${GRADE_CONFIG[item.grade as ItemGrade || "common"].color}40`,
                       }}
                     >
                       <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
                         <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
                       <div className="text-2xl">
-                        <DynamicIcon name={item.symbol} className="w-8 h-8" />
+                        <DynamicIcon 
+                          name={item.symbol} 
+                          className="w-8 h-8"
+                          style={{ color: GRADE_CONFIG[item.grade as ItemGrade || "common"].color }}
+                        />
                       </div>
                       <div className="flex-1">
-                        <div className="font-bold text-white">
-                          {item.name} ?{item.quantity}
+                        <div className="font-bold text-white flex items-center gap-2 flex-wrap">
+                          <span>{item.name} ×{item.quantity}</span>
+                          <span
+                            className="text-xs px-1.5 py-0.5 rounded"
+                            style={{
+                              backgroundColor: `${GRADE_CONFIG[item.grade as ItemGrade || "common"].color}30`,
+                              color: GRADE_CONFIG[item.grade as ItemGrade || "common"].color,
+                            }}
+                          >
+                            {GRADE_CONFIG[item.grade as ItemGrade || "common"].label}
+                          </span>
+                          {item.type && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                              {item.type}
+                            </span>
+                          )}
                         </div>
                         {item.description && (
                           <div className="text-sm text-blue-300/60">
                             {item.description}
                           </div>
                         )}
-                        <div className="text-xs text-purple-400">
-                          {item.type}
-                        </div>
+                        {item.type !== "consumable" && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-blue-200/40">Durability:</span>
+                            {item.grade === "mythic" ? (
+                              <span className="text-xs text-yellow-400">∞</span>
+                            ) : (
+                              <>
+                                <div className="w-16 h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                      width: `${((item.durability ?? getMaxDurability(item.grade as ItemGrade || "common")) / getMaxDurability(item.grade as ItemGrade || "common")) * 100}%`,
+                                      backgroundColor: GRADE_CONFIG[item.grade as ItemGrade || "common"].color,
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-xs text-blue-200/60">
+                                  {item.durability ?? getMaxDurability(item.grade as ItemGrade || "common")}/{getMaxDurability(item.grade as ItemGrade || "common")}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="flex flex-col items-center gap-2">
                         <div className="flex flex-row items-center gap-1 ml-3">

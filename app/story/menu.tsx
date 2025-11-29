@@ -43,6 +43,7 @@ import { DynamicIcon } from "../components/DynamicIcon";
 import { IconPicker } from "../components/IconPicker";
 import { CustomTablesEditor } from "../components/CustomTablesEditor";
 import { DraggableScroll } from "../components/DraggableScroll";
+import { GRADE_CONFIG, getMaxDurability, ItemGrade, GRADE_ORDER } from "../misc/itemSystem";
 
 // AI Model Selector Component with state management
 function AIModelSelector({
@@ -2536,6 +2537,9 @@ function InventoryEditor({
       description: "",
       type: "normal",
       symbol: "Package",
+      grade: "common",
+      durability: 3,
+      maxDurability: 3,
     };
     const updated = [...localInventory, newItem];
     setLocalInventory(updated);
@@ -2606,9 +2610,8 @@ function InventoryEditor({
                     placeholder="Quantity"
                     className="px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
-                  <input
-                    type="text"
-                    value={editInventoryItem.type || ""}
+                  <select
+                    value={editInventoryItem.type || "normal"}
                     onChange={(e) =>
                       setEditInventoryItem({
                         ...editInventoryItem,
@@ -2619,9 +2622,57 @@ function InventoryEditor({
                           | "misc",
                       })
                     }
-                    placeholder="Type"
                     className="px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
-                  />
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="consumable">Consumable</option>
+                    <option value="story">Story</option>
+                    <option value="misc">Misc</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-blue-200/60 mb-1">Grade</label>
+                    <select
+                      value={editInventoryItem.grade || "common"}
+                      onChange={(e) => {
+                        const newGrade = e.target.value as ItemGrade;
+                        const maxDur = getMaxDurability(newGrade);
+                        setEditInventoryItem({
+                          ...editInventoryItem,
+                          grade: newGrade,
+                          maxDurability: maxDur,
+                          durability: Math.min(editInventoryItem.durability || maxDur, maxDur),
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                      style={{ color: GRADE_CONFIG[editInventoryItem.grade as ItemGrade || "common"].color }}
+                    >
+                      {GRADE_ORDER.map((g) => (
+                        <option key={g} value={g} style={{ color: GRADE_CONFIG[g].color }}>
+                          {GRADE_CONFIG[g].label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-blue-200/60 mb-1">
+                      Durability {editInventoryItem.grade === "mythic" ? "(∞)" : `(max ${getMaxDurability(editInventoryItem.grade as ItemGrade || "common")})`}
+                    </label>
+                    <input
+                      type="number"
+                      value={editInventoryItem.grade === "mythic" ? "∞" : (editInventoryItem.durability ?? getMaxDurability(editInventoryItem.grade as ItemGrade || "common"))}
+                      onChange={(e) =>
+                        setEditInventoryItem({
+                          ...editInventoryItem,
+                          durability: Math.max(0, Math.min(parseInt(e.target.value) || 0, getMaxDurability(editInventoryItem.grade as ItemGrade || "common"))),
+                        })
+                      }
+                      disabled={editInventoryItem.grade === "mythic"}
+                      placeholder="Durability"
+                      className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white disabled:opacity-50"
+                    />
+                  </div>
                 </div>
                 <textarea
                   value={editInventoryItem.description || ""}
@@ -2658,9 +2709,14 @@ function InventoryEditor({
               onDragStart={() => handleInventoryDragStart(index)}
               onDragOver={(e) => handleInventoryDragOver(e, index)}
               onDragEnd={handleInventoryDragEnd}
-              className={`p-4 bg-blue-900/20 rounded-lg cursor-move flex items-center gap-3 ${
+              className={`p-4 rounded-lg cursor-move flex items-center gap-3 ${
                 draggedInventoryIndex === index ? "opacity-50" : ""
               }`}
+              style={{
+                backgroundColor: `${GRADE_CONFIG[item.grade as ItemGrade || "common"].color}15`,
+                borderWidth: 1,
+                borderColor: `${GRADE_CONFIG[item.grade as ItemGrade || "common"].color}30`,
+              }}
             >
               <span className="text-gray-400 select-none">
                 <DynamicIcon name="GripVertical" className="w-5 h-5" />
@@ -2669,15 +2725,53 @@ function InventoryEditor({
                 <div className="font-medium text-white flex items-center gap-2">
                   <DynamicIcon
                     name={item.symbol}
-                    className="w-5 h-5 text-blue-200/60"
+                    className="w-5 h-5"
+                    style={{ color: GRADE_CONFIG[item.grade as ItemGrade || "common"].color }}
                   />
                   <span>
-                    {item.name} x{item.quantity} {item.type && `(${item.type})`}
+                    {item.name} x{item.quantity}
                   </span>
+                  <span
+                    className="text-xs px-1.5 py-0.5 rounded"
+                    style={{
+                      backgroundColor: `${GRADE_CONFIG[item.grade as ItemGrade || "common"].color}30`,
+                      color: GRADE_CONFIG[item.grade as ItemGrade || "common"].color,
+                    }}
+                  >
+                    {GRADE_CONFIG[item.grade as ItemGrade || "common"].label}
+                  </span>
+                  {item.type && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                      {item.type}
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm text-blue-200/60">
                   {item.description}
                 </div>
+                {item.type !== "consumable" && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-blue-200/40">Durability:</span>
+                    {item.grade === "mythic" ? (
+                      <span className="text-xs text-yellow-400">∞</span>
+                    ) : (
+                      <>
+                        <div className="w-20 h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${((item.durability ?? getMaxDurability(item.grade as ItemGrade || "common")) / getMaxDurability(item.grade as ItemGrade || "common")) * 100}%`,
+                              backgroundColor: GRADE_CONFIG[item.grade as ItemGrade || "common"].color,
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs text-blue-200/60">
+                          {item.durability ?? getMaxDurability(item.grade as ItemGrade || "common")}/{getMaxDurability(item.grade as ItemGrade || "common")}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="flex gap-0.5">

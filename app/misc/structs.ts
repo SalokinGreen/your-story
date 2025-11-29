@@ -30,6 +30,9 @@ export interface InventoryItem {
   quantity: number;
   description: string;
   type: "normal" | "consumable" | "story" | "misc";
+  grade?: "common" | "uncommon" | "rare" | "epic" | "legendary" | "mythic"; // Item rarity tier
+  durability?: number;    // Current durability
+  maxDurability?: number; // Max durability (based on grade)
   stat?: string;
   resource?: string;
   symbol: string;
