@@ -6,8 +6,8 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { executeTools } from "@/app/misc/toolExecutor";
-import type { StoryData, ToolCall } from "@/app/misc/structs";
+import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
+import type { StoryData } from "@/app/misc/structs";
 
 // Helper to create minimal story data
 function createTestStory(): StoryData {
@@ -59,7 +59,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
@@ -93,7 +93,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(2);
       expect(responses[0].success).toBe(true);
@@ -116,7 +116,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses[0].success).toBe(true);
       expect(responses[0].message).toContain("...");
@@ -143,7 +143,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
@@ -172,7 +172,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
@@ -209,7 +209,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(false);
@@ -244,7 +244,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(2);
       expect(responses[0].success).toBe(true);
@@ -284,7 +284,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(3);
       expect(responses[0].success).toBe(true);
@@ -311,7 +311,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
@@ -334,7 +334,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
@@ -354,7 +354,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(false);
@@ -386,7 +386,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
@@ -418,7 +418,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
@@ -442,7 +442,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(false);
@@ -467,7 +467,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
@@ -500,7 +500,7 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
@@ -532,11 +532,159 @@ describe("Tool Execution", () => {
         },
       ];
 
-      const responses = executeTools(toolCalls, storyData);
+      const { responses } = executeTools(toolCalls, storyData);
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
       expect(storyData.resources).toHaveLength(0);
     });
   });
-});
+
+  describe("stateChanges tracking", () => {
+    test("should generate stateChanges for stat modifications", () => {
+      const storyData = createTestStory();
+      storyData.stats.push({
+        name: "Strength",
+        description: "Physical power",
+        value: 10,
+        symbol: "💪",
+      });
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "adjust_stat",
+            arguments: {
+              name: "Strength",
+              valueDelta: 5,
+            },
+          },
+        },
+      ];
+
+      const { responses, stateChanges } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(true);
+      expect(stateChanges).toHaveLength(1);
+      expect(stateChanges[0]).toContain("Strength");
+    });
+
+    test("should generate stateChanges for item additions", () => {
+      const storyData = createTestStory();
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "add_item",
+            arguments: {
+              name: "Magic Sword",
+              description: "A glowing blade",
+              type: "normal",
+              quantity: 1,
+            },
+          },
+        },
+      ];
+
+      const { responses, stateChanges } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(true);
+      expect(stateChanges).toHaveLength(1);
+      expect(stateChanges[0]).toContain("Magic Sword");
+    });
+
+    test("should NOT generate stateChanges for memory additions", () => {
+      const storyData = createTestStory();
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "add_memory",
+            arguments: {
+              entry: "Met the blacksmith",
+            },
+          },
+        },
+      ];
+
+      const { responses, stateChanges } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(true);
+      // Memory is not in STATE_CHANGE_TOOLS, so no stateChange
+      expect(stateChanges).toHaveLength(0);
+    });
+
+    test("should generate multiple stateChanges for multiple tools", () => {
+      const storyData = createTestStory();
+      storyData.stats.push({
+        name: "Health",
+        description: "Life force",
+        value: 100,
+        symbol: "❤️",
+      });
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "adjust_stat",
+            arguments: {
+              name: "Health",
+              valueDelta: -10,
+            },
+          },
+        },
+        {
+          type: "function",
+          function: {
+            name: "add_item",
+            arguments: {
+              name: "Health Potion",
+              description: "Restores health",
+              type: "consumable",
+              quantity: 1,
+            },
+          },
+        },
+      ];
+
+      const { responses, stateChanges } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(2);
+      expect(responses[0].success).toBe(true);
+      expect(responses[1].success).toBe(true);
+      expect(stateChanges).toHaveLength(2);
+      expect(stateChanges[0]).toContain("Health");
+      expect(stateChanges[1]).toContain("Health Potion");
+    });
+
+    test("should NOT generate stateChanges for failed tool calls", () => {
+      const storyData = createTestStory();
+      // No stats exist, so adjust_stat should fail
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "adjust_stat",
+            arguments: {
+              name: "NonExistentStat",
+              valueDelta: 5,
+            },
+          },
+        },
+      ];
+
+      const { responses, stateChanges } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(false);
+      expect(stateChanges).toHaveLength(0);
+    });
+  });});

@@ -34,6 +34,60 @@ export interface ToolCall {
   };
 }
 
+export interface ExecuteToolsResult {
+  responses: CommandResponse[];
+  stateChanges: string[];
+}
+
+/**
+ * Tools whose successful execution should generate state change notifications
+ * for the story generation stage. Includes both tool names and their command equivalents.
+ */
+const STATE_CHANGE_TOOLS = new Set([
+  // Stats - tool names and command names
+  "adjust_stat", "modify_stat",
+  "set_stat",
+  "create_stat",
+  // Resources - tool names and command names
+  "adjust_resource",
+  "set_resource", "set_resource_max",
+  "create_resource", "add_resource",
+  "delete_resource", "remove_resource",
+  // Items - tool names and command names
+  "add_item",
+  "remove_item",
+  "modify_item",
+  "break_item",
+  "consume_item",
+  // Conditions
+  "add_condition",
+  "upgrade_condition",
+  "downgrade_condition",
+  "remove_condition",
+  // Relationships - tool names and command names
+  "add_relationship",
+  "modify_relationship",
+  "delete_relationship",
+  "update_relationship_description",
+  // Achievements - tool names and command names
+  "trigger_achievement",
+  // Lore - tool names and command names
+  "show_lore", "lore_show",
+  "hide_lore", "lore_hide",
+  "create_lore",
+  // Variables
+  "set_variable",
+  "modify_variable",
+  "toggle_variable",
+  "add_to_list",
+  "remove_from_list",
+  "clear_list",
+  // Momentum - tool names and command names
+  "modify_momentum",
+  // Game state
+  "game_over",
+]);
+
 /**
  * Parse dice notation (e.g., "2d6+3", "-1d8+2", "3d6-5") and return the rolled value
  * Returns null if the string is not valid dice notation
@@ -99,13 +153,13 @@ function parseDiceNotation(
 }
 
 /**
- * Execute multiple tool calls and return command responses
+ * Execute multiple tool calls and return command responses with state changes
  * Converts tool calls to XML command format and reuses existing validation
  */
 export function executeTools(
   toolCalls: ToolCall[],
   storyData: StoryData
-): CommandResponse[] {
+): ExecuteToolsResult {
   logger.action(
     `Executing ${toolCalls.length} tool call${
       toolCalls.length !== 1 ? "s" : ""
@@ -114,6 +168,7 @@ export function executeTools(
   );
 
   const responses: CommandResponse[] = [];
+  const stateChanges: string[] = [];
 
   // Helper to serialize arguments (string or object) in a compact form for failure diagnostics
   function serializeArgs(raw: string | Record<string, any>): string {
@@ -1659,7 +1714,31 @@ export function executeTools(
     }
   );
 
-  return responses;
+  // Generate state changes from successful tool calls that modify game state
+  for (const response of responses) {
+    if (!response.success) continue;
+    
+    // Extract tool name from command (may be in format "/command_name: args" or just "tool_name")
+    const commandMatch = response.command.match(/^\/(\w+):|^(\w+)$/);
+    const toolName = commandMatch ? (commandMatch[1] || commandMatch[2]) : response.command;
+    
+    // Check if this tool should generate state change notification
+    if (STATE_CHANGE_TOOLS.has(toolName)) {
+      // Clean up message for state changes (remove emoji prefixes like ✓ or ⚠️)
+      const cleanMessage = response.message.replace(/^[✓✗⚠️\s]+/, "").trim();
+      if (cleanMessage) {
+        stateChanges.push(cleanMessage);
+      }
+    }
+  }
+
+  if (stateChanges.length > 0) {
+    logger.action(`Generated ${stateChanges.length} state change notifications`, {
+      stateChanges,
+    });
+  }
+
+  return { responses, stateChanges };
 }
 
 /**

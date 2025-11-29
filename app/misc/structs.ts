@@ -94,6 +94,7 @@ export interface ScenePart {
   toolCalls?: any[]; // Tool calls made by AI (OpenAI/DeepSeek format)
   toolResponses?: CommandResponse[]; // Execution results of tool calls
   revealedLore?: string[]; // Lore titles manually revealed by AI in this part
+  stateChanges?: string[]; // Human-readable game state changes from tool calls (for story context)
   endChapter?: boolean;
   endStory?: boolean;
   gameOver?: boolean;

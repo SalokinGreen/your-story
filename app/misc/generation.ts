@@ -83,6 +83,7 @@ export interface GenerationResult {
   content: string;
   toolCalls: ToolCall[];
   toolResponses: CommandResponse[];
+  stateChanges: string[];
   choices: Choice[];
   scenePart: ScenePart;
   meta: {
@@ -300,6 +301,7 @@ export async function generateStoryTurn(
   let storyContent = "";
   let allToolCalls: ToolCall[] = [];
   let allToolResponses: CommandResponse[] = [];
+  let allStateChanges: string[] = [];
   let choices: Choice[] = [];
   let storyMeta: GenerationMeta | undefined;
   let toolsMeta: GenerationMeta | undefined;
@@ -517,10 +519,11 @@ export async function generateStoryTurn(
         logger.action("Executing tools locally", {
           count: newToolCalls.length,
         });
-        const newResponses = executeTools(newToolCalls, storyData);
+        const { responses: newResponses, stateChanges: newStateChanges } = executeTools(newToolCalls, storyData);
 
         allToolCalls = [...allToolCalls, ...newToolCalls];
         allToolResponses = [...allToolResponses, ...newResponses];
+        allStateChanges = [...allStateChanges, ...newStateChanges];
       }
 
       callbacks.onToolsComplete?.(
@@ -628,6 +631,7 @@ export async function generateStoryTurn(
       choices,
       toolCalls: allToolCalls.length > 0 ? allToolCalls : undefined,
       toolResponses: allToolResponses.length > 0 ? allToolResponses : undefined,
+      stateChanges: allStateChanges.length > 0 ? allStateChanges : undefined,
     };
 
     const result: GenerationResult = {
@@ -635,6 +639,7 @@ export async function generateStoryTurn(
       content: storyContent,
       toolCalls: allToolCalls,
       toolResponses: allToolResponses,
+      stateChanges: allStateChanges,
       choices,
       scenePart,
       meta: {

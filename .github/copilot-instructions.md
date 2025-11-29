@@ -27,7 +27,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Achievement**: Includes optional `ai_hint` field for precise AI triggering conditions separate from user-facing descriptions.
   - **InventoryItem**: Strict type union 'normal' | 'consumable' | 'story' | 'misc' with specific behaviors per type.
   - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `beats_trigger` (number[]), `beats_untrigger` (number[]) for dynamic visibility.
-  - **ScenePart**: Includes optional `toolCalls` (ToolCall[]) and `toolResponses` (CommandResponse[]) for preserving tool calling conversation history.
+  - **ScenePart**: Includes optional `toolCalls` (ToolCall[]) and `toolResponses` (CommandResponse[]) for preserving tool calling conversation history. Also includes `stateChanges` (string[]) for human-readable game state modifications that are sent to the story stage.
   - **CommandResponse**: Includes optional `toolCallId` for linking responses to specific tool calls in conversation history.
   - **Condition**: Afflictions/injuries with tiers I-VI that penalize skill checks. Includes `id`, `name`, `tier` (1-6), `description`, `affects` (array of stat names), `affectsAll` (boolean), `source`, `permanent`, `createdAt`.
   - **GameOver**: State for permanent character death/loss with `reason`, `condition` (optional), `timestamp`.
@@ -66,7 +66,8 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Context-aware pruning**: buildStoryPrompt accepts `modelName` parameter and dynamically prunes oldest scene parts to fit 75% of model's context for story history, 25% for info (lore, memory, stats).
   - Returns `{ messages, prunedParts }` where `prunedParts` indicates how many oldest parts were removed.
   - No fixed truncation limits - uses actual model context window from ai_prices.ts.
-- app/misc/toolExecutor.ts: Executes tool calls from AI responses locally on the frontend, mapping AI tool names to XML command format. Modifies storyData directly and returns CommandResponse array with success/failure status and toolCallId linking.
+  - **State Changes in Context**: buildStoryPrompt prepends `stateChanges` from the previous assistant part to the user's choice message, informing the story stage about mechanical game state updates.
+- app/misc/toolExecutor.ts: Executes tool calls from AI responses locally on the frontend, mapping AI tool names to XML command format. Modifies storyData directly and returns `{ responses: CommandResponse[], stateChanges: string[] }`. The `stateChanges` array contains human-readable descriptions of game state modifications for tools like stat/resource changes, item updates, conditions, etc.
 - app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter). Includes getModelConfig() helper for dynamic model selection. Exports AI_MODELS constant with 9 predefined models (Prometheus, Hades, Hermes, Hercules, Poseidon, Chronos, Athena, Zeus, Hephaestus).
 - app/misc/generation.ts: **Frontend generation orchestrator**. Exports generateStoryTurn() which handles the complete 3-stage generation flow:
   - Stage 1: Calls buildStoryPrompt(), streams story content via /api/generate-stream

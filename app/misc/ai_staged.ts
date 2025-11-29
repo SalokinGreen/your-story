@@ -414,9 +414,20 @@ ${
 
   // Add user choice to history if present
   if (userChoice) {
+    // Include state changes from the most recent assistant part (previous turn's tool results)
+    // This gives the AI context about what mechanical changes happened
+    let choiceMessage = `Player chose: ${userChoice}`;
+    
+    // Find the most recent assistant part to get its stateChanges
+    const lastAssistantPart = [...storyData.scene.parts].reverse().find(p => !p.user);
+    if (lastAssistantPart?.stateChanges && lastAssistantPart.stateChanges.length > 0) {
+      const stateChangesStr = lastAssistantPart.stateChanges.join("\n- ");
+      choiceMessage = `[Game State Updates from previous turn:\n- ${stateChangesStr}]\n\n${choiceMessage}`;
+    }
+    
     historyMessages.push({
       role: "user",
-      content: cleanString(`Player chose: ${userChoice}`),
+      content: cleanString(choiceMessage),
     });
   }
 
