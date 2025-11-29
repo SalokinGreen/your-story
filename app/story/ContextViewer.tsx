@@ -479,8 +479,13 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
 
             {/* State Changes from most recent assistant part */}
             {(() => {
-              const lastAssistantPart = [...storyData.scene.parts].reverse().find(p => !p.user);
-              if (lastAssistantPart?.stateChanges && lastAssistantPart.stateChanges.length > 0) {
+              const lastAssistantPart = [...storyData.scene.parts]
+                .reverse()
+                .find((p) => !p.user);
+              if (
+                lastAssistantPart?.stateChanges &&
+                lastAssistantPart.stateChanges.length > 0
+              ) {
                 return (
                   <div className="text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-2 rounded">
                     <div className="font-semibold text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1">

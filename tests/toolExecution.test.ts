@@ -687,4 +687,5 @@ describe("Tool Execution", () => {
       expect(responses[0].success).toBe(false);
       expect(stateChanges).toHaveLength(0);
     });
-  });});
+  });
+});

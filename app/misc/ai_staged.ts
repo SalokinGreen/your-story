@@ -89,13 +89,15 @@ export function buildInfoMessage(storyData: StoryData): string {
   const activeLore = storyData.lore.filter((l) => {
     if (l.enabled === false) return false; // Explicitly disabled in editor
     if (l.alwaysOn) return true; // Always include always-on lore
-    
+
     // Check if manually revealed via show_lore command in any scene part
-    const wasRevealed = storyData.scene.parts.some(
-      (p) => p.revealedLore?.some(title => title.toLowerCase() === l.title.toLowerCase())
+    const wasRevealed = storyData.scene.parts.some((p) =>
+      p.revealedLore?.some(
+        (title) => title.toLowerCase() === l.title.toLowerCase()
+      )
     );
     if (wasRevealed) return true;
-    
+
     // Standard trigger-based logic
     if (l.on === false) return false; // Explicitly turned off
     if (!l.lastTriggeredIndex) return l.on === true; // Fallback for old lore without tracking
@@ -220,29 +222,24 @@ ${
           .join("\n")}`
       : "";
 
-  // Build variables section if any exist
+  // Build variables section if any exist - clean, simple format
   const variablesSection =
     storyData.variables && storyData.variables.length > 0
-      ? `Variables (track state with set_variable, modify_variable, toggle_variable, add_to_list, remove_from_list, clear_list):\n${storyData.variables
+      ? `Variables:\n${storyData.variables
           .map((v) => {
             if (v.type === "number") {
-              const bounds =
-                v.minValue !== undefined || v.maxValue !== undefined
-                  ? ` [${v.minValue ?? "∞"}..${v.maxValue ?? "∞"}]`
-                  : "";
-              return `- ${v.name} (number): ${v.value}${bounds}${
-                v.description ? ` - ${v.description}` : ""
+              return `- ${v.name}: ${v.value}${
+                v.description ? ` (${v.description})` : ""
               }`;
             } else if (v.type === "boolean") {
-              return `- ${v.name} (boolean): ${v.value}${
-                v.description ? ` - ${v.description}` : ""
+              return `- ${v.name}: ${v.value ? "true" : "false"}${
+                v.description ? ` (${v.description})` : ""
               }`;
             } else {
               // list type
-              const items = v.items.length ? v.items.join(", ") : "(empty)";
-              const maxSize = v.maxSize ? ` [max ${v.maxSize}]` : "";
-              return `- ${v.name} (list${maxSize}): ${items}${
-                v.description ? ` - ${v.description}` : ""
+              const items = v.items.length ? v.items.join(", ") : "empty";
+              return `- ${v.name}: [${items}]${
+                v.description ? ` (${v.description})` : ""
               }`;
             }
           })
@@ -417,14 +414,19 @@ ${
     // Include state changes from the most recent assistant part (previous turn's tool results)
     // This gives the AI context about what mechanical changes happened
     let choiceMessage = `Player chose: ${userChoice}`;
-    
+
     // Find the most recent assistant part to get its stateChanges
-    const lastAssistantPart = [...storyData.scene.parts].reverse().find(p => !p.user);
-    if (lastAssistantPart?.stateChanges && lastAssistantPart.stateChanges.length > 0) {
+    const lastAssistantPart = [...storyData.scene.parts]
+      .reverse()
+      .find((p) => !p.user);
+    if (
+      lastAssistantPart?.stateChanges &&
+      lastAssistantPart.stateChanges.length > 0
+    ) {
       const stateChangesStr = lastAssistantPart.stateChanges.join("\n- ");
       choiceMessage = `[Game State Updates from previous turn:\n- ${stateChangesStr}]\n\n${choiceMessage}`;
     }
-    
+
     historyMessages.push({
       role: "user",
       content: cleanString(choiceMessage),

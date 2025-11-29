@@ -519,7 +519,8 @@ export async function generateStoryTurn(
         logger.action("Executing tools locally", {
           count: newToolCalls.length,
         });
-        const { responses: newResponses, stateChanges: newStateChanges } = executeTools(newToolCalls, storyData);
+        const { responses: newResponses, stateChanges: newStateChanges } =
+          executeTools(newToolCalls, storyData);
 
         allToolCalls = [...allToolCalls, ...newToolCalls];
         allToolResponses = [...allToolResponses, ...newResponses];

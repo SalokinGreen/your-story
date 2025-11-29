@@ -45,14 +45,18 @@ export interface ExecuteToolsResult {
  */
 const STATE_CHANGE_TOOLS = new Set([
   // Stats - tool names and command names
-  "adjust_stat", "modify_stat",
+  "adjust_stat",
+  "modify_stat",
   "set_stat",
   "create_stat",
   // Resources - tool names and command names
   "adjust_resource",
-  "set_resource", "set_resource_max",
-  "create_resource", "add_resource",
-  "delete_resource", "remove_resource",
+  "set_resource",
+  "set_resource_max",
+  "create_resource",
+  "add_resource",
+  "delete_resource",
+  "remove_resource",
   // Items - tool names and command names
   "add_item",
   "remove_item",
@@ -72,8 +76,10 @@ const STATE_CHANGE_TOOLS = new Set([
   // Achievements - tool names and command names
   "trigger_achievement",
   // Lore - tool names and command names
-  "show_lore", "lore_show",
-  "hide_lore", "lore_hide",
+  "show_lore",
+  "lore_show",
+  "hide_lore",
+  "lore_hide",
   "create_lore",
   // Variables
   "set_variable",
@@ -293,8 +299,10 @@ export function executeTools(
 
       // Special handling for list_inactive_lore (query tool - returns data directly)
       if (toolCall.function.name === "list_inactive_lore") {
-        logger.action("Special handling: list_inactive_lore", { toolCallId: toolId });
-        
+        logger.action("Special handling: list_inactive_lore", {
+          toolCallId: toolId,
+        });
+
         if (!storyData.lore || storyData.lore.length === 0) {
           responses.push({
             command: toolCall.function.name,
@@ -311,21 +319,26 @@ export function executeTools(
         const inactiveLore = storyData.lore.filter((l) => {
           if (l.enabled === false) return false; // Completely disabled in editor
           if (l.alwaysOn) return false; // Always visible, not "inactive"
-          
+
           // Check if already revealed via show_lore
-          const wasRevealed = storyData.scene.parts.some(
-            (p) => p.revealedLore?.some(title => title.toLowerCase() === l.title.toLowerCase())
+          const wasRevealed = storyData.scene.parts.some((p) =>
+            p.revealedLore?.some(
+              (title) => title.toLowerCase() === l.title.toLowerCase()
+            )
           );
           if (wasRevealed) return false;
-          
+
           // Check standard activation
           if (l.on === true) {
             // If recently triggered, it's active
-            if (l.lastTriggeredIndex && currentPartIndex - l.lastTriggeredIndex <= 15) {
+            if (
+              l.lastTriggeredIndex &&
+              currentPartIndex - l.lastTriggeredIndex <= 15
+            ) {
               return false;
             }
           }
-          
+
           // If we get here, lore is inactive
           return true;
         });
@@ -334,7 +347,8 @@ export function executeTools(
           responses.push({
             command: toolCall.function.name,
             success: true,
-            message: "All lore entries are currently active/visible. No hidden lore available.",
+            message:
+              "All lore entries are currently active/visible. No hidden lore available.",
             timestamp: Date.now(),
             toolCallId: toolCall.id,
           });
@@ -342,18 +356,26 @@ export function executeTools(
         }
 
         // Format inactive lore for AI
-        const loreList = inactiveLore.map((l) => {
-          const preview = l.content.length > 80 ? l.content.substring(0, 77) + "..." : l.content;
-          return `- ${l.title}: ${preview}`;
-        }).join("\n");
+        const loreList = inactiveLore
+          .map((l) => {
+            const preview =
+              l.content.length > 80
+                ? l.content.substring(0, 77) + "..."
+                : l.content;
+            return `- ${l.title}: ${preview}`;
+          })
+          .join("\n");
 
         const successMsg = `Inactive/Hidden Lore Entries (${inactiveLore.length}):\n${loreList}\n\nUse show_lore({ title: "..." }) to reveal any of these to the player.`;
-        
-        logger.action(`Tool call succeeded: list_inactive_lore found ${inactiveLore.length} entries`, {
-          toolCallId: toolId,
-          count: inactiveLore.length,
-        });
-        
+
+        logger.action(
+          `Tool call succeeded: list_inactive_lore found ${inactiveLore.length} entries`,
+          {
+            toolCallId: toolId,
+            count: inactiveLore.length,
+          }
+        );
+
         responses.push({
           command: toolCall.function.name,
           success: true,
@@ -1717,11 +1739,13 @@ export function executeTools(
   // Generate state changes from successful tool calls that modify game state
   for (const response of responses) {
     if (!response.success) continue;
-    
+
     // Extract tool name from command (may be in format "/command_name: args" or just "tool_name")
     const commandMatch = response.command.match(/^\/(\w+):|^(\w+)$/);
-    const toolName = commandMatch ? (commandMatch[1] || commandMatch[2]) : response.command;
-    
+    const toolName = commandMatch
+      ? commandMatch[1] || commandMatch[2]
+      : response.command;
+
     // Check if this tool should generate state change notification
     if (STATE_CHANGE_TOOLS.has(toolName)) {
       // Clean up message for state changes (remove emoji prefixes like ✓ or ⚠️)
@@ -1733,9 +1757,12 @@ export function executeTools(
   }
 
   if (stateChanges.length > 0) {
-    logger.action(`Generated ${stateChanges.length} state change notifications`, {
-      stateChanges,
-    });
+    logger.action(
+      `Generated ${stateChanges.length} state change notifications`,
+      {
+        stateChanges,
+      }
+    );
   }
 
   return { responses, stateChanges };

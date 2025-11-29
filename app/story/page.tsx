@@ -689,16 +689,17 @@ export function processCommands(
         const loreEntry = matchResult.item;
         loreEntry.on = true;
         loreEntry.lastTriggeredIndex = storyData.scene.parts.length;
-        
+
         // Add to revealedLore on the last scene part (or create one if needed)
-        const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
+        const lastPart =
+          storyData.scene.parts[storyData.scene.parts.length - 1];
         if (lastPart) {
           if (!lastPart.revealedLore) lastPart.revealedLore = [];
           if (!lastPart.revealedLore.includes(loreEntry.title)) {
             lastPart.revealedLore.push(loreEntry.title);
           }
         }
-        
+
         logger.action("Lore entry revealed via command", {
           title: loreEntry.title,
           matchedFrom: loreTitle,
