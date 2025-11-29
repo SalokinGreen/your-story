@@ -187,8 +187,7 @@ export default function ChoicesModal({
           item_used: result.analysis.item_used || undefined,
           resource_used: result.analysis.resource_used || undefined,
           mythic_check: result.analysis.mythic_check || undefined,
-          mythic_table: result.analysis.mythic_table || undefined,
-          custom_table: result.analysis.custom_table || undefined,
+          table: result.analysis.table || undefined,
           stt_input: usedStt || undefined,
         };
         onActionConfirm(choice);
@@ -300,22 +299,13 @@ export default function ChoicesModal({
       );
     }
 
-    // Mythic table
-    if (choice.mythic_table) {
+    // Unified table field (or legacy mythic_table/custom_table)
+    const tableToShow = choice.table || choice.mythic_table || choice.custom_table;
+    if (tableToShow) {
       details.push(
         <div key="table" className="flex items-center gap-2 text-indigo-400">
           <DynamicIcon name="Dices" className="w-4 h-4" />
-          <span className="text-sm">Mythic Table: {choice.mythic_table}</span>
-        </div>
-      );
-    }
-
-    // Custom table
-    if (choice.custom_table) {
-      details.push(
-        <div key="custom" className="flex items-center gap-2 text-teal-400">
-          <DynamicIcon name="Table" className="w-4 h-4" />
-          <span className="text-sm">Roll on: {choice.custom_table}</span>
+          <span className="text-sm">Table: {tableToShow}</span>
         </div>
       );
     }

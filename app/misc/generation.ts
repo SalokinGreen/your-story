@@ -252,25 +252,34 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
         }
       }
 
-      // Parse mythic_table: category
-      const mythicTableMatch = metadata.match(
-        /mythic_table:\s*([^;]+?)(?:;|$)/i
-      );
-      if (mythicTableMatch) {
-        const mythicTable = mythicTableMatch[1].trim();
-        if (mythicTable.toLowerCase() !== "none") {
-          choice.mythic_table = mythicTable;
+      // Parse unified table: field (replaces both mythic_table and custom_table)
+      const tableMatch = metadata.match(/table:\s*([^;]+?)(?:;|$)/i);
+      if (tableMatch) {
+        const tableName = tableMatch[1].trim();
+        if (tableName.toLowerCase() !== "none") {
+          choice.table = tableName;
         }
       }
 
-      // Parse custom_table: table name
+      // Legacy support: Parse mythic_table: category (migrate to unified table field)
+      const mythicTableMatch = metadata.match(
+        /mythic_table:\s*([^;]+?)(?:;|$)/i
+      );
+      if (mythicTableMatch && !choice.table) {
+        const mythicTable = mythicTableMatch[1].trim();
+        if (mythicTable.toLowerCase() !== "none") {
+          choice.table = mythicTable;
+        }
+      }
+
+      // Legacy support: Parse custom_table: table name (migrate to unified table field)
       const customTableMatch = metadata.match(
         /custom_table:\s*([^;]+?)(?:;|$)/i
       );
-      if (customTableMatch) {
+      if (customTableMatch && !choice.table) {
         const customTable = customTableMatch[1].trim();
         if (customTable.toLowerCase() !== "none") {
-          choice.custom_table = customTable;
+          choice.table = customTable;
         }
       }
     }
@@ -841,8 +850,7 @@ export async function analyzeAction(
       item_used: null,
       resource_used: null,
       mythic_check: null,
-      mythic_table: null,
-      custom_table: null,
+      table: null,
       is_plain_action: true,
     };
   }
@@ -908,18 +916,54 @@ export async function analyzeAction(
     }
   }
 
-  // Validate custom_table
-  if (analysis.custom_table && storyData.customTables) {
-    const table = storyData.customTables.find(
-      (t) => t.name.toLowerCase() === analysis.custom_table!.toLowerCase()
-    );
-    if (table) {
-      analysis.custom_table = table.name;
-    } else {
-      validationWarnings.push(
-        `Custom table "${analysis.custom_table}" not found, removing`
+  // Handle legacy mythic_table/custom_table fields - migrate to unified table field
+  if (analysis.mythic_table && !analysis.table) {
+    analysis.table = analysis.mythic_table;
+  }
+  if (analysis.custom_table && !analysis.table) {
+    analysis.table = analysis.custom_table;
+  }
+
+  // Validate unified table field - check both custom tables AND mythic element tables
+  if (analysis.table) {
+    const tableName = analysis.table;
+    
+    // First, check custom tables
+    if (storyData.customTables && storyData.customTables.length > 0) {
+      const customTable = storyData.customTables.find(
+        (t) => t.name.toLowerCase() === tableName.toLowerCase()
       );
-      analysis.custom_table = null;
+      if (customTable) {
+        analysis.table = customTable.name; // Use exact name
+      }
+    }
+    
+    // If not found in custom tables, check if it's a valid mythic table
+    const mythicTableNames = [
+      "adventure_tone", "alien_species", "animal_actions", "army", "cavern",
+      "character_actions_combat", "character_actions_general", "character_appearance",
+      "character_background", "character_conversations", "character_descriptors",
+      "character_identity", "character_motivations", "character_personality",
+      "character_skills", "character_traits_flaws", "characters", "city",
+      "civilization", "creature_abilities", "creature_descriptors", "cryptic_message",
+      "curses", "domicile", "dungeon", "dungeon_traps", "forest", "gods", "legends",
+      "locations", "magic_item", "mutation", "names", "noble_house", "objects",
+      "plot_twists", "powers", "scavenging_results", "smells", "sounds",
+      "spell_effects", "starship", "terrain", "undead", "visions_dreams"
+    ];
+    
+    const isMythicTable = mythicTableNames.some(
+      (name) => name.toLowerCase() === tableName.toLowerCase()
+    );
+    const isCustomTable = storyData.customTables?.some(
+      (t) => t.name.toLowerCase() === tableName.toLowerCase()
+    );
+    
+    if (!isMythicTable && !isCustomTable) {
+      validationWarnings.push(
+        `Table "${tableName}" not found in custom or mythic tables, removing`
+      );
+      analysis.table = null;
     }
   }
 
@@ -929,8 +973,7 @@ export async function analyzeAction(
     !analysis.item_used &&
     !analysis.resource_used &&
     !analysis.mythic_check &&
-    !analysis.mythic_table &&
-    !analysis.custom_table
+    !analysis.table
   ) {
     analysis.is_plain_action = true;
   }
@@ -970,7 +1013,6 @@ export function analysisToChoice(
     item_used: analysis.item_used || undefined,
     resource_used: analysis.resource_used || undefined,
     mythic_check: analysis.mythic_check || undefined,
-    mythic_table: analysis.mythic_table || undefined,
-    custom_table: analysis.custom_table || undefined,
+    table: analysis.table || undefined,
   };
 }

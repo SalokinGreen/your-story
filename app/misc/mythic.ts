@@ -5658,6 +5658,11 @@ const ELEMENT_TABLES: Record<ElementCategory, string[]> = {
 };
 
 /**
+ * List of all available mythic table names for validation
+ */
+export const MYTHIC_TABLE_NAMES = Object.keys(ELEMENT_TABLES) as ElementCategory[];
+
+/**
  * Generate a random element from a specific category
  * @param category - The element category to roll on
  * @returns Random element from that category with roll number

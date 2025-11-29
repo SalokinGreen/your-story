@@ -110,8 +110,10 @@ export interface Choice {
   condition_applies?: string; // Name of condition that applies penalty to this roll (AI chooses most relevant)
   mythic_check?: string; // Format: "question (likelihood)" e.g., "Is the door locked? (Likely)"
   mythic_context_only?: boolean; // When true with skill_used, mythic provides context only and doesn't override skill check result
-  mythic_table?: string; // Element category name e.g., "character_descriptors", "locations"
-  custom_table?: string; // Name or ID of custom table to roll on
+  table?: string; // Unified table field - checks both custom tables AND mythic element tables
+  // Legacy fields for backward compatibility (deprecated - use 'table' instead)
+  mythic_table?: string;
+  custom_table?: string;
   stt_input?: boolean; // True if text was input via speech-to-text (may contain transcription errors)
 }
 export interface Scene {
@@ -403,8 +405,10 @@ export interface StartingChoice {
   item_loss?: boolean; // Whether the item is consumed when used
   mythic_check?: string; // Optional: Mythic yes/no question
   mythic_context_only?: boolean; // When true with skill_used, mythic provides context only
-  mythic_table?: string; // Element category name e.g., "character_descriptors"
-  custom_table?: string; // Name or ID of custom table to roll on
+  table?: string; // Unified table field - checks both custom tables AND mythic element tables
+  // Legacy fields for backward compatibility (deprecated - use 'table' instead)
+  mythic_table?: string;
+  custom_table?: string;
 }
 
 export interface Adventure {
@@ -485,8 +489,10 @@ export interface ActionAnalysis {
   item_used: string | null; // Item name if using an item
   resource_used: string | null; // Resource name if using a resource
   mythic_check: string | null; // Mythic yes/no question with likelihood
-  mythic_table: string | null; // Mythic table to roll on for random generation
-  custom_table: string | null; // Custom table to roll on
+  table: string | null; // Unified table field - checks both custom tables AND mythic element tables
+  // Legacy fields for backward compatibility (deprecated - use 'table' instead)
+  mythic_table?: string | null;
+  custom_table?: string | null;
   is_plain_action: boolean; // True if no mechanics, just narration
 }
 

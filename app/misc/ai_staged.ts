@@ -217,7 +217,7 @@ ${
   // Build custom tables section if any exist
   const customTablesSection =
     storyData.customTables && storyData.customTables.length > 0
-      ? `Custom Tables (use ONLY these exact names with custom_table parameter):\n${storyData.customTables
+      ? `Custom Tables (use ONLY these exact names with table parameter):\n${storyData.customTables
           .map((t) => `- ${t.name}: ${t.description || "No description"}`)
           .join("\n")}`
       : "";
@@ -936,10 +936,10 @@ Example choices using tables:
       ? `
 
 CUSTOM TABLES:
-The creator has defined these custom weighted-random tables. Use them in choices with the custom_table parameter (inside angle brackets with other metadata) when they fit the narrative:
+The creator has defined these custom weighted-random tables. Use them in choices with the table parameter (inside angle brackets with other metadata) when they fit the narrative:
 ${storyData.customTables.map((t) => `- ${t.name}: ${t.description}`).join("\n")}
 
-Example: "Take a risk <custom_table: ${
+Example: "Take a risk <table: ${
           storyData.customTables[0]?.name || "TableName"
         }>"`
       : ""
@@ -990,6 +990,59 @@ export function buildActionAnalysisPrompt({
 }): { messages: ChatMessage[] } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
+  // Build unified table list - custom tables first, then mythic tables
+  const customTableNames = storyData.customTables?.map((t) => t.name) || [];
+  const mythicTableNames = storyData.mythicState
+    ? [
+        "adventure_tone",
+        "alien_species",
+        "animal_actions",
+        "army",
+        "cavern",
+        "character_actions_combat",
+        "character_actions_general",
+        "character_appearance",
+        "character_background",
+        "character_conversations",
+        "character_descriptors",
+        "character_identity",
+        "character_motivations",
+        "character_personality",
+        "character_skills",
+        "character_traits_flaws",
+        "characters",
+        "city",
+        "civilization",
+        "creature_abilities",
+        "creature_descriptors",
+        "cryptic_message",
+        "curses",
+        "domicile",
+        "dungeon",
+        "dungeon_traps",
+        "forest",
+        "gods",
+        "legends",
+        "locations",
+        "magic_item",
+        "mutation",
+        "names",
+        "noble_house",
+        "objects",
+        "plot_twists",
+        "powers",
+        "scavenging_results",
+        "smells",
+        "sounds",
+        "spell_effects",
+        "starship",
+        "terrain",
+        "undead",
+        "visions_dreams",
+      ]
+    : [];
+  const hasAnyTables = customTableNames.length > 0 || mythicTableNames.length > 0;
+
   const systemPrompt = `You analyze player actions for an interactive RPG game and determine what game mechanics apply.
 
 RESPOND WITH VALID JSON ONLY - no markdown, no explanation, just the JSON object:
@@ -1000,8 +1053,7 @@ RESPOND WITH VALID JSON ONLY - no markdown, no explanation, just the JSON object
   "item_used": "exact item name from inventory, or null",
   "resource_used": "exact resource name from the list below, or null",
   "mythic_check": "yes/no question (likelihood)" or null,
-  "mythic_table": "table name" or null,
-  "custom_table": "exact table name" or null,
+  "table": "table name" or null,
   "is_plain_action": true/false (true if this is just dialogue/narration with no mechanics)
 }
 
@@ -1052,16 +1104,23 @@ ${
 }
 
 ${
-  storyData.customTables && storyData.customTables.length > 0
-    ? `CUSTOM TABLES (for custom_table):\n${storyData.customTables
-        .map((t) => `• ${t.name}`)
-        .join("\n")}`
+  hasAnyTables
+    ? `RANDOM TABLES (for table):
+Use these tables for random generation when the player's action involves discovery or uncertainty.
+${customTableNames.length > 0 ? `Custom Tables: ${customTableNames.join(", ")}` : ""}
+${mythicTableNames.length > 0 ? `Mythic Tables: ${mythicTableNames.join(", ")}` : ""}
+
+Example uses:
+- Player searches a room → table: "scavenging_results" or "objects"
+- Player asks about an NPC's motives → table: "character_motivations"
+- Player explores a dungeon → table: "dungeon" or "dungeon_traps"
+- Player encounters a creature → table: "creature_abilities"`
     : ""
 }
 ${
   storyData.mythicState
     ? `
-MYTHIC GME (for mythic_check and mythic_table):
+MYTHIC GME (for mythic_check):
 Use mythic_check for yes/no questions about the world that skill checks can't answer.
 Format: "question (likelihood)" where likelihood is one of:
 Impossible, No Way, Very Unlikely, Unlikely, 50/50, Somewhat Likely, Likely, Very Likely, Near Sure Thing, A Sure Thing, Has To Be
@@ -1070,17 +1129,7 @@ Current Chaos Factor: ${storyData.mythicState.chaosFactor}/9
 
 Good uses: "Is the door locked? (50/50)", "Is someone watching? (Likely)", "Are there guards nearby? (Somewhat Likely)"
 Bad uses: Don't use mythic_check to determine success of skill-based actions - that's what skill_used is for.
-If skill_used is set, only use mythic_check for CONTEXT questions that don't override the skill result.
-
-MYTHIC TABLES (for mythic_table):
-Use mythic_table for random generation when the player's action involves discovery or uncertainty.
-Available tables: actions_combat, actions_general, appearance, background, conversations, descriptors, identity, motivations, personality, skills, traits_flaws, adventure_tone, cavern, city, civilization, domicile, dungeon, dungeon_traps, forest, locations, terrain, alien_species, animal_actions, creature_abilities, creature_descriptors, undead, magic_item, objects, powers, scavenging_results, spell_effects, cryptic_message, curses, gods, legends, names, plot_twists, visions_dreams, army, smells, sounds, mutation, noble_house, starship
-
-Example uses:
-- Player searches a room → mythic_table: "scavenging_results" or "objects"
-- Player asks about an NPC's motives → mythic_table: "motivations"
-- Player explores a dungeon → mythic_table: "dungeon" or "dungeon_traps"
-- Player encounters a creature → mythic_table: "creature_abilities" or "creature_descriptors"`
+If skill_used is set, only use mythic_check for CONTEXT questions that don't override the skill result.`
     : ""
 }
 

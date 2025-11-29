@@ -2083,8 +2083,8 @@ function StoryPageContent() {
           resource_used: sc.resource_used,
           mythic_check: sc.mythic_check,
           mythic_context_only: sc.mythic_context_only,
-          mythic_table: sc.mythic_table,
-          custom_table: sc.custom_table,
+          // Use unified table field, with fallback to legacy fields
+          table: sc.table || sc.mythic_table || sc.custom_table,
         }))
       : [{ text: "Start Story" }];
 
@@ -2767,38 +2767,26 @@ function StoryPageContent() {
       }
     }
 
-    if (choice.mythic_table) {
+    // Process unified table field (checks both custom tables and mythic tables)
+    // Also handle legacy mythic_table and custom_table fields for backward compatibility
+    const tableToRoll = choice.table || choice.mythic_table || choice.custom_table;
+    if (tableToRoll) {
       try {
-        const result = generateElement(choice.mythic_table as ElementCategory);
-        const tableName = choice.mythic_table
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, (l) => l.toUpperCase());
-        mythicDetails.push(`[Mythic ${tableName} Table: ${result.element}]`);
-
-        logger.action("Mythic table roll from choice", {
-          table: choice.mythic_table,
-          result: result.element,
-        });
-      } catch (error) {
-        console.error("Error processing mythic_table:", error);
-      }
-    }
-
-    // Process custom tables (also less important context)
-    if (choice.custom_table) {
-      try {
-        const table = storyData.customTables?.find(
-          (t) => t.name === choice.custom_table
+        // First, check if it's a custom table
+        const customTable = storyData.customTables?.find(
+          (t) => t.name.toLowerCase() === tableToRoll.toLowerCase()
         );
-        if (table) {
-          const totalWeight = table.entries.reduce(
+        
+        if (customTable) {
+          // Roll on custom table
+          const totalWeight = customTable.entries.reduce(
             (sum, e) => sum + e.weight,
             0
           );
           const roll = Math.random() * totalWeight;
           let cumulative = 0;
           let result: { text: string; weight: number } | undefined;
-          for (const entry of table.entries) {
+          for (const entry of customTable.entries) {
             cumulative += entry.weight;
             if (roll <= cumulative) {
               result = entry;
@@ -2806,16 +2794,28 @@ function StoryPageContent() {
             }
           }
           if (result) {
-            mythicDetails.push(`[${table.name}: ${result.text}]`);
+            mythicDetails.push(`[${customTable.name}: ${result.text}]`);
             logger.action("Custom table roll from choice", {
-              table: table.name,
+              table: customTable.name,
               result: result.text,
               weight: result.weight,
             });
           }
+        } else {
+          // Try as mythic element table
+          const result = generateElement(tableToRoll as ElementCategory);
+          const tableName = tableToRoll
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (l) => l.toUpperCase());
+          mythicDetails.push(`[${tableName} Table: ${result.element}]`);
+
+          logger.action("Mythic table roll from choice", {
+            table: tableToRoll,
+            result: result.element,
+          });
         }
       } catch (error) {
-        console.error("Error processing custom_table:", error);
+        console.error("Error processing table roll:", error);
       }
     }
 
@@ -3853,15 +3853,17 @@ function StoryPageContent() {
       choiceDetails = [...mythicDetails, ...choiceDetails];
     }
 
-    // Process custom table rolls
-    if (choice.custom_table && storyData.customTables) {
+    // Process table rolls using unified table field
+    // Support legacy custom_table field for backward compatibility
+    const tableForChoiceDetails = choice.table || choice.custom_table;
+    if (tableForChoiceDetails && storyData.customTables) {
       try {
         const { getTableByName, rollOnCustomTable } = await import(
           "../misc/tableRoller"
         );
         const table = getTableByName(
           storyData.customTables,
-          choice.custom_table
+          tableForChoiceDetails
         );
 
         if (table) {
@@ -3875,17 +3877,10 @@ function StoryPageContent() {
           } else {
             addNotification(`?? Table "${table.name}" is empty`, "warning");
           }
-        } else {
-          addNotification(
-            `?? Table not found: ${choice.custom_table}`,
-            "warning"
-          );
-          logger.action("Custom table not found", {
-            requestedTable: choice.custom_table,
-          });
         }
+        // If not a custom table, the mythic table was already handled earlier
       } catch (error) {
-        console.error("Error processing custom_table:", error);
+        console.error("Error processing table roll:", error);
       }
     }
 
