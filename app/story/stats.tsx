@@ -8,16 +8,24 @@ import {
   NumberVariable,
   BooleanVariable,
   ListVariable,
+  Ability,
 } from "../misc/structs";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { useState } from "react";
 import { getRPGSystem } from "../misc/rpgSystems";
 import { GRADE_CONFIG, getMaxDurability, ItemGrade } from "../misc/itemSystem";
+import {
+  ABILITY_GRADE_CONFIG,
+  formatAbilityCost,
+  formatCooldown,
+  getAbilityBonus,
+} from "../misc/abilitySystem";
 
 type StatsTab =
   | "stats"
   | "resources"
   | "inventory"
+  | "abilities"
   | "achievements"
   | "quests"
   | "relationships"
@@ -83,6 +91,9 @@ export default function StatsPage(storyData: StoryData) {
             { id: "stats", label: "Stats", icon: "BarChart2" },
             { id: "resources", label: "Resources", icon: "Zap" },
             { id: "inventory", label: "Items", icon: "Backpack" },
+            ...(storyData.abilities && storyData.abilities.length > 0
+              ? [{ id: "abilities", label: "Abilities", icon: "Sparkles" }]
+              : []),
             { id: "achievements", label: "Badges", icon: "Trophy" },
             { id: "quests", label: "Quests", icon: "Scroll" },
             { id: "relationships", label: "NPCs", icon: "Users" },
@@ -442,11 +453,16 @@ export default function StatsPage(storyData: StoryData) {
                   {storyData.inventory.map((item, index) => {
                     const grade = (item.grade || "common") as ItemGrade;
                     const gradeConfig = GRADE_CONFIG[grade];
-                    const maxDurability = item.maxDurability || getMaxDurability(grade);
+                    const maxDurability =
+                      item.maxDurability || getMaxDurability(grade);
                     const durability = item.durability ?? maxDurability;
-                    const durabilityPercent = grade === "mythic" ? 100 : Math.round((durability / maxDurability) * 100);
-                    const isLowDurability = durabilityPercent <= 33 && grade !== "mythic";
-                    
+                    const durabilityPercent =
+                      grade === "mythic"
+                        ? 100
+                        : Math.round((durability / maxDurability) * 100);
+                    const isLowDurability =
+                      durabilityPercent <= 33 && grade !== "mythic";
+
                     return (
                       <div
                         key={index}
@@ -468,7 +484,10 @@ export default function StatsPage(storyData: StoryData) {
                             <span className="font-medium text-sm text-white truncate">
                               {item.name}
                             </span>
-                            <span className="font-bold text-sm ml-2" style={{ color: gradeConfig.color }}>
+                            <span
+                              className="font-bold text-sm ml-2"
+                              style={{ color: gradeConfig.color }}
+                            >
                               ×{item.quantity}
                             </span>
                           </div>
@@ -499,9 +518,19 @@ export default function StatsPage(storyData: StoryData) {
                           {item.type !== "consumable" && (
                             <div className="mt-1.5">
                               <div className="flex items-center justify-between text-xs mb-0.5">
-                                <span className="text-blue-200/40">Durability</span>
-                                <span className={isLowDurability ? "text-red-400" : "text-blue-200/60"}>
-                                  {grade === "mythic" ? "∞" : `${durability}/${maxDurability}`}
+                                <span className="text-blue-200/40">
+                                  Durability
+                                </span>
+                                <span
+                                  className={
+                                    isLowDurability
+                                      ? "text-red-400"
+                                      : "text-blue-200/60"
+                                  }
+                                >
+                                  {grade === "mythic"
+                                    ? "∞"
+                                    : `${durability}/${maxDurability}`}
                                 </span>
                               </div>
                               {grade !== "mythic" && (
@@ -510,7 +539,9 @@ export default function StatsPage(storyData: StoryData) {
                                     className="h-full rounded-full transition-all"
                                     style={{
                                       width: `${durabilityPercent}%`,
-                                      backgroundColor: isLowDurability ? "#ef4444" : gradeConfig.color,
+                                      backgroundColor: isLowDurability
+                                        ? "#ef4444"
+                                        : gradeConfig.color,
                                     }}
                                   />
                                 </div>
@@ -526,6 +557,143 @@ export default function StatsPage(storyData: StoryData) {
                 <div className="p-4 text-center rounded-lg bg-blue-900/30 border border-blue-800/30">
                   <p className="text-sm text-blue-200/40">
                     Your inventory is empty
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Abilities Tab */}
+          {activeTab === "abilities" && (
+            <div>
+              <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
+                <DynamicIcon
+                  name="Sparkles"
+                  className="w-5 h-5 text-purple-400"
+                />
+                Abilities
+              </h3>
+              {storyData.abilities && storyData.abilities.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {storyData.abilities.map((ability, index) => {
+                    const gradeConfig =
+                      ABILITY_GRADE_CONFIG[ability.grade || "novice"];
+                    const isOnCooldown = (ability.currentCooldown ?? 0) > 0;
+                    const cooldownPercent =
+                      ability.cooldown && ability.cooldown > 0
+                        ? Math.round(
+                            ((ability.currentCooldown ?? 0) /
+                              ability.cooldown) *
+                              100
+                          )
+                        : 0;
+                    const rpgSystem = getRPGSystem(
+                      storyData.rpgSystem || "3d6"
+                    );
+                    const bonus = getAbilityBonus(ability, rpgSystem.id);
+
+                    return (
+                      <div
+                        key={index}
+                        className={`flex flex-row items-start gap-2.5 p-3 rounded-lg border transition-opacity ${
+                          isOnCooldown ? "opacity-60" : ""
+                        }`}
+                        style={{
+                          backgroundColor: `${gradeConfig.color}10`,
+                          borderColor: `${gradeConfig.color}40`,
+                        }}
+                      >
+                        <div className="shrink-0">
+                          <DynamicIcon
+                            name={ability.symbol || "Sparkles"}
+                            className="w-6 h-6"
+                            style={{ color: gradeConfig.color }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-row items-baseline justify-between">
+                            <span className="font-medium text-sm text-white truncate">
+                              {ability.name}
+                            </span>
+                            {bonus > 0 && (
+                              <span
+                                className="font-bold text-sm ml-2"
+                                style={{ color: gradeConfig.color }}
+                              >
+                                +{bonus}
+                              </span>
+                            )}
+                          </div>
+                          {ability.description && (
+                            <p className="text-xs text-blue-200/40 line-clamp-2 mt-0.5">
+                              {ability.description}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            {/* Grade badge */}
+                            <span
+                              className="inline-block px-1.5 py-0.5 text-xs rounded font-medium"
+                              style={{
+                                backgroundColor: `${gradeConfig.color}30`,
+                                color: gradeConfig.color,
+                              }}
+                            >
+                              {gradeConfig.label}
+                            </span>
+                            {/* Stat association badge */}
+                            {ability.stat && (
+                              <span className="inline-block px-1.5 py-0.5 text-xs rounded bg-blue-500/20 text-blue-300 font-medium">
+                                {ability.stat}
+                              </span>
+                            )}
+                            {/* Cost badge */}
+                            {ability.cost && ability.cost.length > 0 && (
+                              <span className="inline-block px-1.5 py-0.5 text-xs rounded bg-red-500/20 text-red-300 font-medium">
+                                {formatAbilityCost(ability.cost)}
+                              </span>
+                            )}
+                          </div>
+                          {/* Cooldown bar */}
+                          {ability.cooldown && ability.cooldown > 0 && (
+                            <div className="mt-1.5">
+                              <div className="flex items-center justify-between text-xs mb-0.5">
+                                <span className="text-blue-200/40">
+                                  Cooldown
+                                </span>
+                                <span
+                                  className={
+                                    isOnCooldown
+                                      ? "text-orange-400"
+                                      : "text-green-400"
+                                  }
+                                >
+                                  {isOnCooldown
+                                    ? `${ability.currentCooldown} turns`
+                                    : "Ready"}
+                                </span>
+                              </div>
+                              <div className="h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all"
+                                  style={{
+                                    width: `${100 - cooldownPercent}%`,
+                                    backgroundColor: isOnCooldown
+                                      ? "#f97316"
+                                      : "#22c55e",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-4 text-center rounded-lg bg-blue-900/30 border border-blue-800/30">
+                  <p className="text-sm text-blue-200/40">
+                    You have no abilities yet
                   </p>
                 </div>
               )}

@@ -202,7 +202,8 @@ const modifyItemTool: ToolSchema = {
   type: "function",
   function: {
     name: "modify_item",
-    description: "Change an existing item's description, type, grade, or durability",
+    description:
+      "Change an existing item's description, type, grade, or durability",
     parameters: {
       type: "object",
       properties: {
@@ -222,11 +223,13 @@ const modifyItemTool: ToolSchema = {
         grade: {
           type: "string",
           enum: ["common", "uncommon", "rare", "epic", "legendary", "mythic"],
-          description: "New item grade (optional) - upgrading increases max durability",
+          description:
+            "New item grade (optional) - upgrading increases max durability",
         },
         durability: {
           type: "number",
-          description: "Set specific durability value (optional) - for repairs or damage",
+          description:
+            "Set specific durability value (optional) - for repairs or damage",
           minimum: 0,
         },
       },
@@ -258,7 +261,8 @@ const repairItemTool: ToolSchema = {
   type: "function",
   function: {
     name: "repair_item",
-    description: "Repair an item, restoring its durability. Use for narrative repairs (blacksmith, magic, resting, etc.)",
+    description:
+      "Repair an item, restoring its durability. Use for narrative repairs (blacksmith, magic, resting, etc.)",
     parameters: {
       type: "object",
       properties: {
@@ -268,7 +272,8 @@ const repairItemTool: ToolSchema = {
         },
         amount: {
           type: "number",
-          description: "Amount of durability to restore. If omitted, fully repairs the item.",
+          description:
+            "Amount of durability to restore. If omitted, fully repairs the item.",
           minimum: 1,
         },
       },
@@ -281,7 +286,8 @@ const damageItemTool: ToolSchema = {
   type: "function",
   function: {
     name: "damage_item",
-    description: "Damage an item, reducing its durability. Use for narrative damage (acid, fire, wear, etc.). Item breaks if durability reaches 0.",
+    description:
+      "Damage an item, reducing its durability. Use for narrative damage (acid, fire, wear, etc.). Item breaks if durability reaches 0.",
     parameters: {
       type: "object",
       properties: {
@@ -304,7 +310,8 @@ const upgradeItemTool: ToolSchema = {
   type: "function",
   function: {
     name: "upgrade_item",
-    description: "Upgrade an item's grade/rarity. Use for crafting, enchanting, or narrative upgrades. Increases max durability and bonuses.",
+    description:
+      "Upgrade an item's grade/rarity. Use for crafting, enchanting, or narrative upgrades. Increases max durability and bonuses.",
     parameters: {
       type: "object",
       properties: {
@@ -315,7 +322,8 @@ const upgradeItemTool: ToolSchema = {
         newGrade: {
           type: "string",
           enum: ["uncommon", "rare", "epic", "legendary", "mythic"],
-          description: "The new grade to upgrade to (must be higher than current grade)",
+          description:
+            "The new grade to upgrade to (must be higher than current grade)",
         },
       },
       required: ["name", "newGrade"],
@@ -334,6 +342,197 @@ const consumeItemTool: ToolSchema = {
         name: {
           type: "string",
           description: "Item name (fuzzy matching supported)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
+// Ability Management Tools
+const addAbilityTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "add_ability",
+    description:
+      "Grant the player a new ability (spell, skill, special move). Abilities provide bonuses to skill checks and may have resource/variable costs. Grades: novice (+0), apprentice (+1), adept (+2), expert (+3), master (+4), legendary (+5)",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description:
+            "Ability name (e.g., 'Fireball', 'Power Strike', 'Lockpicking')",
+        },
+        description: {
+          type: "string",
+          description: "What the ability does and any narrative effects",
+        },
+        grade: {
+          type: "string",
+          enum: [
+            "novice",
+            "apprentice",
+            "adept",
+            "expert",
+            "master",
+            "legendary",
+          ],
+          description:
+            "Ability grade determines bonus: novice (+0), apprentice (+1), adept (+2), expert (+3), master (+4), legendary (+5). Default: novice",
+        },
+        stat: {
+          type: "string",
+          description:
+            "Optional: which stat this ability relates to (e.g., 'Strength', 'Magic')",
+        },
+        cooldown: {
+          type: "number",
+          description:
+            "Turns before ability can be used again (0 = no cooldown). Default: 0",
+          minimum: 0,
+        },
+        cost: {
+          type: "array",
+          description:
+            "Array of costs to use this ability (can be empty for free abilities)",
+          items: {
+            type: "object",
+            properties: {
+              type: {
+                type: "string",
+                enum: ["resource", "variable"],
+                description:
+                  "Whether cost is from a resource or number variable",
+              },
+              name: {
+                type: "string",
+                description: "Name of the resource or variable to deduct from",
+              },
+              amount: {
+                type: "number",
+                description: "Amount to deduct when ability is used",
+                minimum: 1,
+              },
+            },
+            required: ["type", "name", "amount"],
+          },
+        },
+      },
+      required: ["name", "description"],
+    },
+  },
+};
+
+const removeAbilityTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "remove_ability",
+    description:
+      "Remove an ability from the player (lost through curse, injury, story events, etc.)",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Ability name (fuzzy matching supported)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
+const modifyAbilityTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "modify_ability",
+    description:
+      "Modify an existing ability's description, cost, cooldown, or stat association",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Ability name (fuzzy matching supported)",
+        },
+        description: {
+          type: "string",
+          description: "New description (optional)",
+        },
+        stat: {
+          type: "string",
+          description: "New stat association (optional)",
+        },
+        cooldown: {
+          type: "number",
+          description: "New cooldown value in turns (optional)",
+          minimum: 0,
+        },
+        cost: {
+          type: "array",
+          description: "New cost array (optional, replaces existing costs)",
+          items: {
+            type: "object",
+            properties: {
+              type: {
+                type: "string",
+                enum: ["resource", "variable"],
+              },
+              name: {
+                type: "string",
+              },
+              amount: {
+                type: "number",
+                minimum: 1,
+              },
+            },
+            required: ["type", "name", "amount"],
+          },
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
+const upgradeAbilityTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "upgrade_ability",
+    description:
+      "Upgrade an ability to a higher grade, increasing its bonus. Use for training, level-ups, or narrative achievements.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Ability name (fuzzy matching supported)",
+        },
+        newGrade: {
+          type: "string",
+          enum: ["apprentice", "adept", "expert", "master", "legendary"],
+          description:
+            "The new grade to upgrade to (must be higher than current grade)",
+        },
+      },
+      required: ["name", "newGrade"],
+    },
+  },
+};
+
+const resetAbilityCooldownTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "reset_ability_cooldown",
+    description:
+      "Reset an ability's cooldown to 0 (ready to use). Use for narrative reasons like resting, potions, or special events.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Ability name (fuzzy matching supported)",
         },
       },
       required: ["name"],
@@ -1294,6 +1493,13 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   repairItemTool,
   damageItemTool,
   upgradeItemTool,
+
+  // Ability Management (5 tools)
+  addAbilityTool,
+  removeAbilityTool,
+  modifyAbilityTool,
+  upgradeAbilityTool,
+  resetAbilityCooldownTool,
 
   // Resource Management (4 tools)
   adjustResourceTool,

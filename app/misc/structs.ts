@@ -31,12 +31,41 @@ export interface InventoryItem {
   description: string;
   type: "normal" | "consumable" | "story" | "misc";
   grade?: "common" | "uncommon" | "rare" | "epic" | "legendary" | "mythic"; // Item rarity tier
-  durability?: number;    // Current durability
+  durability?: number; // Current durability
   maxDurability?: number; // Max durability (based on grade)
   stat?: string;
   resource?: string;
   symbol: string;
   custom_symbol_url?: string;
+}
+
+// Ability cost types
+export interface AbilityCost {
+  type: "resource" | "variable";
+  name: string; // Name of the resource or variable
+  amount: number; // How much to deduct
+}
+
+// Ability grade types (skill-themed)
+export type AbilityGrade =
+  | "novice"
+  | "apprentice"
+  | "adept"
+  | "expert"
+  | "master"
+  | "legendary";
+
+// Abilities system - skills, spells, special moves
+export interface Ability {
+  name: string;
+  description: string;
+  grade: AbilityGrade; // Determines bonus
+  cost: AbilityCost[]; // Can have multiple costs
+  stat?: string; // Optional: which stat this ability relates to
+  symbol: string;
+  custom_symbol_url?: string;
+  cooldown?: number; // Turns before can use again (0 = no cooldown)
+  currentCooldown?: number; // Current cooldown counter
 }
 
 export interface Achievement {
@@ -107,6 +136,7 @@ export interface Choice {
   text: string;
   item_used?: string;
   item_loss?: boolean;
+  ability_used?: string; // Name of ability to use (applies bonus, deducts cost)
   skill_used?: string;
   skill_dc?: number;
   resource_used?: string;
@@ -182,6 +212,7 @@ export interface Preset {
   stats: Stat[];
   resources: Resource[];
   inventory: InventoryItem[];
+  abilities?: Ability[]; // Starting abilities for this preset
   relationships: Relationship[];
   conditions?: Condition[]; // Starting conditions/afflictions for this preset
   variables?: Variable[]; // Starting variables for this preset
@@ -245,6 +276,7 @@ export interface StoryData {
   stats: Stat[];
   resources: Resource[];
   inventory: InventoryItem[];
+  abilities: Ability[]; // Skills, spells, special moves
   achievements: Achievement[];
   lore: StoryLore[];
   momentum: number;
@@ -406,6 +438,7 @@ export interface StartingChoice {
   resource_used?: string; // Optional: resource cost/check
   item_used?: string; // Optional: requires/uses an item
   item_loss?: boolean; // Whether the item is consumed when used
+  ability_used?: string; // Optional: uses an ability (applies bonus, deducts cost)
   mythic_check?: string; // Optional: Mythic yes/no question
   mythic_context_only?: boolean; // When true with skill_used, mythic provides context only
   table?: string; // Unified table field - checks both custom tables AND mythic element tables
@@ -490,6 +523,7 @@ export interface ActionAnalysis {
   skill_used: string | null; // Stat name for skill check, or null if no check needed
   skill_dc: number | null; // Difficulty class if skill check is needed
   item_used: string | null; // Item name if using an item
+  ability_used: string | null; // Ability name if using an ability
   resource_used: string | null; // Resource name if using a resource
   mythic_check: string | null; // Mythic yes/no question with likelihood
   table: string | null; // Unified table field - checks both custom tables AND mythic element tables

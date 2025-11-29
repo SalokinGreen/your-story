@@ -1972,6 +1972,55 @@ function convertToolToCommand(
     case "edit_relationship":
       return `/update_relationship_description: ${args.name} | ${args.description}`;
 
+    // Ability Management
+    case "add_ability": {
+      // Format: /add_ability: name | description | grade | stat | costs | maxCooldown
+      // costs format: "resource:Health:10,variable:ManaSpent:5"
+      const costsStr =
+        args.costs
+          ?.map(
+            (c: { type: string; name: string; amount: number }) =>
+              `${c.type}:${c.name}:${c.amount}`
+          )
+          .join(",") || "";
+      return `/add_ability: ${args.name} | ${args.description} | ${
+        args.grade || "novice"
+      } | ${args.stat || ""} | ${costsStr} | ${args.maxCooldown || 0}`;
+    }
+
+    case "remove_ability":
+      return `/remove_ability: ${args.name}`;
+
+    case "modify_ability": {
+      // Handle different modification types
+      if (args.costs !== undefined) {
+        const costsStr =
+          args.costs
+            ?.map(
+              (c: { type: string; name: string; amount: number }) =>
+                `${c.type}:${c.name}:${c.amount}`
+            )
+            .join(",") || "none";
+        return `/modify_ability: ${args.name} | costs | ${costsStr}`;
+      } else if (args.description !== undefined) {
+        return `/modify_ability: ${args.name} | description | ${args.description}`;
+      } else if (args.stat !== undefined) {
+        return `/modify_ability: ${args.name} | stat | ${args.stat || "none"}`;
+      } else if (args.maxCooldown !== undefined) {
+        return `/modify_ability: ${args.name} | maxCooldown | ${args.maxCooldown}`;
+      }
+      return null; // No valid modifications specified
+    }
+
+    case "upgrade_ability":
+      return `/upgrade_ability: ${args.name}`;
+
+    case "reduce_cooldown":
+      return `/reduce_cooldown: ${args.name} | ${args.amount}`;
+
+    case "refresh_ability":
+      return `/refresh_ability: ${args.name}`;
+
     // Memory - handled directly in executeTools, not via command
     case "add_memory":
       return null; // Signal to handle directly

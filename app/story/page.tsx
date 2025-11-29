@@ -8,6 +8,7 @@ import {
   Choice,
   Resource,
   InventoryItem,
+  Ability,
   UPGRADE_COSTS,
   Preset,
   CommandResponse,
@@ -107,9 +108,18 @@ import {
   findQuestMatch,
   findRelationshipMatch,
   findLoreMatch,
+  findAbilityMatch,
 } from "../misc/fuzzyMatch";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn, analyzeAction } from "../misc/generation";
+import {
+  canAffordAbility,
+  deductAbilityCost,
+  startCooldown,
+  getAbilityBonus,
+  tickCooldowns,
+  ABILITY_GRADE_CONFIG,
+} from "../misc/abilitySystem";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -2778,14 +2788,15 @@ function StoryPageContent() {
 
     // Process unified table field (checks both custom tables and mythic tables)
     // Also handle legacy mythic_table and custom_table fields for backward compatibility
-    const tableToRoll = choice.table || choice.mythic_table || choice.custom_table;
+    const tableToRoll =
+      choice.table || choice.mythic_table || choice.custom_table;
     if (tableToRoll) {
       try {
         // First, check if it's a custom table
         const customTable = storyData.customTables?.find(
           (t) => t.name.toLowerCase() === tableToRoll.toLowerCase()
         );
-        
+
         if (customTable) {
           // Roll on custom table
           const totalWeight = customTable.entries.reduce(
@@ -2843,6 +2854,17 @@ function StoryPageContent() {
     let insufficientResource = false;
     let skillCheckResult = "";
 
+    // Ability tracking
+    let abilityUsed: Ability | null = null;
+    let abilityGradeBonus = 0;
+    let abilityGradeLabel = "";
+    let abilityCooldownStarted = false;
+    let abilityCostsDeducted: Array<{
+      type: string;
+      name: string;
+      amount: number;
+    }> = [];
+
     // YZE: Panic data for user message
     // Explosive: Explosion data for user message
     let yzeData: {
@@ -2866,8 +2888,8 @@ function StoryPageContent() {
       // Try fuzzy matching first
       const matchResult = findItemMatch(choice.item_used, storyData.inventory);
       // Get the actual typed item from inventory (fuzzy match returns generic type)
-      const item: InventoryItem | undefined = matchResult 
-        ? storyData.inventory.find(i => i.name === matchResult.name)
+      const item: InventoryItem | undefined = matchResult
+        ? storyData.inventory.find((i) => i.name === matchResult.name)
         : undefined;
       const item_exists = item !== undefined;
 
@@ -2891,16 +2913,18 @@ function StoryPageContent() {
       if (item_exists && item) {
         itemQuantityBefore = item.quantity;
         itemType = item.type || "normal";
-        
+
         // Track grade label before item might be removed
-        itemGradeLabel = item.grade ? ` [${GRADE_CONFIG[item.grade].label}]` : "";
-        
+        itemGradeLabel = item.grade
+          ? ` [${GRADE_CONFIG[item.grade].label}]`
+          : "";
+
         // Track durability info for display
         const durabilityInfo = getDurabilityDisplay(item);
         itemDurabilityBefore = durabilityInfo.current;
         itemMaxDurability = durabilityInfo.max;
         itemDurabilityAfter = itemDurabilityBefore; // Will be updated after skill check
-        
+
         // Get item grade bonus for this RPG system
         itemGradeBonus = getItemBonus(item, rpgSystem.id);
 
@@ -2950,6 +2974,122 @@ function StoryPageContent() {
           `Missing item: ${choice.item_used} (Disadvantage!)`,
           "warning"
         );
+      }
+    }
+
+    // Process ability usage
+    if (choice.ability_used) {
+      // Initialize abilities array if needed
+      if (!storyData.abilities) {
+        storyData.abilities = [];
+      }
+
+      // Try fuzzy matching first
+      const matchResult = findAbilityMatch(
+        choice.ability_used,
+        storyData.abilities
+      );
+      // Get the actual typed ability from array
+      const ability: Ability | undefined = matchResult
+        ? storyData.abilities.find((a) => a.name === matchResult.name)
+        : undefined;
+
+      // Log fuzzy match result
+      if (matchResult && !matchResult.isExact) {
+        logger.info("Fuzzy matched ability", {
+          aiProvided: choice.ability_used,
+          matched: matchResult.name,
+          score: matchResult.score,
+        });
+        addNotification(
+          `🔮 Matched "${choice.ability_used}" → "${
+            matchResult.name
+          }" (${Math.round(matchResult.score * 100)}% match)`,
+          "info"
+        );
+        // Update choice to use the exact matched name
+        choice.ability_used = matchResult.name;
+      }
+
+      if (ability) {
+        // Check if ability is on cooldown (currentCooldown tracks remaining turns)
+        if ((ability.currentCooldown ?? 0) > 0) {
+          addNotification(
+            `⏳ ${ability.name} is on cooldown (${ability.currentCooldown} turns remaining)`,
+            "warning"
+          );
+          // Clear ability_used since it can't be activated
+          choice.ability_used = undefined;
+        } else {
+          // Check if player can afford the ability costs
+          const affordability = canAffordAbility(ability, storyData);
+
+          if (!affordability.canAfford) {
+            // Cannot afford - cancel ability use
+            const missingStr = affordability.missingCosts.join("; ");
+            addNotification(
+              `❌ Cannot use ${ability.name}: ${missingStr}`,
+              "warning"
+            );
+            // Clear ability_used since it can't be activated
+            choice.ability_used = undefined;
+          } else {
+            // Can afford - ability will be used
+            abilityUsed = ability;
+            abilityGradeLabel = ability.grade
+              ? ` [${ABILITY_GRADE_CONFIG[ability.grade].label}]`
+              : "";
+            abilityGradeBonus = getAbilityBonus(ability, rpgSystem.id);
+
+            // Apply ability advantage
+            advantageCount++;
+            advantageSources.push(ability.name);
+            const bonusText =
+              abilityGradeBonus > 0 ? ` +${abilityGradeBonus}` : "";
+            addNotification(
+              `🔮 Using ability: ${ability.name}${abilityGradeLabel} (Advantage${bonusText}!)`,
+              "success"
+            );
+
+            // Deduct costs immediately
+            const costChanges = deductAbilityCost(ability, storyData);
+            if (costChanges.length > 0) {
+              // Store cost info for logging/display
+              abilityCostsDeducted = ability.cost.map((c) => ({
+                type: c.type,
+                name: c.name,
+                amount: c.amount,
+              }));
+
+              // Log cost deductions
+              for (const cost of abilityCostsDeducted) {
+                logger.action("Ability cost deducted", {
+                  ability: ability.name,
+                  costType: cost.type,
+                  costName: cost.name,
+                  amount: cost.amount,
+                });
+              }
+            }
+
+            // Start cooldown if ability has one
+            if (ability.cooldown && ability.cooldown > 0) {
+              startCooldown(ability);
+              abilityCooldownStarted = true;
+              addNotification(
+                `⏳ ${ability.name} is now on cooldown (${ability.cooldown} turns)`,
+                "info"
+              );
+            }
+          }
+        }
+      } else {
+        // Ability not found - no penalty, just clear it
+        addNotification(
+          `⚠️ Ability not found: ${choice.ability_used}`,
+          "warning"
+        );
+        choice.ability_used = undefined;
       }
     }
 
@@ -3531,7 +3671,7 @@ function StoryPageContent() {
               dice_roll,
               statValue,
               dc,
-              conditionPenaltyModifier, // Apply condition penalty (YZE uses dice pool reduction)
+              conditionPenaltyModifier + itemGradeBonus + abilityGradeBonus, // Apply condition penalty and grade bonuses (YZE uses dice pool reduction)
               lastRoll
             );
 
@@ -3575,7 +3715,9 @@ function StoryPageContent() {
               statValue,
               dc,
               (rpgSystem.id === "pbta" ? pbtaPenalty : 0) +
-                conditionPenaltyModifier // PbtA uses +/-1 per net advantage/disadv; add condition penalty
+                conditionPenaltyModifier +
+                itemGradeBonus +
+                abilityGradeBonus // PbtA uses +/-1 per net advantage/disadv; add condition penalty and grade bonuses
             );
 
             dc_passed = successResult.success;
@@ -3639,15 +3781,20 @@ function StoryPageContent() {
           const hasItemAdvantage =
             !!usedItem && (usedItem.type || "normal") !== "misc";
           const hasItemDisadvantage = !!(choice.item_used && !usedItem);
+          const hasAbilityAdvantage = !!abilityUsed;
 
           // For display: use modifier instead of raw stat for systems with statToModifier
           const baseDisplayBonus = rpgSystem.statToModifier
             ? rpgSystem.statToModifier(statValue)
             : statValue;
+          // Include grade bonuses from items and abilities in display
           const displayBonus =
             rpgSystem.id === "pbta"
-              ? baseDisplayBonus - pbtaPenalty
-              : baseDisplayBonus; // pbtaPenalty negative increases modifier
+              ? baseDisplayBonus -
+                pbtaPenalty +
+                itemGradeBonus +
+                abilityGradeBonus
+              : baseDisplayBonus + itemGradeBonus + abilityGradeBonus; // pbtaPenalty negative increases modifier
 
           // Calculate net advantage/disadvantage for display
           const netAdvantage = advantageCount - disadvantageCount;
@@ -3661,7 +3808,7 @@ function StoryPageContent() {
             dc,
             isSuccess: dc_passed,
             isCritical: isCritical,
-            hasAdvantage: hasItemAdvantage,
+            hasAdvantage: hasItemAdvantage || hasAbilityAdvantage,
             hasDisadvantage: hasItemDisadvantage,
             advantageCount,
             disadvantageCount,
@@ -3753,7 +3900,7 @@ function StoryPageContent() {
               if (item && itemType !== "consumable") {
                 const durabilityResult = applyDurabilityLoss(item, false);
                 itemDurabilityAfter = durabilityResult.newDurability;
-                
+
                 if (durabilityResult.broken) {
                   // Item broke from durability loss
                   itemBroken = true;
@@ -3766,7 +3913,8 @@ function StoryPageContent() {
                       // Reset durability for remaining items
                       const maxDur = getMaxDurability(item.grade || "common");
                       storyData.inventory[itemIndex].durability = maxDur;
-                      itemQuantityAfter = storyData.inventory[itemIndex].quantity;
+                      itemQuantityAfter =
+                        storyData.inventory[itemIndex].quantity;
                     } else {
                       storyData.inventory.splice(itemIndex, 1);
                       itemQuantityAfter = 0;
@@ -3783,7 +3931,8 @@ function StoryPageContent() {
                     (i) => i.name === choice.item_used
                   );
                   if (itemIndex !== -1) {
-                    storyData.inventory[itemIndex].durability = durabilityResult.newDurability;
+                    storyData.inventory[itemIndex].durability =
+                      durabilityResult.newDurability;
                   }
                   logger.action("Item durability reduced (Success)", {
                     item: choice.item_used,
@@ -3830,7 +3979,7 @@ function StoryPageContent() {
               if (item && itemType !== "consumable") {
                 const durabilityResult = applyDurabilityLoss(item, true);
                 itemDurabilityAfter = durabilityResult.newDurability;
-                
+
                 if (durabilityResult.broken) {
                   // Item broke from durability loss
                   itemBroken = true;
@@ -3843,7 +3992,8 @@ function StoryPageContent() {
                       // Reset durability for remaining items
                       const maxDur = getMaxDurability(item.grade || "common");
                       storyData.inventory[itemIndex].durability = maxDur;
-                      itemQuantityAfter = storyData.inventory[itemIndex].quantity;
+                      itemQuantityAfter =
+                        storyData.inventory[itemIndex].quantity;
                     } else {
                       storyData.inventory.splice(itemIndex, 1);
                       itemQuantityAfter = 0;
@@ -3860,7 +4010,8 @@ function StoryPageContent() {
                     (i) => i.name === choice.item_used
                   );
                   if (itemIndex !== -1) {
-                    storyData.inventory[itemIndex].durability = durabilityResult.newDurability;
+                    storyData.inventory[itemIndex].durability =
+                      durabilityResult.newDurability;
                   }
                   logger.action("Item durability reduced (Failure)", {
                     item: choice.item_used,
@@ -3931,7 +4082,7 @@ function StoryPageContent() {
     if (choice.item_used && itemQuantityBefore > 0) {
       // Use pre-tracked grade and type (item might be removed from inventory)
       const bonusText = itemGradeBonus > 0 ? ` +${itemGradeBonus}` : "";
-      
+
       if (itemBroken) {
         // Item broke (durability hit 0)
         choiceDetails.push(
@@ -3948,7 +4099,10 @@ function StoryPageContent() {
             `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore}]`
           );
         }
-      } else if (itemDurabilityBefore > 0 && itemDurabilityAfter !== itemDurabilityBefore) {
+      } else if (
+        itemDurabilityBefore > 0 &&
+        itemDurabilityAfter !== itemDurabilityBefore
+      ) {
         // Non-consumable items show durability change
         choiceDetails.push(
           `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; Durability ${itemDurabilityBefore}/${itemMaxDurability} → ${itemDurabilityAfter}/${itemMaxDurability}]`
@@ -3964,6 +4118,24 @@ function StoryPageContent() {
           `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore}]`
         );
       }
+    }
+
+    // Build ability usage line
+    if (choice.ability_used && abilityUsed) {
+      const bonusText = abilityGradeBonus > 0 ? ` +${abilityGradeBonus}` : "";
+      const costsText =
+        abilityCostsDeducted.length > 0
+          ? `; Cost: ${abilityCostsDeducted
+              .map((c) => `${c.amount} ${c.name}`)
+              .join(", ")}`
+          : "";
+      const cooldownText =
+        abilityCooldownStarted && abilityUsed.cooldown
+          ? `; Cooldown: ${abilityUsed.cooldown} turns`
+          : "";
+      choiceDetails.push(
+        `[Ability Used: ${abilityUsed.name}${abilityGradeLabel}${bonusText}${costsText}${cooldownText}]`
+      );
     }
 
     //Buildresourceusageline(includesanyadditionallossfromfailure)

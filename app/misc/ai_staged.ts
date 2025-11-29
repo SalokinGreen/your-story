@@ -1,7 +1,13 @@
-import { StoryData, Choice, CommandResponse } from "@/app/misc/structs";
+import {
+  StoryData,
+  Choice,
+  CommandResponse,
+  AbilityGrade,
+} from "@/app/misc/structs";
 import { getRPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
+import { ABILITY_GRADE_CONFIG } from "@/app/misc/abilitySystem";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -69,14 +75,44 @@ export function buildInfoMessage(storyData: StoryData): string {
         .map((i) => {
           const typeLabel = i.type ? ` [${i.type}]` : "";
           const gradeLabel = i.grade ? ` (${i.grade})` : "";
-          const durabilityInfo = i.type !== "consumable" && i.grade !== "mythic" 
-            ? ` [dur: ${i.durability ?? "?"}/${i.maxDurability ?? "?"}]`
-            : i.grade === "mythic" ? " [dur: ∞]" : "";
+          const durabilityInfo =
+            i.type !== "consumable" && i.grade !== "mythic"
+              ? ` [dur: ${i.durability ?? "?"}/${i.maxDurability ?? "?"}]`
+              : i.grade === "mythic"
+              ? " [dur: ∞]"
+              : "";
           const desc = i.description ? ` - ${i.description}` : "";
           return `- ${i.name}${gradeLabel}${typeLabel}${durabilityInfo} x${i.quantity}${desc}`;
         })
         .join("\n")}`
     : "Inventory: Empty";
+
+  // Build abilities section with grade, cooldown, and cost info
+  const abilitiesSection = storyData.abilities?.length
+    ? `Abilities:\n${storyData.abilities
+        .map((a) => {
+          const gradeLabel = a.grade
+            ? ` (${
+                ABILITY_GRADE_CONFIG[a.grade as AbilityGrade]?.label || a.grade
+              })`
+            : "";
+          const cooldownInfo =
+            (a.cooldown || 0) > 0
+              ? ` [cooldown: ${a.currentCooldown || 0}/${a.cooldown}]`
+              : "";
+          const costInfo = a.cost?.length
+            ? ` [costs: ${a.cost
+                .map((c) => `${c.amount} ${c.name}`)
+                .join(", ")}]`
+            : "";
+          const statInfo = a.stat ? ` [${a.stat}]` : "";
+          const desc = a.description ? ` - ${a.description}` : "";
+          const readyStatus =
+            (a.currentCooldown || 0) > 0 ? " (on cooldown)" : " (ready)";
+          return `- ${a.name}${gradeLabel}${statInfo}${cooldownInfo}${costInfo}${readyStatus}${desc}`;
+        })
+        .join("\n")}`
+    : "Abilities: None";
 
   // Build achievements section - show LOCKED achievements with ai_hint
   const lockedAchievements = storyData.achievements.filter(
@@ -265,6 +301,7 @@ ${
     statsSection,
     resourcesSection,
     inventorySection,
+    abilitiesSection,
     achievementsSection,
     loreSection,
     memorySection,
@@ -776,6 +813,33 @@ ${
     : "• (No items in inventory)"
 }
 
+✨ AVAILABLE ABILITIES (use ONLY these exact names):
+${
+  storyData.abilities?.length
+    ? storyData.abilities
+        .map((a) => {
+          const gradeLabel = a.grade
+            ? ` (${
+                ABILITY_GRADE_CONFIG[a.grade as AbilityGrade]?.label || a.grade
+              })`
+            : "";
+          const cooldownInfo =
+            (a.cooldown || 0) > 0
+              ? ` [cooldown: ${a.currentCooldown || 0}/${a.cooldown}]`
+              : "";
+          const costInfo = a.cost?.length
+            ? ` [costs: ${a.cost
+                .map((c) => `${c.amount} ${c.name}`)
+                .join(", ")}]`
+            : "";
+          const readyStatus =
+            (a.currentCooldown || 0) > 0 ? " (on cooldown)" : " (ready)";
+          return `• ${a.name}${gradeLabel}${cooldownInfo}${costInfo}${readyStatus}`;
+        })
+        .join("\n")
+    : "• (No abilities available)"
+}
+
 ⚠️ ACTIVE CONDITIONS (penalize skill checks):
 ${
   storyData.conditions && storyData.conditions.length > 0
@@ -1045,7 +1109,8 @@ export function buildActionAnalysisPrompt({
         "visions_dreams",
       ]
     : [];
-  const hasAnyTables = customTableNames.length > 0 || mythicTableNames.length > 0;
+  const hasAnyTables =
+    customTableNames.length > 0 || mythicTableNames.length > 0;
 
   const systemPrompt = `You analyze player actions for an interactive RPG game and determine what game mechanics apply.
 
@@ -1055,6 +1120,7 @@ RESPOND WITH VALID JSON ONLY - no markdown, no explanation, just the JSON object
   "skill_used": "exact stat name from the list below, or null if no skill check needed",
   "skill_dc": number or null (only if skill_used is set),
   "item_used": "exact item name from inventory, or null",
+  "ability_used": "exact ability name from abilities list, or null",
   "resource_used": "exact resource name from the list below, or null",
   "mythic_check": "yes/no question (likelihood)" or null,
   "table": "table name" or null,
@@ -1085,13 +1151,43 @@ ${
     ? storyData.inventory
         .map((i) => {
           const gradeLabel = i.grade ? `(${i.grade})` : "";
-          const durInfo = i.type !== "consumable" && i.grade !== "mythic"
-            ? ` dur:${i.durability ?? "?"}/${i.maxDurability ?? "?"}`
-            : i.grade === "mythic" ? " dur:∞" : "";
+          const durInfo =
+            i.type !== "consumable" && i.grade !== "mythic"
+              ? ` dur:${i.durability ?? "?"}/${i.maxDurability ?? "?"}`
+              : i.grade === "mythic"
+              ? " dur:∞"
+              : "";
           return `• ${i.name} ${gradeLabel}[${i.type}]${durInfo} x${i.quantity}`;
         })
         .join("\n")
     : "• (No items - set item_used to null)"
+}
+
+AVAILABLE ABILITIES (for ability_used):
+${
+  storyData.abilities?.length
+    ? storyData.abilities
+        .map((a) => {
+          const gradeLabel = a.grade
+            ? `(${
+                ABILITY_GRADE_CONFIG[a.grade as AbilityGrade]?.label || a.grade
+              })`
+            : "";
+          const cooldownInfo =
+            (a.cooldown || 0) > 0
+              ? ` [cd: ${a.currentCooldown || 0}/${a.cooldown}]`
+              : "";
+          const costInfo = a.cost?.length
+            ? ` [costs: ${a.cost
+                .map((c) => `${c.amount} ${c.name}`)
+                .join(", ")}]`
+            : "";
+          const readyStatus =
+            (a.currentCooldown || 0) > 0 ? " (on cooldown)" : "";
+          return `• ${a.name} ${gradeLabel}${cooldownInfo}${costInfo}${readyStatus}`;
+        })
+        .join("\n")
+    : "• (No abilities - set ability_used to null)"
 }
 
 ACTIVE CONDITIONS (apply penalties to skill checks):
@@ -1117,8 +1213,16 @@ ${
   hasAnyTables
     ? `RANDOM TABLES (for table):
 Use these tables for random generation when the player's action involves discovery or uncertainty.
-${customTableNames.length > 0 ? `Custom Tables: ${customTableNames.join(", ")}` : ""}
-${mythicTableNames.length > 0 ? `Mythic Tables: ${mythicTableNames.join(", ")}` : ""}
+${
+  customTableNames.length > 0
+    ? `Custom Tables: ${customTableNames.join(", ")}`
+    : ""
+}
+${
+  mythicTableNames.length > 0
+    ? `Mythic Tables: ${mythicTableNames.join(", ")}`
+    : ""
+}
 
 Example uses:
 - Player searches a room → table: "scavenging_results" or "objects"
@@ -1159,15 +1263,26 @@ ITEM USAGE RULES:
 - Exception: If an action is IMPOSSIBLE without a specific item (e.g., "unlock door with key" when no key exists), set is_plain_action: false but item_used: null, and the story will handle the impossibility
 - Example: Climbing a wall → could use "Rope" even if not owned (climbing without rope = disadvantage)
 
+ABILITY USAGE RULES:
+- Abilities are skills, spells, or techniques that cost resources/variables to use
+- Only set ability_used if the player explicitly uses a named ability or describes an action fitting an ability
+- Abilities on cooldown (cd > 0) CANNOT be used - set ability_used to null
+- Abilities provide grade-based bonuses: novice (+0), apprentice (+1), adept (+2), expert (+3), master (+4), legendary (+5)
+- A player CAN use BOTH an item AND an ability on the same action (bonuses stack)
+- Only abilities that are "ready" (not on cooldown) can be used
+- Example: Casting "Fireball" → set ability_used to "Fireball" if it exists and is ready
+
 DECISION RULES:
 1. Simple actions (talking, walking, looking around, basic interactions) → is_plain_action: true, everything else null
 2. Challenging physical actions → appropriate physical stat + DC based on difficulty
 3. Social challenges (persuasion, deception, intimidation) → social/charisma stat if available
 4. Using a specific item the player mentions → set item_used to the exact item name
-5. Strenuous or costly actions → set resource_used to an appropriate resource
-6. Only set skill_dc if skill_used is set
-7. If the action mentions using a specific item, include it even without a skill check
-8. Be conservative with skill checks - not every action needs one`;
+5. Using a specific ability the player mentions → set ability_used to the exact ability name (if ready)
+6. Strenuous or costly actions → set resource_used to an appropriate resource
+7. Only set skill_dc if skill_used is set
+8. If the action mentions using a specific item or ability, include it even without a skill check
+9. Be conservative with skill checks - not every action needs one
+10. Both item_used AND ability_used can be set together if the action involves both`;
 
   // Build minimal context - just recent story for situational awareness
   const recentParts = storyData.scene.parts.slice(-4);

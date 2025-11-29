@@ -27,6 +27,9 @@ import {
   NumberVariable,
   BooleanVariable,
   ListVariable,
+  Ability,
+  AbilityCost,
+  AbilityGrade,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
@@ -44,7 +47,18 @@ import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { IconPicker } from "@/app/components/IconPicker";
 import { CustomTablesEditor } from "@/app/components/CustomTablesEditor";
 import { DraggableScroll } from "@/app/components/DraggableScroll";
-import { GRADE_CONFIG, getMaxDurability, ItemGrade, GRADE_ORDER } from "@/app/misc/itemSystem";
+import {
+  GRADE_CONFIG,
+  getMaxDurability,
+  ItemGrade,
+  GRADE_ORDER,
+} from "@/app/misc/itemSystem";
+import {
+  ABILITY_GRADE_CONFIG,
+  ABILITY_GRADE_ORDER,
+  initializeAbility,
+  formatAbilityCost,
+} from "@/app/misc/abilitySystem";
 import {
   saveLocalAdventure,
   getLocalAdventure,
@@ -58,6 +72,7 @@ type CreatorStep =
   | "stats"
   | "resources"
   | "inventory"
+  | "abilities"
   | "lore"
   | "relationships"
   | "achievements"
@@ -1240,6 +1255,7 @@ function AdventureCreatorContent() {
             if (Array.isArray(saved.stats)) setStats(saved.stats);
             if (Array.isArray(saved.resources)) setResources(saved.resources);
             if (Array.isArray(saved.inventory)) setInventory(saved.inventory);
+            if (Array.isArray(saved.abilities)) setAbilities(saved.abilities);
             if (Array.isArray(saved.plotBeats)) setPlotBeats(saved.plotBeats);
             if (Array.isArray(saved.lore)) setLore(saved.lore);
             if (Array.isArray(saved.relationships))
@@ -1362,6 +1378,27 @@ function AdventureCreatorContent() {
   const [editInventoryItem, setEditInventoryItem] = useState<
     Partial<InventoryItem>
   >({});
+
+  // Starting Abilities
+  const [abilities, setAbilities] = useState<Ability[]>([]);
+  const [newAbility, setNewAbility] = useState<Partial<Ability>>({
+    name: "",
+    description: "",
+    grade: "novice",
+    cost: [],
+    cooldown: 0,
+    currentCooldown: 0,
+    symbol: "Sparkles",
+  });
+  const [newAbilityCosts, setNewAbilityCosts] = useState<AbilityCost[]>([]);
+  const [draggedAbilityIndex, setDraggedAbilityIndex] = useState<number | null>(
+    null
+  );
+  const [editingAbilityIndex, setEditingAbilityIndex] = useState<number | null>(
+    null
+  );
+  const [editAbility, setEditAbility] = useState<Partial<Ability>>({});
+  const [editAbilityCosts, setEditAbilityCosts] = useState<AbilityCost[]>([]);
 
   // Plot Beats
   const [plotBeats, setPlotBeats] = useState<PlotBeat[]>([]);
@@ -1569,6 +1606,7 @@ function AdventureCreatorContent() {
     { id: "stats", label: "Stats", icon: "BarChart2" },
     { id: "resources", label: "Resources", icon: "Gem" },
     { id: "inventory", label: "Starting Items", icon: "Backpack" },
+    { id: "abilities", label: "Starting Abilities", icon: "Wand2" },
     { id: "lore", label: "Lore", icon: "Scroll" },
     { id: "relationships", label: "Relationships", icon: "Users" },
     { id: "achievements", label: "Achievements", icon: "Trophy" },
@@ -1625,6 +1663,7 @@ function AdventureCreatorContent() {
       if (Array.isArray(saved.stats)) setStats(saved.stats);
       if (Array.isArray(saved.resources)) setResources(saved.resources);
       if (Array.isArray(saved.inventory)) setInventory(saved.inventory);
+      if (Array.isArray(saved.abilities)) setAbilities(saved.abilities);
       if (Array.isArray(saved.plotBeats)) setPlotBeats(saved.plotBeats);
       if (Array.isArray(saved.lore)) setLore(saved.lore);
       if (Array.isArray(saved.achievements))
@@ -1700,6 +1739,7 @@ function AdventureCreatorContent() {
       stats,
       resources,
       inventory,
+      abilities,
       plotBeats,
       lore,
       relationships,
@@ -1748,6 +1788,7 @@ function AdventureCreatorContent() {
     stats,
     resources,
     inventory,
+    abilities,
     plotBeats,
     lore,
     relationships,
@@ -2176,6 +2217,138 @@ function AdventureCreatorContent() {
     }
   };
 
+  // Ability functions
+  const addAbility = () => {
+    if (newAbility.name) {
+      const ability = initializeAbility({
+        ...newAbility,
+        cost: newAbilityCosts,
+      } as Ability);
+      setAbilities([...abilities, ability]);
+      setNewAbility({
+        name: "",
+        description: "",
+        grade: "novice",
+        cost: [],
+        cooldown: 0,
+        currentCooldown: 0,
+        symbol: "Sparkles",
+      });
+      setNewAbilityCosts([]);
+    }
+  };
+
+  const removeAbility = (index: number) => {
+    setAbilities(abilities.filter((_, i) => i !== index));
+  };
+
+  const handleAbilityDragStart = (index: number) => {
+    setDraggedAbilityIndex(index);
+  };
+
+  const handleAbilityDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedAbilityIndex === null || draggedAbilityIndex === index) return;
+
+    const newAbilities = [...abilities];
+    const draggedItem = newAbilities[draggedAbilityIndex];
+    newAbilities.splice(draggedAbilityIndex, 1);
+    newAbilities.splice(index, 0, draggedItem);
+
+    setAbilities(newAbilities);
+    setDraggedAbilityIndex(index);
+  };
+
+  const handleAbilityDragEnd = () => {
+    setDraggedAbilityIndex(null);
+  };
+
+  const moveAbilityUp = (index: number) => {
+    if (index === 0) return;
+    const newAbilities = [...abilities];
+    [newAbilities[index - 1], newAbilities[index]] = [
+      newAbilities[index],
+      newAbilities[index - 1],
+    ];
+    setAbilities(newAbilities);
+  };
+
+  const moveAbilityDown = (index: number) => {
+    if (index === abilities.length - 1) return;
+    const newAbilities = [...abilities];
+    [newAbilities[index], newAbilities[index + 1]] = [
+      newAbilities[index + 1],
+      newAbilities[index],
+    ];
+    setAbilities(newAbilities);
+  };
+
+  const startEditAbility = (index: number) => {
+    setEditingAbilityIndex(index);
+    setEditAbility({ ...abilities[index] });
+    setEditAbilityCosts([...(abilities[index].cost || [])]);
+  };
+
+  const cancelEditAbility = () => {
+    setEditingAbilityIndex(null);
+    setEditAbility({});
+    setEditAbilityCosts([]);
+  };
+
+  const saveEditAbility = () => {
+    if (editingAbilityIndex !== null && editAbility.name) {
+      const updated = [...abilities];
+      updated[editingAbilityIndex] = {
+        ...editAbility,
+        cost: editAbilityCosts,
+      } as Ability;
+      setAbilities(updated);
+      setEditingAbilityIndex(null);
+      setEditAbility({});
+      setEditAbilityCosts([]);
+    }
+  };
+
+  const addNewAbilityCost = () => {
+    setNewAbilityCosts([
+      ...newAbilityCosts,
+      { type: "resource", name: "", amount: 1 },
+    ]);
+  };
+
+  const removeNewAbilityCost = (index: number) => {
+    setNewAbilityCosts(newAbilityCosts.filter((_, i) => i !== index));
+  };
+
+  const updateNewAbilityCost = (
+    index: number,
+    updates: Partial<AbilityCost>
+  ) => {
+    const updated = [...newAbilityCosts];
+    updated[index] = { ...updated[index], ...updates };
+    setNewAbilityCosts(updated);
+  };
+
+  const addEditAbilityCost = () => {
+    setEditAbilityCosts([
+      ...editAbilityCosts,
+      { type: "resource", name: "", amount: 1 },
+    ]);
+  };
+
+  const removeEditAbilityCost = (index: number) => {
+    setEditAbilityCosts(editAbilityCosts.filter((_, i) => i !== index));
+  };
+
+  const updateEditAbilityCost = (
+    index: number,
+    updates: Partial<AbilityCost>
+  ) => {
+    const updated = [...editAbilityCosts];
+    updated[index] = { ...updated[index], ...updates };
+    setEditAbilityCosts(updated);
+  };
+
   // Lore drag-and-drop functions (edit already exists)
   const handleLoreDragStart = (index: number) => {
     setDraggedLoreIndex(index);
@@ -2524,6 +2697,7 @@ function AdventureCreatorContent() {
       stats,
       resources,
       inventory,
+      abilities,
       achievements,
       lore,
       relationships,
@@ -2690,6 +2864,7 @@ function AdventureCreatorContent() {
         stats,
         resources,
         inventory,
+        abilities,
         achievements,
         lore,
         relationships,
@@ -2827,6 +3002,7 @@ function AdventureCreatorContent() {
       stats,
       resources,
       inventory,
+      abilities,
       achievements,
       lore,
       relationships,
@@ -5593,14 +5769,27 @@ function AdventureCreatorContent() {
                                 ...editInventoryItem,
                                 grade: newGrade,
                                 maxDurability: maxDur,
-                                durability: Math.min(editInventoryItem.durability || maxDur, maxDur),
+                                durability: Math.min(
+                                  editInventoryItem.durability || maxDur,
+                                  maxDur
+                                ),
                               });
                             }}
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                            style={{ color: GRADE_CONFIG[editInventoryItem.grade as ItemGrade || "common"].color }}
+                            style={{
+                              color:
+                                GRADE_CONFIG[
+                                  (editInventoryItem.grade as ItemGrade) ||
+                                    "common"
+                                ].color,
+                            }}
                           >
                             {GRADE_ORDER.map((g) => (
-                              <option key={g} value={g} style={{ color: GRADE_CONFIG[g].color }}>
+                              <option
+                                key={g}
+                                value={g}
+                                style={{ color: GRADE_CONFIG[g].color }}
+                              >
                                 {GRADE_CONFIG[g].label}
                               </option>
                             ))}
@@ -5608,21 +5797,50 @@ function AdventureCreatorContent() {
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Durability {editInventoryItem.grade === "mythic" ? "(∞)" : `(max ${getMaxDurability(editInventoryItem.grade as ItemGrade || "common")})`}
+                            Durability{" "}
+                            {editInventoryItem.grade === "mythic"
+                              ? "(∞)"
+                              : `(max ${getMaxDurability(
+                                  (editInventoryItem.grade as ItemGrade) ||
+                                    "common"
+                                )})`}
                           </label>
                           <input
                             type="number"
                             min="0"
-                            max={getMaxDurability(editInventoryItem.grade as ItemGrade || "common")}
-                            value={editInventoryItem.grade === "mythic" ? "" : (editInventoryItem.durability ?? getMaxDurability(editInventoryItem.grade as ItemGrade || "common"))}
+                            max={getMaxDurability(
+                              (editInventoryItem.grade as ItemGrade) || "common"
+                            )}
+                            value={
+                              editInventoryItem.grade === "mythic"
+                                ? ""
+                                : editInventoryItem.durability ??
+                                  getMaxDurability(
+                                    (editInventoryItem.grade as ItemGrade) ||
+                                      "common"
+                                  )
+                            }
                             onChange={(e) =>
                               setEditInventoryItem({
                                 ...editInventoryItem,
-                                durability: Math.max(0, Math.min(parseInt(e.target.value) || 0, getMaxDurability(editInventoryItem.grade as ItemGrade || "common"))),
+                                durability: Math.max(
+                                  0,
+                                  Math.min(
+                                    parseInt(e.target.value) || 0,
+                                    getMaxDurability(
+                                      (editInventoryItem.grade as ItemGrade) ||
+                                        "common"
+                                    )
+                                  )
+                                ),
                               })
                             }
                             disabled={editInventoryItem.grade === "mythic"}
-                            placeholder={editInventoryItem.grade === "mythic" ? "∞" : "Durability"}
+                            placeholder={
+                              editInventoryItem.grade === "mythic"
+                                ? "∞"
+                                : "Durability"
+                            }
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm disabled:opacity-50"
                           />
                         </div>
@@ -5674,31 +5892,55 @@ function AdventureCreatorContent() {
                       className="flex items-center gap-3 p-4 rounded-lg border cursor-move hover:opacity-80 transition-colors"
                       style={{
                         opacity: draggedInventoryIndex === index ? 0.5 : 1,
-                        backgroundColor: `${GRADE_CONFIG[item.grade as ItemGrade || "common"].color}15`,
-                        borderColor: `${GRADE_CONFIG[item.grade as ItemGrade || "common"].color}40`,
+                        backgroundColor: `${
+                          GRADE_CONFIG[(item.grade as ItemGrade) || "common"]
+                            .color
+                        }15`,
+                        borderColor: `${
+                          GRADE_CONFIG[(item.grade as ItemGrade) || "common"]
+                            .color
+                        }40`,
                       }}
                     >
                       <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
                         <DynamicIcon name="GripVertical" className="w-5 h-5" />
                       </div>
                       <div className="text-2xl">
-                        <DynamicIcon 
-                          name={item.symbol} 
+                        <DynamicIcon
+                          name={item.symbol}
                           className="w-8 h-8"
-                          style={{ color: GRADE_CONFIG[item.grade as ItemGrade || "common"].color }}
+                          style={{
+                            color:
+                              GRADE_CONFIG[
+                                (item.grade as ItemGrade) || "common"
+                              ].color,
+                          }}
                         />
                       </div>
                       <div className="flex-1">
                         <div className="font-bold text-white flex items-center gap-2 flex-wrap">
-                          <span>{item.name} ×{item.quantity}</span>
+                          <span>
+                            {item.name} ×{item.quantity}
+                          </span>
                           <span
                             className="text-xs px-1.5 py-0.5 rounded"
                             style={{
-                              backgroundColor: `${GRADE_CONFIG[item.grade as ItemGrade || "common"].color}30`,
-                              color: GRADE_CONFIG[item.grade as ItemGrade || "common"].color,
+                              backgroundColor: `${
+                                GRADE_CONFIG[
+                                  (item.grade as ItemGrade) || "common"
+                                ].color
+                              }30`,
+                              color:
+                                GRADE_CONFIG[
+                                  (item.grade as ItemGrade) || "common"
+                                ].color,
                             }}
                           >
-                            {GRADE_CONFIG[item.grade as ItemGrade || "common"].label}
+                            {
+                              GRADE_CONFIG[
+                                (item.grade as ItemGrade) || "common"
+                              ].label
+                            }
                           </span>
                           {item.type && (
                             <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
@@ -5713,7 +5955,9 @@ function AdventureCreatorContent() {
                         )}
                         {item.type !== "consumable" && (
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-blue-200/40">Durability:</span>
+                            <span className="text-xs text-blue-200/40">
+                              Durability:
+                            </span>
                             {item.grade === "mythic" ? (
                               <span className="text-xs text-yellow-400">∞</span>
                             ) : (
@@ -5722,13 +5966,34 @@ function AdventureCreatorContent() {
                                   <div
                                     className="h-full rounded-full"
                                     style={{
-                                      width: `${((item.durability ?? getMaxDurability(item.grade as ItemGrade || "common")) / getMaxDurability(item.grade as ItemGrade || "common")) * 100}%`,
-                                      backgroundColor: GRADE_CONFIG[item.grade as ItemGrade || "common"].color,
+                                      width: `${
+                                        ((item.durability ??
+                                          getMaxDurability(
+                                            (item.grade as ItemGrade) ||
+                                              "common"
+                                          )) /
+                                          getMaxDurability(
+                                            (item.grade as ItemGrade) ||
+                                              "common"
+                                          )) *
+                                        100
+                                      }%`,
+                                      backgroundColor:
+                                        GRADE_CONFIG[
+                                          (item.grade as ItemGrade) || "common"
+                                        ].color,
                                     }}
                                   />
                                 </div>
                                 <span className="text-xs text-blue-200/60">
-                                  {item.durability ?? getMaxDurability(item.grade as ItemGrade || "common")}/{getMaxDurability(item.grade as ItemGrade || "common")}
+                                  {item.durability ??
+                                    getMaxDurability(
+                                      (item.grade as ItemGrade) || "common"
+                                    )}
+                                  /
+                                  {getMaxDurability(
+                                    (item.grade as ItemGrade) || "common"
+                                  )}
                                 </span>
                               </>
                             )}
@@ -5766,6 +6031,623 @@ function AdventureCreatorContent() {
                           </button>
                           <button
                             onClick={() => removeInventoryItem(index)}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            <DynamicIcon name="Trash2" className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                )
+              )}
+            </div>
+          </div>
+        );
+
+      case "abilities":
+        return (
+          <div className="space-y-6">
+            <div className="bg-purple-900/20 border border-purple-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>Tip:</strong> Abilities are skills, spells, or
+                  techniques that cost resources or variables to use. They
+                  provide bonuses to skill checks based on their grade and can
+                  have cooldowns.
+                </span>
+              </p>
+            </div>
+
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
+                Add Starting Ability
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newAbility.name}
+                    onChange={(e) =>
+                      setNewAbility({ ...newAbility, name: e.target.value })
+                    }
+                    placeholder="e.g., Fireball"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Icon
+                  </label>
+                  <IconPicker
+                    value={newAbility.symbol || "Sparkles"}
+                    onChange={(icon) =>
+                      setNewAbility({ ...newAbility, symbol: icon })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Grade
+                  </label>
+                  <select
+                    value={newAbility.grade || "novice"}
+                    onChange={(e) =>
+                      setNewAbility({
+                        ...newAbility,
+                        grade: e.target.value as AbilityGrade,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    style={{
+                      color:
+                        ABILITY_GRADE_CONFIG[
+                          (newAbility.grade as AbilityGrade) || "novice"
+                        ].color,
+                    }}
+                  >
+                    {ABILITY_GRADE_ORDER.map((g) => (
+                      <option
+                        key={g}
+                        value={g}
+                        style={{ color: ABILITY_GRADE_CONFIG[g].color }}
+                      >
+                        {ABILITY_GRADE_CONFIG[g].label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Associated Stat
+                  </label>
+                  <select
+                    value={newAbility.stat || ""}
+                    onChange={(e) =>
+                      setNewAbility({
+                        ...newAbility,
+                        stat: e.target.value || undefined,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  >
+                    <option value="">None (any stat)</option>
+                    {stats.map((stat) => (
+                      <option key={stat.name} value={stat.name}>
+                        {stat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Cooldown (turns)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="99"
+                    value={newAbility.cooldown || 0}
+                    onChange={(e) =>
+                      setNewAbility({
+                        ...newAbility,
+                        cooldown: clampNumber(
+                          parseInt(e.target.value) || 0,
+                          0,
+                          99
+                        ),
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Description
+                  </label>
+                  <input
+                    type="text"
+                    value={newAbility.description}
+                    onChange={(e) =>
+                      setNewAbility({
+                        ...newAbility,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., Launch a ball of fire at enemies"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Costs ({newAbilityCosts.length})
+                  </label>
+                  <div className="space-y-2">
+                    {newAbilityCosts.map((cost, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 bg-blue-900/20 p-2 rounded-lg"
+                      >
+                        <select
+                          value={cost.type}
+                          onChange={(e) =>
+                            updateNewAbilityCost(index, {
+                              type: e.target.value as "resource" | "variable",
+                            })
+                          }
+                          className="px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
+                        >
+                          <option value="resource">Resource</option>
+                          <option value="variable">Variable</option>
+                        </select>
+                        {cost.type === "resource" ? (
+                          <select
+                            value={cost.name}
+                            onChange={(e) =>
+                              updateNewAbilityCost(index, {
+                                name: e.target.value,
+                              })
+                            }
+                            className="flex-1 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
+                          >
+                            <option value="">Select resource...</option>
+                            {resources.map((r) => (
+                              <option key={r.name} value={r.name}>
+                                {r.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={cost.name}
+                            onChange={(e) =>
+                              updateNewAbilityCost(index, {
+                                name: e.target.value,
+                              })
+                            }
+                            placeholder="Variable name"
+                            className="flex-1 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
+                          />
+                        )}
+                        <input
+                          type="number"
+                          min="1"
+                          max="999"
+                          value={cost.amount}
+                          onChange={(e) =>
+                            updateNewAbilityCost(index, {
+                              amount: clampNumber(
+                                parseInt(e.target.value) || 1,
+                                1,
+                                999
+                              ),
+                            })
+                          }
+                          className="w-16 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
+                        />
+                        <button
+                          onClick={() => removeNewAbilityCost(index)}
+                          className="p-1 text-red-400 hover:text-red-300"
+                        >
+                          <DynamicIcon name="X" className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={addNewAbilityCost}
+                      className="w-full px-3 py-2 bg-blue-700/30 hover:bg-blue-700/50 text-blue-300 rounded-lg text-sm flex items-center justify-center gap-2"
+                    >
+                      <DynamicIcon name="Plus" className="w-4 h-4" />
+                      Add Cost
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={addAbility}
+                disabled={!newAbility.name}
+                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+              >
+                Add Ability
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-lg font-bold text-white">
+                Starting Abilities ({abilities.length})
+              </h3>
+              {abilities.length === 0 ? (
+                <p className="text-blue-300/60 text-sm">
+                  No abilities added yet
+                </p>
+              ) : (
+                abilities.map((ability, index) =>
+                  editingAbilityIndex === index ? (
+                    // Edit mode
+                    <div
+                      key={index}
+                      className="p-4 bg-purple-900/40 rounded-lg border-2 border-purple-600"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={editAbility.name || ""}
+                            onChange={(e) =>
+                              setEditAbility({
+                                ...editAbility,
+                                name: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Icon
+                          </label>
+                          <IconPicker
+                            value={editAbility.symbol || "Sparkles"}
+                            onChange={(icon) =>
+                              setEditAbility({
+                                ...editAbility,
+                                symbol: icon,
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Grade
+                          </label>
+                          <select
+                            value={editAbility.grade || "novice"}
+                            onChange={(e) =>
+                              setEditAbility({
+                                ...editAbility,
+                                grade: e.target.value as AbilityGrade,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
+                            style={{
+                              color:
+                                ABILITY_GRADE_CONFIG[
+                                  (editAbility.grade as AbilityGrade) ||
+                                    "novice"
+                                ].color,
+                            }}
+                          >
+                            {ABILITY_GRADE_ORDER.map((g) => (
+                              <option
+                                key={g}
+                                value={g}
+                                style={{ color: ABILITY_GRADE_CONFIG[g].color }}
+                              >
+                                {ABILITY_GRADE_CONFIG[g].label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Associated Stat
+                          </label>
+                          <select
+                            value={editAbility.stat || ""}
+                            onChange={(e) =>
+                              setEditAbility({
+                                ...editAbility,
+                                stat: e.target.value || undefined,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
+                          >
+                            <option value="">None (any stat)</option>
+                            {stats.map((stat) => (
+                              <option key={stat.name} value={stat.name}>
+                                {stat.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Cooldown (turns)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="99"
+                            value={editAbility.cooldown || 0}
+                            onChange={(e) =>
+                              setEditAbility({
+                                ...editAbility,
+                                cooldown: clampNumber(
+                                  parseInt(e.target.value) || 0,
+                                  0,
+                                  99
+                                ),
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Description
+                          </label>
+                          <input
+                            type="text"
+                            value={editAbility.description || ""}
+                            onChange={(e) =>
+                              setEditAbility({
+                                ...editAbility,
+                                description: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-blue-300 mb-2">
+                            Costs ({editAbilityCosts.length})
+                          </label>
+                          <div className="space-y-2">
+                            {editAbilityCosts.map((cost, costIndex) => (
+                              <div
+                                key={costIndex}
+                                className="flex items-center gap-2 bg-blue-900/20 p-2 rounded-lg"
+                              >
+                                <select
+                                  value={cost.type}
+                                  onChange={(e) =>
+                                    updateEditAbilityCost(costIndex, {
+                                      type: e.target.value as
+                                        | "resource"
+                                        | "variable",
+                                    })
+                                  }
+                                  className="px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
+                                >
+                                  <option value="resource">Resource</option>
+                                  <option value="variable">Variable</option>
+                                </select>
+                                {cost.type === "resource" ? (
+                                  <select
+                                    value={cost.name}
+                                    onChange={(e) =>
+                                      updateEditAbilityCost(costIndex, {
+                                        name: e.target.value,
+                                      })
+                                    }
+                                    className="flex-1 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
+                                  >
+                                    <option value="">Select resource...</option>
+                                    {resources.map((r) => (
+                                      <option key={r.name} value={r.name}>
+                                        {r.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={cost.name}
+                                    onChange={(e) =>
+                                      updateEditAbilityCost(costIndex, {
+                                        name: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Variable name"
+                                    className="flex-1 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
+                                  />
+                                )}
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="999"
+                                  value={cost.amount}
+                                  onChange={(e) =>
+                                    updateEditAbilityCost(costIndex, {
+                                      amount: clampNumber(
+                                        parseInt(e.target.value) || 1,
+                                        1,
+                                        999
+                                      ),
+                                    })
+                                  }
+                                  className="w-16 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
+                                />
+                                <button
+                                  onClick={() =>
+                                    removeEditAbilityCost(costIndex)
+                                  }
+                                  className="p-1 text-red-400 hover:text-red-300"
+                                >
+                                  <DynamicIcon name="X" className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              onClick={addEditAbilityCost}
+                              className="w-full px-3 py-2 bg-blue-700/30 hover:bg-blue-700/50 text-blue-300 rounded-lg text-sm flex items-center justify-center gap-2"
+                            >
+                              <DynamicIcon name="Plus" className="w-4 h-4" />
+                              Add Cost
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveEditAbility}
+                          disabled={!editAbility.name}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          <DynamicIcon
+                            name="Save"
+                            className="inline-block w-4 h-4 mr-1"
+                          />
+                          Save
+                        </button>
+                        <button
+                          onClick={cancelEditAbility}
+                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // View mode with drag-and-drop
+                    <div
+                      key={index}
+                      draggable
+                      onDragStart={() => handleAbilityDragStart(index)}
+                      onDragOver={(e) => handleAbilityDragOver(e, index)}
+                      onDragEnd={handleAbilityDragEnd}
+                      className="flex items-center gap-3 p-4 rounded-lg border cursor-move hover:opacity-80 transition-colors"
+                      style={{
+                        opacity: draggedAbilityIndex === index ? 0.5 : 1,
+                        backgroundColor: `${
+                          ABILITY_GRADE_CONFIG[
+                            (ability.grade as AbilityGrade) || "novice"
+                          ].color
+                        }15`,
+                        borderColor: `${
+                          ABILITY_GRADE_CONFIG[
+                            (ability.grade as AbilityGrade) || "novice"
+                          ].color
+                        }40`,
+                      }}
+                    >
+                      <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
+                        <DynamicIcon name="GripVertical" className="w-5 h-5" />
+                      </div>
+                      <div className="text-2xl">
+                        <DynamicIcon
+                          name={ability.symbol || "Sparkles"}
+                          className="w-8 h-8"
+                          style={{
+                            color:
+                              ABILITY_GRADE_CONFIG[
+                                (ability.grade as AbilityGrade) || "novice"
+                              ].color,
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-bold text-white flex items-center gap-2 flex-wrap">
+                          <span>{ability.name}</span>
+                          <span
+                            className="text-xs px-1.5 py-0.5 rounded"
+                            style={{
+                              backgroundColor: `${
+                                ABILITY_GRADE_CONFIG[
+                                  (ability.grade as AbilityGrade) || "novice"
+                                ].color
+                              }30`,
+                              color:
+                                ABILITY_GRADE_CONFIG[
+                                  (ability.grade as AbilityGrade) || "novice"
+                                ].color,
+                            }}
+                          >
+                            {
+                              ABILITY_GRADE_CONFIG[
+                                (ability.grade as AbilityGrade) || "novice"
+                              ].label
+                            }
+                          </span>
+                          {ability.stat && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">
+                              {ability.stat}
+                            </span>
+                          )}
+                        </div>
+                        {ability.description && (
+                          <div className="text-sm text-blue-300/60">
+                            {ability.description}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          {(ability.cooldown || 0) > 0 && (
+                            <span className="text-xs text-blue-200/60">
+                              Cooldown: {ability.cooldown} turns
+                            </span>
+                          )}
+                          {ability.cost && ability.cost.length > 0 && (
+                            <span className="text-xs text-purple-300">
+                              Cost:{" "}
+                              {ability.cost
+                                .map((c) => `${c.amount} ${c.name}`)
+                                .join(", ")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => moveAbilityUp(index)}
+                            disabled={index === 0}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move up"
+                          >
+                            <DynamicIcon name="ChevronUp" className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => moveAbilityDown(index)}
+                            disabled={index === abilities.length - 1}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            title="Move down"
+                          >
+                            <DynamicIcon
+                              name="ChevronDown"
+                              className="w-4 h-4"
+                            />
+                          </button>
+                        </div>
+                        <div className="flex flex-row items-center gap-1 ml-3">
+                          <button
+                            onClick={() => startEditAbility(index)}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            <DynamicIcon name="Edit2" className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => removeAbility(index)}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
                           >
                             <DynamicIcon name="Trash2" className="w-4 h-4" />

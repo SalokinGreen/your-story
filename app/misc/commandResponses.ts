@@ -19,8 +19,10 @@ import {
   findQuestMatch,
   findRelationshipMatch,
   findLoreMatch,
+  findAbilityMatch,
 } from "./fuzzyMatch";
 import { logger } from "./logger";
+import { ABILITY_GRADE_ORDER, initializeAbility } from "./abilitySystem";
 
 /**
  * Execute a single command and generate a response.
@@ -467,7 +469,9 @@ export function executeCommandWithResponse(
     return {
       command: trimmed,
       success: true,
-      message: `Added ${quantity} ${gradeLabel} ${itemName} to inventory${grade !== "mythic" ? ` (${maxDurability} durability)` : " (unbreakable)"}`,
+      message: `Added ${quantity} ${gradeLabel} ${itemName} to inventory${
+        grade !== "mythic" ? ` (${maxDurability} durability)` : " (unbreakable)"
+      }`,
       timestamp,
     };
   }
@@ -668,7 +672,9 @@ export function executeCommandWithResponse(
   );
   if (repairItemMatch) {
     const itemName = repairItemMatch[1].trim();
-    const repairAmount = repairItemMatch[2] ? parseInt(repairItemMatch[2], 10) : null;
+    const repairAmount = repairItemMatch[2]
+      ? parseInt(repairItemMatch[2], 10)
+      : null;
 
     const matchResult = findItemMatch(itemName, storyData.inventory);
     const item = matchResult?.item;
@@ -694,15 +700,22 @@ export function executeCommandWithResponse(
 
     // Get max durability based on grade
     const gradeMaxDurability: Record<string, number> = {
-      common: 3, uncommon: 5, rare: 8, epic: 12, legendary: 20, mythic: Infinity,
+      common: 3,
+      uncommon: 5,
+      rare: 8,
+      epic: 12,
+      legendary: 20,
+      mythic: Infinity,
     };
-    const maxDurability = item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
+    const maxDurability =
+      item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
     const currentDurability = item.durability ?? maxDurability;
-    
+
     // Full repair if no amount specified
-    const targetDurability = repairAmount !== null 
-      ? Math.min(maxDurability, currentDurability + repairAmount)
-      : maxDurability;
+    const targetDurability =
+      repairAmount !== null
+        ? Math.min(maxDurability, currentDurability + repairAmount)
+        : maxDurability;
     const actualRepaired = targetDurability - currentDurability;
 
     item.durability = targetDurability;
@@ -715,9 +728,10 @@ export function executeCommandWithResponse(
       maxDurability,
     });
 
-    const fuzzyNote = matchResult && !matchResult.isExact
-      ? ` (matched "${itemName}" → "${item.name}")`
-      : "";
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${itemName}" → "${item.name}")`
+        : "";
 
     if (actualRepaired === 0) {
       return {
@@ -768,25 +782,34 @@ export function executeCommandWithResponse(
 
     // Get max durability based on grade
     const gradeMaxDurability: Record<string, number> = {
-      common: 3, uncommon: 5, rare: 8, epic: 12, legendary: 20, mythic: Infinity,
+      common: 3,
+      uncommon: 5,
+      rare: 8,
+      epic: 12,
+      legendary: 20,
+      mythic: Infinity,
     };
-    const maxDurability = item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
+    const maxDurability =
+      item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
     const currentDurability = item.durability ?? maxDurability;
-    
+
     const newDurability = Math.max(0, currentDurability - damageAmount);
     const actualDamage = currentDurability - newDurability;
     item.durability = newDurability;
     item.maxDurability = maxDurability;
 
-    const fuzzyNote = matchResult && !matchResult.isExact
-      ? ` (matched "${itemName}" → "${item.name}")`
-      : "";
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${itemName}" → "${item.name}")`
+        : "";
 
     // Check if item broke (story items never break)
     if (newDurability <= 0 && item.type !== "story") {
       // Remove the item
-      storyData.inventory = storyData.inventory.filter(i => i.name !== item.name);
-      
+      storyData.inventory = storyData.inventory.filter(
+        (i) => i.name !== item.name
+      );
+
       logger.action("Item broke from damage via command response", {
         itemName: item.name,
         damageAmount: actualDamage,
@@ -840,7 +863,14 @@ export function executeCommandWithResponse(
       };
     }
 
-    const gradeOrder = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
+    const gradeOrder = [
+      "common",
+      "uncommon",
+      "rare",
+      "epic",
+      "legendary",
+      "mythic",
+    ];
     const currentGradeIndex = gradeOrder.indexOf(item.grade || "common");
     const newGradeIndex = gradeOrder.indexOf(newGrade);
 
@@ -848,22 +878,34 @@ export function executeCommandWithResponse(
       return {
         command: trimmed,
         success: false,
-        message: `Cannot downgrade ${item.name} from ${item.grade || "common"} to ${newGrade}`,
+        message: `Cannot downgrade ${item.name} from ${
+          item.grade || "common"
+        } to ${newGrade}`,
         timestamp,
       };
     }
 
     // Get new max durability
     const gradeMaxDurability: Record<string, number> = {
-      common: 3, uncommon: 5, rare: 8, epic: 12, legendary: 20, mythic: Infinity,
+      common: 3,
+      uncommon: 5,
+      rare: 8,
+      epic: 12,
+      legendary: 20,
+      mythic: Infinity,
     };
-    const oldMaxDurability = item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
+    const oldMaxDurability =
+      item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
     const newMaxDurability = gradeMaxDurability[newGrade];
-    
+
     // Calculate durability ratio to scale up proportionally
     const currentDurability = item.durability ?? oldMaxDurability;
-    const durabilityRatio = oldMaxDurability > 0 ? currentDurability / oldMaxDurability : 1;
-    const newDurability = newGrade === "mythic" ? Infinity : Math.ceil(newMaxDurability * durabilityRatio);
+    const durabilityRatio =
+      oldMaxDurability > 0 ? currentDurability / oldMaxDurability : 1;
+    const newDurability =
+      newGrade === "mythic"
+        ? Infinity
+        : Math.ceil(newMaxDurability * durabilityRatio);
 
     const oldGrade = item.grade || "common";
     item.grade = newGrade;
@@ -879,15 +921,20 @@ export function executeCommandWithResponse(
       newDurability,
     });
 
-    const fuzzyNote = matchResult && !matchResult.isExact
-      ? ` (matched "${itemName}" → "${item.name}")`
-      : "";
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${itemName}" → "${item.name}")`
+        : "";
     const newGradeLabel = newGrade.charAt(0).toUpperCase() + newGrade.slice(1);
 
     return {
       command: trimmed,
       success: true,
-      message: `Upgraded ${item.name} to ${newGradeLabel}!${newGrade !== "mythic" ? ` Max durability: ${newMaxDurability}` : " (now unbreakable)"}${fuzzyNote}`,
+      message: `Upgraded ${item.name} to ${newGradeLabel}!${
+        newGrade !== "mythic"
+          ? ` Max durability: ${newMaxDurability}`
+          : " (now unbreakable)"
+      }${fuzzyNote}`,
       timestamp,
     };
   }
@@ -922,9 +969,15 @@ export function executeCommandWithResponse(
     }
 
     const gradeMaxDurability: Record<string, number> = {
-      common: 3, uncommon: 5, rare: 8, epic: 12, legendary: 20, mythic: Infinity,
+      common: 3,
+      uncommon: 5,
+      rare: 8,
+      epic: 12,
+      legendary: 20,
+      mythic: Infinity,
     };
-    const maxDurability = item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
+    const maxDurability =
+      item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
     const cappedDurability = Math.min(newDurability, maxDurability);
 
     item.durability = cappedDurability;
@@ -936,14 +989,448 @@ export function executeCommandWithResponse(
       maxDurability,
     });
 
-    const fuzzyNote = matchResult && !matchResult.isExact
-      ? ` (matched "${itemName}" → "${item.name}")`
-      : "";
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${itemName}" → "${item.name}")`
+        : "";
 
     return {
       command: trimmed,
       success: true,
       message: `Set ${item.name} durability to ${cappedDurability}/${maxDurability}${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
+  // === ABILITY COMMANDS ===
+
+  // /add_ability: name | description | grade | stat | costs | maxCooldown
+  // costs format: "resource:Health:10,variable:ManaSpent:5" or empty string
+  const addAbilityMatch = trimmed.match(
+    /^\/add_ability:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(novice|apprentice|adept|expert|master|legendary)\s*(?:\|\s*(.+?))?\s*(?:\|\s*(.+?))?\s*(?:\|\s*(\d+))?$/i
+  );
+  if (addAbilityMatch) {
+    const name = addAbilityMatch[1].trim();
+    const description = addAbilityMatch[2].trim();
+    const grade = addAbilityMatch[3].toLowerCase() as
+      | "novice"
+      | "apprentice"
+      | "adept"
+      | "expert"
+      | "master"
+      | "legendary";
+    const stat = addAbilityMatch[4]?.trim() || undefined;
+    const costsStr = addAbilityMatch[5]?.trim() || "";
+    const maxCooldown = addAbilityMatch[6]
+      ? parseInt(addAbilityMatch[6], 10)
+      : 0;
+
+    // Initialize abilities array if needed
+    if (!storyData.abilities) {
+      storyData.abilities = [];
+    }
+
+    const existing = storyData.abilities.find(
+      (a) => a.name.toLowerCase() === name.toLowerCase()
+    );
+    if (existing) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Ability "${name}" already exists`,
+        timestamp,
+      };
+    }
+
+    // Parse costs string
+    const costs: Array<{
+      type: "resource" | "variable";
+      name: string;
+      amount: number;
+    }> = [];
+    if (costsStr) {
+      const costParts = costsStr.split(",");
+      for (const part of costParts) {
+        const [typeStr, costName, amountStr] = part.trim().split(":");
+        if (typeStr && costName && amountStr) {
+          const type = typeStr.toLowerCase() as "resource" | "variable";
+          if (type === "resource" || type === "variable") {
+            costs.push({
+              type,
+              name: costName.trim(),
+              amount: parseInt(amountStr, 10),
+            });
+          }
+        }
+      }
+    }
+
+    // Validate stat exists if specified
+    if (
+      stat &&
+      !storyData.stats.find((s) => s.name.toLowerCase() === stat.toLowerCase())
+    ) {
+      return {
+        command: trimmed,
+        success: "partial" as const,
+        message: `Added ability "${name}" but stat "${stat}" not found (ability will work with any skill check)`,
+        timestamp,
+      };
+    }
+
+    const ability = initializeAbility({
+      name,
+      description,
+      grade,
+      stat,
+      cost: costs,
+      cooldown: maxCooldown,
+      symbol: "✨",
+    });
+
+    storyData.abilities.push(ability);
+
+    logger.action("Ability added via command response", {
+      name,
+      grade,
+      costs,
+      maxCooldown,
+    });
+
+    const costDesc =
+      costs.length > 0
+        ? ` (costs: ${costs.map((c) => `${c.amount} ${c.name}`).join(", ")})`
+        : "";
+    const cooldownDesc =
+      maxCooldown > 0 ? `, ${maxCooldown} turn cooldown` : "";
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Added ${grade} ability "${name}"${costDesc}${cooldownDesc}`,
+      timestamp,
+    };
+  }
+
+  // /remove_ability: name
+  const removeAbilityMatch = trimmed.match(/^\/remove_ability:\s*(.+)$/i);
+  if (removeAbilityMatch) {
+    const abilityName = removeAbilityMatch[1].trim();
+
+    if (!storyData.abilities || storyData.abilities.length === 0) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `No abilities exist to remove`,
+        timestamp,
+      };
+    }
+
+    const matchResult = findAbilityMatch(abilityName, storyData.abilities);
+    const ability = matchResult?.item;
+
+    if (!ability) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Ability "${abilityName}" not found`,
+        timestamp,
+      };
+    }
+
+    const index = storyData.abilities.findIndex((a) => a.name === ability.name);
+    if (index !== -1) {
+      storyData.abilities.splice(index, 1);
+    }
+
+    logger.action("Ability removed via command response", {
+      name: ability.name,
+    });
+
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${abilityName}" → "${ability.name}")`
+        : "";
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Removed ability "${ability.name}"${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
+  // /modify_ability: name | field | value
+  // fields: description, stat, costs, maxCooldown
+  const modifyAbilityMatch = trimmed.match(
+    /^\/modify_ability:\s*(.+?)\s*\|\s*(description|stat|costs|maxCooldown)\s*\|\s*(.+)$/i
+  );
+  if (modifyAbilityMatch) {
+    const abilityName = modifyAbilityMatch[1].trim();
+    const field = modifyAbilityMatch[2].toLowerCase();
+    const value = modifyAbilityMatch[3].trim();
+
+    if (!storyData.abilities || storyData.abilities.length === 0) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `No abilities exist to modify`,
+        timestamp,
+      };
+    }
+
+    const matchResult = findAbilityMatch(abilityName, storyData.abilities);
+    const ability = matchResult?.item;
+
+    if (!ability) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Ability "${abilityName}" not found`,
+        timestamp,
+      };
+    }
+
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${abilityName}" → "${ability.name}")`
+        : "";
+
+    switch (field) {
+      case "description":
+        ability.description = value;
+        break;
+      case "stat":
+        if (value.toLowerCase() === "none" || value === "") {
+          ability.stat = undefined;
+        } else {
+          ability.stat = value;
+        }
+        break;
+      case "costs":
+        // Parse costs string: "resource:Health:10,variable:ManaSpent:5"
+        const newCosts: Array<{
+          type: "resource" | "variable";
+          name: string;
+          amount: number;
+        }> = [];
+        if (value && value.toLowerCase() !== "none") {
+          const costParts = value.split(",");
+          for (const part of costParts) {
+            const [typeStr, costName, amountStr] = part.trim().split(":");
+            if (typeStr && costName && amountStr) {
+              const type = typeStr.toLowerCase() as "resource" | "variable";
+              if (type === "resource" || type === "variable") {
+                newCosts.push({
+                  type,
+                  name: costName.trim(),
+                  amount: parseInt(amountStr, 10),
+                });
+              }
+            }
+          }
+        }
+        ability.costs = newCosts;
+        break;
+      case "maxcooldown":
+        const newCooldown = parseInt(value, 10);
+        ability.maxCooldown = newCooldown;
+        // Reset current cooldown if reducing max below current
+        if (ability.cooldown > newCooldown) {
+          ability.cooldown = newCooldown;
+        }
+        break;
+    }
+
+    logger.action("Ability modified via command response", {
+      name: ability.name,
+      field,
+      value,
+    });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Modified ${ability.name}: ${field} updated${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
+  // /upgrade_ability: name
+  const upgradeAbilityMatch = trimmed.match(/^\/upgrade_ability:\s*(.+)$/i);
+  if (upgradeAbilityMatch) {
+    const abilityName = upgradeAbilityMatch[1].trim();
+
+    if (!storyData.abilities || storyData.abilities.length === 0) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `No abilities exist to upgrade`,
+        timestamp,
+      };
+    }
+
+    const matchResult = findAbilityMatch(abilityName, storyData.abilities);
+    const ability = matchResult?.item;
+
+    if (!ability) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Ability "${abilityName}" not found`,
+        timestamp,
+      };
+    }
+
+    const currentGradeIndex = ABILITY_GRADE_ORDER.indexOf(
+      ability.grade || "novice"
+    );
+    if (currentGradeIndex >= ABILITY_GRADE_ORDER.length - 1) {
+      return {
+        command: trimmed,
+        success: "partial" as const,
+        message: `${ability.name} is already at Legendary grade (max)`,
+        timestamp,
+      };
+    }
+
+    const newGrade = ABILITY_GRADE_ORDER[currentGradeIndex + 1];
+    const oldGrade = ability.grade;
+    ability.grade = newGrade;
+
+    logger.action("Ability upgraded via command response", {
+      name: ability.name,
+      oldGrade,
+      newGrade,
+    });
+
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${abilityName}" → "${ability.name}")`
+        : "";
+    const newGradeLabel = newGrade.charAt(0).toUpperCase() + newGrade.slice(1);
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Upgraded ${ability.name} to ${newGradeLabel}!${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
+  // /reduce_cooldown: name | amount
+  const reduceCooldownMatch = trimmed.match(
+    /^\/reduce_cooldown:\s*(.+?)\s*\|\s*(\d+)$/i
+  );
+  if (reduceCooldownMatch) {
+    const abilityName = reduceCooldownMatch[1].trim();
+    const amount = parseInt(reduceCooldownMatch[2], 10);
+
+    if (!storyData.abilities || storyData.abilities.length === 0) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `No abilities exist`,
+        timestamp,
+      };
+    }
+
+    const matchResult = findAbilityMatch(abilityName, storyData.abilities);
+    const ability = matchResult?.item;
+
+    if (!ability) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Ability "${abilityName}" not found`,
+        timestamp,
+      };
+    }
+
+    if (ability.cooldown === 0) {
+      return {
+        command: trimmed,
+        success: "partial" as const,
+        message: `${ability.name} is not on cooldown`,
+        timestamp,
+      };
+    }
+
+    const oldCooldown = ability.cooldown;
+    ability.cooldown = Math.max(0, ability.cooldown - amount);
+
+    logger.action("Ability cooldown reduced via command response", {
+      name: ability.name,
+      oldCooldown,
+      newCooldown: ability.cooldown,
+      reduced: amount,
+    });
+
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${abilityName}" → "${ability.name}")`
+        : "";
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Reduced ${ability.name} cooldown by ${amount} (${oldCooldown} → ${ability.cooldown})${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
+  // /refresh_ability: name
+  const refreshAbilityMatch = trimmed.match(/^\/refresh_ability:\s*(.+)$/i);
+  if (refreshAbilityMatch) {
+    const abilityName = refreshAbilityMatch[1].trim();
+
+    if (!storyData.abilities || storyData.abilities.length === 0) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `No abilities exist`,
+        timestamp,
+      };
+    }
+
+    const matchResult = findAbilityMatch(abilityName, storyData.abilities);
+    const ability = matchResult?.item;
+
+    if (!ability) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Ability "${abilityName}" not found`,
+        timestamp,
+      };
+    }
+
+    if (ability.cooldown === 0) {
+      return {
+        command: trimmed,
+        success: "partial" as const,
+        message: `${ability.name} is already ready`,
+        timestamp,
+      };
+    }
+
+    const oldCooldown = ability.cooldown;
+    ability.cooldown = 0;
+
+    logger.action("Ability refreshed via command response", {
+      name: ability.name,
+      oldCooldown,
+    });
+
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${abilityName}" → "${ability.name}")`
+        : "";
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Refreshed ${ability.name} (was ${oldCooldown} turns remaining)${fuzzyNote}`,
       timestamp,
     };
   }

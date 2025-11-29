@@ -32,6 +32,7 @@ import {
   findStatMatch,
   findResourceMatch,
   findItemMatch,
+  findAbilityMatch,
 } from "@/app/misc/fuzzyMatch";
 
 // ============================================================
@@ -848,6 +849,7 @@ export async function analyzeAction(
       skill_used: null,
       skill_dc: null,
       item_used: null,
+      ability_used: null,
       resource_used: null,
       mythic_check: null,
       table: null,
@@ -916,6 +918,38 @@ export async function analyzeAction(
     }
   }
 
+  // Validate ability_used
+  if (analysis.ability_used) {
+    const matchResult = findAbilityMatch(
+      analysis.ability_used,
+      storyData.abilities || []
+    );
+    if (matchResult) {
+      if (!matchResult.isExact) {
+        validationWarnings.push(
+          `Matched ability "${analysis.ability_used}" → "${matchResult.name}"`
+        );
+      }
+      // Also check if ability is on cooldown
+      const ability = storyData.abilities?.find(
+        (a) => a.name === matchResult.name
+      );
+      if (ability && (ability.currentCooldown || 0) > 0) {
+        validationWarnings.push(
+          `Ability "${matchResult.name}" is on cooldown (${ability.currentCooldown} turns remaining), removing`
+        );
+        analysis.ability_used = null;
+      } else {
+        analysis.ability_used = matchResult.name;
+      }
+    } else {
+      validationWarnings.push(
+        `Ability "${analysis.ability_used}" not found, removing`
+      );
+      analysis.ability_used = null;
+    }
+  }
+
   // Handle legacy mythic_table/custom_table fields - migrate to unified table field
   if (analysis.mythic_table && !analysis.table) {
     analysis.table = analysis.mythic_table;
@@ -927,7 +961,7 @@ export async function analyzeAction(
   // Validate unified table field - check both custom tables AND mythic element tables
   if (analysis.table) {
     const tableName = analysis.table;
-    
+
     // First, check custom tables
     if (storyData.customTables && storyData.customTables.length > 0) {
       const customTable = storyData.customTables.find(
@@ -937,28 +971,63 @@ export async function analyzeAction(
         analysis.table = customTable.name; // Use exact name
       }
     }
-    
+
     // If not found in custom tables, check if it's a valid mythic table
     const mythicTableNames = [
-      "adventure_tone", "alien_species", "animal_actions", "army", "cavern",
-      "character_actions_combat", "character_actions_general", "character_appearance",
-      "character_background", "character_conversations", "character_descriptors",
-      "character_identity", "character_motivations", "character_personality",
-      "character_skills", "character_traits_flaws", "characters", "city",
-      "civilization", "creature_abilities", "creature_descriptors", "cryptic_message",
-      "curses", "domicile", "dungeon", "dungeon_traps", "forest", "gods", "legends",
-      "locations", "magic_item", "mutation", "names", "noble_house", "objects",
-      "plot_twists", "powers", "scavenging_results", "smells", "sounds",
-      "spell_effects", "starship", "terrain", "undead", "visions_dreams"
+      "adventure_tone",
+      "alien_species",
+      "animal_actions",
+      "army",
+      "cavern",
+      "character_actions_combat",
+      "character_actions_general",
+      "character_appearance",
+      "character_background",
+      "character_conversations",
+      "character_descriptors",
+      "character_identity",
+      "character_motivations",
+      "character_personality",
+      "character_skills",
+      "character_traits_flaws",
+      "characters",
+      "city",
+      "civilization",
+      "creature_abilities",
+      "creature_descriptors",
+      "cryptic_message",
+      "curses",
+      "domicile",
+      "dungeon",
+      "dungeon_traps",
+      "forest",
+      "gods",
+      "legends",
+      "locations",
+      "magic_item",
+      "mutation",
+      "names",
+      "noble_house",
+      "objects",
+      "plot_twists",
+      "powers",
+      "scavenging_results",
+      "smells",
+      "sounds",
+      "spell_effects",
+      "starship",
+      "terrain",
+      "undead",
+      "visions_dreams",
     ];
-    
+
     const isMythicTable = mythicTableNames.some(
       (name) => name.toLowerCase() === tableName.toLowerCase()
     );
     const isCustomTable = storyData.customTables?.some(
       (t) => t.name.toLowerCase() === tableName.toLowerCase()
     );
-    
+
     if (!isMythicTable && !isCustomTable) {
       validationWarnings.push(
         `Table "${tableName}" not found in custom or mythic tables, removing`

@@ -183,3 +183,13 @@ export function findLoreMatch(
 ) {
   return findBestMatch(searchTitle, lore, (loreEntry) => loreEntry.title, 0.6);
 }
+
+/**
+ * Convenience function for matching abilities by name
+ */
+export function findAbilityMatch(
+  searchName: string | undefined,
+  abilities: Array<{ name: string; [key: string]: any }>
+) {
+  return findBestMatch(searchName, abilities, (ability) => ability.name, 0.6);
+}

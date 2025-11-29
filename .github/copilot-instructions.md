@@ -23,9 +23,12 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 
 ### Data Models
 
-- app/misc/structs.ts: Canonical TypeScript interfaces (StoryData, Scene, ScenePart, Chapter, Stat, Resource, InventoryItem, Achievement, StoryLore, Choices, Adventure, Story, etc.). Single source of truth for shapes.
+- app/misc/structs.ts: Canonical TypeScript interfaces (StoryData, Scene, ScenePart, Chapter, Stat, Resource, InventoryItem, Ability, Achievement, StoryLore, Choices, Adventure, Story, etc.). Single source of truth for shapes.
   - **Achievement**: Includes optional `ai_hint` field for precise AI triggering conditions separate from user-facing descriptions.
-  - **InventoryItem**: Strict type union 'normal' | 'consumable' | 'story' | 'misc' with specific behaviors per type.
+  - **InventoryItem**: Strict type union 'normal' | 'consumable' | 'story' | 'misc' with specific behaviors per type. Includes `grade` (ItemGrade) and `durability/maxDurability`.
+  - **Ability**: Skills/spells/techniques with `name`, `description`, `grade` (AbilityGrade), `cost` (AbilityCost[]), `cooldown`, `currentCooldown`, `stat` (optional), `symbol`.
+  - **AbilityCost**: { type: "resource" | "variable", name: string, amount: number }
+  - **AbilityGrade**: "novice" | "apprentice" | "adept" | "expert" | "master" | "legendary"
   - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `beats_trigger` (number[]), `beats_untrigger` (number[]) for dynamic visibility.
   - **ScenePart**: Includes optional `toolCalls` (ToolCall[]) and `toolResponses` (CommandResponse[]) for preserving tool calling conversation history. Also includes `stateChanges` (string[]) for human-readable game state modifications that are sent to the story stage.
   - **CommandResponse**: Includes optional `toolCallId` for linking responses to specific tool calls in conversation history.
@@ -227,6 +230,16 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - consumable: Advantage on use, consumed immediately
   - story: Advantage on use, never breaks/consumed (quest items)
   - misc: Prevents disadvantage, never breaks/consumed
+- **Item Grades**: common (+0), uncommon (+1), rare (+2), epic (+3), mythic (+5 and infinite durability)
+- **Ability System**:
+  - Abilities are skills, spells, or techniques with resource/variable costs
+  - AbilityGrade: "novice" (+0), "apprentice" (+1), "adept" (+2), "expert" (+3), "master" (+4), "legendary" (+5)
+  - AbilityCost: { type: "resource" | "variable", name: string, amount: number }
+  - Cooldowns in turns - ability unusable while currentCooldown > 0
+  - Can use BOTH an item AND an ability on the same skill check (bonuses stack)
+  - Key functions in abilitySystem.ts: canAffordAbility(), deductAbilityCost(), startCooldown(), getAbilityBonus()
+  - findAbilityMatch() in fuzzyMatch.ts for name matching
+  - AI tools: add_ability, remove_ability, modify_ability, upgrade_ability, reduce_cooldown, refresh_ability
 - **Resource System**:
   - Required amount: DC ÷ 10 (minimum 5)
   - Insufficient resource penalty: -DC÷10 to dice roll (minimum -5)

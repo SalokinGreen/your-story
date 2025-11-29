@@ -300,7 +300,8 @@ export default function ChoicesModal({
     }
 
     // Unified table field (or legacy mythic_table/custom_table)
-    const tableToShow = choice.table || choice.mythic_table || choice.custom_table;
+    const tableToShow =
+      choice.table || choice.mythic_table || choice.custom_table;
     if (tableToShow) {
       details.push(
         <div key="table" className="flex items-center gap-2 text-indigo-400">

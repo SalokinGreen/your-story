@@ -1,25 +1,38 @@
 /**
  * Item System Module
- * 
+ *
  * Handles item grades, durability, and bonuses across different RPG systems.
  */
 
 import { InventoryItem } from "./structs";
 
 // Item grade types
-export type ItemGrade = "common" | "uncommon" | "rare" | "epic" | "legendary" | "mythic";
+export type ItemGrade =
+  | "common"
+  | "uncommon"
+  | "rare"
+  | "epic"
+  | "legendary"
+  | "mythic";
 
 // Grade order constant for iteration
-export const GRADE_ORDER: ItemGrade[] = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
+export const GRADE_ORDER: ItemGrade[] = [
+  "common",
+  "uncommon",
+  "rare",
+  "epic",
+  "legendary",
+  "mythic",
+];
 
 // Grade configuration
 export interface GradeConfig {
   maxDurability: number;
-  color: string;        // Tailwind color class
-  textColor: string;    // Text color class
-  bgColor: string;      // Background color class
-  borderColor: string;  // Border color class
-  label: string;        // Display label
+  color: string; // Tailwind color class
+  textColor: string; // Text color class
+  bgColor: string; // Background color class
+  borderColor: string; // Border color class
+  label: string; // Display label
 }
 
 // Bonus configuration per RPG system
@@ -35,7 +48,7 @@ export interface SystemBonuses {
 // Grade configurations
 export const GRADE_CONFIG: Record<ItemGrade, GradeConfig> = {
   common: {
-    maxDurability: 3,
+    maxDurability: 8,
     color: "gray",
     textColor: "text-gray-400",
     bgColor: "bg-gray-700/50",
@@ -43,7 +56,7 @@ export const GRADE_CONFIG: Record<ItemGrade, GradeConfig> = {
     label: "Common",
   },
   uncommon: {
-    maxDurability: 5,
+    maxDurability: 13,
     color: "green",
     textColor: "text-green-400",
     bgColor: "bg-green-900/30",
@@ -51,7 +64,7 @@ export const GRADE_CONFIG: Record<ItemGrade, GradeConfig> = {
     label: "Uncommon",
   },
   rare: {
-    maxDurability: 8,
+    maxDurability: 20,
     color: "blue",
     textColor: "text-blue-400",
     bgColor: "bg-blue-900/30",
@@ -59,7 +72,7 @@ export const GRADE_CONFIG: Record<ItemGrade, GradeConfig> = {
     label: "Rare",
   },
   epic: {
-    maxDurability: 12,
+    maxDurability: 30,
     color: "purple",
     textColor: "text-purple-400",
     bgColor: "bg-purple-900/30",
@@ -67,7 +80,7 @@ export const GRADE_CONFIG: Record<ItemGrade, GradeConfig> = {
     label: "Epic",
   },
   legendary: {
-    maxDurability: 20,
+    maxDurability: 50,
     color: "orange",
     textColor: "text-orange-400",
     bgColor: "bg-orange-900/30",
@@ -114,7 +127,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     mythic: 25,
   },
   // Percentile: Same as 1d100
-  "percentile": {
+  percentile: {
     common: 0,
     uncommon: 5,
     rare: 10,
@@ -123,7 +136,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     mythic: 25,
   },
   // PbtA: 2d6 system, +1 is HUGE (shifts entire tier)
-  "pbta": {
+  pbta: {
     common: 0,
     uncommon: 1,
     rare: 1,
@@ -132,7 +145,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     mythic: 3,
   },
   // Fate: Ladder system, +1 shifts one step
-  "fate": {
+  fate: {
     common: 0,
     uncommon: 1,
     rare: 1,
@@ -141,7 +154,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     mythic: 3,
   },
   // YZE: Dice pool system, bonus = extra dice
-  "yze": {
+  yze: {
     common: 0,
     uncommon: 1,
     rare: 2,
@@ -150,16 +163,16 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     mythic: 5,
   },
   // Explosive: Die size steps (d4→d6→d8→d10→d12→d20)
-  "explosive": {
+  explosive: {
     common: 0,
-    uncommon: 1,  // +1 die step
+    uncommon: 1, // +1 die step
     rare: 1,
-    epic: 2,      // +2 die steps
+    epic: 2, // +2 die steps
     legendary: 2,
     mythic: 3,
   },
   // Narrative: Simple bonuses
-  "narrative": {
+  narrative: {
     common: 0,
     uncommon: 1,
     rare: 1,
@@ -189,7 +202,9 @@ export function getItemBonus(item: InventoryItem, rpgSystemId: string): number {
  * Get the max durability for an item based on its grade
  */
 export function getMaxDurability(grade: ItemGrade): number {
-  return GRADE_CONFIG[grade]?.maxDurability || GRADE_CONFIG.common.maxDurability;
+  return (
+    GRADE_CONFIG[grade]?.maxDurability || GRADE_CONFIG.common.maxDurability
+  );
 }
 
 /**
@@ -204,28 +219,37 @@ export function applyDurabilityLoss(
 ): { newDurability: number; broken: boolean; durabilityLost: number } {
   // Mythic items never lose durability
   if (item.grade === "mythic") {
-    return { newDurability: item.durability ?? Infinity, broken: false, durabilityLost: 0 };
+    return {
+      newDurability: item.durability ?? Infinity,
+      broken: false,
+      durabilityLost: 0,
+    };
   }
 
   // Story items track durability visually but never break
   const isStoryItem = item.type === "story";
-  
+
   // Consumables are consumed, not damaged
   if (item.type === "consumable") {
-    return { newDurability: 0, broken: true, durabilityLost: item.durability ?? 1 };
+    return {
+      newDurability: 0,
+      broken: true,
+      durabilityLost: item.durability ?? 1,
+    };
   }
 
-  const currentDurability = item.durability ?? getMaxDurability(item.grade || "common");
+  const currentDurability =
+    item.durability ?? getMaxDurability(item.grade || "common");
   const durabilityLoss = failed ? 2 : 1;
   const newDurability = Math.max(0, currentDurability - durabilityLoss);
-  
+
   // Story items never break even at 0 durability
   const broken = !isStoryItem && newDurability <= 0;
-  
-  return { 
-    newDurability, 
-    broken, 
-    durabilityLost: Math.min(durabilityLoss, currentDurability) 
+
+  return {
+    newDurability,
+    broken,
+    durabilityLost: Math.min(durabilityLoss, currentDurability),
   };
 }
 
@@ -235,7 +259,7 @@ export function applyDurabilityLoss(
 export function initializeItem(item: Partial<InventoryItem>): InventoryItem {
   const grade = item.grade || "common";
   const maxDurability = getMaxDurability(grade);
-  
+
   return {
     name: item.name || "Unknown Item",
     quantity: item.quantity ?? 1,
@@ -261,12 +285,13 @@ export function repairItem(
   if (item.grade === "mythic") {
     return { newDurability: Infinity, amountRepaired: 0 };
   }
-  
-  const maxDurability = item.maxDurability ?? getMaxDurability(item.grade || "common");
+
+  const maxDurability =
+    item.maxDurability ?? getMaxDurability(item.grade || "common");
   const currentDurability = item.durability ?? maxDurability;
   const newDurability = Math.min(maxDurability, currentDurability + amount);
   const amountRepaired = newDurability - currentDurability;
-  
+
   return { newDurability, amountRepaired };
 }
 
@@ -280,16 +305,17 @@ export function damageItem(
   if (item.grade === "mythic") {
     return { newDurability: Infinity, broken: false, amountDamaged: 0 };
   }
-  
-  const currentDurability = item.durability ?? getMaxDurability(item.grade || "common");
+
+  const currentDurability =
+    item.durability ?? getMaxDurability(item.grade || "common");
   const newDurability = Math.max(0, currentDurability - amount);
   const isStoryItem = item.type === "story";
   const broken = !isStoryItem && newDurability <= 0;
-  
-  return { 
-    newDurability, 
-    broken, 
-    amountDamaged: Math.min(amount, currentDurability) 
+
+  return {
+    newDurability,
+    broken,
+    amountDamaged: Math.min(amount, currentDurability),
   };
 }
 
@@ -300,22 +326,35 @@ export function upgradeItemGrade(
   item: InventoryItem,
   newGrade: ItemGrade
 ): { success: boolean; message: string } {
-  const gradeOrder: ItemGrade[] = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
+  const gradeOrder: ItemGrade[] = [
+    "common",
+    "uncommon",
+    "rare",
+    "epic",
+    "legendary",
+    "mythic",
+  ];
   const currentIndex = gradeOrder.indexOf(item.grade || "common");
   const newIndex = gradeOrder.indexOf(newGrade);
-  
+
   if (newIndex <= currentIndex) {
-    return { 
-      success: false, 
-      message: `Cannot downgrade ${item.name} from ${item.grade || "common"} to ${newGrade}` 
+    return {
+      success: false,
+      message: `Cannot downgrade ${item.name} from ${
+        item.grade || "common"
+      } to ${newGrade}`,
     };
   }
-  
+
   const newMaxDurability = getMaxDurability(newGrade);
-  
-  return { 
-    success: true, 
-    message: `${item.name} upgraded to ${newGrade}! Max durability increased to ${newGrade === "mythic" ? "∞" : newMaxDurability}.` 
+
+  return {
+    success: true,
+    message: `${
+      item.name
+    } upgraded to ${newGrade}! Max durability increased to ${
+      newGrade === "mythic" ? "∞" : newMaxDurability
+    }.`,
   };
 }
 
@@ -340,11 +379,12 @@ export function getDurabilityDisplay(item: InventoryItem): {
       displayText: "∞",
     };
   }
-  
-  const maxDurability = item.maxDurability ?? getMaxDurability(item.grade || "common");
+
+  const maxDurability =
+    item.maxDurability ?? getMaxDurability(item.grade || "common");
   const currentDurability = item.durability ?? maxDurability;
   const percentage = (currentDurability / maxDurability) * 100;
-  
+
   return {
     current: currentDurability,
     max: maxDurability,
@@ -366,5 +406,7 @@ export function getGradeOrder(): ItemGrade[] {
  * Check if a string is a valid grade
  */
 export function isValidGrade(grade: string): grade is ItemGrade {
-  return ["common", "uncommon", "rare", "epic", "legendary", "mythic"].includes(grade);
+  return ["common", "uncommon", "rare", "epic", "legendary", "mythic"].includes(
+    grade
+  );
 }

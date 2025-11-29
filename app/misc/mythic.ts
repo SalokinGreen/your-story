@@ -5660,7 +5660,9 @@ const ELEMENT_TABLES: Record<ElementCategory, string[]> = {
 /**
  * List of all available mythic table names for validation
  */
-export const MYTHIC_TABLE_NAMES = Object.keys(ELEMENT_TABLES) as ElementCategory[];
+export const MYTHIC_TABLE_NAMES = Object.keys(
+  ELEMENT_TABLES
+) as ElementCategory[];
 
 /**
  * Generate a random element from a specific category
