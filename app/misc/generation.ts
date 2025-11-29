@@ -55,6 +55,7 @@ export interface GenerationCallbacks {
   onToolsComplete?: (
     toolCalls: ToolCall[],
     responses: CommandResponse[],
+    stateChanges: string[],
     usage: TokenUsage
   ) => void;
   onChoicesStart?: () => void;
@@ -530,6 +531,7 @@ export async function generateStoryTurn(
       callbacks.onToolsComplete?.(
         allToolCalls,
         allToolResponses,
+        allStateChanges,
         toolsMeta?.usage || {
           promptTokens: 0,
           completionTokens: 0,
@@ -539,6 +541,7 @@ export async function generateStoryTurn(
       logger.action("Stage 2 complete", {
         toolCalls: allToolCalls.length,
         responses: allToolResponses.length,
+        stateChanges: allStateChanges.length,
       });
     };
 

@@ -2434,14 +2434,16 @@ function StoryPageContent() {
           onToolsStart: () => {
             // Keep showing tools stage while either is running
           },
-          onToolsComplete: (toolCalls, toolResponses, usage) => {
-            // Update the last part with tool data
+          onToolsComplete: (toolCalls, toolResponses, stateChanges, usage) => {
+            // Update the last part with tool data including stateChanges
             const lastPartIndex = storyData.scene.parts.length - 1;
             if (lastPartIndex >= 0) {
               storyData.scene.parts[lastPartIndex] = {
                 ...storyData.scene.parts[lastPartIndex],
                 toolCalls,
                 toolResponses,
+                stateChanges:
+                  stateChanges.length > 0 ? stateChanges : undefined,
               };
             }
 
@@ -2455,6 +2457,7 @@ function StoryPageContent() {
             logger.ai_response("Tools complete (custom input)", {
               toolCallsCount: toolCalls.length,
               responsesCount: toolResponses.length,
+              stateChangesCount: stateChanges.length,
               usage,
             });
           },
@@ -4003,14 +4006,21 @@ function StoryPageContent() {
             onToolsStart: () => {
               // Keep showing tools stage while either is running
             },
-            onToolsComplete: (toolCalls, toolResponses, usage) => {
-              // Update the last part with tool data
+            onToolsComplete: (
+              toolCalls,
+              toolResponses,
+              stateChanges,
+              usage
+            ) => {
+              // Update the last part with tool data including stateChanges
               const lastPartIndex = storyData.scene.parts.length - 1;
               if (lastPartIndex >= 0) {
                 storyData.scene.parts[lastPartIndex] = {
                   ...storyData.scene.parts[lastPartIndex],
                   toolCalls,
                   toolResponses,
+                  stateChanges:
+                    stateChanges.length > 0 ? stateChanges : undefined,
                 };
               }
 
@@ -4024,6 +4034,7 @@ function StoryPageContent() {
               logger.ai_response("Tools complete", {
                 toolCallsCount: toolCalls.length,
                 responsesCount: toolResponses.length,
+                stateChangesCount: stateChanges.length,
                 usage,
               });
             },
@@ -4250,14 +4261,16 @@ function StoryPageContent() {
           onToolsStart: () => {
             // Keep showing tools stage while either is running
           },
-          onToolsComplete: (toolCalls, toolResponses, usage) => {
-            // Update the last part with tool data
+          onToolsComplete: (toolCalls, toolResponses, stateChanges, usage) => {
+            // Update the last part with tool data including stateChanges
             const lastPartIndex = storyData.scene.parts.length - 1;
             if (lastPartIndex >= 0) {
               storyData.scene.parts[lastPartIndex] = {
                 ...storyData.scene.parts[lastPartIndex],
                 toolCalls,
                 toolResponses,
+                stateChanges:
+                  stateChanges.length > 0 ? stateChanges : undefined,
               };
             }
 
@@ -4271,6 +4284,7 @@ function StoryPageContent() {
             logger.ai_response("Tools complete (retry)", {
               toolCallsCount: toolCalls.length,
               responsesCount: toolResponses.length,
+              stateChangesCount: stateChanges.length,
               usage,
             });
           },

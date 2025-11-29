@@ -393,11 +393,25 @@ ${
 
   // Build story history messages (we'll prune from the front if needed)
   const historyMessages: ChatMessage[] = [];
-  for (const part of storyData.scene.parts) {
+  for (let i = 0; i < storyData.scene.parts.length; i++) {
+    const part = storyData.scene.parts[i];
     if (part.user) {
+      // Check if the previous part (assistant) had stateChanges to prepend
+      let userContent = part.content;
+      if (i > 0) {
+        const prevPart = storyData.scene.parts[i - 1];
+        if (
+          !prevPart.user &&
+          prevPart.stateChanges &&
+          prevPart.stateChanges.length > 0
+        ) {
+          const stateChangesStr = prevPart.stateChanges.join("\n- ");
+          userContent = `[Game State Updates from previous turn:\n- ${stateChangesStr}]\n\n${userContent}`;
+        }
+      }
       historyMessages.push({
         role: "user",
-        content: cleanString(part.content),
+        content: cleanString(userContent),
       });
     } else {
       // For story generation, we only need the narrative content, not tool calls/responses

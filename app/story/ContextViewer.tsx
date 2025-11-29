@@ -507,6 +507,47 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             })()}
           </>
         )}
+
+        {/* State Changes - Always visible when present (outside showInfo) */}
+        {!showInfo &&
+          (() => {
+            const lastAssistantPart = [...storyData.scene.parts]
+              .reverse()
+              .find((p) => !p.user);
+            if (
+              lastAssistantPart?.stateChanges &&
+              lastAssistantPart.stateChanges.length > 0
+            ) {
+              return (
+                <div className="text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-2 rounded">
+                  <div className="font-semibold text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1">
+                    <DynamicIcon name="Zap" className="w-3 h-3" />
+                    Pending State Changes (
+                    {lastAssistantPart.stateChanges.length})
+                  </div>
+                  <ul className="list-disc list-inside text-amber-800 dark:text-amber-300 space-y-0.5">
+                    {lastAssistantPart.stateChanges.map((change, i) => (
+                      <li key={i}>{change}</li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            } else if (
+              lastAssistantPart?.toolResponses &&
+              lastAssistantPart.toolResponses.length > 0
+            ) {
+              // Has tool responses but no stateChanges - this is an old part before the feature
+              return (
+                <div className="text-xs bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 p-2 rounded text-gray-600 dark:text-gray-400">
+                  <DynamicIcon name="Info" className="w-3 h-3 inline mr-1" />
+                  Last part has {lastAssistantPart.toolResponses.length} tool
+                  responses but no stateChanges (generated before feature was
+                  added).
+                </div>
+              );
+            }
+            return null;
+          })()}
       </div>
 
       {/* Messages List */}
