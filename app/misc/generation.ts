@@ -47,6 +47,7 @@ export interface GenerationOptions {
   maxToolLoops?: number;
   skipChoices?: boolean;
   customMaxContext?: number;
+  customMaxOutput?: number;
 }
 
 export interface GenerationCallbacks {
@@ -349,7 +350,7 @@ export async function generateStoryTurn(
       body: JSON.stringify({
         messages: storyPrompt.messages,
         model: options.storyModel,
-        maxTokens: 4000,
+        maxTokens: options.customMaxOutput || 4000,
         temperature: 0.7,
       }),
     });
@@ -448,7 +449,7 @@ export async function generateStoryTurn(
                 messages: toolPrompt.messages,
                 tools: TOOL_SCHEMAS,
                 model: currentModel,
-                maxTokens: 4000,
+                maxTokens: Math.min(options.customMaxOutput || 4000, 4000), // Cap tools at 4K
                 temperature: 0.3,
               }),
               signal: toolAbortController.signal,

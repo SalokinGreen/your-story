@@ -3,7 +3,7 @@ export const AI_MODELS = {
     name: "Grok 4 Fast",
     original_model: "Grok 4 Fast",
     model: "x-ai/grok-4-fast",
-    maxTokens: 400000,
+    maxTokens: 500000,
     maxOutputTokens: 8000,
     provider: "openrouter",
     supportsToolCalling: true,
@@ -237,6 +237,24 @@ export const AI_MODELS = {
       "A powerful and cost-effective model from Qwen, suitable for a variety of tasks including storytelling and content generation.",
     bannerUrl: undefined,
   },
+  "Mistral Nemo 12B": {
+    name: "Mistral Nemo 12B",
+    original_model: "mistralai/mistral-nemo",
+    model: "mistralai/mistral-nemo",
+    maxTokens: 131000,
+    maxOutputTokens: 4000,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.02,
+    outputPrice: 0.04,
+    finetunes: [],
+    strengths: ["extremely cost-effective"],
+    weaknesses: ["creativity", "logic"],
+    description:
+      "An extremely cost-effective model from Mistral, suitable for basic tasks where creativity and logic are less critical.",
+    bannerUrl: undefined,
+  },
 } as const;
 
 export interface ModelPreset {
@@ -304,6 +322,15 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     toolsModel: "Deepseek Chat",
     choicesModel: "microsoft/phi-4",
     estimatedCost: 3, // 1 + 1 + 1
+  },
+  cheap: {
+    id: "cheap",
+    name: "Budget",
+    description: "Affordable generation with basic capabilities",
+    storyModel: "Mistral Nemo 12B",
+    toolsModel: "Deepseek Chat",
+    choicesModel: "microsoft/phi-4",
+    estimatedCost: 1, // 1 + 1 + 1
   },
   custom: {
     id: "custom",

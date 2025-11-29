@@ -105,6 +105,13 @@ function AIModelSelector({
     }
     return 36000;
   });
+  const [customMaxOutput, setCustomMaxOutput] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("customMaxOutput");
+      return stored ? parseInt(stored, 10) : 4000; // Default 4K output
+    }
+    return 4000;
+  });
 
   // Model configuration for custom preset
   const [showModelConfig, setShowModelConfig] = useState(false);
@@ -517,6 +524,92 @@ function AIModelSelector({
           )}
           <p className="text-xs text-blue-300/50 mt-1">
             Lower = cheaper & faster • Higher = better story memory
+          </p>
+        </div>
+
+        {/* Max Output Slider */}
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-200">
+              Response Length
+            </span>
+            <span className="text-sm text-purple-300 font-medium">
+              {customMaxOutput === -1
+                ? "Custom"
+                : `${(customMaxOutput / 1000).toFixed(0)}K tokens`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-green-400 whitespace-nowrap">
+              ⚡ Fast
+            </span>
+            <div className="flex-1 relative">
+              {/* Slider track with gradient */}
+              <div className="h-2 rounded-full bg-linear-to-r from-green-600 via-blue-500 to-purple-600" />
+              {/* Tick marks */}
+              <div className="absolute top-0 left-0 right-0 h-2 flex justify-between px-0">
+                {[1000, 2000, 4000, 8000, -1].map((val) => (
+                  <button
+                    key={val}
+                    onClick={() => {
+                      const newValue = val;
+                      setCustomMaxOutput(newValue);
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem(
+                          "customMaxOutput",
+                          String(newValue)
+                        );
+                      }
+                    }}
+                    className={`w-4 h-4 rounded-full border-2 -mt-1 transition-all ${
+                      customMaxOutput === val
+                        ? "bg-white border-white scale-125 shadow-lg"
+                        : "bg-blue-900/80 border-blue-400/50 hover:border-white hover:scale-110"
+                    }`}
+                    title={
+                      val === -1 ? "Custom" : `${(val / 1000).toFixed(0)}K`
+                    }
+                  />
+                ))}
+              </div>
+              {/* Labels under ticks */}
+              <div className="flex justify-between mt-3 text-[10px] text-blue-300/70">
+                <span>1K</span>
+                <span>2K</span>
+                <span>4K</span>
+                <span>8K</span>
+                <span>⚙️</span>
+              </div>
+            </div>
+            <span className="text-xs text-purple-400 whitespace-nowrap">
+              📝 Length
+            </span>
+          </div>
+          {/* Custom input when Custom is selected */}
+          {customMaxOutput === -1 && (
+            <div className="flex items-center gap-2 mt-2 pl-16">
+              <input
+                type="number"
+                value={customMaxOutput === -1 ? "" : customMaxOutput}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10) || 0;
+                  if (val > 0) {
+                    setCustomMaxOutput(val);
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem("customMaxOutput", String(val));
+                    }
+                  }
+                }}
+                min="500"
+                step="500"
+                placeholder="Enter tokens..."
+                className="w-32 px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <span className="text-xs text-blue-300/50">tokens</span>
+            </div>
+          )}
+          <p className="text-xs text-blue-300/50 mt-1">
+            Lower = faster responses • Higher = longer story passages
           </p>
         </div>
 

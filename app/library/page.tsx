@@ -228,14 +228,14 @@ export default function LibraryPage() {
       confirmText: "Delete Story",
       confirmButtonClass: "bg-red-600 hover:bg-red-700",
       onConfirm: async () => {
-        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
           setDeleting(storyId);
 
           if (isOffline) {
             // Delete local story
             await deleteLocalStory(storyId);
-            setLocalStories(localStories.filter((s) => s.id !== storyId));
+            setLocalStories((prev) => prev.filter((s) => s.id !== storyId));
           } else {
             // Delete online story
             const response = await authenticatedFetch(
@@ -250,7 +250,7 @@ export default function LibraryPage() {
               throw new Error(error.error || "Failed to delete story");
             }
 
-            setStories(stories.filter((s) => s.id !== storyId));
+            setStories((prev) => prev.filter((s) => s.id !== storyId));
           }
 
           addNotification("Story deleted successfully", "success");
@@ -277,15 +277,15 @@ export default function LibraryPage() {
       confirmText: "Delete Adventure",
       confirmButtonClass: "bg-red-600 hover:bg-red-700",
       onConfirm: async () => {
-        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
           setDeleting(adventureId);
 
           if (isOffline) {
             // Delete local adventure using localAdventureManager
             await deleteLocalAdventure(adventureId);
-            setLocalAdventures(
-              localAdventures.filter((a) => a.id !== adventureId)
+            setLocalAdventures((prev) =>
+              prev.filter((a) => a.id !== adventureId)
             );
           } else {
             // Delete online adventure
@@ -301,7 +301,7 @@ export default function LibraryPage() {
               throw new Error(error.error || "Failed to delete adventure");
             }
 
-            setAdventures(adventures.filter((a) => a.id !== adventureId));
+            setAdventures((prev) => prev.filter((a) => a.id !== adventureId));
           }
 
           addNotification("Adventure deleted successfully", "success");
@@ -390,7 +390,7 @@ export default function LibraryPage() {
       confirmText: "Delete Folder",
       confirmButtonClass: "bg-orange-600 hover:bg-orange-700",
       onConfirm: async () => {
-        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
           const response = await authenticatedFetch(
             `/api/folders/${folderId}`,
@@ -404,13 +404,11 @@ export default function LibraryPage() {
             throw new Error(error.error || "Failed to delete folder");
           }
 
-          setFolders(folders.filter((f) => f.id !== folderId));
-          if (selectedFolder === folderId) {
-            setSelectedFolder(null);
-          }
+          setFolders((prev) => prev.filter((f) => f.id !== folderId));
+          setSelectedFolder((prev) => (prev === folderId ? null : prev));
           // Update stories to remove folder reference
-          setStories(
-            stories.map((s) =>
+          setStories((prev) =>
+            prev.map((s) =>
               s.folder_id === folderId ? { ...s, folder_id: null } : s
             )
           );
@@ -521,79 +519,78 @@ export default function LibraryPage() {
   const handleMassDelete = () => {
     if (selectedStories.size === 0) return;
 
+    // Capture the current selection and local story IDs to avoid stale closure
+    const storiesToDelete = Array.from(selectedStories);
+    // Create a set of local story IDs for quick lookup
+    const localStoryIds = new Set(localStories.map((s) => s.id));
+
     setConfirmDialog({
       isOpen: true,
       title: "Delete Multiple Stories?",
-      message: `Are you sure you want to delete ${selectedStories.size} ${
-        selectedStories.size === 1 ? "story" : "stories"
+      message: `Are you sure you want to delete ${storiesToDelete.length} ${
+        storiesToDelete.length === 1 ? "story" : "stories"
       }? This action cannot be undone.`,
       icon: "Trash2",
-      confirmText: `Delete ${selectedStories.size} ${
-        selectedStories.size === 1 ? "Story" : "Stories"
+      confirmText: `Delete ${storiesToDelete.length} ${
+        storiesToDelete.length === 1 ? "Story" : "Stories"
       }`,
       confirmButtonClass: "bg-red-600 hover:bg-red-700",
       onConfirm: async () => {
-        setConfirmDialog({ ...confirmDialog, isOpen: false });
-        try {
-          const deletePromises = Array.from(selectedStories).map(
-            async (storyId) => {
-              const isLocal = storyId.startsWith("local_");
-              if (isLocal) {
-                await deleteLocalStory(storyId);
-              } else {
-                const response = await authenticatedFetch(
-                  `/api/stories/${storyId}`,
-                  {
-                    method: "DELETE",
-                  }
-                );
-                if (!response.ok) {
-                  throw new Error(`Failed to delete story ${storyId}`);
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        
+        const deletedIds: string[] = [];
+        const failedIds: string[] = [];
+
+        // Process deletions sequentially to avoid race conditions
+        for (const storyId of storiesToDelete) {
+          try {
+            // Check if this story exists in localStories (not just by prefix)
+            const isLocalStory = localStoryIds.has(storyId);
+            
+            if (isLocalStory) {
+              // Delete from IndexedDB
+              await deleteLocalStory(storyId);
+              deletedIds.push(storyId);
+            } else {
+              // Delete from server
+              const response = await authenticatedFetch(
+                `/api/stories/${storyId}`,
+                {
+                  method: "DELETE",
                 }
+              );
+              if (response.ok) {
+                deletedIds.push(storyId);
+              } else {
+                failedIds.push(storyId);
               }
-              return storyId;
             }
-          );
-
-          // Use allSettled to continue even if some deletions fail
-          const results = await Promise.allSettled(deletePromises);
-
-          // Separate successful and failed deletions
-          const deletedIds = new Set<string>();
-          const failedCount = results.filter((r, index) => {
-            if (r.status === "fulfilled") {
-              deletedIds.add(r.value);
-              return false;
-            }
-            return true;
-          }).length;
-
-          // Update state for successfully deleted stories
-          setStories(stories.filter((s) => !deletedIds.has(s.id)));
-          setLocalStories(localStories.filter((s) => !deletedIds.has(s.id)));
-          setSelectedStories(new Set());
-          setSelectionMode(false);
-
-          if (failedCount > 0) {
-            addNotification(
-              `Deleted ${deletedIds.size} ${
-                deletedIds.size === 1 ? "story" : "stories"
-              }, ${failedCount} failed`,
-              "warning"
-            );
-          } else {
-            addNotification(
-              `${deletedIds.size} ${
-                deletedIds.size === 1 ? "story" : "stories"
-              } deleted successfully`,
-              "success"
-            );
+          } catch (error) {
+            console.error(`Failed to delete story ${storyId}:`, error);
+            failedIds.push(storyId);
           }
-        } catch (error: any) {
-          console.error("Error deleting stories:", error);
+        }
+
+        // Update state for successfully deleted stories
+        const deletedSet = new Set(deletedIds);
+        setStories((prev) => prev.filter((s) => !deletedSet.has(s.id)));
+        setLocalStories((prev) => prev.filter((s) => !deletedSet.has(s.id)));
+        setSelectedStories(new Set());
+        setSelectionMode(false);
+
+        if (failedIds.length > 0) {
           addNotification(
-            `Failed to delete some stories: ${error.message}`,
-            "failure"
+            `Deleted ${deletedIds.length} ${
+              deletedIds.length === 1 ? "story" : "stories"
+            }, ${failedIds.length} failed`,
+            "warning"
+          );
+        } else if (deletedIds.length > 0) {
+          addNotification(
+            `${deletedIds.length} ${
+              deletedIds.length === 1 ? "story" : "stories"
+            } deleted successfully`,
+            "success"
           );
         }
       },
