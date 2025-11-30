@@ -169,7 +169,7 @@ export const AI_MODELS = {
     name: "Phi 4",
     original_model: "microsoft/phi-4",
     model: "microsoft/phi-4",
-    maxTokens: 160000,
+    maxTokens: 16000,
     maxOutputTokens: 4000,
     provider: "openrouter",
     supportsToolCalling: true,
@@ -323,8 +323,8 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     choicesModel: "microsoft/phi-4",
     estimatedCost: 3, // 1 + 1 + 1
   },
-  cheap: {
-    id: "cheap",
+  budget: {
+    id: "budget",
     name: "Budget",
     description: "Affordable generation with basic capabilities",
     storyModel: "Mistral Nemo 12B",
