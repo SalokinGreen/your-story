@@ -17,6 +17,7 @@ import {
   Variable,
   NumberVariable,
   BooleanVariable,
+  StringVariable,
   ListVariable,
   Ability,
   AbilityCost,
@@ -4843,7 +4844,7 @@ function VariablesEditor({
   const [editVariable, setEditVariable] = useState<Partial<Variable>>({});
   const [newItemInput, setNewItemInput] = useState<string>("");
 
-  const addVariable = (type: "number" | "boolean" | "list") => {
+  const addVariable = (type: "number" | "boolean" | "string" | "list") => {
     const id = crypto.randomUUID();
     let newVar: Variable;
 
@@ -4864,6 +4865,15 @@ function VariablesEditor({
           description: "",
           type: "boolean",
           value: false,
+        };
+        break;
+      case "string":
+        newVar = {
+          id,
+          name: "New Text",
+          description: "",
+          type: "string",
+          value: "",
         };
         break;
       case "list":
@@ -4945,6 +4955,8 @@ function VariablesEditor({
         return "Hash";
       case "boolean":
         return "ToggleLeft";
+      case "string":
+        return "Type";
       case "list":
         return "List";
       default:
@@ -4958,6 +4970,8 @@ function VariablesEditor({
         return "cyan";
       case "boolean":
         return "emerald";
+      case "string":
+        return "amber";
       case "list":
         return "violet";
       default:
@@ -4986,6 +5000,13 @@ function VariablesEditor({
           >
             <DynamicIcon name="ToggleLeft" className="w-4 h-4" />
             Boolean
+          </button>
+          <button
+            onClick={() => addVariable("string")}
+            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-lg flex items-center gap-1"
+          >
+            <DynamicIcon name="Type" className="w-4 h-4" />
+            String
           </button>
           <button
             onClick={() => addVariable("list")}
@@ -5147,6 +5168,57 @@ function VariablesEditor({
                     </div>
                   )}
 
+                  {editVariable.type === "string" && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-blue-200 mb-1">
+                          Current Value
+                        </label>
+                        <input
+                          type="text"
+                          value={
+                            (editVariable as Partial<StringVariable>).value ??
+                            ""
+                          }
+                          onChange={(e) =>
+                            setEditVariable({
+                              ...editVariable,
+                              value: e.target.value,
+                            })
+                          }
+                          placeholder="Enter text value..."
+                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-blue-200 mb-1">
+                          Predefined Options (optional)
+                        </label>
+                        <p className="text-xs text-blue-300/50 mb-2">
+                          If set, the AI will prefer these values. One per line.
+                        </p>
+                        <textarea
+                          value={
+                            (
+                              editVariable as Partial<StringVariable>
+                            ).options?.join("\n") ?? ""
+                          }
+                          onChange={(e) =>
+                            setEditVariable({
+                              ...editVariable,
+                              options: e.target.value
+                                ? e.target.value.split("\n").filter((o) => o.trim())
+                                : undefined,
+                            })
+                          }
+                          placeholder="Monday&#10;Tuesday&#10;Wednesday&#10;..."
+                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+                          rows={4}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {editVariable.type === "list" && (
                     <div className="space-y-3">
                       <div>
@@ -5266,6 +5338,8 @@ function VariablesEditor({
                   ? "bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-800"
                   : variable.type === "boolean"
                   ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
+                  : variable.type === "string"
+                  ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
                   : "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800"
               }`}
             >
@@ -5277,6 +5351,8 @@ function VariablesEditor({
                       ? "text-cyan-500"
                       : variable.type === "boolean"
                       ? "text-emerald-500"
+                      : variable.type === "string"
+                      ? "text-amber-500"
                       : "text-violet-500"
                   }`}
                 />
@@ -5300,6 +5376,11 @@ function VariablesEditor({
                       {(variable as BooleanVariable).value ? "TRUE" : "FALSE"}
                     </span>
                   )}
+                  {variable.type === "string" && (
+                    <span className="text-sm px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                      &quot;{(variable as StringVariable).value || "(empty)"}&quot;
+                    </span>
+                  )}
                   {variable.type === "list" && (
                     <span className="text-sm px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-200">
                       {(variable as ListVariable).items.length} items
@@ -5321,6 +5402,25 @@ function VariablesEditor({
                       Range: {(variable as NumberVariable).minValue ?? "-∞"} to{" "}
                       {(variable as NumberVariable).maxValue ?? "∞"}
                     </p>
+                  )}
+                {/* Show string options if defined */}
+                {variable.type === "string" &&
+                  (variable as StringVariable).options &&
+                  (variable as StringVariable).options!.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(variable as StringVariable).options!.map((opt, i) => (
+                        <span
+                          key={i}
+                          className={`px-2 py-0.5 text-xs rounded ${
+                            opt === (variable as StringVariable).value
+                              ? "bg-amber-500/40 text-amber-200 font-semibold"
+                              : "bg-amber-500/20 text-amber-300"
+                          }`}
+                        >
+                          {opt}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 {/* Show list items preview */}
                 {variable.type === "list" &&

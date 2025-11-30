@@ -276,6 +276,10 @@ ${
               return `- ${v.name}: ${v.value ? "true" : "false"}${
                 v.description ? ` (${v.description})` : ""
               }`;
+            } else if (v.type === "string") {
+              return `- ${v.name}: "${v.value}"${
+                v.description ? ` (${v.description})` : ""
+              }`;
             } else {
               // list type
               const items = v.items.length ? v.items.join(", ") : "empty";

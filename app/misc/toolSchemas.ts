@@ -1336,7 +1336,7 @@ const setVariableTool: ToolSchema = {
   function: {
     name: "set_variable",
     description:
-      "Set a variable to a specific value. For numbers, supports dice notation (e.g., '3d6+5'). For booleans, set true/false. Cannot be used on list variables.",
+      "Set a variable to a specific value. For numbers, supports dice notation (e.g., '3d6+5'). For booleans, set true/false. For strings, set any text value. Cannot be used on list variables.",
     parameters: {
       type: "object",
       properties: {
@@ -1350,10 +1350,10 @@ const setVariableTool: ToolSchema = {
             { type: "boolean" },
             {
               type: "string",
-              description: "Dice notation like '2d6+3' for numbers",
+              description: "Text value for string variables, or dice notation like '2d6+3' for numbers",
             },
           ],
-          description: "Value to set: number, boolean, or dice notation string",
+          description: "Value to set: number, boolean, string text, or dice notation",
         },
       },
       required: ["name", "value"],

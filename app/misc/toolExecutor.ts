@@ -14,6 +14,7 @@ import {
   Variable,
   NumberVariable,
   BooleanVariable,
+  StringVariable,
   ListVariable,
 } from "@/app/misc/structs";
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
@@ -2101,6 +2102,36 @@ function executeVariableTool(
           command: toolName,
           success: true,
           message: `Set ${variable.name} to ${newValue}`,
+          timestamp: Date.now(),
+        };
+      }
+
+      if (variable.type === "string") {
+        const strValue = String(args.value);
+        const strVar = variable as StringVariable;
+        
+        // If options are defined, validate against them
+        if (strVar.options && strVar.options.length > 0) {
+          const validOption = strVar.options.find(
+            (opt) => opt.toLowerCase() === strValue.toLowerCase()
+          );
+          if (validOption) {
+            (storyData.variables![index] as StringVariable).value = validOption;
+          } else {
+            // Allow setting to any value, but log that it's outside predefined options
+            (storyData.variables![index] as StringVariable).value = strValue;
+          }
+        } else {
+          (storyData.variables![index] as StringVariable).value = strValue;
+        }
+        
+        logger.action(`Set string variable: ${variable.name} = "${strValue}"`, {
+          toolId,
+        });
+        return {
+          command: toolName,
+          success: true,
+          message: `Set ${variable.name} to "${strValue}"`,
           timestamp: Date.now(),
         };
       }

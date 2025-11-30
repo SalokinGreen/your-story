@@ -242,7 +242,7 @@ export interface CustomTable {
 }
 
 // Variables system - dynamic named values the AI and player can track
-export type VariableType = "number" | "boolean" | "list";
+export type VariableType = "number" | "boolean" | "string" | "list";
 
 export interface VariableBase {
   id: string; // Unique identifier
@@ -262,13 +262,19 @@ export interface BooleanVariable extends VariableBase {
   value: boolean;
 }
 
+export interface StringVariable extends VariableBase {
+  type: "string";
+  value: string; // Text value (e.g., "Monday", "Tavern District")
+  options?: string[]; // Optional predefined options to choose from
+}
+
 export interface ListVariable extends VariableBase {
   type: "list";
   items: string[]; // Array of items
   maxSize?: number; // Optional maximum list size
 }
 
-export type Variable = NumberVariable | BooleanVariable | ListVariable;
+export type Variable = NumberVariable | BooleanVariable | StringVariable | ListVariable;
 
 export interface StoryData {
   story_name: string;

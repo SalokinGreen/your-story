@@ -26,6 +26,7 @@ import {
   Variable,
   NumberVariable,
   BooleanVariable,
+  StringVariable,
   ListVariable,
   Ability,
   AbilityCost,
@@ -126,6 +127,8 @@ function VariableEditorCard({
         return "Hash";
       case "boolean":
         return "ToggleLeft";
+      case "string":
+        return "Type";
       case "list":
         return "List";
       default:
@@ -148,6 +151,13 @@ function VariableEditorCard({
           border: "border-emerald-800",
           text: "text-emerald-400",
           badge: "bg-emerald-500/20 text-emerald-300",
+        };
+      case "string":
+        return {
+          bg: "bg-amber-900/20",
+          border: "border-amber-800",
+          text: "text-amber-400",
+          badge: "bg-amber-500/20 text-amber-300",
         };
       case "list":
         return {
@@ -322,6 +332,50 @@ function VariableEditorCard({
             </div>
           )}
 
+          {editData.type === "string" && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-blue-200 mb-1">
+                  Default Value
+                </label>
+                <input
+                  type="text"
+                  value={(editData as StringVariable).value}
+                  onChange={(e) =>
+                    setEditData({
+                      ...editData,
+                      value: e.target.value,
+                    } as StringVariable)
+                  }
+                  placeholder="Enter default text..."
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-blue-200 mb-1">
+                  Predefined Options (optional)
+                </label>
+                <p className="text-xs text-blue-300/50 mb-2">
+                  If set, the AI will prefer these values. One per line.
+                </p>
+                <textarea
+                  value={(editData as StringVariable).options?.join("\n") ?? ""}
+                  onChange={(e) =>
+                    setEditData({
+                      ...editData,
+                      options: e.target.value
+                        ? e.target.value.split("\n").filter((o) => o.trim())
+                        : undefined,
+                    } as StringVariable)
+                  }
+                  placeholder="Monday&#10;Tuesday&#10;Wednesday&#10;..."
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+                  rows={4}
+                />
+              </div>
+            </div>
+          )}
+
           {editData.type === "list" && (
             <div className="space-y-3">
               <div>
@@ -446,6 +500,13 @@ function VariableEditorCard({
               {(variable as BooleanVariable).value ? "TRUE" : "FALSE"}
             </span>
           )}
+          {variable.type === "string" && (
+            <span
+              className={`text-sm px-2 py-0.5 rounded-full ${colors.badge}`}
+            >
+              &quot;{(variable as StringVariable).value || "(empty)"}&quot;
+            </span>
+          )}
           {variable.type === "list" && (
             <span
               className={`text-sm px-2 py-0.5 rounded-full ${colors.badge}`}
@@ -467,6 +528,25 @@ function VariableEditorCard({
               Range: {(variable as NumberVariable).minValue ?? "-∞"} to{" "}
               {(variable as NumberVariable).maxValue ?? "∞"}
             </p>
+          )}
+        {/* Show string options if defined */}
+        {variable.type === "string" &&
+          (variable as StringVariable).options &&
+          (variable as StringVariable).options!.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {(variable as StringVariable).options!.map((opt, i) => (
+                <span
+                  key={i}
+                  className={`px-2 py-0.5 text-xs rounded ${
+                    opt === (variable as StringVariable).value
+                      ? "bg-amber-500/40 text-amber-200 font-semibold"
+                      : "bg-amber-500/20 text-amber-300"
+                  }`}
+                >
+                  {opt}
+                </span>
+              ))}
+            </div>
           )}
         {/* Show list items preview */}
         {variable.type === "list" &&
@@ -9984,7 +10064,7 @@ function AdventureCreatorContent() {
                   Variables
                 </h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  Track custom values: numbers, flags, and lists
+                  Track custom values: numbers, flags, text, and lists
                 </p>
               </div>
             </div>
@@ -10022,6 +10102,22 @@ function AdventureCreatorContent() {
               >
                 <DynamicIcon name="ToggleLeft" className="w-4 h-4" />
                 Add Boolean
+              </button>
+              <button
+                onClick={() => {
+                  const newVar: StringVariable = {
+                    id: crypto.randomUUID(),
+                    name: "New Text",
+                    description: "",
+                    type: "string",
+                    value: "",
+                  };
+                  setVariables([...variables, newVar]);
+                }}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg flex items-center gap-2"
+              >
+                <DynamicIcon name="Type" className="w-4 h-4" />
+                Add String
               </button>
               <button
                 onClick={() => {
@@ -10069,7 +10165,8 @@ function AdventureCreatorContent() {
                   </p>
                   <p className="text-sm text-blue-400/50">
                     Variables let you track custom values like counters, flags,
-                    or lists of items that the AI can reference and modify.
+                    text (e.g., day of week, current location), or lists of
+                    items that the AI can reference and modify.
                   </p>
                 </div>
               )}
