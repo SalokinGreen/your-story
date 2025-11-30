@@ -1350,10 +1350,12 @@ const setVariableTool: ToolSchema = {
             { type: "boolean" },
             {
               type: "string",
-              description: "Text value for string variables, or dice notation like '2d6+3' for numbers",
+              description:
+                "Text value for string variables, or dice notation like '2d6+3' for numbers",
             },
           ],
-          description: "Value to set: number, boolean, string text, or dice notation",
+          description:
+            "Value to set: number, boolean, string text, or dice notation",
         },
       },
       required: ["name", "value"],
@@ -1486,7 +1488,8 @@ const createVariableTool: ToolSchema = {
       properties: {
         name: {
           type: "string",
-          description: "Variable name (e.g., 'Days Until Festival', 'Current Weather', 'Allies Met')",
+          description:
+            "Variable name (e.g., 'Days Until Festival', 'Current Weather', 'Allies Met')",
         },
         type: {
           type: "string",
@@ -1494,12 +1497,9 @@ const createVariableTool: ToolSchema = {
           description: "Variable type: number, boolean, string, or list",
         },
         value: {
-          oneOf: [
-            { type: "number" },
-            { type: "boolean" },
-            { type: "string" },
-          ],
-          description: "Initial value (for number/boolean/string types). Lists start empty.",
+          oneOf: [{ type: "number" }, { type: "boolean" }, { type: "string" }],
+          description:
+            "Initial value (for number/boolean/string types). Lists start empty.",
         },
         description: {
           type: "string",
@@ -1508,7 +1508,8 @@ const createVariableTool: ToolSchema = {
         options: {
           type: "array",
           items: { type: "string" },
-          description: "For string variables only: predefined options (e.g., ['Monday', 'Tuesday', ...])",
+          description:
+            "For string variables only: predefined options (e.g., ['Monday', 'Tuesday', ...])",
         },
         minValue: {
           type: "number",

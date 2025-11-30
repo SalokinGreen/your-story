@@ -5207,7 +5207,9 @@ function VariablesEditor({
                             setEditVariable({
                               ...editVariable,
                               options: e.target.value
-                                ? e.target.value.split("\n").filter((o) => o.trim())
+                                ? e.target.value
+                                    .split("\n")
+                                    .filter((o) => o.trim())
                                 : undefined,
                             })
                           }
@@ -5378,7 +5380,8 @@ function VariablesEditor({
                   )}
                   {variable.type === "string" && (
                     <span className="text-sm px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
-                      &quot;{(variable as StringVariable).value || "(empty)"}&quot;
+                      &quot;{(variable as StringVariable).value || "(empty)"}
+                      &quot;
                     </span>
                   )}
                   {variable.type === "list" && (

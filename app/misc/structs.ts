@@ -274,7 +274,11 @@ export interface ListVariable extends VariableBase {
   maxSize?: number; // Optional maximum list size
 }
 
-export type Variable = NumberVariable | BooleanVariable | StringVariable | ListVariable;
+export type Variable =
+  | NumberVariable
+  | BooleanVariable
+  | StringVariable
+  | ListVariable;
 
 export interface StoryData {
   story_name: string;
