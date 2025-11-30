@@ -122,9 +122,45 @@ export default function Story({
     };
   }, []);
 
-  // Handle STT transcript - submit as freeform action
-  const handleSTTTranscript = (text: string) => {
-    if (onActionConfirm && text.trim()) {
+  // Handle STT transcript - analyze action then submit as freeform action
+  const handleSTTTranscript = async (text: string) => {
+    if (!text.trim()) return;
+
+    // Analyze the action first (like ChoicesModal does)
+    if (onActionSubmit && onActionConfirm) {
+      try {
+        const result = await onActionSubmit(text.trim());
+        if (result) {
+          // Submit with analyzed mechanics (skill checks, tables, etc.)
+          const choice: Choice = {
+            text: text.trim(),
+            skill_used: result.analysis.skill_used || undefined,
+            skill_dc: result.analysis.skill_dc || undefined,
+            item_used: result.analysis.item_used || undefined,
+            ability_used: result.analysis.ability_used || undefined,
+            resource_used: result.analysis.resource_used || undefined,
+            mythic_check: result.analysis.mythic_check || undefined,
+            table: result.analysis.table || undefined,
+            stt_input: true,
+          };
+          onActionConfirm(choice);
+        } else {
+          // Analysis failed, submit as plain action
+          onActionConfirm({
+            text: text.trim(),
+            stt_input: true,
+          });
+        }
+      } catch (error) {
+        console.error("STT action analysis failed:", error);
+        // Fallback to plain action
+        onActionConfirm({
+          text: text.trim(),
+          stt_input: true,
+        });
+      }
+    } else if (onActionConfirm) {
+      // No analysis available, submit plain
       onActionConfirm({
         text: text.trim(),
         stt_input: true,
