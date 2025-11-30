@@ -1975,6 +1975,126 @@ export function executeCommandWithResponse(
     };
   }
 
+  // /lore_show: lore title
+  const loreShowMatch = trimmed.match(/^\/lore_show:\s*(.+)$/i);
+  if (loreShowMatch) {
+    const loreTitle = loreShowMatch[1].trim();
+
+    if (!storyData.lore) storyData.lore = [];
+
+    const matchResult = findLoreMatch(loreTitle, storyData.lore);
+    const loreEntry = matchResult?.item;
+
+    if (!loreEntry) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Lore "${loreTitle}" not found`,
+        timestamp,
+      };
+    }
+
+    if (loreEntry.on === true) {
+      const fuzzyNote =
+        matchResult && !matchResult.isExact
+          ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+              matchResult.score * 100
+            )}%)`
+          : "";
+      return {
+        command: trimmed,
+        success: "partial",
+        message: `Lore "${loreEntry.title}" was already visible${fuzzyNote}`,
+        timestamp,
+      };
+    }
+
+    loreEntry.on = true;
+    loreEntry.lastTriggeredIndex = storyData.scene.parts.length;
+
+    // Add to revealedLore on the last scene part (or create one if needed)
+    const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
+    if (lastPart) {
+      if (!lastPart.revealedLore) lastPart.revealedLore = [];
+      if (!lastPart.revealedLore.includes(loreEntry.title)) {
+        lastPart.revealedLore.push(loreEntry.title);
+      }
+    }
+
+    logger.action("Lore revealed via command response", {
+      title: loreEntry.title,
+    });
+
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
+        : "";
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Revealed lore "${loreEntry.title}"${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
+  // /lore_hide: lore title
+  const loreHideMatch = trimmed.match(/^\/lore_hide:\s*(.+)$/i);
+  if (loreHideMatch) {
+    const loreTitle = loreHideMatch[1].trim();
+
+    if (!storyData.lore) storyData.lore = [];
+
+    const matchResult = findLoreMatch(loreTitle, storyData.lore);
+    const loreEntry = matchResult?.item;
+
+    if (!loreEntry) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Lore "${loreTitle}" not found`,
+        timestamp,
+      };
+    }
+
+    if (loreEntry.on === false) {
+      const fuzzyNote =
+        matchResult && !matchResult.isExact
+          ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+              matchResult.score * 100
+            )}%)`
+          : "";
+      return {
+        command: trimmed,
+        success: "partial",
+        message: `Lore "${loreEntry.title}" was already hidden${fuzzyNote}`,
+        timestamp,
+      };
+    }
+
+    loreEntry.on = false;
+
+    logger.action("Lore hidden via command response", {
+      title: loreEntry.title,
+    });
+
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
+        : "";
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Hidden lore "${loreEntry.title}"${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
   // /lore_add_content: lore title | new text
   const loreAddMatch = trimmed.match(
     /^\/lore_add_content:\s*(.+?)\s*\|\s*(.+)$/i

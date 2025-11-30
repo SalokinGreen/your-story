@@ -537,7 +537,7 @@ export default function LibraryPage() {
       confirmButtonClass: "bg-red-600 hover:bg-red-700",
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        
+
         const deletedIds: string[] = [];
         const failedIds: string[] = [];
 
@@ -546,7 +546,7 @@ export default function LibraryPage() {
           try {
             // Check if this story exists in localStories (not just by prefix)
             const isLocalStory = localStoryIds.has(storyId);
-            
+
             if (isLocalStory) {
               // Delete from IndexedDB
               await deleteLocalStory(storyId);

@@ -688,4 +688,217 @@ describe("Tool Execution", () => {
       expect(stateChanges).toHaveLength(0);
     });
   });
+
+  describe("Lore Visibility Tools", () => {
+    test("should show lore entry that exists", () => {
+      const storyData = createTestStory();
+      storyData.lore = [
+        {
+          title: "Containment Wards",
+          content: "Ancient magical barriers that keep evil at bay",
+          on: false,
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          on_triggers: [],
+          off_triggers: [],
+        },
+      ];
+      storyData.scene.parts.push({
+        text: "You discover ancient writing on the wall.",
+      });
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "show_lore",
+            arguments: {
+              title: "Containment Wards",
+            },
+          },
+        },
+      ];
+
+      const { responses, stateChanges } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(true);
+      expect(responses[0].message).toContain("Revealed lore");
+      expect(storyData.lore[0].on).toBe(true);
+      expect(storyData.scene.parts[0].revealedLore).toContain(
+        "Containment Wards"
+      );
+      expect(stateChanges.length).toBeGreaterThan(0);
+    });
+
+    test("should handle show_lore with fuzzy matching", () => {
+      const storyData = createTestStory();
+      storyData.lore = [
+        {
+          title: "The Ancient Prophecy",
+          content: "A prophecy about the chosen one",
+          on: false,
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          on_triggers: [],
+          off_triggers: [],
+        },
+      ];
+      storyData.scene.parts.push({
+        text: "You find an old scroll.",
+      });
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "show_lore",
+            arguments: {
+              title: "Ancient Prophecy", // Missing "The" - should still match
+            },
+          },
+        },
+      ];
+
+      const { responses } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(true);
+      expect(storyData.lore[0].on).toBe(true);
+    });
+
+    test("should fail show_lore when lore not found", () => {
+      const storyData = createTestStory();
+      storyData.lore = [];
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "show_lore",
+            arguments: {
+              title: "Nonexistent Lore",
+            },
+          },
+        },
+      ];
+
+      const { responses } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(false);
+      expect(responses[0].message).toContain("not found");
+    });
+
+    test("should return partial success if lore already visible", () => {
+      const storyData = createTestStory();
+      storyData.lore = [
+        {
+          title: "Known Secret",
+          content: "Something everyone knows",
+          on: true,
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          on_triggers: [],
+          off_triggers: [],
+        },
+      ];
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "show_lore",
+            arguments: {
+              title: "Known Secret",
+            },
+          },
+        },
+      ];
+
+      const { responses } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe("partial");
+      expect(responses[0].message).toContain("already visible");
+    });
+
+    test("should hide lore entry that exists", () => {
+      const storyData = createTestStory();
+      storyData.lore = [
+        {
+          title: "Temporary Knowledge",
+          content: "Information that fades from memory",
+          on: true,
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          on_triggers: [],
+          off_triggers: [],
+        },
+      ];
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "hide_lore",
+            arguments: {
+              title: "Temporary Knowledge",
+            },
+          },
+        },
+      ];
+
+      const { responses, stateChanges } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(true);
+      expect(responses[0].message).toContain("Hidden lore");
+      expect(storyData.lore[0].on).toBe(false);
+      expect(stateChanges.length).toBeGreaterThan(0);
+    });
+
+    test("should return partial success if lore already hidden", () => {
+      const storyData = createTestStory();
+      storyData.lore = [
+        {
+          title: "Hidden Lore",
+          content: "Already hidden",
+          on: false,
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          on_triggers: [],
+          off_triggers: [],
+        },
+      ];
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "hide_lore",
+            arguments: {
+              title: "Hidden Lore",
+            },
+          },
+        },
+      ];
+
+      const { responses } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe("partial");
+      expect(responses[0].message).toContain("already hidden");
+    });
+  });
 });
