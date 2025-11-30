@@ -1076,6 +1076,11 @@ CHARACTER PRESETS (${presetCount}):
 Different character builds/classes players can choose. Each has unique stats, resources, inventory, and abilities.
 Presets should offer meaningfully different playstyles.
 
+IMPORTANT: Each preset MUST include abilities. Use the abilities generated in the mechanics stage as a base:
+- Give each preset a subset of the available abilities that fits their playstyle
+- You may also create 1-2 unique abilities per preset for specialization
+- Adjust ability grades to reflect each preset's proficiency
+
 STAT VALUES FOR PRESETS:
 - Range: 1-100 where 50 is human average
 - Player characters typically have 40-70 in most stats
@@ -1238,25 +1243,49 @@ export function buildBigAdventureMessages(
       previousResults.storyTemplate?.stats &&
       previousResults.storyTemplate.stats.length > 0
     ) {
-      contextMessage += `Stats: ${previousResults.storyTemplate.stats
-        .map((s) => s.name)
-        .join(", ")}\n`;
+      // For advanced stage, include full stat details for preset creation
+      if (stage === "advanced") {
+        contextMessage += `\nStats (use these for presets, adjust values per build):\n`;
+        previousResults.storyTemplate.stats.forEach((s) => {
+          contextMessage += `- ${s.name} (${s.symbol || "📊"}): ${s.description || "No description"} [Default: ${s.value}]\n`;
+        });
+      } else {
+        contextMessage += `Stats: ${previousResults.storyTemplate.stats
+          .map((s) => s.name)
+          .join(", ")}\n`;
+      }
     }
     if (
       previousResults.storyTemplate?.resources &&
       previousResults.storyTemplate.resources.length > 0
     ) {
-      contextMessage += `Resources: ${previousResults.storyTemplate.resources
-        .map((r) => r.name)
-        .join(", ")}\n`;
+      // For advanced stage, include full resource details for preset creation
+      if (stage === "advanced") {
+        contextMessage += `\nResources (use these for presets, adjust values per build):\n`;
+        previousResults.storyTemplate.resources.forEach((r) => {
+          contextMessage += `- ${r.name} (${r.symbol || "📦"}): ${r.description || "No description"} [Default: ${r.value}/${r.maxValue}]\n`;
+        });
+      } else {
+        contextMessage += `Resources: ${previousResults.storyTemplate.resources
+          .map((r) => r.name)
+          .join(", ")}\n`;
+      }
     }
     if (
       previousResults.storyTemplate?.abilities &&
       previousResults.storyTemplate.abilities.length > 0
     ) {
-      contextMessage += `Abilities: ${previousResults.storyTemplate.abilities
-        .map((a) => a.name)
-        .join(", ")}\n`;
+      contextMessage += `\nAbilities:\n`;
+      previousResults.storyTemplate.abilities.forEach((a) => {
+        contextMessage += `- ${a.name} (${a.grade || "novice"}): ${a.description || "No description"}`;
+        if (a.cost && a.cost.length > 0) {
+          contextMessage += ` [Cost: ${a.cost.map((c) => `${c.amount} ${c.name}`).join(", ")}]`;
+        }
+        if (a.cooldown) {
+          contextMessage += ` [Cooldown: ${a.cooldown} turns]`;
+        }
+        contextMessage += `\n`;
+      });
     }
     if (
       previousResults.storyTemplate?.variables &&
