@@ -84,6 +84,9 @@ function AIModelSelector({
   const [openRouterKey, setOpenRouterKey] = useState("");
   const [speechifyKey, setSpeechifyKey] = useState("");
   const [deepgramKey, setDeepgramKey] = useState("");
+  const [novelaiKey, setNovelaiKey] = useState("");
+  const [novelaiEnabled, setNovelaiEnabled] = useState(false);
+  const [novelaiTemperature, setNovelaiTemperature] = useState(1);
   const [sttEnabled, setSttEnabled] = useState(true);
   const [byokEnabled, setByokEnabled] = useState(false);
   const [isSubscriber, setIsSubscriber] = useState(false);
@@ -161,6 +164,10 @@ function AIModelSelector({
         setOpenRouterKey(localStorage.getItem("openRouterKey") || "");
         setSpeechifyKey(localStorage.getItem("speechifyKey") || "");
         setDeepgramKey(localStorage.getItem("deepgramKey") || "");
+        setNovelaiKey(localStorage.getItem("novelaiKey") || "");
+        setNovelaiEnabled(localStorage.getItem("novelaiEnabled") === "true");
+        const storedTemp = localStorage.getItem("novelaiTemperature");
+        if (storedTemp) setNovelaiTemperature(parseFloat(storedTemp));
         setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
         const toolCalling = localStorage.getItem("toolCallingEnabled");
         if (toolCalling !== null) {
@@ -299,6 +306,9 @@ function AIModelSelector({
       localStorage.setItem("openRouterKey", openRouterKey);
       localStorage.setItem("speechifyKey", speechifyKey);
       localStorage.setItem("deepgramKey", deepgramKey);
+      localStorage.setItem("novelaiKey", novelaiKey);
+      localStorage.setItem("novelaiEnabled", novelaiEnabled.toString());
+      localStorage.setItem("novelaiTemperature", novelaiTemperature.toString());
       localStorage.setItem("sttEnabled", sttEnabled.toString());
     }
 
@@ -939,6 +949,69 @@ function AIModelSelector({
                   className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm font-mono"
                 />
               </div>
+            </div>
+
+            {/* NovelAI Settings */}
+            <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-600">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>📖</span> NovelAI (Story Stage)
+                </h4>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-xs text-blue-200">
+                    {novelaiEnabled ? "Enabled" : "Disabled"}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={novelaiEnabled}
+                    onChange={(e) => setNovelaiEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="relative w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
+                </label>
+              </div>
+              <p className="text-xs text-blue-300/60">
+                Use your own NovelAI API key for story generation. Tools and choices will still use our service.
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                  NovelAI API Key (BYOK)
+                </label>
+                <input
+                  type={showKeys ? "text" : "password"}
+                  value={novelaiKey}
+                  onChange={(e) => setNovelaiKey(e.target.value)}
+                  placeholder="pst-..."
+                  disabled={!novelaiEnabled}
+                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-sm font-mono disabled:opacity-50"
+                />
+              </div>
+              {novelaiEnabled && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                    Temperature: {novelaiTemperature.toFixed(2)}
+                  </label>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="2"
+                    step="0.05"
+                    value={novelaiTemperature}
+                    onChange={(e) => setNovelaiTemperature(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-blue-900/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  />
+                  <div className="flex justify-between text-xs text-blue-300/50 mt-1">
+                    <span>Focused</span>
+                    <span>Balanced</span>
+                    <span>Creative</span>
+                  </div>
+                </div>
+              )}
+              {novelaiEnabled && !novelaiKey && (
+                <p className="text-xs text-amber-400">
+                  ⚠️ Enter your NovelAI API key to use this feature
+                </p>
+              )}
             </div>
 
             {/* Custom Model Config */}

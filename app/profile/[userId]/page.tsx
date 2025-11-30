@@ -425,11 +425,11 @@ export default function ProfilePage() {
                       </span>
                       <span
                         className={`px-1.5 py-0.5 rounded text-xs capitalize ${
-                          adventure.difficulty === "Easy"
+                          adventure.difficulty === "easy"
                             ? "bg-green-500/20 text-green-300"
-                            : adventure.difficulty === "Medium"
+                            : adventure.difficulty === "medium"
                             ? "bg-yellow-500/20 text-yellow-300"
-                            : adventure.difficulty === "Hard"
+                            : adventure.difficulty === "hard"
                             ? "bg-orange-500/20 text-orange-300"
                             : "bg-red-500/20 text-red-300"
                         }`}

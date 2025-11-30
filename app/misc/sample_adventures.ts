@@ -13,7 +13,7 @@ export const sampleAdventures: Adventure[] = [
     thumbnailUrl: undefined,
     bannerUrl: undefined,
     tags: ["Fantasy", "Combat", "Exploration", "Dark"],
-    difficulty: "Medium",
+    difficulty: "medium",
     estimatedDuration: "3-4 hours",
     popularity: 8500,
     rating: 4.7,
@@ -36,7 +36,7 @@ export const sampleAdventures: Adventure[] = [
     thumbnailUrl: undefined,
     bannerUrl: undefined,
     tags: ["Sci-Fi", "Post-Apocalyptic", "Mechs", "Survival"],
-    difficulty: "Hard",
+    difficulty: "hard",
     estimatedDuration: "4-5 hours",
     popularity: 9200,
     rating: 4.8,
@@ -57,7 +57,7 @@ export const sampleAdventures: Adventure[] = [
     author: "System",
     authorId: "system",
     tags: ["Fantasy", "Magic", "Puzzle", "Adventure"],
-    difficulty: "Easy",
+    difficulty: "easy",
     estimatedDuration: "2-3 hours",
     popularity: 6800,
     rating: 4.5,
@@ -98,7 +98,7 @@ export const sampleAdventures: Adventure[] = [
     author: "System",
     authorId: "system",
     tags: ["Cyberpunk", "Stealth", "Hacking", "Noir"],
-    difficulty: "Medium",
+    difficulty: "medium",
     estimatedDuration: "3-4 hours",
     popularity: 7600,
     rating: 4.6,
@@ -139,7 +139,7 @@ export const sampleAdventures: Adventure[] = [
     author: "System",
     authorId: "system",
     tags: ["Historical", "Pirates", "Naval Combat", "Adventure"],
-    difficulty: "Medium",
+    difficulty: "medium",
     estimatedDuration: "3-4 hours",
     popularity: 8100,
     rating: 4.6,
@@ -180,7 +180,7 @@ export const sampleAdventures: Adventure[] = [
     author: "System",
     authorId: "system",
     tags: ["Mystery", "Sci-Fi", "Detective", "Mind-Bending"],
-    difficulty: "Hard",
+    difficulty: "hard",
     estimatedDuration: "4-5 hours",
     popularity: 6200,
     rating: 4.7,
@@ -227,7 +227,7 @@ export function filterAdventures(
   filters: {
     searchQuery?: string;
     tags?: string[];
-    difficulty?: ("Easy" | "Medium" | "Hard" | "Expert")[];
+    difficulty?: ("easy" | "medium" | "hard" | "expert")[];
     sortBy?: "popularity" | "newest" | "rating" | "title";
   }
 ): Adventure[] {

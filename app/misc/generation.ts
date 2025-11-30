@@ -48,6 +48,10 @@ export interface GenerationOptions {
   skipChoices?: boolean;
   customMaxContext?: number;
   customMaxOutput?: number;
+  // NovelAI BYOK support (story stage only)
+  novelaiEnabled?: boolean;
+  novelaiKey?: string;
+  novelaiTemperature?: number;
 }
 
 export interface GenerationCallbacks {
@@ -341,19 +345,42 @@ export async function generateStoryTurn(
       );
     }
 
-    const storyResponse = await fetch("/api/generate-stream", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        messages: storyPrompt.messages,
-        model: options.storyModel,
-        maxTokens: options.customMaxOutput || 4000,
-        temperature: 0.7,
-      }),
-    });
+    // Determine which API to use for story generation
+    const useNovelAI = options.novelaiEnabled && options.novelaiKey;
+
+    let storyResponse: Response;
+    if (useNovelAI) {
+      // Use NovelAI for story generation (BYOK)
+      logger.action("Using NovelAI for story generation (BYOK)");
+      storyResponse = await fetch("/api/novelai/generate-stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          messages: storyPrompt.messages,
+          novelaiKey: options.novelaiKey,
+          maxTokens: options.customMaxOutput || 2000,
+          temperature: options.novelaiTemperature ?? 1,
+        }),
+      });
+    } else {
+      // Use standard API (DeepSeek/OpenRouter)
+      storyResponse = await fetch("/api/generate-stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          messages: storyPrompt.messages,
+          model: options.storyModel,
+          maxTokens: options.customMaxOutput || 4000,
+          temperature: 0.7,
+        }),
+      });
+    }
 
     if (!storyResponse.ok) {
       const errorText = await storyResponse.text().catch(() => "");

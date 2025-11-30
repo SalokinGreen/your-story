@@ -682,7 +682,7 @@ export default function UpgradesPage({
                     const alreadyOwned = storyData.abilities?.some(
                       (a) => a.name === shopAbility.name
                     );
-                    const gradeConfig = ABILITY_GRADE_CONFIG[shopAbility.grade];
+                    const gradeConfig = ABILITY_GRADE_CONFIG[shopAbility.grade] || ABILITY_GRADE_CONFIG.novice;
                     return (
                       <div
                         key={index}

@@ -492,7 +492,7 @@ export interface Adventure {
   thumbnailUrl?: string;
   bannerUrl?: string;
   tags: string[];
-  difficulty: "Easy" | "Medium" | "Hard" | "Expert";
+  difficulty: "easy" | "medium" | "hard" | "expert";
   visibility?: "public" | "hidden" | "private"; // Controls who can see the adventure
   estimatedDuration: string; // e.g., "2-3 hours"
   popularity: number; // For sorting/ranking
@@ -512,7 +512,7 @@ export interface Adventure {
 export interface AdventureFilter {
   searchQuery?: string;
   tags?: string[];
-  difficulty?: ("Easy" | "Medium" | "Hard" | "Expert")[];
+  difficulty?: ("easy" | "medium" | "hard" | "expert")[];
   sortBy?: "popularity" | "newest" | "rating" | "title";
 }
 

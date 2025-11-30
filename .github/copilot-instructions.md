@@ -80,6 +80,8 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - Backend is just a thin AI proxy (no storyData parsing or tool execution)
 - app/api/generate/route.ts: **Thin AI proxy** (non-streaming). Accepts { messages, tools?, model, maxTokens, temperature }. Validates auth, checks tokens, forwards to AI provider (DeepSeek/OpenRouter), returns { content, toolCalls?, meta }.
 - app/api/generate-stream/route.ts: **Thin AI proxy** (SSE streaming). Same interface as /api/generate. Streams events: { type: "content", content }, { type: "tool_calls", toolCalls }, { type: "done", meta }.
+- app/api/novelai/generate-stream/route.ts: **NovelAI BYOK proxy** (SSE streaming). Accepts { messages, novelaiKey, maxTokens, temperature }. Converts chat messages to completion prompt, forwards to NovelAI GLM-4-6, streams back. No token deduction (BYOK). Story stage only.
+- app/misc/novelai.ts: NovelAI types and utilities. Exports NOVELAI_MODEL ("glm-4-6"), NOVELAI_DEFAULT_PARAMS, convertMessagesToPrompt(), buildNovelAIRequest(), NOVELAI_CONTEXT_SIZE (8192).
 - app/api/tts/generate/route.ts: POST endpoint for Speechify text-to-speech generation; deducts dynamic tokens per generation; returns audio blob with token metadata.
 - app/api/stt/transcribe/route.ts: POST endpoint for Deepgram speech-to-text transcription; accepts FormData with audio file; deducts 2 tokens per transcription; supports BYOK via deepgramKey field; returns { transcript, language, tokenCost, tokenBalance }.
 
@@ -177,6 +179,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Toast notifications via NotificationContext; use addNotification("message", "success"|"failure"|"warning").
 - Profile page: Admin controls must always be at the very bottom (see comment in profile/[userId]/page.tsx).
 - **AI Config Menu**: Model selection saved to localStorage as "aiPreset", with presets defined in MODEL_PRESETS. Custom presets allow per-stage model overrides.
+- **NovelAI Settings**: BYOK integration for story generation only. Settings saved to localStorage (novelaiEnabled, novelaiKey, novelaiTemperature). When enabled, story stage uses NovelAI GLM-4-6 while tools/choices stages continue using our service. No token cost for NovelAI (user's own API key).
 - **TTS Settings**: All TTS preferences saved to localStorage (ttsEnabled, ttsLastVoice, ttsAutoGenerate, ttsVolume, ttsCustomVoices).
 - **STT Settings**: Speech-to-text preferences saved to localStorage (sttEnabled, deepgramKey). STTButton in ChoicesModal sends audio to /api/stt/transcribe with auto-stop after 3s silence.
 - **Hidden Messages**: AI can use ||double pipes|| syntax for hidden text (DM notes). Players can't see hidden text unless "showHiddenMessages" is enabled in localStorage. When revealed, hidden text appears with purple highlighting.

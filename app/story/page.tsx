@@ -58,11 +58,19 @@ function getModelsFromPreset() {
       storyModel: preset.storyModel,
       toolsModel: preset.toolsModel,
       choicesModel: preset.choicesModel,
+      novelaiEnabled: false,
+      novelaiKey: "",
+      novelaiTemperature: 1,
     };
   }
 
   const currentPreset = localStorage.getItem("aiPreset") || "main";
   const preset = MODEL_PRESETS[currentPreset];
+
+  // NovelAI settings (BYOK for story stage only)
+  const novelaiEnabled = localStorage.getItem("novelaiEnabled") === "true";
+  const novelaiKey = localStorage.getItem("novelaiKey") || "";
+  const novelaiTemperature = parseFloat(localStorage.getItem("novelaiTemperature") || "1");
 
   // For custom preset, check if user has overridden any models
   if (currentPreset === "custom") {
@@ -71,6 +79,9 @@ function getModelsFromPreset() {
       toolsModel: localStorage.getItem("aiModelTools") || preset.toolsModel,
       choicesModel:
         localStorage.getItem("aiModelChoices") || preset.choicesModel,
+      novelaiEnabled,
+      novelaiKey,
+      novelaiTemperature,
     };
   }
 
@@ -79,6 +90,9 @@ function getModelsFromPreset() {
     storyModel: preset.storyModel,
     toolsModel: preset.toolsModel,
     choicesModel: preset.choicesModel,
+    novelaiEnabled,
+    novelaiKey,
+    novelaiTemperature,
   };
 }
 
@@ -2375,7 +2389,7 @@ function StoryPageContent() {
     //ProcessLoretriggersafteruserinput
     processLoreTriggers(storyData, addNotification);
 
-    const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
+    const { storyModel, toolsModel, choicesModel, novelaiEnabled, novelaiKey, novelaiTemperature } = getModelsFromPreset();
     const toolCallingEnabled =
       typeof window !== "undefined"
         ? localStorage.getItem("toolCallingEnabled") !== "false"
@@ -2386,6 +2400,7 @@ function StoryPageContent() {
       toolsModel,
       choicesModel,
       toolCallingEnabled,
+      novelaiEnabled,
     });
 
     // Track partial scene part as we stream
@@ -2432,6 +2447,9 @@ function StoryPageContent() {
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
+          novelaiEnabled: novelaiEnabled && !!novelaiKey,
+          novelaiKey,
+          novelaiTemperature,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -4222,7 +4240,7 @@ function StoryPageContent() {
     //ProcessLoretriggersafteruserchoice
     processLoreTriggers(storyData, addNotification);
 
-    const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
+    const { storyModel, toolsModel, choicesModel, novelaiEnabled, novelaiKey, novelaiTemperature } = getModelsFromPreset();
     const toolCallingEnabled =
       typeof window !== "undefined"
         ? localStorage.getItem("toolCallingEnabled") !== "false"
@@ -4233,6 +4251,7 @@ function StoryPageContent() {
       toolsModel,
       choicesModel,
       toolCallingEnabled,
+      novelaiEnabled,
     });
 
     // Track partial scene part as we stream
@@ -4295,6 +4314,9 @@ function StoryPageContent() {
               customMaxContext > 0 ? customMaxContext : undefined,
             customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
             skipChoices: !!actionChoice, // Skip choices generation in freeform action mode
+            novelaiEnabled: novelaiEnabled && !!novelaiKey,
+            novelaiKey,
+            novelaiTemperature,
           },
           {
             onStoryContent: (chunk: string, fullContent: string) => {
@@ -4514,7 +4536,7 @@ function StoryPageContent() {
     addNotification("Regenerating response...", "info");
     logger.action("User requested retry");
 
-    const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
+    const { storyModel, toolsModel, choicesModel, novelaiEnabled, novelaiKey, novelaiTemperature } = getModelsFromPreset();
     const toolCallingEnabled =
       typeof window !== "undefined"
         ? localStorage.getItem("toolCallingEnabled") !== "false"
@@ -4525,6 +4547,7 @@ function StoryPageContent() {
       toolsModel,
       choicesModel,
       toolCallingEnabled,
+      novelaiEnabled,
     });
 
     // Track partial scene part as we stream
@@ -4571,6 +4594,9 @@ function StoryPageContent() {
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
+          novelaiEnabled: novelaiEnabled && !!novelaiKey,
+          novelaiKey,
+          novelaiTemperature,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {

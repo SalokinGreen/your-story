@@ -76,15 +76,15 @@ export default function AdventureDetailPage() {
 
           // Convert LocalAdventure to Adventure format
           const difficultyValue = localAdventure.adventureData.difficulty;
-          let normalizedDifficulty: "Easy" | "Medium" | "Hard" | "Expert" =
-            "Medium";
+          let normalizedDifficulty: "easy" | "medium" | "hard" | "expert" =
+            "medium";
 
           if (difficultyValue) {
             const lower = difficultyValue.toLowerCase();
-            if (lower === "easy") normalizedDifficulty = "Easy";
-            else if (lower === "medium") normalizedDifficulty = "Medium";
-            else if (lower === "hard") normalizedDifficulty = "Hard";
-            else if (lower === "expert") normalizedDifficulty = "Expert";
+            if (lower === "easy") normalizedDifficulty = "easy";
+            else if (lower === "medium") normalizedDifficulty = "medium";
+            else if (lower === "hard") normalizedDifficulty = "hard";
+            else if (lower === "expert") normalizedDifficulty = "expert";
           }
 
           const adventure: Adventure = {

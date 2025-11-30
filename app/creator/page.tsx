@@ -626,8 +626,8 @@ function AdventureCreatorContent() {
   const [shortDescription, setShortDescription] = useState("");
   const [description, setDescription] = useState("");
   const [difficulty, setDifficulty] = useState<
-    "Easy" | "Medium" | "Hard" | "Expert"
-  >("Medium");
+    "easy" | "medium" | "hard" | "expert"
+  >("medium");
   const [rpgSystem, setRpgSystem] = useState<
     | "3d6"
     | "1d20"
@@ -1263,7 +1263,7 @@ function AdventureCreatorContent() {
         setTitle(adventure.title || "");
         setShortDescription(adventure.shortDescription || "");
         setDescription(adventure.description || "");
-        setDifficulty(adventure.difficulty || "Medium");
+        setDifficulty(adventure.difficulty || "medium");
         setRpgSystem(adventure.storyTemplate?.rpgSystem || "3d6");
         setVisibility(adventure.visibility || "public");
         setNsfw(adventure.nsfw || false);
@@ -2839,7 +2839,7 @@ function AdventureCreatorContent() {
         thumbnailUrl: thumbnailUrl || "",
         bannerUrl: bannerUrl || "",
         tags,
-        difficulty: difficulty as "Easy" | "Medium" | "Hard" | "Expert",
+        difficulty,
         nsfw,
         estimatedDuration: "1-2 hours",
         storyTemplate: storyData,
@@ -2891,7 +2891,7 @@ function AdventureCreatorContent() {
       setTitle("");
       setShortDescription("");
       setDescription("");
-      setDifficulty("Medium");
+      setDifficulty("medium");
       setRpgSystem("3d6");
       setVisibility("private");
       setNsfw(false);
@@ -3329,11 +3329,11 @@ function AdventureCreatorContent() {
                 Difficulty
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {(["Easy", "Medium", "Hard", "Expert"] as const).map((diff) => (
+                {(["easy", "medium", "hard", "expert"] as const).map((diff) => (
                   <button
                     key={diff}
                     onClick={() => setDifficulty(diff)}
-                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
+                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all capitalize ${
                       difficulty === diff
                         ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
                         : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
@@ -11617,6 +11617,16 @@ function AdventureCreatorContent() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {!editAdventureId && (
+                <button
+                  onClick={() => router.push("/creator/generate")}
+                  className="flex items-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
+                  title="Generate a full adventure from a single prompt"
+                >
+                  <DynamicIcon name="Sparkles" className="w-4 h-4" />
+                  <span className="hidden sm:inline">Big Creator</span>
+                </button>
+              )}
               <button
                 onClick={() => setIsAIMenuOpen(true)}
                 className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"

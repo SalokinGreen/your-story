@@ -452,7 +452,7 @@ export default function StatsPage(storyData: StoryData) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {storyData.inventory.map((item, index) => {
                     const grade = (item.grade || "common") as ItemGrade;
-                    const gradeConfig = GRADE_CONFIG[grade];
+                    const gradeConfig = GRADE_CONFIG[grade] || GRADE_CONFIG.common;
                     const maxDurability =
                       item.maxDurability || getMaxDurability(grade);
                     const durability = item.durability ?? maxDurability;
@@ -577,7 +577,7 @@ export default function StatsPage(storyData: StoryData) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {storyData.abilities.map((ability, index) => {
                     const gradeConfig =
-                      ABILITY_GRADE_CONFIG[ability.grade || "novice"];
+                      ABILITY_GRADE_CONFIG[ability.grade || "novice"] || ABILITY_GRADE_CONFIG.novice;
                     const isOnCooldown = (ability.currentCooldown ?? 0) > 0;
                     const cooldownPercent =
                       ability.cooldown && ability.cooldown > 0
