@@ -194,7 +194,8 @@ export function buildInfoMessage(storyData: StoryData): string {
       : "";
 
   // Build quests section if any exist
-  const activeQuests = storyData.quests?.filter((q) => q.active && !q.fulfilled) || [];
+  const activeQuests =
+    storyData.quests?.filter((q) => q.active && !q.fulfilled) || [];
   const inactiveQuests =
     storyData.quests?.filter((q) => !q.active && !q.fulfilled) || [];
   const questsSection =

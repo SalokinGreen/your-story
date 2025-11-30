@@ -9,7 +9,6 @@ import {
   findItemMatch,
 } from "../misc/fuzzyMatch";
 import { getRPGSystem } from "../misc/rpgSystems";
-import STTButton from "./STTButton";
 
 interface ChoicesModalProps {
   isOpen: boolean;
@@ -56,8 +55,6 @@ export default function ChoicesModal({
   const [actionText, setActionText] = useState("");
   const [analyzingAction, setAnalyzingAction] = useState(false);
   const [showActionBuilder, setShowActionBuilder] = useState(false);
-  const [sttUsed, setSttUsed] = useState(false);
-  const [sttEnabled, setSttEnabled] = useState(false);
 
   // Action builder state
   const [builderSkill, setBuilderSkill] = useState("");
@@ -82,14 +79,6 @@ export default function ChoicesModal({
     }
   }, [isOpen, actionMode]);
 
-  // Check STT settings on mount/open
-  useEffect(() => {
-    if (isOpen) {
-      const enabled = localStorage.getItem("sttEnabled") !== "false";
-      setSttEnabled(enabled);
-    }
-  }, [isOpen]);
-
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -103,7 +92,6 @@ export default function ChoicesModal({
       setBuilderItem("");
       setBuilderResource("");
       setBuilderPlain(true);
-      setSttUsed(false);
     }
   }, [isOpen, rpgSystem.dc.medium]);
 
@@ -158,7 +146,6 @@ export default function ChoicesModal({
     isStt?: boolean
   ) => {
     const text = (overrideText ?? actionText).trim();
-    const usedStt = isStt ?? sttUsed;
 
     // If no text, just send "> continue"
     if (!text) {
@@ -188,7 +175,7 @@ export default function ChoicesModal({
           resource_used: result.analysis.resource_used || undefined,
           mythic_check: result.analysis.mythic_check || undefined,
           table: result.analysis.table || undefined,
-          stt_input: usedStt || undefined,
+          stt_input: isStt || undefined,
         };
         onActionConfirm(choice);
         onClose();
@@ -209,7 +196,6 @@ export default function ChoicesModal({
 
     const choice: Choice = {
       text: actionText,
-      stt_input: sttUsed || undefined,
     };
 
     if (!builderPlain) {
@@ -477,7 +463,6 @@ export default function ChoicesModal({
                     onChange={(e) => {
                       setActionText(e.target.value);
                       setShowActionBuilder(false);
-                      setSttUsed(false);
                     }}
                     placeholder="Describe your action... (e.g., 'I kick the door open' or 'I try to convince the guard to let us pass')"
                     rows={3}
@@ -490,29 +475,9 @@ export default function ChoicesModal({
                       }
                     }}
                   />
-                  {/* STT Button */}
-                  {sttEnabled && (
-                    <div className="flex flex-col justify-center">
-                      <STTButton
-                        onTranscript={(text) => {
-                          setActionText(text);
-                          setSttUsed(true);
-                          setShowActionBuilder(false);
-                          // Submit directly with the transcript text (don't wait for state)
-                          handleActionAnalyze(text, true);
-                        }}
-                        disabled={analyzingAction || loading}
-                      />
-                    </div>
-                  )}
                 </div>
                 <p className="text-xs text-blue-200/40">
                   {actionText.length} characters • Ctrl+Enter to act
-                  {sttUsed && (
-                    <span className="ml-2 text-amber-400">
-                      • Voice input (may contain errors)
-                    </span>
-                  )}
                 </p>
               </div>
 

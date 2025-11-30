@@ -6,6 +6,7 @@ import TTSControls from "../components/TTSControls";
 import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
 import SyncIndicator from "../components/SyncIndicator";
+import STTButton from "../components/STTButton";
 import type { SyncStatus } from "../misc/localStoryManager";
 
 interface StoryProps {
@@ -100,6 +101,36 @@ export default function Story({
   React.useEffect(() => {
     localStorage.setItem("actionMode", actionMode.toString());
   }, [actionMode]);
+
+  // STT state
+  const [sttEnabled, setSttEnabled] = React.useState(false);
+
+  // Load STT settings from localStorage
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
+    }
+    // Listen for changes
+    const handleStorageChange = () => {
+      setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
+    };
+    window.addEventListener("storage", handleStorageChange);
+    const interval = setInterval(handleStorageChange, 500);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Handle STT transcript - submit as freeform action
+  const handleSTTTranscript = (text: string) => {
+    if (onActionConfirm && text.trim()) {
+      onActionConfirm({
+        text: text.trim(),
+        stt_input: true,
+      });
+    }
+  };
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -394,34 +425,46 @@ export default function Story({
           </div>
         )}
 
-        {/* Continue Button */}
+        {/* Continue Button with STT */}
         {!editMode && (
           <div className="p-3">
-            <button
-              onClick={() => setShowChoicesModal(true)}
-              disabled={loading || !!loadingStage}
-              className={`w-full py-3.5 sm:py-2.5 text-base font-semibold rounded-lg transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation ${
-                loading || loadingStage
-                  ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-500 text-white"
-              }`}
-            >
-              {loading || loadingStage ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-blue-300 rounded-full animate-spin" />
-                  {loadingStage === "tools"
-                    ? "Updating game state..."
-                    : loadingStage === "choices"
-                    ? "Preparing choices..."
-                    : "Generating..."}
-                </>
-              ) : (
-                <>
-                  <DynamicIcon name="Compass" className="w-4 h-4" />
-                  Continue
-                </>
+            <div className="flex gap-2">
+              {/* STT Button - shown when STT is enabled */}
+              {sttEnabled && (
+                <STTButton
+                  onTranscript={handleSTTTranscript}
+                  disabled={loading || !!loadingStage}
+                  className="shrink-0"
+                />
               )}
-            </button>
+
+              {/* Continue Button */}
+              <button
+                onClick={() => setShowChoicesModal(true)}
+                disabled={loading || !!loadingStage}
+                className={`flex-1 py-3.5 sm:py-2.5 text-base font-semibold rounded-lg transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation ${
+                  loading || loadingStage
+                    ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-500 text-white"
+                }`}
+              >
+                {loading || loadingStage ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-blue-300 rounded-full animate-spin" />
+                    {loadingStage === "tools"
+                      ? "Updating game state..."
+                      : loadingStage === "choices"
+                      ? "Preparing choices..."
+                      : "Generating..."}
+                  </>
+                ) : (
+                  <>
+                    <DynamicIcon name="Compass" className="w-4 h-4" />
+                    Continue
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
       </div>

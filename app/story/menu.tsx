@@ -334,7 +334,7 @@ function AIModelSelector({
   });
 
   // Get current preset configuration
-  const preset = MODEL_PRESETS[currentPreset];
+  const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["main"];
   const effectiveStoryModel =
     currentPreset === "custom" && storyModel ? storyModel : preset.storyModel;
   const effectiveToolsModel =
@@ -940,31 +940,6 @@ function AIModelSelector({
               </div>
             </div>
 
-            {/* Speech-to-Text Settings */}
-            <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-bold text-white">Speech-to-Text</h4>
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-sm text-blue-200">Enable STT</p>
-                  <p className="text-xs text-gray-400">
-                    Show microphone button for voice input (2 tokens per use)
-                  </p>
-                </div>
-                <button
-                  onClick={() => setSttEnabled(!sttEnabled)}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    sttEnabled ? "bg-green-600" : "bg-gray-600"
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      sttEnabled ? "left-7" : "left-1"
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
             {/* Custom Model Config */}
             <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-600">
               <h4 className="text-sm font-bold text-white">Custom Models</h4>
@@ -1250,6 +1225,39 @@ function AIModelSelector({
             </button>
           </div>
         )}
+
+        {/* Speech-to-Text Settings - Always visible */}
+        <div className="space-y-3 mt-4 pt-4 border-t border-blue-700/40">
+          <h4 className="text-sm font-bold text-white flex items-center gap-2">
+            <span>🎤</span> Speech-to-Text
+          </h4>
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm text-blue-200">Enable Voice Input</p>
+              <p className="text-xs text-gray-400">
+                Show mic button next to Continue (2 tokens per use)
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                const newValue = !sttEnabled;
+                setSttEnabled(newValue);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("sttEnabled", String(newValue));
+                }
+              }}
+              className={`relative w-12 h-6 rounded-full transition-colors ${
+                sttEnabled ? "bg-green-600" : "bg-gray-600"
+              }`}
+            >
+              <div
+                className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                  sttEnabled ? "left-7" : "left-1"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
 
         <p className="text-xs text-blue-200/60 mt-2">
           Select the AI model used for story generation. Different models have
@@ -7256,161 +7264,162 @@ export default function MenuPage({
                     {/* AI Model Selection with Enhanced Details */}
                     <AIModelSelector addNotification={addNotification} />
 
-                    {/* Raw Context Toggle */}
-                    <label className="flex items-center gap-3 p-4 bg-blue-900/20 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
-                      <input
-                        type="checkbox"
-                        checked={
-                          typeof window !== "undefined" &&
-                          localStorage.getItem("useRawContext") === "true"
-                        }
-                        onChange={(e) => {
-                          if (typeof window !== "undefined") {
-                            localStorage.setItem(
-                              "useRawContext",
-                              e.target.checked ? "true" : "false"
-                            );
-                            addNotification(
-                              e.target.checked
-                                ? "Raw context mode enabled"
-                                : "Raw context mode disabled",
-                              "success"
-                            );
-                          }
-                        }}
-                        className="w-5 h-5 rounded text-purple-600"
-                      />
-                      <div>
-                        <span className="font-semibold text-white">
-                          Use Raw AI Output in Context
-                        </span>
-                        <p className="text-sm text-blue-200/60">
-                          Send complete AI responses back to the model instead
-                          of parsed content. Helps some AIs maintain
-                          consistency.
-                        </p>
-                      </div>
-                    </label>
-
-                    {/* Show Hidden Messages Toggle */}
-                    <label className="flex items-center gap-3 p-4 bg-blue-900/20 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
-                      <input
-                        type="checkbox"
-                        checked={
-                          typeof window !== "undefined" &&
-                          localStorage.getItem("showHiddenMessages") === "true"
-                        }
-                        onChange={(e) => {
-                          if (typeof window !== "undefined") {
-                            localStorage.setItem(
-                              "showHiddenMessages",
-                              e.target.checked ? "true" : "false"
-                            );
-                            addNotification(
-                              e.target.checked
-                                ? "Hidden messages visible"
-                                : "Hidden messages hidden",
-                              "success"
-                            );
-                          }
-                        }}
-                        className="w-5 h-5 rounded text-purple-600"
-                      />
-                      <div>
-                        <span className="font-semibold text-white">
-                          Show Hidden Messages
-                        </span>
-                        <p className="text-sm text-blue-200/60">
-                          Reveal text wrapped in ||double pipes|| that the AI
-                          uses for internal notes. Players normally can&apos;t
-                          see these.
-                        </p>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3 p-4 bg-blue-900/20 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
-                      <input
-                        type="checkbox"
-                        checked={
-                          typeof window !== "undefined" &&
-                          localStorage.getItem("ttsEnabled") !== "false"
-                        }
-                        onChange={(e) => {
-                          if (typeof window !== "undefined") {
-                            localStorage.setItem(
-                              "ttsEnabled",
-                              e.target.checked ? "true" : "false"
-                            );
-                            addNotification(
-                              e.target.checked ? "TTS Enabled" : "TTS Disabled",
-                              "success"
-                            );
-                            // Force re-render
-                            window.location.reload();
-                          }
-                        }}
-                        className="w-5 h-5 rounded text-blue-600"
-                      />
-                      <div>
-                        <span className="font-semibold text-white">
-                          Enable Text-to-Speech
-                        </span>
-                        <p className="text-sm text-blue-200/60">
-                          Show TTS controls for story narration
-                        </p>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3 p-4 bg-blue-900/20 rounded-lg cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-600">
-                      <input
-                        type="checkbox"
-                        checked={
-                          typeof window !== "undefined" &&
-                          localStorage.getItem("ttsAutoGenerate") === "true"
-                        }
-                        onChange={(e) => {
-                          if (typeof window !== "undefined") {
-                            localStorage.setItem(
-                              "ttsAutoGenerate",
-                              e.target.checked ? "true" : "false"
-                            );
-                            addNotification(
-                              e.target.checked
-                                ? "Auto-generate enabled"
-                                : "Auto-generate disabled",
-                              "success"
-                            );
-                          }
-                        }}
-                        className="w-5 h-5 rounded text-blue-600"
-                      />
-                      <div>
-                        <span className="font-semibold text-white">
-                          Auto-Generate Narration
-                        </span>
-                        <p className="text-sm text-blue-200/60">
-                          Automatically generate audio when new story content
-                          appears
-                        </p>
-                      </div>
-                    </label>
-
-                    <div className="p-4 bg-blue-900/20 rounded-lg">
-                      <h5 className="text-sm font-semibold text-blue-200 mb-3">
-                        <DynamicIcon
-                          name="Volume2"
-                          className="inline-block w-4 h-4 mr-1"
-                        />
-                        TTS Voice Settings
+                    {/* Settings Section with Modern Toggles */}
+                    <div className="bg-blue-900/20 rounded-lg p-4 space-y-4">
+                      <h5 className="text-sm font-bold text-white flex items-center gap-2">
+                        <DynamicIcon name="Settings" className="w-4 h-4" />
+                        Display Settings
                       </h5>
 
-                      {/* Voice Selector */}
-                      <div className="mb-4">
-                        <label className="block text-sm font-semibold text-blue-200 mb-2">
-                          <DynamicIcon
-                            name="Mic"
-                            className="inline-block w-4 h-4 mr-1"
+                      {/* Show Hidden Messages Toggle */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm text-blue-200">
+                            Show Hidden Messages
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Reveal ||double pipe|| text (AI internal notes)
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (typeof window !== "undefined") {
+                              const current =
+                                localStorage.getItem("showHiddenMessages") ===
+                                "true";
+                              localStorage.setItem(
+                                "showHiddenMessages",
+                                (!current).toString()
+                              );
+                              addNotification(
+                                !current
+                                  ? "Hidden messages visible"
+                                  : "Hidden messages hidden",
+                                "success"
+                              );
+                              // Force re-render
+                              window.dispatchEvent(new Event("storage"));
+                            }
+                          }}
+                          className={`relative w-12 h-6 rounded-full transition-colors ${
+                            typeof window !== "undefined" &&
+                            localStorage.getItem("showHiddenMessages") ===
+                              "true"
+                              ? "bg-green-600"
+                              : "bg-gray-600"
+                          }`}
+                        >
+                          <div
+                            className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                              typeof window !== "undefined" &&
+                              localStorage.getItem("showHiddenMessages") ===
+                                "true"
+                                ? "left-7"
+                                : "left-1"
+                            }`}
                           />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* TTS Settings Section */}
+                    <div className="bg-blue-900/20 rounded-lg p-4 space-y-4">
+                      <h5 className="text-sm font-bold text-white flex items-center gap-2">
+                        <DynamicIcon name="Volume2" className="w-4 h-4" />
+                        Text-to-Speech
+                      </h5>
+
+                      {/* Enable TTS Toggle */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm text-blue-200">Enable TTS</p>
+                          <p className="text-xs text-gray-400">
+                            Show audio controls for story narration
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (typeof window !== "undefined") {
+                              const current =
+                                localStorage.getItem("ttsEnabled") !== "false";
+                              localStorage.setItem(
+                                "ttsEnabled",
+                                (!current).toString()
+                              );
+                              addNotification(
+                                !current ? "TTS Enabled" : "TTS Disabled",
+                                "success"
+                              );
+                              window.location.reload();
+                            }
+                          }}
+                          className={`relative w-12 h-6 rounded-full transition-colors ${
+                            typeof window !== "undefined" &&
+                            localStorage.getItem("ttsEnabled") !== "false"
+                              ? "bg-green-600"
+                              : "bg-gray-600"
+                          }`}
+                        >
+                          <div
+                            className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                              typeof window !== "undefined" &&
+                              localStorage.getItem("ttsEnabled") !== "false"
+                                ? "left-7"
+                                : "left-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Auto-Generate Toggle */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm text-blue-200">
+                            Auto-Generate Audio
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Automatically narrate new story content
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (typeof window !== "undefined") {
+                              const current =
+                                localStorage.getItem("ttsAutoGenerate") ===
+                                "true";
+                              localStorage.setItem(
+                                "ttsAutoGenerate",
+                                (!current).toString()
+                              );
+                              addNotification(
+                                !current
+                                  ? "Auto-generate enabled"
+                                  : "Auto-generate disabled",
+                                "success"
+                              );
+                            }
+                          }}
+                          className={`relative w-12 h-6 rounded-full transition-colors ${
+                            typeof window !== "undefined" &&
+                            localStorage.getItem("ttsAutoGenerate") === "true"
+                              ? "bg-green-600"
+                              : "bg-gray-600"
+                          }`}
+                        >
+                          <div
+                            className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                              typeof window !== "undefined" &&
+                              localStorage.getItem("ttsAutoGenerate") === "true"
+                                ? "left-7"
+                                : "left-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Voice Selector */}
+                      <div>
+                        <label className="block text-sm text-blue-200 mb-2">
                           Voice
                         </label>
                         <select
@@ -7433,7 +7442,7 @@ export default function MenuPage({
                               );
                             }
                           }}
-                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                         >
                           <option value="henry">Henry (British)</option>
                           <option value="snoop">Snoop</option>
@@ -7463,76 +7472,40 @@ export default function MenuPage({
 
                       <CustomVoiceManager addNotification={addNotification} />
 
-                      <label className="block text-sm font-semibold text-blue-200 mb-2 mt-4">
-                        Default Volume:{" "}
-                        {Math.round(
-                          (typeof window !== "undefined"
-                            ? parseFloat(
-                                localStorage.getItem("ttsVolume") || "1.0"
-                              )
-                            : 1.0) * 100
-                        )}
-                        %
-                      </label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        defaultValue={
-                          typeof window !== "undefined"
-                            ? localStorage.getItem("ttsVolume") || "1.0"
-                            : "1.0"
-                        }
-                        onChange={(e) => {
-                          if (typeof window !== "undefined") {
-                            localStorage.setItem("ttsVolume", e.target.value);
-                            // Update the label
-                            e.currentTarget.previousElementSibling!.textContent = `Default Volume: ${Math.round(
-                              parseFloat(e.target.value) * 100
-                            )}%`;
+                      {/* Volume Slider */}
+                      <div>
+                        <label className="block text-sm text-blue-200 mb-2">
+                          Volume:{" "}
+                          {Math.round(
+                            (typeof window !== "undefined"
+                              ? parseFloat(
+                                  localStorage.getItem("ttsVolume") || "1.0"
+                                )
+                              : 1.0) * 100
+                          )}
+                          %
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          defaultValue={
+                            typeof window !== "undefined"
+                              ? localStorage.getItem("ttsVolume") || "1.0"
+                              : "1.0"
                           }
-                        }}
-                        className="w-full h-2 bg-blue-900/30 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <div className="flex justify-between mt-2 text-xs text-blue-300/50">
-                        <span>
-                          <DynamicIcon
-                            name="VolumeX"
-                            className="inline-block w-3 h-3"
-                          />{" "}
-                          0%
-                        </span>
-                        <span>
-                          <DynamicIcon
-                            name="Volume2"
-                            className="inline-block w-3 h-3"
-                          />{" "}
-                          100%
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-blue-900/30 rounded-lg">
-                      <h5 className="font-semibold text-blue-200 mb-2">
-                        <DynamicIcon
-                          name="Info"
-                          className="inline-block w-4 h-4 mr-1"
+                          onChange={(e) => {
+                            if (typeof window !== "undefined") {
+                              localStorage.setItem("ttsVolume", e.target.value);
+                              e.currentTarget.previousElementSibling!.textContent = `Volume: ${Math.round(
+                                parseFloat(e.target.value) * 100
+                              )}%`;
+                            }
+                          }}
+                          className="w-full h-2 bg-blue-900 rounded-lg appearance-none cursor-pointer accent-purple-500"
                         />
-                        How TTS Works
-                      </h5>
-                      <ul className="text-sm text-blue-300 space-y-1">
-                        <li>
-                          • Press Play button in the story view to hear
-                          narration
-                        </li>
-                        <li>• Audio is generated once and saved for replay</li>
-                        <li>• Voice and volume settings are saved locally</li>
-                        <li>
-                          • New story content generates new audio automatically
-                          if enabled
-                        </li>
-                      </ul>
+                      </div>
                     </div>
                   </div>
                 </div>
