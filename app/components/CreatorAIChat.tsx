@@ -553,6 +553,15 @@ function ChangeSummary({
       icon: "Backpack",
     });
   }
+  if (data.abilities?.length) {
+    changes.push({
+      type: "Add/Update",
+      label: "Abilities",
+      value: `${data.abilities.length} abilities`,
+      details: data.abilities,
+      icon: "Wand2",
+    });
+  }
   if (data.plot_beats?.length) {
     changes.push({
       type: "Add/Update",

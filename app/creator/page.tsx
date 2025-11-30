@@ -758,6 +758,14 @@ function AdventureCreatorContent() {
       });
     }
 
+    if (data.abilities) {
+      data.abilities.forEach((a: any) => {
+        if (a._command === "delete") {
+          deletions.push(`Ability: ${a.name}`);
+        }
+      });
+    }
+
     if (data.presets) {
       data.presets.forEach((p: any) => {
         if (p._command === "delete") {
@@ -787,6 +795,13 @@ function AdventureCreatorContent() {
         us.itemShop.forEach((i: any) => {
           if (i._command === "delete") {
             deletions.push(`Item Shop Item: ${i.name}`);
+          }
+        });
+      }
+      if (us.abilityShop) {
+        us.abilityShop.forEach((a: any) => {
+          if (a._command === "delete") {
+            deletions.push(`Ability Shop Item: ${a.name}`);
           }
         });
       }
@@ -930,6 +945,12 @@ function AdventureCreatorContent() {
       );
     }
 
+    if (data.abilities) {
+      setAbilities(
+        applyItemChanges(abilities, data.abilities as any, "ability", "name")
+      );
+    }
+
     // Apply upgrade shop settings
     if (data.upgradeSettings) {
       const us = data.upgradeSettings;
@@ -944,6 +965,8 @@ function AdventureCreatorContent() {
           updated.resourceShopEnabled = us.resourceShopEnabled;
         if (us.itemShopEnabled !== undefined)
           updated.itemShopEnabled = us.itemShopEnabled;
+        if (us.abilityShopEnabled !== undefined)
+          updated.abilityShopEnabled = us.abilityShopEnabled;
 
         // Update shop arrays
         if (us.statShop) {
@@ -969,6 +992,15 @@ function AdventureCreatorContent() {
             prev.itemShop,
             us.itemShop as any,
             "item shop item",
+            "name"
+          );
+        }
+
+        if (us.abilityShop) {
+          updated.abilityShop = applyItemChanges(
+            prev.abilityShop,
+            us.abilityShop as any,
+            "ability shop item",
             "name"
           );
         }
