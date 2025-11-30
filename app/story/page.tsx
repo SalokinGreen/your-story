@@ -2523,6 +2523,17 @@ function StoryPageContent() {
               );
             }
 
+            // Tick ability cooldowns at end of turn
+            if (storyData.abilities && storyData.abilities.length > 0) {
+              const offCooldown = tickCooldowns(storyData.abilities);
+              if (offCooldown.length > 0) {
+                addNotification(
+                  `Abilities ready: ${offCooldown.join(", ")}`,
+                  "success"
+                );
+              }
+            }
+
             setCanRetry(true);
             setCanUndo(true);
             setLoadingStage(null);
@@ -4383,6 +4394,17 @@ function StoryPageContent() {
                   storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
                   addNotification(
                     `Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                    "success"
+                  );
+                }
+              }
+
+              // Tick ability cooldowns at end of turn
+              if (storyData.abilities && storyData.abilities.length > 0) {
+                const offCooldown = tickCooldowns(storyData.abilities);
+                if (offCooldown.length > 0) {
+                  addNotification(
+                    `Abilities ready: ${offCooldown.join(", ")}`,
                     "success"
                   );
                 }

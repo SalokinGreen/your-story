@@ -2177,7 +2177,9 @@ export function executeCommandWithResponse(
     return {
       command: trimmed,
       success: true,
-      message: `Updated lore "${loreEntry.title}": ${changes.join(", ")}${fuzzyNote}`,
+      message: `Updated lore "${loreEntry.title}": ${changes.join(
+        ", "
+      )}${fuzzyNote}`,
       timestamp,
     };
   }

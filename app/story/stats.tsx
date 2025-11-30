@@ -625,7 +625,7 @@ export default function StatsPage(storyData: StoryData) {
                             )}
                           </div>
                           {ability.description && (
-                            <p className="text-xs text-blue-200/40 line-clamp-2 mt-0.5">
+                            <p className="text-xs text-blue-200/40 mt-0.5">
                               {ability.description}
                             </p>
                           )}
