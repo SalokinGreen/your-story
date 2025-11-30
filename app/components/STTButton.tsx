@@ -3,6 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 import { authenticatedFetch } from "../misc/getAuthToken";
+import { useNotification } from "../misc/NotificationContext";
 
 interface STTButtonProps {
   onTranscript: (text: string) => void;
@@ -23,7 +24,7 @@ export default function STTButton({
   silenceTimeout = 3000,
 }: STTButtonProps) {
   const [state, setState] = useState<RecordingState>("idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { addNotification } = useNotification();
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -101,7 +102,6 @@ export default function STTButton({
 
   const sendAudioToAPI = async (audioBlob: Blob) => {
     setState("processing");
-    setErrorMessage(null);
 
     try {
       // Get BYOK key from localStorage if available
@@ -137,7 +137,7 @@ export default function STTButton({
       }
     } catch (error: any) {
       const message = error.message || "Transcription failed";
-      setErrorMessage(message);
+      addNotification(message, "failure");
       onError?.(message);
     } finally {
       setState("idle");
@@ -145,8 +145,6 @@ export default function STTButton({
   };
 
   const startRecording = async () => {
-    setErrorMessage(null);
-
     try {
       // Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -193,7 +191,7 @@ export default function STTButton({
           if (audioBlob.size > 1000) {
             await sendAudioToAPI(audioBlob);
           } else {
-            setErrorMessage("Recording too short");
+            addNotification("Recording too short", "warning");
             setState("idle");
           }
         } else {
@@ -203,7 +201,7 @@ export default function STTButton({
 
       mediaRecorder.onerror = (event: any) => {
         console.error("MediaRecorder error:", event.error);
-        setErrorMessage("Recording error");
+        addNotification("Recording error", "failure");
         cleanup();
         setState("idle");
       };
@@ -217,15 +215,17 @@ export default function STTButton({
     } catch (error: any) {
       console.error("Failed to start recording:", error);
 
+      let message: string;
       if (error.name === "NotAllowedError") {
-        setErrorMessage("Microphone access denied");
+        message = "Microphone access denied";
       } else if (error.name === "NotFoundError") {
-        setErrorMessage("No microphone found");
+        message = "No microphone found";
       } else {
-        setErrorMessage(error.message || "Failed to start recording");
+        message = error.message || "Failed to start recording";
       }
 
-      onError?.(errorMessage || "Recording failed");
+      addNotification(message, "failure");
+      onError?.(message);
       cleanup();
       setState("idle");
     }
@@ -323,13 +323,6 @@ export default function STTButton({
         <span className="absolute -top-1 -right-1 flex h-3 w-3">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-        </span>
-      )}
-
-      {/* Error message */}
-      {errorMessage && state === "idle" && (
-        <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-red-400 whitespace-nowrap">
-          {errorMessage}
         </span>
       )}
     </div>
