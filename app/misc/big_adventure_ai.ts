@@ -1247,7 +1247,9 @@ export function buildBigAdventureMessages(
       if (stage === "advanced") {
         contextMessage += `\nStats (use these for presets, adjust values per build):\n`;
         previousResults.storyTemplate.stats.forEach((s) => {
-          contextMessage += `- ${s.name} (${s.symbol || "📊"}): ${s.description || "No description"} [Default: ${s.value}]\n`;
+          contextMessage += `- ${s.name} (${s.symbol || "📊"}): ${
+            s.description || "No description"
+          } [Default: ${s.value}]\n`;
         });
       } else {
         contextMessage += `Stats: ${previousResults.storyTemplate.stats
@@ -1263,7 +1265,9 @@ export function buildBigAdventureMessages(
       if (stage === "advanced") {
         contextMessage += `\nResources (use these for presets, adjust values per build):\n`;
         previousResults.storyTemplate.resources.forEach((r) => {
-          contextMessage += `- ${r.name} (${r.symbol || "📦"}): ${r.description || "No description"} [Default: ${r.value}/${r.maxValue}]\n`;
+          contextMessage += `- ${r.name} (${r.symbol || "📦"}): ${
+            r.description || "No description"
+          } [Default: ${r.value}/${r.maxValue}]\n`;
         });
       } else {
         contextMessage += `Resources: ${previousResults.storyTemplate.resources
@@ -1277,9 +1281,13 @@ export function buildBigAdventureMessages(
     ) {
       contextMessage += `\nAbilities:\n`;
       previousResults.storyTemplate.abilities.forEach((a) => {
-        contextMessage += `- ${a.name} (${a.grade || "novice"}): ${a.description || "No description"}`;
+        contextMessage += `- ${a.name} (${a.grade || "novice"}): ${
+          a.description || "No description"
+        }`;
         if (a.cost && a.cost.length > 0) {
-          contextMessage += ` [Cost: ${a.cost.map((c) => `${c.amount} ${c.name}`).join(", ")}]`;
+          contextMessage += ` [Cost: ${a.cost
+            .map((c) => `${c.amount} ${c.name}`)
+            .join(", ")}]`;
         }
         if (a.cooldown) {
           contextMessage += ` [Cooldown: ${a.cooldown} turns]`;

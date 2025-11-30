@@ -5900,7 +5900,8 @@ function AdventureCreatorContent() {
                             }}
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                             style={{
-                              color: getGradeConfig(editInventoryItem.grade).color,
+                              color: getGradeConfig(editInventoryItem.grade)
+                                .color,
                             }}
                           >
                             {GRADE_ORDER.map((g) => (
@@ -6011,7 +6012,9 @@ function AdventureCreatorContent() {
                       className="flex items-center gap-3 p-4 rounded-lg border cursor-move hover:opacity-80 transition-colors"
                       style={{
                         opacity: draggedInventoryIndex === index ? 0.5 : 1,
-                        backgroundColor: `${getGradeConfig(item.grade).color}15`,
+                        backgroundColor: `${
+                          getGradeConfig(item.grade).color
+                        }15`,
                         borderColor: `${getGradeConfig(item.grade).color}40`,
                       }}
                     >
@@ -6035,7 +6038,9 @@ function AdventureCreatorContent() {
                           <span
                             className="text-xs px-1.5 py-0.5 rounded"
                             style={{
-                              backgroundColor: `${getGradeConfig(item.grade).color}30`,
+                              backgroundColor: `${
+                                getGradeConfig(item.grade).color
+                              }30`,
                               color: getGradeConfig(item.grade).color,
                             }}
                           >
@@ -6077,7 +6082,9 @@ function AdventureCreatorContent() {
                                           )) *
                                         100
                                       }%`,
-                                      backgroundColor: getGradeConfig(item.grade).color,
+                                      backgroundColor: getGradeConfig(
+                                        item.grade
+                                      ).color,
                                     }}
                                   />
                                 </div>
@@ -6434,7 +6441,8 @@ function AdventureCreatorContent() {
                             }
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                             style={{
-                              color: getAbilityGradeConfig(editAbility.grade).color,
+                              color: getAbilityGradeConfig(editAbility.grade)
+                                .color,
                             }}
                           >
                             {ABILITY_GRADE_ORDER.map((g) => (
@@ -6629,8 +6637,12 @@ function AdventureCreatorContent() {
                       className="flex items-center gap-3 p-4 rounded-lg border cursor-move hover:opacity-80 transition-colors"
                       style={{
                         opacity: draggedAbilityIndex === index ? 0.5 : 1,
-                        backgroundColor: `${getAbilityGradeConfig(ability.grade).color}15`,
-                        borderColor: `${getAbilityGradeConfig(ability.grade).color}40`,
+                        backgroundColor: `${
+                          getAbilityGradeConfig(ability.grade).color
+                        }15`,
+                        borderColor: `${
+                          getAbilityGradeConfig(ability.grade).color
+                        }40`,
                       }}
                     >
                       <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
@@ -6651,7 +6663,9 @@ function AdventureCreatorContent() {
                           <span
                             className="text-xs px-1.5 py-0.5 rounded"
                             style={{
-                              backgroundColor: `${getAbilityGradeConfig(ability.grade).color}30`,
+                              backgroundColor: `${
+                                getAbilityGradeConfig(ability.grade).color
+                              }30`,
                               color: getAbilityGradeConfig(ability.grade).color,
                             }}
                           >
@@ -11535,7 +11549,7 @@ function AdventureCreatorContent() {
   // Show loading screen when loading adventure data
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#030712] flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
           <p className="text-white font-semibold">Loading adventure...</p>
@@ -11545,10 +11559,10 @@ function AdventureCreatorContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#030712] pt-16">
+    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 pt-16">
       <div className="max-w-6xl mx-auto p-3 sm:p-6">
         {/* Compact Header */}
-        <div className="bg-[#0f1a2e] rounded-xl p-4 border border-blue-800/30 mb-4">
+        <div className="bg-blue-950/50 rounded-xl p-4 border border-blue-800/30 mb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
@@ -11601,7 +11615,7 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Progress Steps */}
-        <div className="mb-4 bg-[#0f1a2e] rounded-xl p-3 border border-blue-800/30">
+        <div className="mb-4 bg-blue-950/50 rounded-xl p-3 border border-blue-800/30">
           <DraggableScroll innerClassName="gap-2">
             {steps.map((step, index) => (
               <button
@@ -11623,7 +11637,7 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Content */}
-        <div className="bg-[#0f1a2e] rounded-xl p-4 sm:p-6 border border-blue-800/30 mb-4">
+        <div className="bg-blue-950/50 rounded-xl p-4 sm:p-6 border border-blue-800/30 mb-4">
           <h2 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
             <DynamicIcon
               name={steps.find((s) => s.id === currentStep)?.icon || "FileText"}
@@ -11635,7 +11649,7 @@ function AdventureCreatorContent() {
         </div>
 
         {/* Navigation */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#0f1a2e] rounded-xl p-3 border border-blue-800/30 mb-5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-blue-950/50 rounded-xl p-3 border border-blue-800/30 mb-5">
           <button
             onClick={() => {
               const prevIndex = Math.max(0, currentStepIndex - 1);
@@ -11782,7 +11796,7 @@ export default function AdventureCreatorPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-linear-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center">
+        <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
         </div>
       }
