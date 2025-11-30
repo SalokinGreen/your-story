@@ -326,12 +326,9 @@ export function processCommands(
           title: existing.title,
           points: existing.points,
         });
+        addNotification(`Achievement Unlocked: ${existing.title}`, "success");
         addNotification(
-          `?? Achievement Unlocked: ${existing.title}`,
-          "success"
-        );
-        addNotification(
-          `? Earned ${existing.points} points! Total: ${storyData.points}`,
+          `Earned ${existing.points} points! Total: ${storyData.points}`,
           "success"
         );
       } else if (!existing) {
@@ -340,7 +337,7 @@ export function processCommands(
           availableAchievements: storyData.achievements.map((a) => a.title),
         });
         addNotification(
-          `?? Achievement not found: ${achievementTitle}`,
+          `Achievement not found: ${achievementTitle}`,
           "warning"
         );
       }
@@ -374,7 +371,7 @@ export function processCommands(
           beatIndex: beatIndex + 1,
           title: storyData.plot_beats[beatIndex].title,
         });
-        addNotification(`? Story beat ${beatIndex + 1} completed`, "success");
+        addNotification(`Story beat ${beatIndex + 1} completed`, "success");
 
         // Award points for completing a new beat (use custom points if set, otherwise default)
         if (!storyData.earnedPointsFromBeats.includes(beatIndex)) {
@@ -387,7 +384,7 @@ export function processCommands(
             totalPoints: storyData.points,
           });
           addNotification(
-            `?? Earned ${pointsAwarded} points! Total: ${storyData.points}`,
+            `Earned ${pointsAwarded} points! Total: ${storyData.points}`,
             "success"
           );
         }
@@ -422,7 +419,7 @@ export function processCommands(
 
       storyData.quests.push(newQuest);
       logger.action("New quest created via command", { title, points });
-      addNotification(`? New quest: ${title}`, "success");
+      addNotification(`New quest: ${title}`, "success");
       continue;
     }
 
@@ -452,7 +449,7 @@ export function processCommands(
         logger.warn("Quest not found or no fuzzy match", {
           quest: questTitle,
         });
-        addNotification(`?? Quest not found: ${questTitle}`, "warning");
+        addNotification(`Quest not found: ${questTitle}`, "warning");
       }
       continue;
     }
@@ -490,19 +487,19 @@ export function processCommands(
             points: quest.points,
             totalPoints: storyData.points,
           });
-          addNotification(`? Quest completed: ${quest.title}`, "success");
+          addNotification(`Quest completed: ${quest.title}`, "success");
           addNotification(
-            `? Earned ${quest.points} points! Total: ${storyData.points}`,
+            `Earned ${quest.points} points! Total: ${storyData.points}`,
             "success"
           );
         } else {
-          addNotification(`? Quest completed: ${quest.title}`, "success");
+          addNotification(`Quest completed: ${quest.title}`, "success");
         }
       } else if (!quest) {
         logger.warn("Quest not found or no fuzzy match", {
           quest: questTitle,
         });
-        addNotification(`?? Quest not found: ${questTitle}`, "warning");
+        addNotification(`Quest not found: ${questTitle}`, "warning");
       }
       continue;
     }
@@ -533,7 +530,7 @@ export function processCommands(
         logger.warn("Quest not found or no fuzzy match", {
           quest: questTitle,
         });
-        addNotification(`?? Quest not found: ${questTitle}`, "warning");
+        addNotification(`Quest not found: ${questTitle}`, "warning");
       }
       continue;
     }
@@ -554,7 +551,7 @@ export function processCommands(
       const existingLore = storyData.lore.find((l) => l.title === loreTitle);
       if (existingLore) {
         logger.warn("Lore already exists", { loreTitle });
-        addNotification(`?? Lore "${loreTitle}" already exists`, "warning");
+        addNotification(`Lore "${loreTitle}" already exists`, "warning");
       } else {
         const onTriggerArray = onTriggers
           ? onTriggers
@@ -1171,7 +1168,7 @@ export function processCommands(
       }
 
       if (!quest) {
-        addNotification(`?? Quest "${questTitle}" not found`, "warning");
+        addNotification(`Quest "${questTitle}" not found`, "warning");
         logger.warn("Quest description update failed: quest not found", {
           title: questTitle,
         });
@@ -1207,7 +1204,7 @@ export function processCommands(
       }
 
       if (!quest) {
-        addNotification(`?? Quest "${questTitle}" not found`, "warning");
+        addNotification(`Quest "${questTitle}" not found`, "warning");
         logger.warn("Quest short description update failed: quest not found", {
           title: questTitle,
         });
@@ -1234,7 +1231,7 @@ export function processCommands(
 
       // Validate name is not empty
       if (!name) {
-        addNotification(`?? Relationship name cannot be empty`, "warning");
+        addNotification(`Relationship name cannot be empty`, "warning");
         logger.warn("Relationship add failed: empty name");
         continue;
       }
@@ -1246,10 +1243,10 @@ export function processCommands(
 
       if (existing) {
         logger.warn("Relationship add failed: already exists", { name });
-        addNotification(`?? Relationship "${name}" already exists`, "warning");
+        addNotification(`Relationship "${name}" already exists`, "warning");
       } else if (value < -100 || value > 100) {
         addNotification(
-          `?? Relationship value must be between -100 and 100`,
+          `Relationship value must be between -100 and 100`,
           "warning"
         );
         logger.warn("Relationship add failed: invalid value", {
@@ -1306,7 +1303,7 @@ export function processCommands(
 
       if (!relationship) {
         logger.warn("Relationship modify failed: not found", { name });
-        addNotification(`?? Relationship not found: ${name}`, "warning");
+        addNotification(`Relationship not found: ${name}`, "warning");
       } else {
         const oldValue = relationship.value;
         relationship.value = Math.max(-100, Math.min(100, oldValue + delta));
@@ -1353,7 +1350,7 @@ export function processCommands(
 
       if (!relationship) {
         logger.warn("Relationship remove failed: not found", { name });
-        addNotification(`?? Relationship not found: ${name}`, "warning");
+        addNotification(`Relationship not found: ${name}`, "warning");
       } else {
         storyData.relationships = storyData.relationships.filter(
           (r) => r !== relationship
@@ -1391,7 +1388,7 @@ export function processCommands(
         logger.warn("Relationship description update failed: not found", {
           name,
         });
-        addNotification(`?? Relationship not found: ${name}`, "warning");
+        addNotification(`Relationship not found: ${name}`, "warning");
       } else {
         relationship.description = newDescription;
         logger.action("Relationship description updated via command", {
@@ -1654,7 +1651,7 @@ function StoryPageContent() {
                 storyData.memory.push(entry);
                 existingMemoryLower.push(entry.toLowerCase().trim());
                 addNotification(
-                  `?? Memory added: ${entry.substring(0, 80)}${
+                  `Memory added: ${entry.substring(0, 80)}${
                     entry.length > 80 ? "..." : ""
                   }`,
                   "success"
@@ -2247,7 +2244,7 @@ function StoryPageContent() {
           "Cannot save story: encryption credentials not available"
         );
         addNotification(
-          "?? Please sign out and sign back in to enable encrypted story saving",
+          "Please sign out and sign back in to enable encrypted story saving",
           "warning"
         );
         return; //Abortsavetopreventunencrypteddatastorage
@@ -2264,7 +2261,7 @@ function StoryPageContent() {
       } catch (encryptError) {
         console.error("Encryption failed:", encryptError);
         addNotification(
-          "? Failed to encrypt story data. Please sign out and sign back in.",
+          "Failed to encrypt story data. Please sign out and sign back in.",
           "failure"
         );
         return; //Abortsaveonencryptionfailure
@@ -2521,7 +2518,7 @@ function StoryPageContent() {
 
             if (result.meta.totalTokenCost) {
               addNotification(
-                `? Used ${result.meta.totalTokenCost} tokens`,
+                `Used ${result.meta.totalTokenCost} tokens`,
                 "success"
               );
             }
@@ -2677,7 +2674,7 @@ function StoryPageContent() {
         remaining: storyData.momentum,
       });
       addNotification(
-        `? Spent 1 Momentum for Reroll! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
+        `Spent 1 Momentum for Reroll! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
         "info"
       );
     } else if (momentumMode === "guarantee" && storyData.momentum >= 2) {
@@ -2688,7 +2685,7 @@ function StoryPageContent() {
         remaining: storyData.momentum,
       });
       addNotification(
-        `? Spent 2 Momentum for Guaranteed Success! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
+        `Spent 2 Momentum for Guaranteed Success! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
         "success"
       );
     }
@@ -2911,9 +2908,9 @@ function StoryPageContent() {
           score: matchResult.score,
         });
         addNotification(
-          `?? Matched "${choice.item_used}" ? "${
-            matchResult.name
-          }" (${Math.round(matchResult.score * 100)}% match)`,
+          `Matched "${choice.item_used}" → "${matchResult.name}" (${Math.round(
+            matchResult.score * 100
+          )}% match)`,
           "info"
         );
         // Update choice to use the exact matched name
@@ -3012,7 +3009,7 @@ function StoryPageContent() {
           score: matchResult.score,
         });
         addNotification(
-          `🔮 Matched "${choice.ability_used}" → "${
+          `Matched "${choice.ability_used}" → "${
             matchResult.name
           }" (${Math.round(matchResult.score * 100)}% match)`,
           "info"
@@ -3025,7 +3022,7 @@ function StoryPageContent() {
         // Check if ability is on cooldown (currentCooldown tracks remaining turns)
         if ((ability.currentCooldown ?? 0) > 0) {
           addNotification(
-            `⏳ ${ability.name} is on cooldown (${ability.currentCooldown} turns remaining)`,
+            `${ability.name} is on cooldown (${ability.currentCooldown} turns remaining)`,
             "warning"
           );
           // Clear ability_used since it can't be activated
@@ -3038,7 +3035,7 @@ function StoryPageContent() {
             // Cannot afford - cancel ability use
             const missingStr = affordability.missingCosts.join("; ");
             addNotification(
-              `❌ Cannot use ${ability.name}: ${missingStr}`,
+              `Cannot use ${ability.name}: ${missingStr}`,
               "warning"
             );
             // Clear ability_used since it can't be activated
@@ -3057,7 +3054,7 @@ function StoryPageContent() {
             const bonusText =
               abilityGradeBonus > 0 ? ` +${abilityGradeBonus}` : "";
             addNotification(
-              `🔮 Using ability: ${ability.name}${abilityGradeLabel} (Advantage${bonusText}!)`,
+              `Using ability: ${ability.name}${abilityGradeLabel} (Advantage${bonusText}!)`,
               "success"
             );
 
@@ -3087,7 +3084,7 @@ function StoryPageContent() {
               startCooldown(ability);
               abilityCooldownStarted = true;
               addNotification(
-                `⏳ ${ability.name} is now on cooldown (${ability.cooldown} turns)`,
+                `${ability.name} is now on cooldown (${ability.cooldown} turns)`,
                 "info"
               );
             }
@@ -3095,10 +3092,7 @@ function StoryPageContent() {
         }
       } else {
         // Ability not found - no penalty, just clear it
-        addNotification(
-          `⚠️ Ability not found: ${choice.ability_used}`,
-          "warning"
-        );
+        addNotification(`Ability not found: ${choice.ability_used}`, "warning");
         choice.ability_used = undefined;
       }
     }
@@ -3131,7 +3125,7 @@ function StoryPageContent() {
           score: matchResult.score,
         });
         addNotification(
-          `?? Matched "${choice.resource_used}" ? "${
+          `Matched "${choice.resource_used}" ? "${
             matchResult.name
           }" (${Math.round(matchResult.score * 100)}% match)`,
           "info"
@@ -3168,14 +3162,14 @@ function StoryPageContent() {
             disadvantage: true,
           });
           addNotification(
-            `?? Insufficient ${matchedResource.name}! Need ${requiredAmount}, have ${matchedResource.value}. Disadvantage on roll!`,
+            `Insufficient ${matchedResource.name}! Need ${requiredAmount}, have ${matchedResource.value}. Disadvantage on roll!`,
             "warning"
           );
         }
       } else {
         logger.warn("Resource not found", { resource: choice.resource_used });
         addNotification(
-          `?? Resource not found: ${choice.resource_used}`,
+          `Resource not found: ${choice.resource_used}`,
           "warning"
         );
       }
@@ -3363,7 +3357,7 @@ function StoryPageContent() {
                 `${highestTierCondition.name} (Tier ${tierLabel})`
               );
               addNotification(
-                `?? Condition penalty: ${highestTierCondition.name} (Tier ${tierLabel}) ? ${penalty.value} to roll`,
+                `Condition penalty: ${highestTierCondition.name} (Tier ${tierLabel}) ? ${penalty.value} to roll`,
                 "warning"
               );
               break;
@@ -3372,14 +3366,14 @@ function StoryPageContent() {
             case "taken-out":
               conditionAutoFail = true;
               addNotification(
-                `?? Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Auto-fail!`,
+                `Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Auto-fail!`,
                 "failure"
               );
               break;
             case "game-over":
               conditionGameOver = true;
               addNotification(
-                `?? PERMANENT CONDITION: ${highestTierCondition.name} (Tier ${tierLabel}) ? The story may end here.`,
+                `PERMANENT CONDITION: ${highestTierCondition.name} (Tier ${tierLabel}) ? The story may end here.`,
                 "failure"
               );
               break;
@@ -3391,7 +3385,7 @@ function StoryPageContent() {
                 `${highestTierCondition.name} (Tier ${tierLabel})`
               );
               addNotification(
-                `?? Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Die size reduced by ${penalty.value}`,
+                `Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Die size reduced by ${penalty.value}`,
                 "warning"
               );
               break;
@@ -3402,7 +3396,7 @@ function StoryPageContent() {
                 `${highestTierCondition.name} (Tier ${tierLabel})`
               );
               addNotification(
-                `?? Severe Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Forced to use d4!`,
+                `Severe Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Forced to use d4!`,
                 "failure"
               );
               break;
@@ -3608,7 +3602,7 @@ function StoryPageContent() {
             });
 
             addNotification(
-              `? Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} ? Best: ${dice_roll}`,
+              `Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} Best: ${dice_roll}`,
               "success"
             );
           }
@@ -3624,7 +3618,7 @@ function StoryPageContent() {
             score: matchResult.score,
           });
           addNotification(
-            `?? Matched "${choice.skill_used}" ? "${
+            `Matched "${choice.skill_used}" ? "${
               matchResult.name
             }" (${Math.round(matchResult.score * 100)}% match)`,
             "info"
@@ -3636,10 +3630,7 @@ function StoryPageContent() {
           logger.warn("Skill not found or no fuzzy match", {
             skill: choice.skill_used,
           });
-          addNotification(
-            `?? Skill not found: ${choice.skill_used}`,
-            "warning"
-          );
+          addNotification(`Skill not found: ${choice.skill_used}`, "warning");
         }
 
         const dc = choice.skill_dc || 0;
@@ -3655,7 +3646,7 @@ function StoryPageContent() {
             dc,
           });
           addNotification(
-            `? Guaranteed Success! (${choice.skill_used}: Auto-success with 2 Momentum)`,
+            `Guaranteed Success! (${choice.skill_used}: Auto-success with 2 Momentum)`,
             "success"
           );
         } else {
@@ -4184,7 +4175,7 @@ function StoryPageContent() {
               result: result.text,
             });
           } else {
-            addNotification(`?? Table "${table.name}" is empty`, "warning");
+            addNotification(`Table "${table.name}" is empty`, "warning");
           }
         }
         // If not a custom table, the mythic table was already handled earlier
@@ -4391,7 +4382,7 @@ function StoryPageContent() {
                   storyData.earnedPointsFromChapters.push(currentChapter);
                   storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
                   addNotification(
-                    `? Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                    `Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
                     "success"
                   );
                 }
@@ -4651,7 +4642,7 @@ function StoryPageContent() {
                 storyData.earnedPointsFromChapters.push(currentChapter);
                 storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
                 addNotification(
-                  `?? Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                  `Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
                   "success"
                 );
               }
@@ -4672,7 +4663,7 @@ function StoryPageContent() {
             // Save progress
             saveProgress(storyData);
 
-            addNotification("? Response regenerated", "success");
+            addNotification("Response regenerated", "success");
 
             logger.ai_response("Generation complete (retry)", {
               totalTokenCost: result.meta.totalTokenCost,
@@ -4803,13 +4794,13 @@ function StoryPageContent() {
       callback(); //Execute the upgrade
       setStoryData({ ...storyData });
       addNotification(
-        `? Upgrade purchased! (${storyData.points} points remaining)`,
+        `Upgrade purchased! (${storyData.points} points remaining)`,
         "success"
       );
       await saveProgress(storyData);
     } else {
       addNotification(
-        `? Not enough points! Need ${cost}, have ${storyData.points}`,
+        `Not enough points! Need ${cost}, have ${storyData.points}`,
         "failure"
       );
     }

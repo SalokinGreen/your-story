@@ -2095,6 +2095,93 @@ export function executeCommandWithResponse(
     };
   }
 
+  // /lore_update: title | newTitle | content | on | onTriggers | offTriggers
+  const loreUpdateMatch = trimmed.match(
+    /^\/lore_update:\s*(.+?)\s*\|\s*(.*?)\s*\|\s*([\s\S]*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
+  );
+  if (loreUpdateMatch) {
+    const loreTitle = loreUpdateMatch[1].trim();
+    const newTitle = loreUpdateMatch[2].trim();
+    const newContent = loreUpdateMatch[3].trim();
+    const onValue = loreUpdateMatch[4].trim().toLowerCase();
+    const onTriggers = loreUpdateMatch[5].trim();
+    const offTriggers = loreUpdateMatch[6].trim();
+
+    if (!storyData.lore) storyData.lore = [];
+
+    const matchResult = findLoreMatch(loreTitle, storyData.lore);
+    const loreEntry = matchResult?.item;
+
+    if (!loreEntry) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Lore "${loreTitle}" not found`,
+        timestamp,
+      };
+    }
+
+    const changes: string[] = [];
+
+    if (newTitle) {
+      loreEntry.title = newTitle;
+      changes.push("title");
+    }
+    if (newContent) {
+      loreEntry.content = newContent;
+      changes.push("content");
+    }
+    if (onValue === "true") {
+      loreEntry.on = true;
+      changes.push("visibility (shown)");
+    } else if (onValue === "false") {
+      loreEntry.on = false;
+      changes.push("visibility (hidden)");
+    }
+    if (onTriggers) {
+      loreEntry.on_triggers = onTriggers
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+      changes.push("on_triggers");
+    }
+    if (offTriggers) {
+      loreEntry.off_triggers = offTriggers
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+      changes.push("off_triggers");
+    }
+
+    if (changes.length === 0) {
+      return {
+        command: trimmed,
+        success: "partial",
+        message: `Lore "${loreEntry.title}" unchanged (no updates provided)`,
+        timestamp,
+      };
+    }
+
+    logger.action("Lore updated via command response", {
+      title: loreEntry.title,
+      changes,
+    });
+
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
+        : "";
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Updated lore "${loreEntry.title}": ${changes.join(", ")}${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
   // /lore_add_content: lore title | new text
   const loreAddMatch = trimmed.match(
     /^\/lore_add_content:\s*(.+?)\s*\|\s*(.+)$/i

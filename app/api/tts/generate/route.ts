@@ -25,26 +25,26 @@ function splitTextIntoChunks(text: string, maxChunkSize: number): string[] {
 
     // Find a good break point (end of sentence) within the limit
     let breakPoint = maxChunkSize;
-    
+
     // Try to find sentence endings (.!?) followed by space or newline
     const searchArea = remaining.substring(0, maxChunkSize);
     const sentenceEndMatch = searchArea.match(/.*[.!?][\s\n]/);
-    
+
     if (sentenceEndMatch) {
       breakPoint = sentenceEndMatch[0].length;
     } else {
       // Fall back to paragraph break
-      const lastNewline = searchArea.lastIndexOf('\n\n');
+      const lastNewline = searchArea.lastIndexOf("\n\n");
       if (lastNewline > maxChunkSize / 2) {
         breakPoint = lastNewline + 2;
       } else {
         // Fall back to any newline
-        const lastSingleNewline = searchArea.lastIndexOf('\n');
+        const lastSingleNewline = searchArea.lastIndexOf("\n");
         if (lastSingleNewline > maxChunkSize / 2) {
           breakPoint = lastSingleNewline + 1;
         } else {
           // Fall back to space
-          const lastSpace = searchArea.lastIndexOf(' ');
+          const lastSpace = searchArea.lastIndexOf(" ");
           if (lastSpace > maxChunkSize / 2) {
             breakPoint = lastSpace + 1;
           }
@@ -57,7 +57,7 @@ function splitTextIntoChunks(text: string, maxChunkSize: number): string[] {
     remaining = remaining.substring(breakPoint).trim();
   }
 
-  return chunks.filter(chunk => chunk.length > 0);
+  return chunks.filter((chunk) => chunk.length > 0);
 }
 
 // Concatenate MP3 audio buffers
@@ -66,12 +66,12 @@ function concatenateMP3Buffers(buffers: ArrayBuffer[]): ArrayBuffer {
   const totalLength = buffers.reduce((sum, buf) => sum + buf.byteLength, 0);
   const result = new Uint8Array(totalLength);
   let offset = 0;
-  
+
   for (const buffer of buffers) {
     result.set(new Uint8Array(buffer), offset);
     offset += buffer.byteLength;
   }
-  
+
   return result.buffer;
 }
 
@@ -120,10 +120,19 @@ export async function POST(req: NextRequest) {
     const { text, voiceId = "henry", speechifyKey } = await req.json();
 
     // Validate voice ID - use fallback for invalid IDs
-    const validVoices = ["mrbeast", "henry", "snoop", "gwyneth", "cliff", "george"];
+    const validVoices = [
+      "mrbeast",
+      "henry",
+      "snoop",
+      "gwyneth",
+      "cliff",
+      "george",
+    ];
     // Custom voice IDs are typically UUIDs, so accept those too
-    const isCustomVoice = voiceId && voiceId.length > 20 && voiceId.includes("-");
-    const finalVoiceId = validVoices.includes(voiceId) || isCustomVoice ? voiceId : "henry";
+    const isCustomVoice =
+      voiceId && voiceId.length > 20 && voiceId.includes("-");
+    const finalVoiceId =
+      validVoices.includes(voiceId) || isCustomVoice ? voiceId : "henry";
 
     // Check user settings for BYOK
     const userSettings = await getUserSettings(userId, supabase);
@@ -175,22 +184,23 @@ export async function POST(req: NextRequest) {
 
     // Split text into chunks
     const chunks = splitTextIntoChunks(cleanText, CHUNK_SIZE);
-    
+
     // Log what we're sending (for debugging)
     console.log("TTS request:", {
       textLength: cleanText.length,
       chunks: chunks.length,
       voiceId: finalVoiceId,
       originalVoiceId: voiceId !== finalVoiceId ? voiceId : undefined,
-      textPreview: cleanText.substring(0, 100) + (cleanText.length > 100 ? "..." : ""),
+      textPreview:
+        cleanText.substring(0, 100) + (cleanText.length > 100 ? "..." : ""),
     });
 
     // Generate speech for each chunk
     const audioBuffers: ArrayBuffer[] = [];
-    
+
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      
+
       try {
         const response = await speechify.audioGenerate({
           input: chunk,
@@ -205,14 +215,17 @@ export async function POST(req: NextRequest) {
 
         const buffer = await response.audioData.arrayBuffer();
         audioBuffers.push(buffer);
-        
-        console.log(`TTS chunk ${i + 1}/${chunks.length} complete (${chunk.length} chars)`);
+
+        console.log(
+          `TTS chunk ${i + 1}/${chunks.length} complete (${chunk.length} chars)`
+        );
       } catch (speechifyError: any) {
         console.error(`Speechify API error on chunk ${i + 1}:`, speechifyError);
 
         // Handle specific Speechify errors
         const statusCode = speechifyError.statusCode || 500;
-        const errorMessage = speechifyError.message || "Unknown Speechify error";
+        const errorMessage =
+          speechifyError.message || "Unknown Speechify error";
 
         // Log full error details for debugging
         console.error("Speechify error details:", {
