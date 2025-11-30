@@ -85,6 +85,17 @@ type CreatorStep =
   | "upgrades"
   | "preview";
 
+// Safe grade config getters with fallbacks
+function getGradeConfig(grade: string | undefined) {
+  const key = (grade as ItemGrade) || "common";
+  return GRADE_CONFIG[key] || GRADE_CONFIG.common;
+}
+
+function getAbilityGradeConfig(grade: string | undefined) {
+  const key = (grade as AbilityGrade) || "novice";
+  return ABILITY_GRADE_CONFIG[key] || ABILITY_GRADE_CONFIG.novice;
+}
+
 // Helper functions for Mythic UI
 function getChaosColor(chaos: number): string {
   if (chaos <= 3) return "text-blue-400";
@@ -5889,11 +5900,7 @@ function AdventureCreatorContent() {
                             }}
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                             style={{
-                              color:
-                                GRADE_CONFIG[
-                                  (editInventoryItem.grade as ItemGrade) ||
-                                    "common"
-                                ].color,
+                              color: getGradeConfig(editInventoryItem.grade).color,
                             }}
                           >
                             {GRADE_ORDER.map((g) => (
@@ -6004,14 +6011,8 @@ function AdventureCreatorContent() {
                       className="flex items-center gap-3 p-4 rounded-lg border cursor-move hover:opacity-80 transition-colors"
                       style={{
                         opacity: draggedInventoryIndex === index ? 0.5 : 1,
-                        backgroundColor: `${
-                          GRADE_CONFIG[(item.grade as ItemGrade) || "common"]
-                            .color
-                        }15`,
-                        borderColor: `${
-                          GRADE_CONFIG[(item.grade as ItemGrade) || "common"]
-                            .color
-                        }40`,
+                        backgroundColor: `${getGradeConfig(item.grade).color}15`,
+                        borderColor: `${getGradeConfig(item.grade).color}40`,
                       }}
                     >
                       <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
@@ -6022,10 +6023,7 @@ function AdventureCreatorContent() {
                           name={item.symbol}
                           className="w-8 h-8"
                           style={{
-                            color:
-                              GRADE_CONFIG[
-                                (item.grade as ItemGrade) || "common"
-                              ].color,
+                            color: getGradeConfig(item.grade).color,
                           }}
                         />
                       </div>
@@ -6037,22 +6035,11 @@ function AdventureCreatorContent() {
                           <span
                             className="text-xs px-1.5 py-0.5 rounded"
                             style={{
-                              backgroundColor: `${
-                                GRADE_CONFIG[
-                                  (item.grade as ItemGrade) || "common"
-                                ].color
-                              }30`,
-                              color:
-                                GRADE_CONFIG[
-                                  (item.grade as ItemGrade) || "common"
-                                ].color,
+                              backgroundColor: `${getGradeConfig(item.grade).color}30`,
+                              color: getGradeConfig(item.grade).color,
                             }}
                           >
-                            {
-                              GRADE_CONFIG[
-                                (item.grade as ItemGrade) || "common"
-                              ].label
-                            }
+                            {getGradeConfig(item.grade).label}
                           </span>
                           {item.type && (
                             <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
@@ -6090,10 +6077,7 @@ function AdventureCreatorContent() {
                                           )) *
                                         100
                                       }%`,
-                                      backgroundColor:
-                                        GRADE_CONFIG[
-                                          (item.grade as ItemGrade) || "common"
-                                        ].color,
+                                      backgroundColor: getGradeConfig(item.grade).color,
                                     }}
                                   />
                                 </div>
@@ -6219,10 +6203,7 @@ function AdventureCreatorContent() {
                     }
                     className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                     style={{
-                      color:
-                        ABILITY_GRADE_CONFIG[
-                          (newAbility.grade as AbilityGrade) || "novice"
-                        ].color,
+                      color: getAbilityGradeConfig(newAbility.grade).color,
                     }}
                   >
                     {ABILITY_GRADE_ORDER.map((g) => (
@@ -6453,11 +6434,7 @@ function AdventureCreatorContent() {
                             }
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
                             style={{
-                              color:
-                                ABILITY_GRADE_CONFIG[
-                                  (editAbility.grade as AbilityGrade) ||
-                                    "novice"
-                                ].color,
+                              color: getAbilityGradeConfig(editAbility.grade).color,
                             }}
                           >
                             {ABILITY_GRADE_ORDER.map((g) => (
@@ -6652,16 +6629,8 @@ function AdventureCreatorContent() {
                       className="flex items-center gap-3 p-4 rounded-lg border cursor-move hover:opacity-80 transition-colors"
                       style={{
                         opacity: draggedAbilityIndex === index ? 0.5 : 1,
-                        backgroundColor: `${
-                          ABILITY_GRADE_CONFIG[
-                            (ability.grade as AbilityGrade) || "novice"
-                          ].color
-                        }15`,
-                        borderColor: `${
-                          ABILITY_GRADE_CONFIG[
-                            (ability.grade as AbilityGrade) || "novice"
-                          ].color
-                        }40`,
+                        backgroundColor: `${getAbilityGradeConfig(ability.grade).color}15`,
+                        borderColor: `${getAbilityGradeConfig(ability.grade).color}40`,
                       }}
                     >
                       <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
@@ -6672,10 +6641,7 @@ function AdventureCreatorContent() {
                           name={ability.symbol || "Sparkles"}
                           className="w-8 h-8"
                           style={{
-                            color:
-                              ABILITY_GRADE_CONFIG[
-                                (ability.grade as AbilityGrade) || "novice"
-                              ].color,
+                            color: getAbilityGradeConfig(ability.grade).color,
                           }}
                         />
                       </div>
@@ -6685,22 +6651,11 @@ function AdventureCreatorContent() {
                           <span
                             className="text-xs px-1.5 py-0.5 rounded"
                             style={{
-                              backgroundColor: `${
-                                ABILITY_GRADE_CONFIG[
-                                  (ability.grade as AbilityGrade) || "novice"
-                                ].color
-                              }30`,
-                              color:
-                                ABILITY_GRADE_CONFIG[
-                                  (ability.grade as AbilityGrade) || "novice"
-                                ].color,
+                              backgroundColor: `${getAbilityGradeConfig(ability.grade).color}30`,
+                              color: getAbilityGradeConfig(ability.grade).color,
                             }}
                           >
-                            {
-                              ABILITY_GRADE_CONFIG[
-                                (ability.grade as AbilityGrade) || "novice"
-                              ].label
-                            }
+                            {getAbilityGradeConfig(ability.grade).label}
                           </span>
                           {ability.stat && (
                             <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">

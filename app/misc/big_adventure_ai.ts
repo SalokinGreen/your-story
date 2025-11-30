@@ -1075,6 +1075,12 @@ Remember: Output ONLY the JSON object, nothing else.`;
 CHARACTER PRESETS (${presetCount}):
 Different character builds/classes players can choose. Each has unique stats, resources, inventory, and abilities.
 Presets should offer meaningfully different playstyles.
+
+STAT VALUES FOR PRESETS:
+- Range: 1-100 where 50 is human average
+- Player characters typically have 40-70 in most stats
+- One or two standout stats can be 70-85
+- Weaknesses can be 25-40
 `;
     schemaFields.push(`"presets": [
     {
@@ -1134,6 +1140,8 @@ Each entry has a weight (higher = more likely).
 UPGRADE SHOP (${shopItemCount} total items across all shops):
 Configure the progression/upgrade system where players spend points.
 Create interesting unlockables: new stats, resources, items, and abilities.
+
+STAT VALUES: Range 1-100 where 50 is human average. Shop stats typically start at 30-50.
 `;
     schemaFields.push(`"upgradeSettings": {
     "enabled": true,
