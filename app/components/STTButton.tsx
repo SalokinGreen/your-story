@@ -310,7 +310,7 @@ export default function STTButton({
         onClick={handleClick}
         disabled={disabled || state === "processing"}
         title={getTitle()}
-        className={`p-2.5 rounded-lg transition-all flex items-center justify-center touch-manipulation ${getButtonStyle()}`}
+        className={`h-full px-4 rounded-lg transition-all flex items-center justify-center touch-manipulation ${getButtonStyle()}`}
       >
         <DynamicIcon
           name={getIcon()}

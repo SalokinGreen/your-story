@@ -428,7 +428,7 @@ export default function Story({
         {/* Continue Button with STT */}
         {!editMode && (
           <div className="p-3">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-stretch">
               {/* STT Button - shown when STT is enabled */}
               {sttEnabled && (
                 <STTButton
