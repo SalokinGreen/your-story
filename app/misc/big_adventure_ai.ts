@@ -36,10 +36,30 @@ export interface StageConfig {
 
 // Default stage configurations
 export const DEFAULT_STAGE_CONFIGS: Record<GenerationStage, StageConfig> = {
-  core: { enabled: true, iterations: 1, maxOutputTokens: 4000, customInstructions: "" },
-  mechanics: { enabled: true, iterations: 1, maxOutputTokens: 4000, customInstructions: "" },
-  content: { enabled: true, iterations: 1, maxOutputTokens: 6000, customInstructions: "" },
-  advanced: { enabled: true, iterations: 1, maxOutputTokens: 4000, customInstructions: "" },
+  core: {
+    enabled: true,
+    iterations: 1,
+    maxOutputTokens: 4000,
+    customInstructions: "",
+  },
+  mechanics: {
+    enabled: true,
+    iterations: 1,
+    maxOutputTokens: 4000,
+    customInstructions: "",
+  },
+  content: {
+    enabled: true,
+    iterations: 1,
+    maxOutputTokens: 6000,
+    customInstructions: "",
+  },
+  advanced: {
+    enabled: true,
+    iterations: 1,
+    maxOutputTokens: 4000,
+    customInstructions: "",
+  },
 };
 
 // Iteration-specific sub-stages for content stage
@@ -837,7 +857,8 @@ function buildSystemPrompt(
       : "";
 
   // Get custom instructions for this stage
-  const stageConfig = config.stageConfigs?.[stage] || DEFAULT_STAGE_CONFIGS[stage];
+  const stageConfig =
+    config.stageConfigs?.[stage] || DEFAULT_STAGE_CONFIGS[stage];
   const customInstructions = stageConfig.customInstructions?.trim() || "";
 
   const basePrompt = `You are an expert Game Designer creating a complete text adventure game.
@@ -846,7 +867,11 @@ USER'S ADVENTURE CONCEPT:
 "${config.prompt}"
 ${config.genre ? `\nGENRE/THEME: ${config.genre}` : ""}
 ${styleModifier ? `\nSTYLE DIRECTION: ${styleModifier}` : ""}
-${customInstructions ? `\nCUSTOM INSTRUCTIONS FOR THIS STAGE:\n${customInstructions}` : ""}
+${
+  customInstructions
+    ? `\nCUSTOM INSTRUCTIONS FOR THIS STAGE:\n${customInstructions}`
+    : ""
+}
 
 RPG SYSTEM: ${config.rpgSystem}
 ${rpgDesc}

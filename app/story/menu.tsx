@@ -34,6 +34,7 @@ import {
   MODEL_PRESETS,
   getPresetEstimatedCost,
   getCustomEstimatedCost,
+  getStoryStageCost,
 } from "../misc/ai_prices";
 import ConfirmDialog from "../components/ConfirmDialog";
 import {
@@ -207,6 +208,43 @@ function AIModelSelector({
     }
   }, [choicesModel]);
 
+  // Auto-save BYOK keys to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
+      localStorage.setItem("openRouterKey", openRouterKey);
+    }
+  }, [openRouterKey, hasLoadedSettings]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
+      localStorage.setItem("speechifyKey", speechifyKey);
+    }
+  }, [speechifyKey, hasLoadedSettings]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
+      localStorage.setItem("deepgramKey", deepgramKey);
+    }
+  }, [deepgramKey, hasLoadedSettings]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
+      localStorage.setItem("novelaiKey", novelaiKey);
+    }
+  }, [novelaiKey, hasLoadedSettings]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
+      localStorage.setItem("novelaiEnabled", novelaiEnabled.toString());
+    }
+  }, [novelaiEnabled, hasLoadedSettings]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
+      localStorage.setItem("novelaiTemperature", novelaiTemperature.toString());
+    }
+  }, [novelaiTemperature, hasLoadedSettings]);
+
   const handleAddModel = () => {
     if (!newModelId || !newModelName) {
       addNotification("Please fill in model ID and name", "warning");
@@ -231,13 +269,16 @@ function AIModelSelector({
     setNewMaxOutput(1000);
     setNewInputPrice(0);
     setNewOutputPrice(0);
-    addNotification("Model added! Click Save Settings to persist.", "success");
+    addNotification(
+      "Model added! Click Sync to save to your account.",
+      "success"
+    );
   };
 
   const handleDeleteModel = (id: string) => {
     setCustomModels(customModels.filter((m) => m.id !== id));
     addNotification(
-      "Model removed! Click Save Settings to persist.",
+      "Model removed! Click Sync to save to your account.",
       "warning"
     );
   };
@@ -282,7 +323,7 @@ function AIModelSelector({
     setNewInputPrice(0);
     setNewOutputPrice(0);
     addNotification(
-      "Model updated! Click Save Settings to persist.",
+      "Model updated! Click Sync to save to your account.",
       "success"
     );
   };
@@ -301,17 +342,8 @@ function AIModelSelector({
     if (!user) return;
     setIsSaving(true);
 
-    // Save keys to localStorage
-    if (typeof window !== "undefined") {
-      localStorage.setItem("openRouterKey", openRouterKey);
-      localStorage.setItem("speechifyKey", speechifyKey);
-      localStorage.setItem("deepgramKey", deepgramKey);
-      localStorage.setItem("novelaiKey", novelaiKey);
-      localStorage.setItem("novelaiEnabled", novelaiEnabled.toString());
-      localStorage.setItem("novelaiTemperature", novelaiTemperature.toString());
-      localStorage.setItem("sttEnabled", sttEnabled.toString());
-    }
-
+    // localStorage items are now auto-saved via useEffect hooks
+    // This only saves custom models to Supabase
     const { error } = await updateUserSettings(
       user.id,
       {
@@ -361,7 +393,8 @@ function AIModelSelector({
     customMaxContext > 0 ? customMaxContext : undefined;
 
   // Calculate dynamic estimated cost based on actual models being used
-  const estimatedCost =
+  // When NovelAI is enabled for story, story stage is free (BYOK)
+  const baseEstimatedCost =
     currentPreset === "custom"
       ? getCustomEstimatedCost(
           effectiveStoryModel,
@@ -370,6 +403,15 @@ function AIModelSelector({
           effectiveContextSize
         )
       : getPresetEstimatedCost(currentPreset, effectiveContextSize);
+
+  // If NovelAI is enabled with a valid key, calculate savings from free story stage
+  const contextForSavings = effectiveContextSize || 120000;
+  const novelaiSavings =
+    novelaiEnabled && novelaiKey
+      ? getStoryStageCost(effectiveStoryModel, contextForSavings)
+      : 0;
+
+  const estimatedCost = Math.max(0, baseEstimatedCost - novelaiSavings);
 
   const handlePresetChange = (newPreset: string) => {
     if (typeof window !== "undefined") {
@@ -398,23 +440,47 @@ function AIModelSelector({
 
       <div className="px-4 pb-4">
         {/* Current Preset Banner */}
-        <div className="bg-linear-to-r from-purple-600 to-blue-600 rounded-lg p-4 text-white mb-4">
+        <div
+          className={`${
+            novelaiEnabled && novelaiKey
+              ? "bg-linear-to-r from-green-600 to-teal-600"
+              : "bg-linear-to-r from-purple-600 to-blue-600"
+          } rounded-lg p-4 text-white mb-4`}
+        >
           <div className="flex items-center justify-between mb-2">
             <div>
-              <div className="text-xl font-bold">{preset.name}</div>
+              <div className="text-xl font-bold flex items-center gap-2">
+                {preset.name}
+                {novelaiEnabled && novelaiKey && (
+                  <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                    + NovelAI
+                  </span>
+                )}
+              </div>
               <div className="text-sm text-purple-100">
                 {preset.description}
               </div>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold">~{estimatedCost}</div>
-              <div className="text-xs text-purple-100">coins/gen</div>
+              <div className="text-xs text-purple-100">
+                coins/gen
+                {novelaiEnabled && novelaiKey && novelaiSavings > 0 && (
+                  <span className="text-green-200 ml-1">
+                    (-{novelaiSavings})
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex flex-col gap-1 text-xs mt-2">
             <div>
               <span className="text-purple-200">Story:</span>{" "}
-              {effectiveStoryModel}
+              {novelaiEnabled && novelaiKey ? (
+                <span className="text-green-200">NovelAI GLM-4-6 (BYOK)</span>
+              ) : (
+                effectiveStoryModel
+              )}
             </div>
             <div>
               <span className="text-purple-200">Tools:</span>{" "}
@@ -967,11 +1033,12 @@ function AIModelSelector({
                     onChange={(e) => setNovelaiEnabled(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="relative w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
+                  <div className="relative w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
                 </label>
               </div>
               <p className="text-xs text-blue-300/60">
-                Use your own NovelAI API key for story generation. Tools and choices will still use our service.
+                Use your own NovelAI API key for story generation. Tools and
+                choices will still use our service.
               </p>
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
@@ -997,7 +1064,9 @@ function AIModelSelector({
                     max="2"
                     step="0.05"
                     value={novelaiTemperature}
-                    onChange={(e) => setNovelaiTemperature(parseFloat(e.target.value))}
+                    onChange={(e) =>
+                      setNovelaiTemperature(parseFloat(e.target.value))
+                    }
                     className="w-full h-2 bg-blue-900/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
                   />
                   <div className="flex justify-between text-xs text-blue-300/50 mt-1">
@@ -1290,13 +1359,16 @@ function AIModelSelector({
               )}
             </div>
 
-            <button
-              onClick={handleSaveSettings}
-              disabled={isSaving}
-              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm disabled:opacity-50"
-            >
-              {isSaving ? "Saving..." : "Save Settings"}
-            </button>
+            {/* Only show save button if there are custom models to sync */}
+            {customModels.length > 0 && (
+              <button
+                onClick={handleSaveSettings}
+                disabled={isSaving}
+                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm disabled:opacity-50"
+              >
+                {isSaving ? "Saving..." : "Sync Custom Models"}
+              </button>
+            )}
           </div>
         )}
 

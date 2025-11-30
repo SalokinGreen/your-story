@@ -623,6 +623,20 @@ export function getPresetEstimatedCost(
 }
 
 /**
+ * Get the estimated cost for just the story stage
+ * Useful for calculating BYOK savings when using external providers like NovelAI
+ * @param storyModel - Model key for story stage
+ * @param contextSize - Optional custom context size in tokens
+ * @returns Estimated cost in coins for story stage only
+ */
+export function getStoryStageCost(
+  storyModel: string,
+  contextSize: number = 120000
+): number {
+  return calculateTokenCost(storyModel, contextSize, 1500);
+}
+
+/**
  * Get the dynamic estimated cost for custom model selection
  * @param storyModel - Model key for story stage
  * @param toolsModel - Model key for tools stage

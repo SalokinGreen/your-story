@@ -70,7 +70,9 @@ function getModelsFromPreset() {
   // NovelAI settings (BYOK for story stage only)
   const novelaiEnabled = localStorage.getItem("novelaiEnabled") === "true";
   const novelaiKey = localStorage.getItem("novelaiKey") || "";
-  const novelaiTemperature = parseFloat(localStorage.getItem("novelaiTemperature") || "1");
+  const novelaiTemperature = parseFloat(
+    localStorage.getItem("novelaiTemperature") || "1"
+  );
 
   // For custom preset, check if user has overridden any models
   if (currentPreset === "custom") {
@@ -2389,7 +2391,14 @@ function StoryPageContent() {
     //ProcessLoretriggersafteruserinput
     processLoreTriggers(storyData, addNotification);
 
-    const { storyModel, toolsModel, choicesModel, novelaiEnabled, novelaiKey, novelaiTemperature } = getModelsFromPreset();
+    const {
+      storyModel,
+      toolsModel,
+      choicesModel,
+      novelaiEnabled,
+      novelaiKey,
+      novelaiTemperature,
+    } = getModelsFromPreset();
     const toolCallingEnabled =
       typeof window !== "undefined"
         ? localStorage.getItem("toolCallingEnabled") !== "false"
@@ -4240,7 +4249,14 @@ function StoryPageContent() {
     //ProcessLoretriggersafteruserchoice
     processLoreTriggers(storyData, addNotification);
 
-    const { storyModel, toolsModel, choicesModel, novelaiEnabled, novelaiKey, novelaiTemperature } = getModelsFromPreset();
+    const {
+      storyModel,
+      toolsModel,
+      choicesModel,
+      novelaiEnabled,
+      novelaiKey,
+      novelaiTemperature,
+    } = getModelsFromPreset();
     const toolCallingEnabled =
       typeof window !== "undefined"
         ? localStorage.getItem("toolCallingEnabled") !== "false"
@@ -4536,7 +4552,14 @@ function StoryPageContent() {
     addNotification("Regenerating response...", "info");
     logger.action("User requested retry");
 
-    const { storyModel, toolsModel, choicesModel, novelaiEnabled, novelaiKey, novelaiTemperature } = getModelsFromPreset();
+    const {
+      storyModel,
+      toolsModel,
+      choicesModel,
+      novelaiEnabled,
+      novelaiKey,
+      novelaiTemperature,
+    } = getModelsFromPreset();
     const toolCallingEnabled =
       typeof window !== "undefined"
         ? localStorage.getItem("toolCallingEnabled") !== "false"

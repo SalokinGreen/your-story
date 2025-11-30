@@ -214,8 +214,8 @@ export async function POST(req: NextRequest) {
                 const parsed = JSON.parse(data);
                 // Completions API format: choices[0].text (streaming)
                 // Also try delta.content for compatibility
-                const textContent = 
-                  parsed.choices?.[0]?.text || 
+                const textContent =
+                  parsed.choices?.[0]?.text ||
                   parsed.choices?.[0]?.delta?.content ||
                   parsed.text ||
                   "";

@@ -52,7 +52,7 @@ export interface NovelAIConfig {
  */
 export function convertMessagesToPrompt(messages: ChatMessage[]): string {
   const parts: string[] = [];
-  
+
   // Start with GLM special tokens
   parts.push("[gMASK]<sop>");
 

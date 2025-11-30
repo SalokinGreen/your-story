@@ -2284,13 +2284,19 @@ export default function BigAdventureCreatorPage() {
                     >
                       {Object.entries(AI_MODELS).map(([key, model]) => (
                         <option key={key} value={key}>
-                          {model.name} {model.cost > 0 ? `(${model.cost} coin base)` : "(Free - BYOK)"}
+                          {model.name}{" "}
+                          {model.cost > 0
+                            ? `(${model.cost} coin base)`
+                            : "(Free - BYOK)"}
                         </option>
                       ))}
                     </select>
-                    {(AI_MODELS as Record<string, { provider?: string }>)[selectedModel]?.provider === "novelai" && (
+                    {(AI_MODELS as Record<string, { provider?: string }>)[
+                      selectedModel
+                    ]?.provider === "novelai" && (
                       <p className="text-xs text-amber-400 mt-2">
-                        ⚠️ NovelAI requires your own API key. Configure it in Story → Menu → AI Config.
+                        ⚠️ NovelAI requires your own API key. Configure it in
+                        Story → Menu → AI Config.
                       </p>
                     )}
                   </div>
@@ -2849,20 +2855,34 @@ export default function BigAdventureCreatorPage() {
                           <div key={stage} className="space-y-1">
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-purple-200">
-                                {getStageInfo(stage).emoji} {getStageInfo(stage).name}
+                                {getStageInfo(stage).emoji}{" "}
+                                {getStageInfo(stage).name}
                               </span>
                               {!config.stageConfigs?.[stage]?.enabled && (
-                                <span className="text-xs text-blue-400/50">(disabled)</span>
+                                <span className="text-xs text-blue-400/50">
+                                  (disabled)
+                                </span>
                               )}
                             </div>
                             <textarea
-                              value={config.stageConfigs?.[stage]?.customInstructions ?? ""}
+                              value={
+                                config.stageConfigs?.[stage]
+                                  ?.customInstructions ?? ""
+                              }
                               onChange={(e) =>
                                 updateStageConfig(stage, {
                                   customInstructions: e.target.value,
                                 })
                               }
-                              placeholder={`e.g., "Focus on ${stage === 'core' ? 'dark fantasy themes' : stage === 'mechanics' ? 'strategic combat options' : stage === 'content' ? 'memorable NPCs' : 'complex puzzles'}..."`}
+                              placeholder={`e.g., "Focus on ${
+                                stage === "core"
+                                  ? "dark fantasy themes"
+                                  : stage === "mechanics"
+                                  ? "strategic combat options"
+                                  : stage === "content"
+                                  ? "memorable NPCs"
+                                  : "complex puzzles"
+                              }..."`}
                               rows={2}
                               className="w-full px-3 py-2 bg-blue-900/30 border border-purple-700/30 rounded-lg text-white placeholder-purple-300/30 text-sm resize-none focus:outline-none focus:border-purple-500/50"
                               disabled={!config.stageConfigs?.[stage]?.enabled}
