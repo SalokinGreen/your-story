@@ -1475,6 +1475,78 @@ const clearListTool: ToolSchema = {
   },
 };
 
+const createVariableTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "create_variable",
+    description:
+      "Create a new variable to track custom game state. Types: 'number' for counters/timers, 'boolean' for flags, 'string' for text values (day, location, etc.), 'list' for collections.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Variable name (e.g., 'Days Until Festival', 'Current Weather', 'Allies Met')",
+        },
+        type: {
+          type: "string",
+          enum: ["number", "boolean", "string", "list"],
+          description: "Variable type: number, boolean, string, or list",
+        },
+        value: {
+          oneOf: [
+            { type: "number" },
+            { type: "boolean" },
+            { type: "string" },
+          ],
+          description: "Initial value (for number/boolean/string types). Lists start empty.",
+        },
+        description: {
+          type: "string",
+          description: "What this variable tracks (shown to player)",
+        },
+        options: {
+          type: "array",
+          items: { type: "string" },
+          description: "For string variables only: predefined options (e.g., ['Monday', 'Tuesday', ...])",
+        },
+        minValue: {
+          type: "number",
+          description: "For number variables only: minimum allowed value",
+        },
+        maxValue: {
+          type: "number",
+          description: "For number variables only: maximum allowed value",
+        },
+        maxSize: {
+          type: "number",
+          description: "For list variables only: maximum number of items",
+        },
+      },
+      required: ["name", "type"],
+    },
+  },
+};
+
+const deleteVariableTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "delete_variable",
+    description:
+      "Delete a variable that is no longer needed. Use when a tracked value becomes irrelevant to the story.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Variable name to delete (fuzzy matching supported)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
 // Export all tools as array
 export const TOOL_SCHEMAS: ToolSchema[] = [
   // Quest Management (5 tools)
@@ -1550,13 +1622,15 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   modifyConditionTool,
   gameOverTool,
 
-  // Variable Management (6 tools)
+  // Variable Management (8 tools)
   setVariableTool,
   modifyVariableTool,
   toggleVariableTool,
   addToListTool,
   removeFromListTool,
   clearListTool,
+  createVariableTool,
+  deleteVariableTool,
 
   // Mythic GME (9 tools)
   ...MYTHIC_TOOLS,

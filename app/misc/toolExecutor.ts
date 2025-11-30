@@ -93,6 +93,8 @@ const STATE_CHANGE_TOOLS = new Set([
   "add_to_list",
   "remove_from_list",
   "clear_list",
+  "create_variable",
+  "delete_variable",
   // Momentum - tool names and command names
   "modify_momentum",
   // Game state
@@ -400,6 +402,8 @@ export function executeTools(
           "add_to_list",
           "remove_from_list",
           "clear_list",
+          "create_variable",
+          "delete_variable",
         ].includes(toolCall.function.name)
       ) {
         const variableResult = executeVariableTool(
@@ -2033,6 +2037,8 @@ function convertToolToCommand(
     case "add_to_list":
     case "remove_from_list":
     case "clear_list":
+    case "create_variable":
+    case "delete_variable":
       return null; // Signal to handle directly
 
     default:
@@ -2109,7 +2115,7 @@ function executeVariableTool(
       if (variable.type === "string") {
         const strValue = String(args.value);
         const strVar = variable as StringVariable;
-        
+
         // If options are defined, validate against them
         if (strVar.options && strVar.options.length > 0) {
           const validOption = strVar.options.find(
@@ -2124,7 +2130,7 @@ function executeVariableTool(
         } else {
           (storyData.variables![index] as StringVariable).value = strValue;
         }
-        
+
         logger.action(`Set string variable: ${variable.name} = "${strValue}"`, {
           toolId,
         });
@@ -2411,6 +2417,138 @@ function executeVariableTool(
         command: toolName,
         success: true,
         message: `Cleared ${variable.name} (${oldCount} items removed)`,
+        timestamp: Date.now(),
+      };
+    }
+
+    case "create_variable": {
+      // Initialize variables array if needed
+      if (!storyData.variables) {
+        storyData.variables = [];
+      }
+
+      // Check for duplicate name
+      const existingVar = storyData.variables.find(
+        (v) => v.name.toLowerCase() === args.name.toLowerCase()
+      );
+      if (existingVar) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Variable "${args.name}" already exists`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const id = crypto.randomUUID();
+      let newVar: Variable;
+
+      switch (args.type) {
+        case "number": {
+          const numValue = typeof args.value === "number" ? args.value : 0;
+          newVar = {
+            id,
+            name: args.name,
+            description: args.description || "",
+            type: "number",
+            value: numValue,
+            minValue: args.minValue,
+            maxValue: args.maxValue,
+          } as NumberVariable;
+          break;
+        }
+        case "boolean": {
+          const boolValue =
+            typeof args.value === "boolean" ? args.value : false;
+          newVar = {
+            id,
+            name: args.name,
+            description: args.description || "",
+            type: "boolean",
+            value: boolValue,
+          } as BooleanVariable;
+          break;
+        }
+        case "string": {
+          const strValue = typeof args.value === "string" ? args.value : "";
+          newVar = {
+            id,
+            name: args.name,
+            description: args.description || "",
+            type: "string",
+            value: strValue,
+            options: args.options,
+          } as StringVariable;
+          break;
+        }
+        case "list": {
+          newVar = {
+            id,
+            name: args.name,
+            description: args.description || "",
+            type: "list",
+            items: [],
+            maxSize: args.maxSize,
+          } as ListVariable;
+          break;
+        }
+        default:
+          return {
+            command: toolName,
+            success: false,
+            message: `Invalid variable type "${args.type}". Must be: number, boolean, string, or list`,
+            timestamp: Date.now(),
+          };
+      }
+
+      storyData.variables.push(newVar);
+      logger.action(`Created ${args.type} variable: ${args.name}`, { toolId });
+
+      let valueStr = "";
+      if (args.type === "number")
+        valueStr = ` = ${(newVar as NumberVariable).value}`;
+      else if (args.type === "boolean")
+        valueStr = ` = ${(newVar as BooleanVariable).value}`;
+      else if (args.type === "string")
+        valueStr = ` = "${(newVar as StringVariable).value}"`;
+      else if (args.type === "list") valueStr = " (empty list)";
+
+      return {
+        command: toolName,
+        success: true,
+        message: `Created ${args.type} variable "${args.name}"${valueStr}`,
+        timestamp: Date.now(),
+      };
+    }
+
+    case "delete_variable": {
+      if (!storyData.variables || storyData.variables.length === 0) {
+        return {
+          command: toolName,
+          success: false,
+          message: `No variables exist to delete`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const found = findVariable(args.name);
+      if (!found) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Variable "${args.name}" not found`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const { variable, index } = found;
+      storyData.variables.splice(index, 1);
+      logger.action(`Deleted variable: ${variable.name}`, { toolId });
+
+      return {
+        command: toolName,
+        success: true,
+        message: `Deleted variable "${variable.name}"`,
         timestamp: Date.now(),
       };
     }
