@@ -109,7 +109,11 @@ import {
   decryptStoryData,
   isEncrypted,
 } from "../misc/encryption";
-import { syncLoreEmbeddings, syncNewMemories, getExistingEmbeddingKeys } from "../misc/embeddings";
+import {
+  syncLoreEmbeddings,
+  syncNewMemories,
+  getExistingEmbeddingKeys,
+} from "../misc/embeddings";
 import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
 import { DynamicIcon } from "../components/DynamicIcon";
@@ -2095,8 +2099,9 @@ function StoryPageContent() {
     if (!embeddingsEnabled) return;
 
     // Only sync lore if we have enough entries and it's dirty (or first load)
-    const shouldSyncLore = storyData.lore.length >= 5 && storyData.loreEmbeddingsDirty !== false;
-    
+    const shouldSyncLore =
+      storyData.lore.length >= 5 && storyData.loreEmbeddingsDirty !== false;
+
     // Always sync memories on load if we have any
     const shouldSyncMemories = storyData.memory.length > 0;
 
@@ -2107,17 +2112,23 @@ function StoryPageContent() {
       if (!token) return;
 
       // First, get existing embedding keys to avoid re-generating
-      let existingKeys: { lore: string[]; memory: string[]; scene: string[] } = {
-        lore: [],
-        memory: [],
-        scene: [],
-      };
-      
+      let existingKeys: { lore: string[]; memory: string[]; scene: string[] } =
+        {
+          lore: [],
+          memory: [],
+          scene: [],
+        };
+
       try {
         existingKeys = await getExistingEmbeddingKeys(storyDbId, token);
-        console.log(`[Embeddings] Found existing keys: ${existingKeys.lore.length} lore, ${existingKeys.memory.length} memories`);
+        console.log(
+          `[Embeddings] Found existing keys: ${existingKeys.lore.length} lore, ${existingKeys.memory.length} memories`
+        );
       } catch (err) {
-        console.warn("[Embeddings] Failed to get existing keys, will sync all:", err);
+        console.warn(
+          "[Embeddings] Failed to get existing keys, will sync all:",
+          err
+        );
       }
 
       // Sync lore if needed
@@ -2154,7 +2165,9 @@ function StoryPageContent() {
         )
           .then((result) => {
             if (result.synced > 0 || result.cleaned > 0) {
-              console.log(`[Embeddings] Memory sync: ${result.synced} entries, ${result.cleaned} cleaned`);
+              console.log(
+                `[Embeddings] Memory sync: ${result.synced} entries, ${result.cleaned} cleaned`
+              );
             }
           })
           .catch((err) => {

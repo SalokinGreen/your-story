@@ -134,7 +134,12 @@ export async function POST(req: NextRequest) {
       });
 
       if (error) {
-        console.error("Upsert error at batch", i / UPSERT_BATCH_SIZE, ":", error);
+        console.error(
+          "Upsert error at batch",
+          i / UPSERT_BATCH_SIZE,
+          ":",
+          error
+        );
         return NextResponse.json(
           { error: "Upsert failed: " + error.message },
           { status: 500 }
@@ -144,7 +149,11 @@ export async function POST(req: NextRequest) {
       totalUpserted += data || batch.length;
     }
 
-    console.log(`[Embeddings] Upserted ${totalUpserted} records in ${Math.ceil(formattedRecords.length / UPSERT_BATCH_SIZE)} batches`);
+    console.log(
+      `[Embeddings] Upserted ${totalUpserted} records in ${Math.ceil(
+        formattedRecords.length / UPSERT_BATCH_SIZE
+      )} batches`
+    );
 
     return NextResponse.json({
       upserted: totalUpserted,

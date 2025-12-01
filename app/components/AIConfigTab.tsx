@@ -936,7 +936,8 @@ export default function AIConfigTab() {
               </span>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Lower = more results (broader matching) • Higher = fewer results (stricter matching)
+              Lower = more results (broader matching) • Higher = fewer results
+              (stricter matching)
             </p>
           </div>
         )}
@@ -945,9 +946,9 @@ export default function AIConfigTab() {
           <p className="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-1.5">
             <DynamicIcon name="Info" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             <span>
-              When enabled, uses Mistral embeddings to semantically search lore and memories.
-              Activates automatically for stories with 30+ lore entries or 50+ memories.
-              Cost: ~0.5 coins per 100 turns.
+              When enabled, uses Mistral embeddings to semantically search lore
+              and memories. Activates automatically for stories with 30+ lore
+              entries or 50+ memories. Cost: ~0.5 coins per 100 turns.
             </span>
           </p>
         </div>

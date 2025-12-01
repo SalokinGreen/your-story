@@ -44,13 +44,17 @@ export async function POST(req: NextRequest) {
     const allEmbeddings: number[][] = [];
     const totalBatches = Math.ceil(texts.length / BATCH_SIZE);
 
-    console.log(`[Embeddings] Generating embeddings for ${texts.length} texts in ${totalBatches} batches`);
+    console.log(
+      `[Embeddings] Generating embeddings for ${texts.length} texts in ${totalBatches} batches`
+    );
 
     for (let i = 0; i < texts.length; i += BATCH_SIZE) {
       const batch = texts.slice(i, i + BATCH_SIZE);
       const batchNum = Math.floor(i / BATCH_SIZE) + 1;
 
-      console.log(`[Embeddings] Processing batch ${batchNum}/${totalBatches} (${batch.length} texts)`);
+      console.log(
+        `[Embeddings] Processing batch ${batchNum}/${totalBatches} (${batch.length} texts)`
+      );
 
       const response = await fetch("https://api.mistral.ai/v1/embeddings", {
         method: "POST",
@@ -80,11 +84,15 @@ export async function POST(req: NextRequest) {
         (d: { embedding: number[] }) => d.embedding
       );
       allEmbeddings.push(...batchEmbeddings);
-      
-      console.log(`[Embeddings] Batch ${batchNum} complete: got ${batchEmbeddings.length} embeddings, total: ${allEmbeddings.length}`);
+
+      console.log(
+        `[Embeddings] Batch ${batchNum} complete: got ${batchEmbeddings.length} embeddings, total: ${allEmbeddings.length}`
+      );
     }
 
-    console.log(`[Embeddings] All batches complete: ${allEmbeddings.length} embeddings generated`);
+    console.log(
+      `[Embeddings] All batches complete: ${allEmbeddings.length} embeddings generated`
+    );
 
     return NextResponse.json({
       embeddings: allEmbeddings,

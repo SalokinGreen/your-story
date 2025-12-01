@@ -362,7 +362,7 @@ export async function syncNewMemories(
   authToken: string
 ): Promise<{ synced: number; cleaned: number; errors: string[] }> {
   const errors: string[] = [];
-  
+
   // Build current memory entries with content-based keys
   const memoryEntries: Array<{
     key: string;
@@ -370,13 +370,13 @@ export async function syncNewMemories(
     type: "memory";
     importance?: number;
   }> = [];
-  
+
   const validKeys: string[] = [];
 
   memories.forEach((memory, index) => {
     const key = getMemoryKey(memory, index);
     validKeys.push(key);
-    
+
     // Only generate embedding if this key doesn't exist
     if (!existingKeys.has(key)) {
       memoryEntries.push({

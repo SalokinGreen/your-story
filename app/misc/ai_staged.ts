@@ -63,7 +63,7 @@ export function buildInfoMessage(
 
   // Build stats section
   const statsSection = storyData.stats.length
-    ? `Stats:\n${storyData.stats
+    ? `## Stats\n${storyData.stats
         .map(
           (s) =>
             `- ${s.name}: ${s.value}${
@@ -75,7 +75,7 @@ export function buildInfoMessage(
 
   // Build resources section
   const resourcesSection = storyData.resources.length
-    ? `Resources:\n${storyData.resources
+    ? `## Resources\n${storyData.resources
         .map(
           (r) =>
             `- ${r.name}: ${r.value}/${r.maxValue}${
@@ -87,7 +87,7 @@ export function buildInfoMessage(
 
   // Build inventory section with grade and durability info
   const inventorySection = storyData.inventory.length
-    ? `Inventory:\n${storyData.inventory
+    ? `## Inventory\n${storyData.inventory
         .map((i) => {
           const typeLabel = i.type ? ` [${i.type}]` : "";
           const gradeLabel = i.grade ? ` (${i.grade})` : "";
@@ -101,11 +101,11 @@ export function buildInfoMessage(
           return `- ${i.name}${gradeLabel}${typeLabel}${durabilityInfo} x${i.quantity}${desc}`;
         })
         .join("\n")}`
-    : "Inventory: Empty";
+    : "## Inventory\nEmpty";
 
   // Build abilities section with grade, cooldown, and cost info
   const abilitiesSection = storyData.abilities?.length
-    ? `Abilities:\n${storyData.abilities
+    ? `## Abilities\n${storyData.abilities
         .map((a) => {
           const gradeLabel = a.grade
             ? ` (${
@@ -128,14 +128,14 @@ export function buildInfoMessage(
           return `- ${a.name}${gradeLabel}${statInfo}${cooldownInfo}${costInfo}${readyStatus}${desc}`;
         })
         .join("\n")}`
-    : "Abilities: None";
+    : "";
 
   // Build achievements section - show LOCKED achievements with ai_hint
   const lockedAchievements = storyData.achievements.filter(
     (a) => !a.dateAchieved
   );
   const achievementsSection = lockedAchievements.length
-    ? `Locked Achievements (trigger when conditions met):\n${lockedAchievements
+    ? `## Locked Achievements\n${lockedAchievements
         .map((a) => `- ${a.title}: ${a.ai_hint || a.description}`)
         .join("\n")}`
     : "";
@@ -151,7 +151,11 @@ export function buildInfoMessage(
 
   // If we have embedding context AND threshold is met, use embedding-based selection
   let activeLore: StoryLore[];
-  if (embeddingContext && embeddingContext.loreTitles.length > 0 && storyData.lore.length > 30) {
+  if (
+    embeddingContext &&
+    embeddingContext.loreTitles.length > 0 &&
+    storyData.lore.length > 30
+  ) {
     // Get lore entries matching embedding-retrieved titles
     const embeddingLoreTitles = new Set(
       embeddingContext.loreTitles.map((t) => t.toLowerCase())
@@ -197,7 +201,7 @@ export function buildInfoMessage(
   }
 
   const loreSection = activeLore.length
-    ? `Lore:\n----\n${activeLore
+    ? `## Lore\n----\n${activeLore
         .map((l) => `${l.title}\n${cleanString(l.content)}`)
         .join("\n----\n")}`
     : "";
@@ -210,30 +214,65 @@ export function buildInfoMessage(
     storyData.memory.length > 50
   ) {
     // Use embedding-retrieved memories for large memory sets
-    memorySection = `Memory (relevant story developments):\n${embeddingContext.memories
+    memorySection = `## Memory\n${embeddingContext.memories
       .map((m) => `- ${m}`)
       .join("\n")}`;
   } else {
     // Use all memories for smaller sets (or when no embeddings)
     memorySection = storyData.memory.length
-      ? `Memory (story developments so far):\n${storyData.memory
+      ? `## Memory\n${storyData.memory
           .map((m) => `- ${m}`)
           .join("\n")}`
       : "";
   }
 
-  // Build plot beats section
-  const unfulfilledBeats = storyData.plot_beats.filter((b) => !b.fulfilled);
-  const plotBeatsSection = unfulfilledBeats.length
-    ? `Unfulfilled Plot Beats (important story goals to work toward):\n${unfulfilledBeats
-        .map((b) => `- ${b.title}: ${cleanString(b.content)}`)
-        .join("\n")}`
-    : "";
+  // Build plot beats section - linear progression showing last done, current, and next
+  let plotBeatsSection = "";
+  if (storyData.plot_beats.length > 0) {
+    // Find the index of the first unfulfilled beat (current beat)
+    const currentIndex = storyData.plot_beats.findIndex((b) => !b.fulfilled);
+
+    const beatLines: string[] = [];
+
+    // Last completed beat (one before current, if exists)
+    if (currentIndex > 0) {
+      const lastBeat = storyData.plot_beats[currentIndex - 1];
+      beatLines.push(
+        `[COMPLETED] ${lastBeat.title}: ${cleanString(lastBeat.content)}`
+      );
+    } else if (currentIndex === -1 && storyData.plot_beats.length > 0) {
+      // All beats are fulfilled, show the last one
+      const lastBeat = storyData.plot_beats[storyData.plot_beats.length - 1];
+      beatLines.push(
+        `[COMPLETED] ${lastBeat.title}: ${cleanString(lastBeat.content)}`
+      );
+    }
+
+    // Current beat (first unfulfilled)
+    if (currentIndex !== -1) {
+      const currentBeat = storyData.plot_beats[currentIndex];
+      beatLines.push(
+        `[CURRENT] ${currentBeat.title}: ${cleanString(currentBeat.content)}`
+      );
+
+      // Next beat (one after current, if exists)
+      if (currentIndex + 1 < storyData.plot_beats.length) {
+        const nextBeat = storyData.plot_beats[currentIndex + 1];
+        beatLines.push(
+          `[NEXT] ${nextBeat.title}: ${cleanString(nextBeat.content)}`
+        );
+      }
+    }
+
+    if (beatLines.length > 0) {
+      plotBeatsSection = `## Story Progression\n${beatLines.join("\n")}`;
+    }
+  }
 
   // Build relationships section if any exist
   const relationshipsSection =
     storyData.relationships && storyData.relationships.length > 0
-      ? `Relationships:\n${storyData.relationships
+      ? `## Relationships\n${storyData.relationships
           .map(
             (r) =>
               `- ${r.name}: ${r.value} (${r.description || "No description"})`
@@ -244,7 +283,7 @@ export function buildInfoMessage(
   // Build conditions/afflictions section if any exist
   const conditionsSection =
     storyData.conditions && storyData.conditions.length > 0
-      ? `Active Conditions/Afflictions (impose penalties on skill checks):\n${storyData.conditions
+      ? `## Active Conditions\n${storyData.conditions
           .map((c) => {
             const tierLabel = ["I", "II", "III", "IV", "V", "VI"][c.tier - 1];
             const affectsLabel = c.affectsAll
@@ -266,17 +305,17 @@ export function buildInfoMessage(
     storyData.quests?.filter((q) => !q.active && !q.fulfilled) || [];
   const questsSection =
     activeQuests.length || inactiveQuests.length
-      ? `${
+      ? `## Quests\n${
           activeQuests.length
-            ? `Active Quests:\n${activeQuests
+            ? `### Active\n${activeQuests
                 .map((q) => `- ${q.title}: ${q.description}`)
                 .join("\n")}`
             : ""
         }${
           inactiveQuests.length
             ? `${
-                activeQuests.length ? "\n\n" : ""
-              }Inactive Quests (not yet started):\n${inactiveQuests
+                activeQuests.length ? "\n" : ""
+              }### Inactive\n${inactiveQuests
                 .map((q) => `- ${q.title}`)
                 .join("\n")}`
             : ""
@@ -285,7 +324,7 @@ export function buildInfoMessage(
 
   // Build mythic GME section if enabled
   const mythicSection = storyData.mythicState
-    ? `Mythic GME State:
+    ? `## Mythic GME
 - Chaos Factor: ${storyData.mythicState.chaosFactor}/9 (${getChaosDescription(
         storyData.mythicState.chaosFactor
       )})
@@ -299,32 +338,32 @@ export function buildInfoMessage(
           .length
       }/${storyData.mythicState.characters.length}
 
-Story Threads:
+### Threads
 ${
   storyData.mythicState.threads
     .filter((t) => t.status === "active")
-    .map((t) => `  - [Active] ${t.description} (ID: ${t.id})`)
-    .join("\n") || "  (none)"
+    .map((t) => `- [Active] ${t.description} (ID: ${t.id})`)
+    .join("\n") || "(none)"
 }
 ${
   storyData.mythicState.threads
     .filter((t) => t.status === "closed")
-    .map((t) => `  - [Closed] ${t.description} (ID: ${t.id})`)
+    .map((t) => `- [Closed] ${t.description} (ID: ${t.id})`)
     .join("\n") || ""
 }
 
-NPCs:
+### NPCs
 ${
   storyData.mythicState.characters
-    .map((c) => `  - ${c.name} (${c.role}) [${c.status}] (ID: ${c.id})`)
-    .join("\n") || "  (none)"
+    .map((c) => `- ${c.name} (${c.role}) [${c.status}] (ID: ${c.id})`)
+    .join("\n") || "(none)"
 }`
     : "";
 
   // Build custom tables section if any exist
   const customTablesSection =
     storyData.customTables && storyData.customTables.length > 0
-      ? `Custom Tables (use ONLY these exact names with table parameter):\n${storyData.customTables
+      ? `## Custom Tables\n${storyData.customTables
           .map((t) => `- ${t.name}: ${t.description || "No description"}`)
           .join("\n")}`
       : "";
@@ -332,7 +371,7 @@ ${
   // Build variables section if any exist - clean, simple format
   const variablesSection =
     storyData.variables && storyData.variables.length > 0
-      ? `Variables:\n${storyData.variables
+      ? `## Variables\n${storyData.variables
           .map((v) => {
             if (v.type === "number") {
               return `- ${v.name}: ${v.value}${
@@ -359,15 +398,15 @@ ${
 
   // Combine all sections
   const sections = [
-    `Story: ${cleanString(storyData.story_name || "Untitled Story")}`,
-    `Premise: ${cleanString(storyData.premise || "")}`,
-    `Player: ${cleanString(storyData.player_name || "Hero")}${
+    `# ${cleanString(storyData.story_name || "Untitled Story")}`,
+    storyData.premise ? `**Premise:** ${cleanString(storyData.premise)}` : "",
+    `**Player:** ${cleanString(storyData.player_name || "Hero")}${
       storyData.player_summary
         ? ` - ${cleanString(storyData.player_summary)}`
         : ""
     }`,
     rpgSystem.id !== "3d6"
-      ? `RPG System: ${rpgSystem.name} - ${rpgSystem.description}`
+      ? `**RPG System:** ${rpgSystem.name} - ${rpgSystem.description}`
       : "",
     statsSection,
     resourcesSection,
@@ -384,18 +423,18 @@ ${
     mythicSection,
     customTablesSection,
     storyData.author_notes
-      ? `Author Notes: ${cleanString(storyData.author_notes)}`
+      ? `## Author Notes\n${cleanString(storyData.author_notes)}`
       : "",
     storyData.player_notes
-      ? `Player Notes: ${cleanString(storyData.player_notes)}`
+      ? `## Player Notes\n${cleanString(storyData.player_notes)}`
       : "",
     storyData.momentum !== undefined
-      ? `Momentum: ${storyData.momentum}/${
+      ? `**Momentum:** ${storyData.momentum}/${
           storyData.maxMomentum || 3
         } (spend for rerolls/guaranteed success)`
       : "",
     storyData.points !== undefined
-      ? `Progression Points: ${storyData.points} (spend on upgrades)`
+      ? `**Progression Points:** ${storyData.points} (spend on upgrades)`
       : "",
   ]
     .filter(Boolean)
