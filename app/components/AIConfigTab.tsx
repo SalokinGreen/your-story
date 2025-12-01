@@ -442,10 +442,8 @@ export default function AIConfigTab() {
                       "success"
                     );
                   } else {
-                    // Switching to BYOK mode - switch to main preset if on mistral
-                    if (currentPreset === "mistral") {
-                      handlePresetChange("main");
-                    }
+                    // Switching to BYOK mode - switch to custom preset
+                    handlePresetChange("custom");
                     addNotification(
                       "Switched to BYOK mode - use your own API keys",
                       "success"
