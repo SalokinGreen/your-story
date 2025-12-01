@@ -355,7 +355,42 @@ export const AI_MODELS = {
       "Mistral's tiny edge model. Ultra-cheap for simple tasks like choices generation. Uses Coins.",
     bannerUrl: undefined,
   },
-
+  "Ministral 8B": {
+    name: "Ministral 8B",
+    original_model: "ministral-8b-2410",
+    model: "ministral-8b-2410",
+    maxTokens: 128000,
+    maxOutputTokens: 8000,
+    provider: "mistral",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.04,
+    outputPrice: 0.04,
+    finetunes: [],
+    strengths: ["ultra cost-effective", "fast", "edge model"],
+    weaknesses: ["creativity", "complex reasoning"],
+    description:
+      "Mistral's tiny edge model. Ultra-cheap for simple tasks like choices generation. Uses Coins.",
+    bannerUrl: undefined,
+  },
+  "Magistral Medium 1.2": {
+    name: "Magistral Medium 1.2",
+    original_model: "magistral-medium-2509",
+    model: "magistral-medium-2509",
+    maxTokens: 128000,
+    maxOutputTokens: 16000,
+    provider: "mistral",
+    supportsToolCalling: true,
+    cost: 3,
+    inputPrice: 2,
+    outputPrice: 5,
+    finetunes: [],
+    strengths: ["creative", "powerful", "tool calling"],
+    weaknesses: ["price"],
+    description:
+      "Mistral's powerful medium model with enhanced creativity and tool calling. Uses Coins.",
+    bannerUrl: undefined,
+  },
   Codestral: {
     name: "Codestral",
     original_model: "codestral-2508",
@@ -561,43 +596,6 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 12, // 10 + 1 + 1
   },
-
-  clusterTwo: {
-    id: "clusterTwo",
-    name: "Cluster David",
-    description: "High performance with advanced capabilities",
-    storyModel: "qwen/qwen3-vl-30b-a3b-instruct",
-    toolsModel: "Deepseek Chat",
-    choicesModel: "microsoft/phi-4",
-    estimatedCost: 5, // 1 + 1 + 1
-  },
-  clusterFour: {
-    id: "clusterFour",
-    name: "Cluster Moses",
-    description: "Balanced performance and cost-effectiveness",
-    storyModel: "Qwen 3 Next 80b",
-    toolsModel: "Deepseek Chat",
-    choicesModel: "microsoft/phi-4",
-    estimatedCost: 7, // 5 + 1 + 1
-  },
-  clusterFive: {
-    id: "clusterFive",
-    name: "Cluster Goliath",
-    description: "Maximum power for the most demanding adventures",
-    storyModel: "Qwen 3 235B A22B Instruct",
-    toolsModel: "Deepseek Chat",
-    choicesModel: "microsoft/phi-4",
-    estimatedCost: 3, // 1 + 1 + 1
-  },
-  budget: {
-    id: "budget",
-    name: "Budget",
-    description: "Affordable generation with basic capabilities",
-    storyModel: "Mistral Nemo 12B",
-    toolsModel: "Deepseek Chat",
-    choicesModel: "microsoft/phi-4",
-    estimatedCost: 1, // 1 + 1 + 1
-  },
   custom: {
     id: "custom",
     name: "Custom",
@@ -613,7 +611,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     description: "Balanced Mistral models - uses Coins for payment",
     storyModel: "Mistral Medium 3.1",
     toolsModel: "Codestral",
-    choicesModel: "Mistral Small 3.2",
+    choicesModel: "Ministral 8B",
     estimatedCost: 4,
   },
   mistralBudget: {
@@ -622,8 +620,17 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     description: "Ultra-cheap Nemo story, Ministral 3B choices - uses Coins",
     storyModel: "Mistral Nemo",
     toolsModel: "Codestral",
-    choicesModel: "Ministral 3B",
+    choicesModel: "Ministral 8B",
     estimatedCost: 2,
+  },
+  mistralBrain: {
+    id: "mistralBrain",
+    name: "Mistral Brain (Coins)",
+    description: "Creative Medium story, Codestral tools - uses Coins",
+    storyModel: "Magistral Medium 1.2",
+    toolsModel: "Codestral",
+    choicesModel: "Ministral 8B",
+    estimatedCost: 4,
   },
 };
 
