@@ -730,43 +730,43 @@ const COMPLEXITY_COUNTS: Record<
   }
 > = {
   simple: {
-    stats: 4,
-    resources: 2,
-    abilities: 3,
-    plotBeats: 5,
-    lore: 4,
-    achievements: 5,
-    quests: 3,
-    relationships: 3,
-    presets: 2,
-    customTables: 2,
-    shopItems: 4,
+    stats: 5,
+    resources: 3,
+    abilities: 4,
+    plotBeats: 8,
+    lore: 6,
+    achievements: 8,
+    quests: 4,
+    relationships: 4,
+    presets: 3,
+    customTables: 3,
+    shopItems: 6,
   },
   moderate: {
-    stats: 6,
-    resources: 3,
-    abilities: 6,
-    plotBeats: 8,
-    lore: 8,
-    achievements: 8,
-    quests: 5,
-    relationships: 5,
-    presets: 3,
-    customTables: 4,
-    shopItems: 8,
-  },
-  complex: {
-    stats: 8,
+    stats: 7,
     resources: 4,
-    abilities: 10,
+    abilities: 8,
     plotBeats: 12,
     lore: 12,
     achievements: 12,
     quests: 8,
     relationships: 8,
     presets: 4,
-    customTables: 6,
-    shopItems: 12,
+    customTables: 5,
+    shopItems: 10,
+  },
+  complex: {
+    stats: 10,
+    resources: 5,
+    abilities: 14,
+    plotBeats: 18,
+    lore: 18,
+    achievements: 18,
+    quests: 12,
+    relationships: 12,
+    presets: 6,
+    customTables: 8,
+    shopItems: 16,
   },
 };
 
@@ -802,36 +802,89 @@ const RPG_SYSTEM_DESCRIPTIONS: Record<RPGSystemType, string> = {
 export function getStageInfo(stage: GenerationStage): {
   name: string;
   description: string;
+  detailedDescription: string;
+  generates: string[];
+  instructionHint: string;
   number: number;
   emoji: string;
 } {
   const stages: Record<
     GenerationStage,
-    { name: string; description: string; number: number; emoji: string }
+    {
+      name: string;
+      description: string;
+      detailedDescription: string;
+      generates: string[];
+      instructionHint: string;
+      number: number;
+      emoji: string;
+    }
   > = {
     core: {
       name: "Core Concept",
-      description: "Title, premise, intro, player character, and author notes",
+      description: "The foundation of your adventure",
+      detailedDescription:
+        "Creates the adventure's identity: its title, main premise, opening scene, and your character's backstory. This sets the tone and narrative direction for everything else.",
+      generates: [
+        "Adventure title & description",
+        "Story premise & setting",
+        "Opening intro scene",
+        "Player character summary",
+        "Author notes (AI guidance)",
+      ],
+      instructionHint:
+        "Guide the tone, setting details, character personality, or narrative style",
       number: 1,
       emoji: "📝",
     },
     mechanics: {
       name: "Game Mechanics",
-      description: "Stats, resources, abilities, and variables",
+      description: "Stats, skills, and game systems",
+      detailedDescription:
+        "Defines how the game plays mechanically: what attributes your character has, what resources to manage, special abilities to use, and hidden variables that track story progress.",
+      generates: [
+        "Character stats (Strength, Charisma, etc.)",
+        "Resources (Health, Mana, Gold, etc.)",
+        "Abilities & skills with costs/cooldowns",
+        "Hidden variables for story tracking",
+      ],
+      instructionHint:
+        "Request specific stats, resource types, unique abilities, or special mechanics",
       number: 2,
       emoji: "⚙️",
     },
     content: {
       name: "Story Content",
-      description:
-        "Inventory, lore, relationships, achievements, quests, and plot beats",
+      description: "NPCs, lore, quests, and world-building",
+      detailedDescription:
+        "Populates your world with content: characters to meet, history to discover, items to find, goals to achieve, and story milestones. This is the meat of your adventure.",
+      generates: [
+        "Lore entries (world history, factions, locations)",
+        "Relationships (NPCs with attitudes)",
+        "Inventory items (equipment, consumables)",
+        "Achievements (goals with rewards)",
+        "Quests (main & side objectives)",
+        "Plot beats (story milestones)",
+      ],
+      instructionHint:
+        "Focus on NPC depth, faction politics, item variety, or story pacing",
       number: 3,
       emoji: "📚",
     },
     advanced: {
       name: "Advanced Features",
-      description:
-        "Character presets, Mythic GME, custom tables, upgrade shop, and starting choices",
+      description: "Character creation, upgrades, and randomization",
+      detailedDescription:
+        "Adds depth through optional systems: character creation choices, progression unlocks, random event tables, and GM emulation tools for unpredictable storytelling.",
+      generates: [
+        "Starting choices (character creation options)",
+        "Upgrade shop (progression purchases)",
+        "Character presets (pre-made builds)",
+        "Custom random tables",
+        "Mythic GME integration",
+      ],
+      instructionHint:
+        "Shape character options, upgrade paths, or random event themes",
       number: 4,
       emoji: "✨",
     },

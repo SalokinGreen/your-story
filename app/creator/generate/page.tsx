@@ -817,6 +817,75 @@ export default function BigAdventureCreatorPage() {
     updateConfig({ prompt: finalPrompt });
   }, [guidedAnswers, updateConfig]);
 
+  // Validation for step 1
+  const [validationError, setValidationError] = useState<string | null>(null);
+  
+  const validateStep1 = useCallback((): { valid: boolean; error: string | null } => {
+    if (promptMode === "freeform") {
+      if (!config.prompt.trim()) {
+        return { valid: false, error: "Please enter an adventure concept" };
+      }
+    } else if (promptMode === "template") {
+      if (!selectedTemplate) {
+        return { valid: false, error: "Please select a template" };
+      }
+      if (!config.prompt.trim()) {
+        return { valid: false, error: "Please select a template to generate your prompt" };
+      }
+    } else if (promptMode === "guided") {
+      // Check required questions
+      const missingRequired = PROMPT_BUILDER_QUESTIONS
+        .filter(q => q.required && !guidedAnswers[q.id]?.trim())
+        .map(q => q.question.replace(/\?$/, ''));
+      
+      if (missingRequired.length > 0) {
+        return { 
+          valid: false, 
+          error: `Please fill in required fields: ${missingRequired.slice(0, 2).join(", ")}${missingRequired.length > 2 ? ` (+${missingRequired.length - 2} more)` : ""}`
+        };
+      }
+      
+      // Generate prompt from answers if not already done
+      const generatedPrompt = buildPromptFromAnswers(guidedAnswers);
+      if (!generatedPrompt.trim()) {
+        return { valid: false, error: "Please answer at least the required questions" };
+      }
+    }
+    return { valid: true, error: null };
+  }, [promptMode, config.prompt, selectedTemplate, guidedAnswers]);
+
+  const handleNextStep = useCallback(() => {
+    const validation = validateStep1();
+    if (!validation.valid) {
+      setValidationError(validation.error);
+      addNotification(validation.error || "Please fill in required fields", "warning");
+      return;
+    }
+    
+    // If in guided mode, finalize the prompt before proceeding
+    if (promptMode === "guided") {
+      finalizeGuidedPrompt();
+    }
+    
+    setValidationError(null);
+    setConfigStep(2);
+  }, [validateStep1, promptMode, finalizeGuidedPrompt, addNotification]);
+
+  // Check if step 1 can proceed (for button disabled state)
+  const canProceedStep1 = useCallback((): boolean => {
+    if (promptMode === "freeform") {
+      return !!config.prompt.trim();
+    } else if (promptMode === "template") {
+      return !!selectedTemplate && !!config.prompt.trim();
+    } else if (promptMode === "guided") {
+      // Check if all required questions are answered
+      return PROMPT_BUILDER_QUESTIONS
+        .filter(q => q.required)
+        .every(q => !!guidedAnswers[q.id]?.trim());
+    }
+    return false;
+  }, [promptMode, config.prompt, selectedTemplate, guidedAnswers]);
+
   // Update stage config
   const updateStageConfig = useCallback(
     (stage: GenerationStage, updates: Partial<StageConfig>) => {
@@ -1561,7 +1630,7 @@ export default function BigAdventureCreatorPage() {
         throw new Error(error.error || "Failed to save adventure");
       }
 
-      const savedAdventure = await response.json();
+      const { adventure: savedAdventure } = await response.json();
       addNotification("Adventure saved successfully!", "success");
 
       // Navigate to the creator to edit the adventure
@@ -2034,7 +2103,7 @@ export default function BigAdventureCreatorPage() {
                 {/* Prompt Mode Selector */}
                 <div className="flex gap-2 mb-4">
                   <button
-                    onClick={() => setPromptMode("freeform")}
+                    onClick={() => { setPromptMode("freeform"); setValidationError(null); }}
                     className={`flex-1 px-4 py-2 rounded-lg text-sm transition-colors ${
                       promptMode === "freeform"
                         ? "bg-purple-600 text-white"
@@ -2044,7 +2113,7 @@ export default function BigAdventureCreatorPage() {
                     ✏️ Write Your Own
                   </button>
                   <button
-                    onClick={() => setPromptMode("template")}
+                    onClick={() => { setPromptMode("template"); setValidationError(null); }}
                     className={`flex-1 px-4 py-2 rounded-lg text-sm transition-colors ${
                       promptMode === "template"
                         ? "bg-purple-600 text-white"
@@ -2054,7 +2123,7 @@ export default function BigAdventureCreatorPage() {
                     📋 Use Template
                   </button>
                   <button
-                    onClick={() => setPromptMode("guided")}
+                    onClick={() => { setPromptMode("guided"); setValidationError(null); }}
                     className={`flex-1 px-4 py-2 rounded-lg text-sm transition-colors ${
                       promptMode === "guided"
                         ? "bg-purple-600 text-white"
@@ -2239,12 +2308,15 @@ export default function BigAdventureCreatorPage() {
                 </div>
 
                 <button
-                  onClick={() => setConfigStep(2)}
-                  disabled={!config.prompt.trim()}
+                  onClick={handleNextStep}
+                  disabled={!canProceedStep1()}
                   className="px-6 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-blue-300/50 text-white rounded-lg transition-colors"
                 >
                   Next: Settings →
                 </button>
+                {validationError && promptMode !== "freeform" && (
+                  <p className="text-sm text-red-400 mt-2">{validationError}</p>
+                )}
               </div>
             </ConfigStep>
 
@@ -2891,7 +2963,7 @@ export default function BigAdventureCreatorPage() {
                         Per-Stage Custom Instructions
                       </h4>
                       <p className="text-xs text-purple-300/50 mb-4">
-                        Add specific guidance for each generation stage
+                        Give the AI specific guidance for each generation stage. These instructions directly influence what gets created.
                       </p>
                       <div className="space-y-4">
                         {(
@@ -2901,17 +2973,33 @@ export default function BigAdventureCreatorPage() {
                             "content",
                             "advanced",
                           ] as GenerationStage[]
-                        ).map((stage) => (
-                          <div key={stage} className="space-y-1">
+                        ).map((stage) => {
+                          const info = getStageInfo(stage);
+                          return (
+                          <div key={stage} className="space-y-2">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm text-purple-200">
-                                {getStageInfo(stage).emoji}{" "}
-                                {getStageInfo(stage).name}
+                              <span className="text-sm font-medium text-purple-200">
+                                {info.emoji}{" "}
+                                {info.name}
                               </span>
                               {!config.stageConfigs?.[stage]?.enabled && (
                                 <span className="text-xs text-blue-400/50">
                                   (disabled)
                                 </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-blue-300/60 leading-relaxed">
+                              {info.detailedDescription}
+                            </p>
+                            <div className="text-xs text-purple-400/70 flex flex-wrap gap-1">
+                              <span className="font-medium">Creates:</span>
+                              {info.generates.slice(0, 3).map((item, i) => (
+                                <span key={i} className="bg-purple-900/30 px-1.5 py-0.5 rounded">
+                                  {item.split(" (")[0]}
+                                </span>
+                              ))}
+                              {info.generates.length > 3 && (
+                                <span className="text-purple-400/50">+{info.generates.length - 3} more</span>
                               )}
                             </div>
                             <textarea
@@ -2924,21 +3012,13 @@ export default function BigAdventureCreatorPage() {
                                   customInstructions: e.target.value,
                                 })
                               }
-                              placeholder={`e.g., "Focus on ${
-                                stage === "core"
-                                  ? "dark fantasy themes"
-                                  : stage === "mechanics"
-                                  ? "strategic combat options"
-                                  : stage === "content"
-                                  ? "memorable NPCs"
-                                  : "complex puzzles"
-                              }..."`}
+                              placeholder={info.instructionHint}
                               rows={2}
-                              className="w-full px-3 py-2 bg-blue-900/30 border border-purple-700/30 rounded-lg text-white placeholder-purple-300/30 text-sm resize-none focus:outline-none focus:border-purple-500/50"
+                              className="w-full px-3 py-2 bg-blue-900/30 border border-purple-700/30 rounded-lg text-white placeholder-purple-300/40 text-sm resize-none focus:outline-none focus:border-purple-500/50"
                               disabled={!config.stageConfigs?.[stage]?.enabled}
                             />
                           </div>
-                        ))}
+                        )})}
                       </div>
                     </div>
                   </div>
