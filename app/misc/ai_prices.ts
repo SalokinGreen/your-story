@@ -318,6 +318,44 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
+  "Mistral Nemo": {
+    name: "Mistral Nemo",
+    original_model: "open-mistral-nemo-2407",
+    model: "open-mistral-nemo-2407",
+    maxTokens: 128000,
+    maxOutputTokens: 8000,
+    provider: "mistral",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.15,
+    outputPrice: 0.15,
+    finetunes: [],
+    strengths: ["extremely cost-effective", "multilingual"],
+    weaknesses: ["creativity", "complex reasoning"],
+    description:
+      "Mistral's budget-friendly open source model. Great for basic tasks at minimal cost. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "Ministral 3B": {
+    name: "Ministral 3B",
+    original_model: "ministral-3b-2410",
+    model: "ministral-3b-2410",
+    maxTokens: 128000,
+    maxOutputTokens: 8000,
+    provider: "mistral",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.04,
+    outputPrice: 0.04,
+    finetunes: [],
+    strengths: ["ultra cost-effective", "fast", "edge model"],
+    weaknesses: ["creativity", "complex reasoning"],
+    description:
+      "Mistral's tiny edge model. Ultra-cheap for simple tasks like choices generation. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
   Codestral: {
     name: "Codestral",
     original_model: "codestral-2508",
@@ -577,6 +615,15 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     toolsModel: "Codestral",
     choicesModel: "Mistral Small 3.2",
     estimatedCost: 4,
+  },
+  mistralBudget: {
+    id: "mistralBudget",
+    name: "Mistral Budget (Coins)",
+    description: "Ultra-cheap Nemo story, Ministral 3B choices - uses Coins",
+    storyModel: "Mistral Nemo",
+    toolsModel: "Codestral",
+    choicesModel: "Ministral 3B",
+    estimatedCost: 2,
   },
 };
 
