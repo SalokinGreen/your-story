@@ -569,33 +569,6 @@ export interface ModelPreset {
 }
 
 export const MODEL_PRESETS: Record<string, ModelPreset> = {
-  main: {
-    id: "main",
-    name: "Main",
-    description: "Creative narration, powerful tools, fast choices",
-    storyModel: "Deepseek Chat",
-    toolsModel: "Deepseek Chat",
-    choicesModel: "Gemini 2.5 Flash Lite",
-    estimatedCost: 6, // 1 + 10 + 1
-  },
-  mainBrain: {
-    id: "mainBrain",
-    name: "Main with Brain",
-    description: "Smarter than main, with reasoning capabilities",
-    storyModel: "Deepseek R1",
-    toolsModel: "Deepseek Chat",
-    choicesModel: "Gemini 2.5 Flash Lite",
-    estimatedCost: 13, // 2 + 10 + 1
-  },
-  speed: {
-    id: "speed",
-    name: "Speed (Fast Responses)",
-    description: "Optimized for quick generation times",
-    storyModel: "Grok 4 Fast",
-    toolsModel: "Grok Code Fast 1",
-    choicesModel: "Gemini 2.5 Flash Lite",
-    estimatedCost: 12, // 10 + 1 + 1
-  },
   custom: {
     id: "custom",
     name: "Custom",

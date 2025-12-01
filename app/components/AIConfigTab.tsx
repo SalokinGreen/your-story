@@ -206,8 +206,8 @@ export default function AIConfigTab() {
   // Check if user has any AI keys configured
   const hasAnyAIKey = hasKey("openRouterKey") || hasKey("deepseekKey");
 
-  // Get current preset configuration
-  const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["main"];
+  // Get current preset configuration (fallback to mistral if preset not found)
+  const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["mistral"];
   const effectiveStoryModel =
     currentPreset === "custom" && storyModel ? storyModel : preset.storyModel;
   const effectiveToolsModel =
@@ -576,12 +576,12 @@ export default function AIConfigTab() {
         >
           {Object.entries(MODEL_PRESETS)
             .filter(([key]) => {
-              // In BYOK mode, hide Mistral presets (coins only)
-              // In Coins mode, show only Mistral presets (no custom allowed)
+              // In BYOK mode, only show custom preset
+              // In Coins mode, show all presets except custom
               if (byokMode) {
-                return key !== "mistral" && key !== "mistralBudget";
+                return key === "custom";
               } else {
-                return key === "mistral" || key === "mistralBudget";
+                return key !== "custom";
               }
             })
             .map(([key, presetConfig]) => (
