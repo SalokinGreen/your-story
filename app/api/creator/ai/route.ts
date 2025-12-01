@@ -267,13 +267,6 @@ export async function POST(req: NextRequest) {
         isByok: true,
       },
     });
-          completion_tokens: completionTokens,
-        },
-        remainingBalance,
-        cost: coinsToDeduct,
-        isByok: isNovelAI,
-      },
-    });
   } catch (err) {
     console.error("Error in creator AI route:", err);
     return NextResponse.json(

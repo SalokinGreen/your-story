@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useAuth } from "@/app/misc/AuthContext";
 import { DynamicIcon } from "./DynamicIcon";
+import AIConfigTab from "./AIConfigTab";
 
 interface APIKeysModalProps {
   isOpen: boolean;
@@ -26,7 +27,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
   } = useAPIKeys();
 
   const [showKeys, setShowKeys] = useState(false);
-  const [activeTab, setActiveTab] = useState<"llm" | "services">("llm");
+  const [activeTab, setActiveTab] = useState<"config" | "llm" | "services">(
+    "config"
+  );
   const [mounted, setMounted] = useState(false);
 
   // Ensure we're on the client for portal rendering
@@ -53,16 +56,16 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
               <DynamicIcon
-                name="Key"
+                name="Settings"
                 className="w-5 h-5 text-purple-600 dark:text-purple-400"
               />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                API Keys
+                Settings
               </h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Connect your AI providers
+                AI models and API keys
               </p>
             </div>
           </div>
@@ -80,6 +83,19 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
         {/* Tabs */}
         <div className="flex border-b border-gray-200 dark:border-gray-700 px-6">
           <button
+            onClick={() => setActiveTab("config")}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "config"
+                ? "border-purple-500 text-purple-600 dark:text-purple-400"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <DynamicIcon name="Sliders" className="w-4 h-4" />
+              AI Config
+            </span>
+          </button>
+          <button
             onClick={() => setActiveTab("llm")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === "llm"
@@ -88,8 +104,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             }`}
           >
             <span className="flex items-center gap-2">
-              <DynamicIcon name="Bot" className="w-4 h-4" />
-              AI Models
+              <DynamicIcon name="Key" className="w-4 h-4" />
+              API Keys
             </span>
           </button>
           <button
@@ -102,7 +118,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
           >
             <span className="flex items-center gap-2">
               <DynamicIcon name="Mic" className="w-4 h-4" />
-              Voice Services
+              Voice
             </span>
           </button>
         </div>
@@ -116,6 +132,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                 className="w-6 h-6 text-purple-500 animate-spin"
               />
             </div>
+          ) : activeTab === "config" ? (
+            <AIConfigTab />
           ) : activeTab === "llm" ? (
             <>
               {/* OpenRouter Section */}
