@@ -2993,14 +2993,11 @@ export default function BigAdventureCreatorPage() {
                             </p>
                             <div className="text-xs text-purple-400/70 flex flex-wrap gap-1">
                               <span className="font-medium">Creates:</span>
-                              {info.generates.slice(0, 3).map((item, i) => (
+                              {info.generates.map((item, i) => (
                                 <span key={i} className="bg-purple-900/30 px-1.5 py-0.5 rounded">
                                   {item.split(" (")[0]}
                                 </span>
                               ))}
-                              {info.generates.length > 3 && (
-                                <span className="text-purple-400/50">+{info.generates.length - 3} more</span>
-                              )}
                             </div>
                             <textarea
                               value={
