@@ -1708,7 +1708,7 @@ export default function BigAdventureCreatorPage() {
       addNotification("Adventure saved successfully!", "success");
 
       // Navigate to the creator to edit the adventure
-      router.push(`/creator?id=${savedAdventure.id}`);
+      router.push(`/creator?edit=${savedAdventure.id}`);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -3167,9 +3167,9 @@ export default function BigAdventureCreatorPage() {
                     <span className="text-sm text-blue-200">API Calls</span>
                     <span className="text-sm text-blue-300">
                       {getTotalGenerationTasks(config)} min –{" "}
-                      {getTotalGenerationTasks(config) * 4} max
+                      {getTotalGenerationTasks(config) * 6} max
                       <span className="text-blue-400/60 ml-1">
-                        (up to 3 retries/stage)
+                        (up to 5 retries/stage)
                       </span>
                     </span>
                   </div>

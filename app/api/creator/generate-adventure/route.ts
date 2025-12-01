@@ -296,7 +296,7 @@ async function generateStage(
   rawContent: string;
 }> {
   const stageInfo = getStageInfo(stage);
-  const MAX_CONTINUATIONS = 3; // Maximum number of continuation attempts
+  const MAX_CONTINUATIONS = 5; // Maximum number of continuation attempts
 
   // Get stage-specific max output tokens
   const stageConfig =
