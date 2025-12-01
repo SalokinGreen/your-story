@@ -5,6 +5,7 @@ import { useAuth } from "@/app/misc/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/misc/supabase";
 import { DynamicIcon } from "./DynamicIcon";
+import APIKeysModal from "./APIKeysModal";
 
 interface ProfileData {
   avatar_url?: string;
@@ -16,6 +17,7 @@ export default function SiteHeader() {
   const { user } = useAuth();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
+  const [showAPIKeysModal, setShowAPIKeysModal] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -132,8 +134,20 @@ export default function SiteHeader() {
             </button>
           </nav>
 
-          {/* Right side - Profile + Mobile Menu */}
+          {/* Right side - Settings + Profile + Mobile Menu */}
           <div className="flex items-center gap-1">
+            {/* Settings Button */}
+            <button
+              onClick={() => setShowAPIKeysModal(true)}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+              title="API Keys Settings"
+            >
+              <DynamicIcon
+                name="Settings"
+                className="w-5 h-5 text-gray-600 dark:text-gray-400"
+              />
+            </button>
+
             {/* Profile */}
             <button
               onClick={(e) => handleNavClick(e, `/profile/${user.id}`)}
@@ -233,6 +247,12 @@ export default function SiteHeader() {
           </nav>
         </div>
       </div>
+
+      {/* API Keys Modal */}
+      <APIKeysModal
+        isOpen={showAPIKeysModal}
+        onClose={() => setShowAPIKeysModal(false)}
+      />
     </header>
   );
 }

@@ -301,9 +301,10 @@ export const OPENROUTER_IMAGE_MODELS = {
     maxTokens: 65000,
     maxOutputTokens: 32000,
     provider: "openrouter",
-    // Actual billing: ~$0.14 for ~1500-1700 output tokens = ~$90/1M output
-    inputPrice: 2.5, // $/1M tokens (text input)
-    outputPrice: 90, // $/1M tokens (image generation, slightly padded)
+    // Official: $2/$12, but actual image gen billing is ~7.5x higher
+    // Based on real usage: ~$0.14 for ~1600 output tokens
+    inputPrice: 2, // $/1M tokens (official)
+    outputPrice: 90, // $/1M tokens (effective for image gen)
     cost: 300, // Fallback flat cost
   },
   "Nano Banana": {
@@ -313,10 +314,11 @@ export const OPENROUTER_IMAGE_MODELS = {
     maxTokens: 33000,
     maxOutputTokens: 32000,
     provider: "openrouter",
-    // Actual OpenRouter pricing: ~$0.038 for ~1300 output tokens = ~$29/1M output
-    inputPrice: 0.3, // $/1M tokens (text input is cheap)
-    outputPrice: 30, // $/1M tokens (image output is expensive)
-    cost: 80, // Fallback flat cost (~$0.04 × 2 markup × 1000)
+    // Official: $0.30/$2.50, but actual image gen billing is ~12x higher
+    // Based on real usage: ~$0.038 for ~1300 output tokens
+    inputPrice: 0.3, // $/1M tokens (official)
+    outputPrice: 30, // $/1M tokens (effective for image gen)
+    cost: 80, // Fallback flat cost
   },
   "Flux 2 Pro": {
     name: "Flux 2 Pro",
@@ -325,8 +327,9 @@ export const OPENROUTER_IMAGE_MODELS = {
     maxTokens: 46000,
     maxOutputTokens: 46000,
     provider: "openrouter",
-    inputPrice: 3.66,
-    outputPrice: 3.66,
+    // Flux charges per-image flat rate, not per-token
+    inputPrice: 0,
+    outputPrice: 0,
     cost: 60, // ~$0.03 per image × 2 markup × 1000 coins/$
   },
   "Flux 2 Flex": {
@@ -336,8 +339,9 @@ export const OPENROUTER_IMAGE_MODELS = {
     maxTokens: 67000,
     maxOutputTokens: 67000,
     provider: "openrouter",
-    inputPrice: 14.64,
-    outputPrice: 14.64,
+    // Flux charges per-image flat rate, not per-token
+    inputPrice: 0,
+    outputPrice: 0,
     cost: 30, // ~$0.015 per image × 2 markup × 1000 coins/$
   },
   "GPT-5 Image": {
@@ -347,9 +351,10 @@ export const OPENROUTER_IMAGE_MODELS = {
     maxTokens: 400000,
     maxOutputTokens: 128000,
     provider: "openrouter",
+    // GPT image models charge based on output tokens
     inputPrice: 10,
-    outputPrice: 10,
-    cost: 50,
+    outputPrice: 40, // Higher effective rate for image gen
+    cost: 200, // Fallback flat cost
   },
   "GPT-5 Image Mini": {
     name: "GPT-5 Image Mini",
@@ -359,8 +364,8 @@ export const OPENROUTER_IMAGE_MODELS = {
     maxOutputTokens: 128000,
     provider: "openrouter",
     inputPrice: 2.5,
-    outputPrice: 2,
-    cost: 10,
+    outputPrice: 10, // Higher effective rate for image gen
+    cost: 50, // Fallback flat cost
   },
 };
 
@@ -375,29 +380,30 @@ export function isPureImageModel(modelId: string): boolean {
 }
 
 /**
- * Estimate cost for image generation (for display purposes)
+ * Calculate actual cost for image generation based on token usage
  * @param modelKey - Key from OPENROUTER_IMAGE_MODELS
- * @returns Estimated cost in coins
+ * @param inputTokens - Actual input tokens from API response
+ * @param outputTokens - Actual output tokens from API response
+ * @returns Cost in coins
  */
-export function estimateImageCost(modelKey: string): number {
+export function calculateImageTokenCost(
+  modelKey: string,
+  inputTokens: number,
+  outputTokens: number
+): number {
   const model = OPENROUTER_IMAGE_MODELS[modelKey as ImageModelKey];
   if (!model) {
-    return 5; // Default minimum
+    return MINIMUM_COST;
   }
 
-  // For pure image models (Flux), use flat cost since no token usage
+  // For pure image models (Flux), use flat cost since they charge per-image
   if (isPureImageModel(model.model)) {
     return model.cost;
   }
 
-  // For chat-based models, estimate based on typical token usage
-  // Input: ~300 tokens for prompt, Output: ~1000 tokens for image URL/response
-  const estimatedInputTokens = 300;
-  const estimatedOutputTokens = 1000;
-
   // Calculate raw cost in dollars (prices are per 1M tokens)
-  const inputCost = (estimatedInputTokens / 1_000_000) * model.inputPrice;
-  const outputCost = (estimatedOutputTokens / 1_000_000) * model.outputPrice;
+  const inputCost = (inputTokens / 1_000_000) * model.inputPrice;
+  const outputCost = (outputTokens / 1_000_000) * model.outputPrice;
   const rawCost = inputCost + outputCost;
 
   // Apply markup and convert to coins
@@ -406,6 +412,33 @@ export function estimateImageCost(modelKey: string): number {
 
   // Ensure minimum cost
   return Math.max(costInCoins, MINIMUM_COST);
+}
+
+/**
+ * Estimate cost for image generation (for display purposes before generation)
+ * @param modelKey - Key from OPENROUTER_IMAGE_MODELS
+ * @returns Estimated cost in coins
+ */
+export function estimateImageCost(modelKey: string): number {
+  const model = OPENROUTER_IMAGE_MODELS[modelKey as ImageModelKey];
+  if (!model) {
+    return MINIMUM_COST;
+  }
+
+  // For pure image models (Flux), use flat cost since no token usage
+  if (isPureImageModel(model.model)) {
+    return model.cost;
+  }
+
+  // For chat-based models, estimate based on typical token usage
+  // Input: ~400 tokens for prompt, Output: ~1500 tokens for image
+  const estimatedInputTokens = 400;
+  const estimatedOutputTokens = 1500;
+  return calculateImageTokenCost(
+    modelKey,
+    estimatedInputTokens,
+    estimatedOutputTokens
+  );
 }
 
 export interface ModelPreset {
@@ -493,6 +526,91 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     estimatedCost: 12,
   },
 };
+
+// ============================================
+// MODEL FILTERING HELPERS
+// ============================================
+
+export interface APIKeysAvailable {
+  openRouterKey?: boolean;
+  deepseekKey?: boolean;
+  novelaiKey?: boolean;
+}
+
+/**
+ * Filter AI models based on which API keys the user has configured
+ * - OpenRouter models: Shown when user has OpenRouter key
+ * - DeepSeek models: Shown only when user has DeepSeek API key
+ * - NovelAI models: Shown only when user has NovelAI key
+ *
+ * @param keys - Object indicating which keys the user has
+ * @returns Array of [modelKey, config] entries for available models
+ */
+export function getAvailableModels(
+  keys: APIKeysAvailable
+): [string, AIModelConfig][] {
+  const entries = Object.entries(AI_MODELS) as [string, AIModelConfig][];
+
+  return entries.filter(([, config]) => {
+    switch (config.provider) {
+      case "openrouter":
+        return !!keys.openRouterKey;
+      case "deepseek":
+        return !!keys.deepseekKey;
+      case "novelai":
+        return !!keys.novelaiKey;
+      default:
+        return false;
+    }
+  });
+}
+
+/**
+ * Get available model keys as an array
+ */
+export function getAvailableModelKeys(keys: APIKeysAvailable): string[] {
+  return getAvailableModels(keys).map(([key]) => key);
+}
+
+/**
+ * Check if user has any API key configured for AI generation
+ */
+export function hasAnyAIKey(keys: APIKeysAvailable): boolean {
+  return !!(keys.openRouterKey || keys.deepseekKey || keys.novelaiKey);
+}
+
+/**
+ * Get the required provider key name for a model
+ */
+export function getRequiredKeyForModel(
+  modelKey: string
+): keyof APIKeysAvailable | null {
+  const config = AI_MODELS[modelKey as AIModelKey];
+  if (!config) return null;
+
+  switch (config.provider) {
+    case "openrouter":
+      return "openRouterKey";
+    case "deepseek":
+      return "deepseekKey";
+    case "novelai":
+      return "novelaiKey";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Check if a specific model is available based on user's API keys
+ */
+export function isModelAvailable(
+  modelKey: string,
+  keys: APIKeysAvailable
+): boolean {
+  const requiredKey = getRequiredKeyForModel(modelKey);
+  if (!requiredKey) return false;
+  return !!keys[requiredKey];
+}
 
 export interface AIModelConfig {
   name: string;

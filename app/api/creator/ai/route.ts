@@ -4,14 +4,7 @@ import { buildCreatorMessages } from "@/app/misc/creator_ai";
 import { ChatMessage } from "@/app/misc/ai";
 import { createClient } from "@supabase/supabase-js";
 import {
-  hasEnoughTokens,
-  deductTokens,
-  getUserTokenBalance,
-} from "@/app/misc/tokens";
-import {
   getModelConfig,
-  AI_MODELS,
-  calculateTokenCost,
 } from "@/app/misc/ai_prices";
 import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
 
@@ -30,6 +23,8 @@ interface RequestBody {
   };
   model?: string;
   novelaiKey?: string;
+  openRouterKey?: string;
+  deepseekKey?: string;
 }
 
 interface AIResponse {
@@ -96,6 +91,8 @@ export async function POST(req: NextRequest) {
     adventureMetadata,
     model: requestedModel,
     novelaiKey,
+    openRouterKey,
+    deepseekKey,
   } = body;
 
   // Model config - requestedModel is the model key (e.g., "Deepseek Chat")
@@ -113,34 +110,12 @@ export async function POST(req: NextRequest) {
     modelConfig.provider
   );
 
-  // Estimate tokens
+  // Estimate tokens (for usage display only, no billing)
   // Rough estimate: 4 chars per token for input
   const inputText = JSON.stringify(messages) + JSON.stringify(currentStoryData);
   const estimatedInputTokens = Math.ceil(inputText.length / 4);
-  const estimatedOutputTokens = 2000;
 
-  // Calculate estimated cost using dynamic pricing (0 for NovelAI BYOK)
-  const requiredCoins = isNovelAI
-    ? 0
-    : calculateTokenCost(modelKey, estimatedInputTokens, estimatedOutputTokens);
-
-  // Skip token check for NovelAI (BYOK - user pays directly)
-  if (!isNovelAI) {
-    const hasTokens = await hasEnoughTokens(
-      user.id,
-      requiredCoins,
-      supabaseAdmin
-    );
-
-    if (!hasTokens) {
-      return NextResponse.json(
-        {
-          error: `Insufficient tokens. Estimated cost: ${requiredCoins} coins`,
-        },
-        { status: 402 }
-      );
-    }
-  }
+  // All providers now use BYOK - no token billing
 
   // Validate NovelAI key if using NovelAI
   if (isNovelAI && !novelaiKey) {
@@ -157,18 +132,25 @@ export async function POST(req: NextRequest) {
     apiKey = novelaiKey;
     apiUrl = NOVELAI_API_URL;
   } else if (modelConfig.provider === "openrouter") {
-    apiKey = process.env.OPENROUTER_API_KEY;
+    // Use user-provided key (BYOK)
+    apiKey = openRouterKey;
     apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "OpenRouter API key required. Please add your API key in Settings." },
+        { status: 400 }
+      );
+    }
   } else {
-    apiKey = process.env.DEEPSEEK_API_KEY;
+    // DeepSeek - use user-provided key (BYOK)
+    apiKey = deepseekKey;
     apiUrl = "https://api.deepseek.com/chat/completions";
-  }
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Provider API key missing" },
-      { status: 500 }
-    );
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "DeepSeek API key required. Please add your API key in Settings." },
+        { status: 400 }
+      );
+    }
   }
 
   const aiMessages = buildCreatorMessages({
@@ -273,22 +255,18 @@ export async function POST(req: NextRequest) {
         (usage.total_tokens ? usage.total_tokens - promptTokens : 0);
     }
 
-    // Calculate actual cost using dynamic pricing (0 for NovelAI)
-    const coinsToDeduct = isNovelAI
-      ? 0
-      : calculateTokenCost(modelKey, promptTokens, completionTokens);
-
-    // Deduct tokens (skip for NovelAI)
-    if (!isNovelAI && coinsToDeduct > 0) {
-      await deductTokens(user.id, coinsToDeduct, supabaseAdmin);
-    }
-    const remainingBalance = await getUserTokenBalance(user.id, supabaseAdmin);
+    // All providers are BYOK - no token billing
 
     return NextResponse.json({
       content,
       meta: {
         usage: {
           prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+        },
+        isByok: true,
+      },
+    });
           completion_tokens: completionTokens,
         },
         remainingBalance,

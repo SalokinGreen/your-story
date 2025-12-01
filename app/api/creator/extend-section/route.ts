@@ -7,12 +7,7 @@
 
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import {
-  hasEnoughTokens,
-  deductTokens,
-  getUserTokenBalance,
-} from "@/app/misc/tokens";
-import { getModelConfig, calculateTokenCost } from "@/app/misc/ai_prices";
+import { getModelConfig } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
 import {
   BigAdventureConfig,
@@ -38,20 +33,22 @@ interface RequestBody {
   model?: string;
   maxOutputTokens?: number;
   openRouterKey?: string;
+  deepseekKey?: string;
   novelaiKey?: string;
 }
 
 function getApiKey(
   provider: "deepseek" | "openrouter" | "novelai",
-  userProvidedKey?: string,
+  userProvidedOpenRouterKey?: string,
+  userProvidedDeepseekKey?: string,
   novelaiKey?: string
-): string {
+): string | null {
   if (provider === "deepseek") {
-    return process.env.DEEPSEEK_API_KEY || "";
+    return userProvidedDeepseekKey || null;
   } else if (provider === "novelai") {
-    return novelaiKey || "";
+    return novelaiKey || null;
   } else {
-    return userProvidedKey || process.env.OPENROUTER_API_KEY || "";
+    return userProvidedOpenRouterKey || null;
   }
 }
 
@@ -107,6 +104,7 @@ export async function POST(req: NextRequest) {
           model = "Deepseek Chat",
           maxOutputTokens = 2000,
           openRouterKey,
+          deepseekKey,
           novelaiKey,
         } = body;
 
@@ -146,36 +144,27 @@ export async function POST(req: NextRequest) {
           userId: user.id,
         });
 
-        // Check token balance
-        const hasTokens = await hasEnoughTokens(user.id, 5);
-        if (!hasTokens) {
-          // Small buffer for extending
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "error",
-                error: "Insufficient tokens",
-              })}\n\n`
-            )
-          );
-          controller.close();
-          return;
-        }
-
-        // Get model config
+        // Get model config - all providers use BYOK
         const modelConfig = getModelConfig(model);
         const apiKey = getApiKey(
-          modelConfig.provider,
+          modelConfig.provider as "deepseek" | "openrouter" | "novelai",
           openRouterKey,
+          deepseekKey,
           novelaiKey
         );
 
         if (!apiKey) {
+          const providerName =
+            modelConfig.provider === "deepseek"
+              ? "DeepSeek"
+              : modelConfig.provider === "openrouter"
+              ? "OpenRouter"
+              : "NovelAI";
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "error",
-                error: `No API key configured for ${modelConfig.provider}`,
+                error: `${providerName} API key required. Please add your API key in Settings.`,
               })}\n\n`
             )
           );
@@ -300,27 +289,7 @@ export async function POST(req: NextRequest) {
           existingResult
         );
 
-        // Calculate token cost
-        const tokenCost = calculateTokenCost(
-          model,
-          promptTokens,
-          completionTokens
-        );
-
-        // Deduct tokens
-        try {
-          await deductTokens(user.id, tokenCost, supabase);
-        } catch (deductError) {
-          logger.warn("Failed to deduct tokens", { error: deductError });
-        }
-
-        // Get updated balance
-        const updatedBalance = (await getUserTokenBalance(
-          user.id,
-          supabase
-        )) || {
-          total: 0,
-        };
+        // All providers use BYOK - no token billing
 
         // Send complete event
         controller.enqueue(
@@ -331,8 +300,7 @@ export async function POST(req: NextRequest) {
               sectionName: sectionInfo.name,
               result: parsedResult,
               rawContent: fullContent,
-              tokenCost,
-              tokenBalance: updatedBalance.total,
+              isByok: true,
             })}\n\n`
           )
         );
@@ -340,7 +308,6 @@ export async function POST(req: NextRequest) {
         logger.info("Extend section complete", {
           section,
           count,
-          tokenCost,
         });
       } catch (error) {
         logger.error("Extend section error", { error });

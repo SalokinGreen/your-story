@@ -52,6 +52,9 @@ export interface GenerationOptions {
   novelaiEnabled?: boolean;
   novelaiKey?: string;
   novelaiTemperature?: number;
+  // BYOK API keys (required for non-NovelAI models)
+  openRouterKey?: string;
+  deepseekKey?: string;
 }
 
 export interface GenerationCallbacks {
@@ -378,6 +381,8 @@ export async function generateStoryTurn(
           model: options.storyModel,
           maxTokens: options.customMaxOutput || 4000,
           temperature: 0.7,
+          openRouterKey: options.openRouterKey,
+          deepseekKey: options.deepseekKey,
         }),
       });
     }
@@ -478,6 +483,8 @@ export async function generateStoryTurn(
                 model: currentModel,
                 maxTokens: Math.min(options.customMaxOutput || 4000, 4000), // Cap tools at 4K
                 temperature: 0.3,
+                openRouterKey: options.openRouterKey,
+                deepseekKey: options.deepseekKey,
               }),
               signal: toolAbortController.signal,
               cache: "no-store",
@@ -606,6 +613,8 @@ export async function generateStoryTurn(
           model: options.choicesModel,
           maxTokens: 1500,
           temperature: 0.7,
+          openRouterKey: options.openRouterKey,
+          deepseekKey: options.deepseekKey,
         }),
       });
 
@@ -715,6 +724,8 @@ export async function generateSimple(
     maxTokens?: number;
     temperature?: number;
     tools?: any[];
+    openRouterKey?: string;
+    deepseekKey?: string;
   }
 ): Promise<{
   content: string;
@@ -738,6 +749,8 @@ export async function generateSimple(
       model: options.model,
       maxTokens: options.maxTokens || 4000,
       temperature: options.temperature || 0.7,
+      openRouterKey: options.openRouterKey,
+      deepseekKey: options.deepseekKey,
     }),
   });
 
@@ -765,6 +778,8 @@ export async function* generateSimpleStream(
     maxTokens?: number;
     temperature?: number;
     tools?: any[];
+    openRouterKey?: string;
+    deepseekKey?: string;
   }
 ): AsyncGenerator<StreamEvent> {
   const token = await getAuthToken();
@@ -784,6 +799,8 @@ export async function* generateSimpleStream(
       model: options.model,
       maxTokens: options.maxTokens || 4000,
       temperature: options.temperature || 0.7,
+      openRouterKey: options.openRouterKey,
+      deepseekKey: options.deepseekKey,
     }),
   });
 
@@ -811,7 +828,8 @@ export interface ActionAnalysisResult {
 export async function analyzeAction(
   storyData: StoryData,
   userAction: string,
-  model: string
+  model: string,
+  apiKeys?: { openRouterKey?: string; deepseekKey?: string }
 ): Promise<ActionAnalysisResult> {
   const token = await getAuthToken();
   if (!token) {
@@ -839,6 +857,8 @@ export async function analyzeAction(
       model,
       maxTokens: 500,
       temperature: 0.3, // Low temperature for structured output
+      openRouterKey: apiKeys?.openRouterKey,
+      deepseekKey: apiKeys?.deepseekKey,
     }),
   });
 

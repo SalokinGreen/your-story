@@ -5,18 +5,17 @@
  * forwards to AI provider, returns raw response. All context building and
  * tool execution happens on the frontend.
  *
- * Request: { messages, tools?, model, maxTokens }
+ * BYOK (Bring Your Own Key) model:
+ * - Users must provide their own API keys
+ * - No token deduction - users pay providers directly
+ *
+ * Request: { messages, tools?, model, maxTokens, openRouterKey?, deepseekKey? }
  * Response: { content, toolCalls?, meta }
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import {
-  hasEnoughTokens,
-  deductTokens,
-  getUserTokenBalance,
-} from "@/app/misc/tokens";
-import { getModelConfig, calculateTokenCost } from "@/app/misc/ai_prices";
+import { getModelConfig } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -48,6 +47,7 @@ interface RequestBody {
   maxTokens?: number;
   temperature?: number;
   openRouterKey?: string;
+  deepseekKey?: string;
 }
 
 interface AIResponse {
@@ -143,12 +143,15 @@ async function callAI(
 
 function getApiKey(
   provider: "deepseek" | "openrouter",
-  userProvidedKey?: string
-): string {
+  openRouterKey?: string,
+  deepseekKey?: string
+): string | null {
   if (provider === "deepseek") {
-    return process.env.DEEPSEEK_API_KEY || "";
+    // DeepSeek requires user's own key - no server fallback
+    return deepseekKey || null;
   } else {
-    return userProvidedKey || process.env.OPENROUTER_API_KEY || "";
+    // OpenRouter requires user's own key - no server fallback
+    return openRouterKey || null;
   }
 }
 
@@ -177,10 +180,11 @@ export async function POST(req: NextRequest) {
     const {
       messages,
       tools,
-      model = "Prometheus",
+      model = "Gemini 2.5 Flash",
       maxTokens = 4000,
       temperature = 0.7,
       openRouterKey,
+      deepseekKey,
     } = body;
 
     if (!messages || messages.length === 0) {
@@ -193,25 +197,22 @@ export async function POST(req: NextRequest) {
     // Get model config
     const modelConfig = getModelConfig(model);
 
-    // Check token balance
-    const hasTokens = await hasEnoughTokens(user.id, 1, supabase);
-    if (!hasTokens) {
-      return NextResponse.json(
-        { error: "Insufficient tokens" },
-        { status: 402 }
-      );
-    }
-
-    // Get API key
+    // Get API key from user's provided keys
     const apiKey = getApiKey(
       modelConfig.provider as "deepseek" | "openrouter",
-      openRouterKey
+      openRouterKey,
+      deepseekKey
     );
 
     if (!apiKey) {
+      const providerName =
+        modelConfig.provider === "deepseek" ? "DeepSeek" : "OpenRouter";
       return NextResponse.json(
-        { error: "API key not configured" },
-        { status: 500 }
+        {
+          error: `No API key configured for ${providerName}. Please add your API key in Settings.`,
+          code: "NO_API_KEY",
+        },
+        { status: 400 }
       );
     }
 
@@ -234,26 +235,12 @@ export async function POST(req: NextRequest) {
       total_tokens: 0,
     };
 
-    // Calculate token cost using helper (includes 50% markup, $0.001/coin)
-    const tokenCost = calculateTokenCost(
-      model,
-      usage.prompt_tokens,
-      usage.completion_tokens
-    );
-
-    // Deduct tokens
-    await deductTokens(user.id, tokenCost, supabase);
-    const balance = (await getUserTokenBalance(user.id, supabase)) || {
-      total: 0,
-    };
-
     logger.action("AI generation complete", {
       userId: user.id,
       model: modelConfig.model,
       provider: modelConfig.provider,
       promptTokens: usage.prompt_tokens,
       completionTokens: usage.completion_tokens,
-      tokenCost,
       hasToolCalls: !!toolCalls,
     });
 
@@ -269,8 +256,6 @@ export async function POST(req: NextRequest) {
           completionTokens: usage.completion_tokens,
           totalTokens: usage.total_tokens,
         },
-        tokenCost,
-        balance: balance.total,
       },
     });
   } catch (error: any) {

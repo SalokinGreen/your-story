@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/app/misc/AuthContext";
+import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { getAuthToken } from "@/app/misc/getAuthToken";
 import {
@@ -580,6 +581,7 @@ function ExpandableContentCard({
 export default function BigAdventureCreatorPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { keys: apiKeys } = useAPIKeys();
   const { addNotification } = useNotification();
 
   // Autosave state
@@ -1045,6 +1047,8 @@ export default function BigAdventureCreatorPage() {
           config,
           model: selectedModel,
           novelaiKey: isNovelAISelected ? novelaiKey : undefined,
+          openRouterKey: apiKeys.openRouterKey,
+          deepseekKey: apiKeys.deepseekKey,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -1289,6 +1293,8 @@ export default function BigAdventureCreatorPage() {
             config,
             existingResult: result,
             model: modelChoice,
+            openRouterKey: apiKeys.openRouterKey,
+            deepseekKey: apiKeys.deepseekKey,
           }),
         });
 
@@ -1423,6 +1429,8 @@ export default function BigAdventureCreatorPage() {
             existingResult: result,
             count,
             model: modelChoice,
+            openRouterKey: apiKeys.openRouterKey,
+            deepseekKey: apiKeys.deepseekKey,
           }),
         });
 
@@ -1729,6 +1737,7 @@ ${result.description || ""}`;
             prompt,
             model: imageModel,
             imageType: type,
+            openRouterKey: apiKeys.openRouterKey,
           }),
         });
 

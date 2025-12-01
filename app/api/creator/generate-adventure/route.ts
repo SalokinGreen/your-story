@@ -8,12 +8,7 @@
 
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import {
-  hasEnoughTokens,
-  deductTokens,
-  getUserTokenBalance,
-} from "@/app/misc/tokens";
-import { getModelConfig, calculateTokenCost } from "@/app/misc/ai_prices";
+import { getModelConfig } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
 import {
   BigAdventureConfig,
@@ -43,20 +38,22 @@ interface RequestBody {
   config: BigAdventureConfig;
   model?: string;
   openRouterKey?: string;
+  deepseekKey?: string;
   novelaiKey?: string;
 }
 
 function getApiKey(
   provider: "deepseek" | "openrouter" | "novelai",
-  userProvidedKey?: string,
+  userProvidedOpenRouterKey?: string,
+  userProvidedDeepseekKey?: string,
   novelaiKey?: string
-): string {
+): string | null {
   if (provider === "deepseek") {
-    return process.env.DEEPSEEK_API_KEY || "";
+    return userProvidedDeepseekKey || null;
   } else if (provider === "novelai") {
-    return novelaiKey || "";
+    return novelaiKey || null;
   } else {
-    return userProvidedKey || process.env.OPENROUTER_API_KEY || "";
+    return userProvidedOpenRouterKey || null;
   }
 }
 
@@ -493,6 +490,7 @@ export async function POST(req: NextRequest) {
           config,
           model = "Deepseek Chat",
           openRouterKey,
+          deepseekKey,
           novelaiKey,
         } = body;
 
@@ -511,45 +509,30 @@ export async function POST(req: NextRequest) {
 
         // Get model config
         const modelConfig = getModelConfig(model);
-        const isNovelAI = modelConfig.provider === "novelai";
 
-        // Estimate total cost and check tokens (skip for NovelAI - BYOK)
+        // All providers use BYOK - no token billing
         const stages = getStagesToRun(config);
-        const estimatedCost = isNovelAI ? 0 : stages.length * 5; // Rough estimate: 5 coins per stage
 
-        if (!isNovelAI) {
-          const hasTokens = await hasEnoughTokens(
-            user.id,
-            estimatedCost,
-            supabase
-          );
-          if (!hasTokens) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "error",
-                  error: `Insufficient tokens. Estimated cost: ${estimatedCost} coins`,
-                })}\n\n`
-              )
-            );
-            controller.close();
-            return;
-          }
-        }
-
-        // Get API key
+        // Get API key (user-provided)
         const apiKey = getApiKey(
           modelConfig.provider as "deepseek" | "openrouter" | "novelai",
           openRouterKey,
+          deepseekKey,
           novelaiKey
         );
 
         if (!apiKey) {
+          const providerName =
+            modelConfig.provider === "deepseek"
+              ? "DeepSeek"
+              : modelConfig.provider === "openrouter"
+              ? "OpenRouter"
+              : "NovelAI";
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "error",
-                error: "API key not configured",
+                error: `${providerName} API key required. Please add your API key in Settings.`,
               })}\n\n`
             )
           );
@@ -637,23 +620,7 @@ export async function POST(req: NextRequest) {
           finalResult.storyTemplate.nsfw = config.nsfw;
         }
 
-        // Calculate token cost (0 for NovelAI - BYOK)
-        let tokenCost = 0;
-        let balance = { total: -1 }; // -1 indicates BYOK/no balance tracking
-
-        if (!isNovelAI) {
-          tokenCost = calculateTokenCost(
-            model,
-            totalPromptTokens,
-            totalCompletionTokens
-          );
-
-          // Deduct tokens
-          await deductTokens(user.id, tokenCost, supabase);
-          balance = (await getUserTokenBalance(user.id, supabase)) || {
-            total: 0,
-          };
-        }
+        // All providers use BYOK - no token billing
 
         logger.action("Big adventure generation complete", {
           userId: user.id,
@@ -662,7 +629,6 @@ export async function POST(req: NextRequest) {
           stages: stages.length,
           totalPromptTokens,
           totalCompletionTokens,
-          tokenCost,
           adventureTitle: finalResult.title,
         });
 
@@ -682,8 +648,7 @@ export async function POST(req: NextRequest) {
                   completionTokens: totalCompletionTokens,
                   totalTokens: totalPromptTokens + totalCompletionTokens,
                 },
-                tokenCost,
-                balance: balance.total,
+                isByok: true,
               },
             })}\n\n`
           )

@@ -47,6 +47,7 @@ import { logger } from "../misc/logger";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { useAuth } from "../misc/AuthContext";
+import { useAPIKeys } from "../misc/APIKeysContext";
 import { supabase } from "../misc/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
 
@@ -1490,6 +1491,8 @@ function StoryPageContent() {
 
   const { addNotification } = useNotification();
   const { user, getEncryptionPassword } = useAuth();
+  const { keys: apiKeys } = useAPIKeys();
+  const { openRouterKey, deepseekKey } = apiKeys;
   const [currentState, setCurrentState] = useState<StoryState>(
     StoryState.STORY
   );
@@ -2459,6 +2462,8 @@ function StoryPageContent() {
           novelaiEnabled: novelaiEnabled && !!novelaiKey,
           novelaiKey,
           novelaiTemperature,
+          openRouterKey,
+          deepseekKey,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -2620,7 +2625,10 @@ function StoryPageContent() {
 
     try {
       const { choicesModel } = getModelsFromPreset();
-      const result = await analyzeAction(storyData, actionText, choicesModel);
+      const result = await analyzeAction(storyData, actionText, choicesModel, {
+        openRouterKey,
+        deepseekKey,
+      });
 
       logger.ai_response("Action analysis complete", {
         analysis: result.analysis,
@@ -4333,6 +4341,8 @@ function StoryPageContent() {
             novelaiEnabled: novelaiEnabled && !!novelaiKey,
             novelaiKey,
             novelaiTemperature,
+            openRouterKey,
+            deepseekKey,
           },
           {
             onStoryContent: (chunk: string, fullContent: string) => {
@@ -4620,6 +4630,8 @@ function StoryPageContent() {
           novelaiEnabled: novelaiEnabled && !!novelaiKey,
           novelaiKey,
           novelaiTemperature,
+          openRouterKey,
+          deepseekKey,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/misc/AuthContext";
+import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { getSystemUpgradeDefaults } from "@/app/misc/rpgSystems";
 import {
   StoryData,
@@ -608,6 +609,7 @@ function AdventureCreatorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
+  const { keys: apiKeys } = useAPIKeys();
   const { addNotification } = useNotification();
 
   const editAdventureId = searchParams?.get("edit");
@@ -2063,6 +2065,14 @@ ${description || ""}`;
       return;
     }
 
+    if (!apiKeys.openRouterKey) {
+      addNotification(
+        "OpenRouter API key required. Please add your API key in Settings.",
+        "warning"
+      );
+      return;
+    }
+
     const prompt = type === "thumbnail" ? thumbnailPrompt : bannerPrompt;
     if (!prompt.trim()) {
       addNotification("Please enter a prompt", "warning");
@@ -2088,6 +2098,7 @@ ${description || ""}`;
           prompt,
           model: imageModel,
           imageType: type,
+          openRouterKey: apiKeys.openRouterKey,
         }),
       });
 
@@ -2122,9 +2133,7 @@ ${description || ""}`;
 
       setUrl(data.publicUrl);
       addNotification(
-        `${type === "thumbnail" ? "Thumbnail" : "Banner"} generated! Cost: ${
-          meta.cost
-        } coins`,
+        `${type === "thumbnail" ? "Thumbnail" : "Banner"} generated!`,
         "success"
       );
     } catch (error: any) {

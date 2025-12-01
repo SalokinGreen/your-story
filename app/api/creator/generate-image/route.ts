@@ -6,39 +6,27 @@
  *
  * Supports two types of models:
  * 1. Chat-based image models (Gemini, GPT-5 Image) - use chat completions API
- * 2. Pure image models (Flux) - use images/generations API
+ * 2. Pure image models (Flux) - use flat per-image pricing
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
-  hasEnoughTokens,
-  deductTokens,
-  getUserTokenBalance,
-} from "@/app/misc/tokens";
-import {
   OPENROUTER_IMAGE_MODELS,
-  MARKUP_MULTIPLIER,
-  COINS_PER_DOLLAR,
-  MINIMUM_COST,
+  type ImageModelKey,
 } from "@/app/misc/ai_prices";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // Allow up to 2 minutes for image generation
 
 // Image model config type
-type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
 type ImageModelConfig = (typeof OPENROUTER_IMAGE_MODELS)[ImageModelKey];
 
 interface RequestBody {
   prompt: string;
   model?: string;
   imageType: "thumbnail" | "banner";
-}
-
-// Check if model is a pure image generation model (Flux) vs chat-based (Gemini/GPT)
-function isPureImageModel(modelId: string): boolean {
-  return modelId.includes("flux") || modelId.includes("black-forest-labs");
+  openRouterKey?: string;
 }
 
 // Get model config
@@ -50,74 +38,18 @@ function getImageModelConfig(modelKey: string): ImageModelConfig {
   return OPENROUTER_IMAGE_MODELS["Nano Banana"];
 }
 
-// Calculate cost for image models based on token usage
-function calculateImageTokenCost(
-  modelKey: string,
-  inputTokens: number,
-  outputTokens: number
-): number {
-  const model = getImageModelConfig(modelKey);
-
-  // Calculate raw cost in dollars (prices are per 1M tokens)
-  const inputCost = (inputTokens / 1_000_000) * model.inputPrice;
-  const outputCost = (outputTokens / 1_000_000) * model.outputPrice;
-  const rawCost = inputCost + outputCost;
-
-  // Apply markup and convert to coins
-  const costWithMarkup = rawCost * MARKUP_MULTIPLIER;
-  const costInCoins = Math.ceil(costWithMarkup * COINS_PER_DOLLAR);
-
-  // Ensure minimum cost
-  return Math.max(costInCoins, MINIMUM_COST);
-}
-
-// Estimate cost before generation (for validation)
-function estimateImageCost(modelKey: string): number {
-  const model = getImageModelConfig(modelKey);
-
-  // For pure image models (Flux), use flat cost since no token usage
-  if (isPureImageModel(model.model)) {
-    return model.cost;
-  }
-
-  // For chat-based models, estimate based on typical token usage
-  // Input: ~300 tokens for prompt, Output: ~1000 tokens for image URL/response
-  const estimatedInputTokens = 300;
-  const estimatedOutputTokens = 1000;
-  return calculateImageTokenCost(
-    modelKey,
-    estimatedInputTokens,
-    estimatedOutputTokens
-  );
-}
-
 export async function POST(req: NextRequest) {
   const supabaseUrl = process.env.SUPABASE_URL!;
   const supabaseKey = process.env.SUPABASE_KEY!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const openrouterKey = process.env.OPENROUTER_API_KEY;
 
-  if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
+  if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json(
       { error: "Server configuration error" },
       { status: 500 }
     );
   }
 
-  if (!openrouterKey) {
-    return NextResponse.json(
-      { error: "OpenRouter API key not configured" },
-      { status: 500 }
-    );
-  }
-
   const supabase = createClient(supabaseUrl, supabaseKey);
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
 
   // Auth check
   const authHeader = req.headers.get("authorization");
@@ -144,7 +76,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { prompt, model: requestedModel, imageType } = body;
+  const { prompt, model: requestedModel, imageType, openRouterKey } = body;
 
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
@@ -157,10 +89,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Validate OpenRouter key (BYOK required)
+  if (!openRouterKey) {
+    return NextResponse.json(
+      {
+        error:
+          "OpenRouter API key required. Please add your API key in Settings.",
+      },
+      { status: 400 }
+    );
+  }
+
   // Get model config
   const modelKey = requestedModel || "Nano Banana";
   const modelConfig = getImageModelConfig(modelKey);
-  const estimatedCost = estimateImageCost(modelKey);
 
   console.log(
     "[Image Gen] Model:",
@@ -169,23 +111,8 @@ export async function POST(req: NextRequest) {
     modelConfig.model,
     ")",
     "Type:",
-    imageType,
-    "Estimated Cost:",
-    estimatedCost
+    imageType
   );
-
-  // Check tokens (use estimated cost for pre-check)
-  const hasTokens = await hasEnoughTokens(
-    user.id,
-    estimatedCost,
-    supabaseAdmin
-  );
-  if (!hasTokens) {
-    return NextResponse.json(
-      { error: `Insufficient tokens. Estimated: ${estimatedCost} coins` },
-      { status: 402 }
-    );
-  }
 
   try {
     // Build the image generation prompt with size hints based on type
@@ -195,9 +122,6 @@ export async function POST(req: NextRequest) {
         : "wide landscape banner image with approximately 3:1 aspect ratio";
 
     let imageUrl: string | null = null;
-    let actualCost: number;
-    let inputTokens = 0;
-    let outputTokens = 0;
 
     // All OpenRouter models use chat/completions endpoint
     const fullPrompt = `Please create a ${sizeDescription} for my text adventure:\n\n${prompt}\n\nStyle: Digital art, game cover style, vibrant colors, professional quality.`;
@@ -212,7 +136,7 @@ export async function POST(req: NextRequest) {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${openrouterKey}`,
+          Authorization: `Bearer ${openRouterKey}`,
           "HTTP-Referer":
             process.env.NEXT_PUBLIC_SITE_URL || "https://your-story.app",
           "X-Title": "Your Story - Adventure Cover Generator",
@@ -240,10 +164,6 @@ export async function POST(req: NextRequest) {
 
     const data = await response.json();
     console.log("[Image Gen] Response structure:", Object.keys(data));
-
-    // Get token usage for cost calculation
-    inputTokens = data.usage?.prompt_tokens || 300;
-    outputTokens = data.usage?.completion_tokens || 1000;
 
     // Extract image from response - different models return images differently
     const message = data.choices?.[0]?.message;
@@ -324,12 +244,7 @@ export async function POST(req: NextRequest) {
       imageUrl = message.image_url;
     }
 
-    // Calculate actual cost based on token usage (or flat cost for pure image models)
-    if (isPureImageModel(modelConfig.model)) {
-      actualCost = modelConfig.cost;
-    } else {
-      actualCost = calculateImageTokenCost(modelKey, inputTokens, outputTokens);
-    }
+    // All providers use BYOK - no cost calculation or token billing
 
     if (!imageUrl) {
       console.error(
@@ -346,19 +261,12 @@ export async function POST(req: NextRequest) {
       imageUrl.length
     );
 
-    // Deduct actual tokens
-    await deductTokens(user.id, actualCost, supabaseAdmin);
-    const remainingBalance = await getUserTokenBalance(user.id, supabaseAdmin);
-
     return NextResponse.json({
       imageUrl,
       meta: {
         model: modelKey,
-        cost: actualCost,
-        remainingBalance,
         imageType,
-        inputTokens,
-        outputTokens,
+        isByok: true,
       },
     });
   } catch (error) {

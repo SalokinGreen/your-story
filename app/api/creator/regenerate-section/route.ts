@@ -7,12 +7,7 @@
 
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import {
-  hasEnoughTokens,
-  deductTokens,
-  getUserTokenBalance,
-} from "@/app/misc/tokens";
-import { getModelConfig, calculateTokenCost } from "@/app/misc/ai_prices";
+import { getModelConfig } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
 import {
   BigAdventureConfig,
@@ -37,20 +32,22 @@ interface RequestBody {
   maxOutputTokens?: number;
   additionalInstructions?: string;
   openRouterKey?: string;
+  deepseekKey?: string;
   novelaiKey?: string;
 }
 
 function getApiKey(
   provider: "deepseek" | "openrouter" | "novelai",
-  userProvidedKey?: string,
+  userProvidedOpenRouterKey?: string,
+  userProvidedDeepseekKey?: string,
   novelaiKey?: string
-): string {
+): string | null {
   if (provider === "deepseek") {
-    return process.env.DEEPSEEK_API_KEY || "";
+    return userProvidedDeepseekKey || null;
   } else if (provider === "novelai") {
-    return novelaiKey || "";
+    return novelaiKey || null;
   } else {
-    return userProvidedKey || process.env.OPENROUTER_API_KEY || "";
+    return userProvidedOpenRouterKey || null;
   }
 }
 
@@ -106,6 +103,7 @@ export async function POST(req: NextRequest) {
           maxOutputTokens = 4000,
           additionalInstructions,
           openRouterKey,
+          deepseekKey,
           novelaiKey,
         } = body;
 
@@ -135,43 +133,29 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // Get model config
+        // Get model config - all providers use BYOK
         const modelConfig = getModelConfig(model);
 
-        // Estimate cost (roughly 3 tokens per section)
-        const estimatedCost = 3;
-
-        const hasTokens = await hasEnoughTokens(
-          user.id,
-          estimatedCost,
-          supabase
-        );
-        if (!hasTokens) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "error",
-                error: `Insufficient tokens. Estimated cost: ${estimatedCost} coins`,
-              })}\n\n`
-            )
-          );
-          controller.close();
-          return;
-        }
-
-        // Get API key
+        // Get API key (user-provided)
         const apiKey = getApiKey(
           modelConfig.provider as "deepseek" | "openrouter" | "novelai",
           openRouterKey,
+          deepseekKey,
           novelaiKey
         );
 
         if (!apiKey) {
+          const providerName =
+            modelConfig.provider === "deepseek"
+              ? "DeepSeek"
+              : modelConfig.provider === "openrouter"
+              ? "OpenRouter"
+              : "NovelAI";
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "error",
-                error: "API key not configured",
+                error: `${providerName} API key required. Please add your API key in Settings.`,
               })}\n\n`
             )
           );
@@ -297,18 +281,7 @@ export async function POST(req: NextRequest) {
           throw new Error("Failed to parse regenerated content");
         }
 
-        // Calculate token cost
-        const tokenCost = calculateTokenCost(
-          model,
-          promptTokens,
-          completionTokens
-        );
-
-        // Deduct tokens
-        await deductTokens(user.id, tokenCost, supabase);
-        const balance = (await getUserTokenBalance(user.id, supabase)) || {
-          total: 0,
-        };
+        // All providers use BYOK - no token billing
 
         logger.action("Section regeneration complete", {
           userId: user.id,
@@ -317,7 +290,6 @@ export async function POST(req: NextRequest) {
           section,
           promptTokens,
           completionTokens,
-          tokenCost,
         });
 
         // Send final result
@@ -337,8 +309,7 @@ export async function POST(req: NextRequest) {
                   completionTokens,
                   totalTokens: promptTokens + completionTokens,
                 },
-                tokenCost,
-                balance: balance.total,
+                isByok: true,
               },
             })}\n\n`
           )

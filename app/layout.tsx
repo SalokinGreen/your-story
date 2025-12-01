@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./misc/AuthContext";
 import { NotificationProvider } from "./misc/NotificationContext";
+import { APIKeysProvider } from "./misc/APIKeysContext";
 import NotificationContainer from "./components/NotificationContainer";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import SiteHeader from "./components/SiteHeader";
@@ -73,8 +74,10 @@ export default function RootLayout({
       >
         <NotificationProvider>
           <AuthProvider>
-            <SiteHeader />
-            {children}
+            <APIKeysProvider>
+              <SiteHeader />
+              {children}
+            </APIKeysProvider>
           </AuthProvider>
           <NotificationContainer />
           <PWAInstallPrompt />

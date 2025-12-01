@@ -7,6 +7,7 @@ import { authenticatedFetch } from "@/app/misc/getAuthToken";
 import { parseCreatorOutput } from "@/app/misc/creator_ai";
 import { DynamicIcon } from "./DynamicIcon";
 import { AI_MODELS } from "@/app/misc/ai_prices";
+import { useAPIKeys } from "@/app/misc/APIKeysContext";
 
 interface CreatorAIChatProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ export default function CreatorAIChat({
   onApplyChanges,
 }: CreatorAIChatProps) {
   const chatKey = adventureId ? `creatorAiChat:${adventureId}` : null;
+  const { keys: apiKeys } = useAPIKeys();
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (typeof window !== "undefined" && chatKey) {
@@ -135,6 +137,8 @@ export default function CreatorAIChat({
           adventureMetadata: adventureMetadata,
           model: model,
           novelaiKey: isNovelAISelected ? novelaiKey : undefined,
+          openRouterKey: apiKeys.openRouterKey,
+          deepseekKey: apiKeys.deepseekKey,
         }),
       });
 
