@@ -220,6 +220,31 @@ export default function Home() {
         {/* Info Tabs - Client component */}
         <InfoTabs />
 
+        {/* Support Section */}
+        <div className="mb-8 text-center">
+          <div className="inline-flex flex-col items-center p-6 rounded-2xl bg-linear-to-br from-pink-500/10 via-purple-500/10 to-blue-500/10 border border-pink-500/20">
+            <Heart className="w-8 h-8 text-pink-400 mb-3" />
+            <h3 className="text-lg font-medium text-white mb-2">
+              Support the Project
+            </h3>
+            <p className="text-sm text-blue-200/60 max-w-md mb-4">
+              If you believe in what we&apos;re building and want to help keep
+              Your Story alive and growing, consider buying us a coffee!
+            </p>
+            <a
+              href="https://ko-fi.com/sgreens"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-pink-500 hover:bg-pink-400 text-white font-medium rounded-full transition-colors"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311z" />
+              </svg>
+              Support on Ko-fi
+            </a>
+          </div>
+        </div>
+
         {/* Footer - Static server-rendered */}
         <footer className="text-center pt-4 border-t border-blue-800/20">
           <p className="text-xs text-blue-200/30">

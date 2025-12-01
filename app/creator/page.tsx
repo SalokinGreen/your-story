@@ -1469,7 +1469,7 @@ function AdventureCreatorContent() {
   // Points and Momentum
   const [points, setPoints] = useState(0);
   const [momentum, setMomentum] = useState(0);
-  const [maxMomentum, setMaxMomentum] = useState(100);
+  const [maxMomentum, setMaxMomentum] = useState(5);
 
   // Stats
   const [stats, setStats] = useState<Stat[]>([]);
@@ -3036,7 +3036,7 @@ ${description || ""}`;
       setAuthorNotes("");
       setPoints(0);
       setMomentum(0);
-      setMaxMomentum(100);
+      setMaxMomentum(5);
       setStats([]);
       setResources([]);
       setInventory([]);
