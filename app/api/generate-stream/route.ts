@@ -6,9 +6,9 @@
  * streams raw response. All context building and tool execution
  * happens on the frontend.
  *
- * BYOK (Bring Your Own Key) model:
- * - Users must provide their own API keys
- * - No token deduction - users pay providers directly
+ * Provider modes:
+ * - BYOK (OpenRouter/DeepSeek): Users provide their own API keys, no token billing
+ * - Coins (Mistral): Server-side API key, users pay with coins
  *
  * Request: { messages, tools?, model, maxTokens, openRouterKey?, deepseekKey? }
  * Response: SSE stream with events: content, tool_calls, done, error
@@ -16,7 +16,8 @@
 
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getModelConfig } from "@/app/misc/ai_prices";
+import { getModelConfig, calculateTokenCost } from "@/app/misc/ai_prices";
+import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import { logger } from "@/app/misc/logger";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -43,12 +44,15 @@ interface RequestBody {
 }
 
 function getApiKey(
-  provider: "deepseek" | "openrouter",
+  provider: "deepseek" | "openrouter" | "mistral",
   openRouterKey?: string,
   deepseekKey?: string
 ): string | null {
   if (provider === "deepseek") {
     return deepseekKey || null;
+  } else if (provider === "mistral") {
+    // Mistral uses server-side API key - users pay with coins
+    return process.env.MISTRAL_API_KEY || null;
   } else {
     return openRouterKey || null;
   }
@@ -124,21 +128,28 @@ export async function POST(req: NextRequest) {
         // Get model config
         const modelConfig = getModelConfig(model);
 
-        // Get API key from user's provided keys
+        // Get API key from user's provided keys (or server key for Mistral)
         const apiKey = getApiKey(
-          modelConfig.provider as "deepseek" | "openrouter",
+          modelConfig.provider as "deepseek" | "openrouter" | "mistral",
           openRouterKey,
           deepseekKey
         );
 
         if (!apiKey) {
-          const providerName =
-            modelConfig.provider === "deepseek" ? "DeepSeek" : "OpenRouter";
+          let errorMessage: string;
+          if (modelConfig.provider === "mistral") {
+            errorMessage =
+              "Mistral API is not configured on the server. Please contact support.";
+          } else {
+            const providerName =
+              modelConfig.provider === "deepseek" ? "DeepSeek" : "OpenRouter";
+            errorMessage = `No API key configured for ${providerName}. Please add your API key in Settings.`;
+          }
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "error",
-                error: `No API key configured for ${providerName}. Please add your API key in Settings.`,
+                error: errorMessage,
                 code: "NO_API_KEY",
               })}\n\n`
             )
@@ -147,11 +158,36 @@ export async function POST(req: NextRequest) {
           return;
         }
 
+        // Check token balance for Mistral (Coins mode) before making request
+        if (modelConfig.provider === "mistral") {
+          const balance = await getUserTokenBalance(user.id, supabase);
+          // Estimate minimum cost (at least 1 coin)
+          const estimatedCost = Math.max(1, modelConfig.cost || 1);
+          const currentBalance = balance?.total ?? 0;
+          if (currentBalance < estimatedCost) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "error",
+                  error: `Insufficient coins. You need at least ${estimatedCost} coins for this model. Current balance: ${currentBalance}`,
+                  code: "INSUFFICIENT_BALANCE",
+                })}\n\n`
+              )
+            );
+            controller.close();
+            return;
+          }
+        }
+
         // Build request
-        const endpoint =
-          modelConfig.provider === "deepseek"
-            ? "https://api.deepseek.com/chat/completions"
-            : "https://openrouter.ai/api/v1/chat/completions";
+        let endpoint: string;
+        if (modelConfig.provider === "deepseek") {
+          endpoint = "https://api.deepseek.com/chat/completions";
+        } else if (modelConfig.provider === "mistral") {
+          endpoint = "https://api.mistral.ai/v1/chat/completions";
+        } else {
+          endpoint = "https://openrouter.ai/api/v1/chat/completions";
+        }
 
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
@@ -166,7 +202,7 @@ export async function POST(req: NextRequest) {
         const requestBody: any = {
           model: modelConfig.model,
           messages: messages.map((m) => {
-            const msg: any = { role: m.role, content: m.content };
+            const msg: any = { role: m.role, content: m.content || "" };
             if (m.tool_calls) {
               // Re-serialize tool call arguments to strings if they're objects
               // (AI APIs expect arguments as JSON strings, not parsed objects)
@@ -339,6 +375,27 @@ export async function POST(req: NextRequest) {
           hasToolCalls: parsedToolCalls.length > 0,
         });
 
+        // Deduct tokens for Mistral (Coins mode) - other providers are BYOK
+        let tokenCost = 0;
+        let newBalance: number | undefined;
+        if (
+          modelConfig.provider === "mistral" &&
+          (promptTokens > 0 || completionTokens > 0)
+        ) {
+          tokenCost = calculateTokenCost(model, promptTokens, completionTokens);
+          const deductResult = await deductTokens(user.id, tokenCost, supabase);
+          if (!deductResult.success) {
+            logger.warn("Failed to deduct tokens for Mistral generation", {
+              userId: user.id,
+              tokenCost,
+              error: deductResult.error,
+            });
+          } else {
+            const balanceResult = await getUserTokenBalance(user.id, supabase);
+            newBalance = balanceResult?.total;
+          }
+        }
+
         // Send done event
         controller.enqueue(
           encoder.encode(
@@ -353,6 +410,8 @@ export async function POST(req: NextRequest) {
                   completionTokens,
                   totalTokens: promptTokens + completionTokens,
                 },
+                tokenCost: tokenCost > 0 ? tokenCost : undefined,
+                newBalance,
               },
             })}\n\n`
           )

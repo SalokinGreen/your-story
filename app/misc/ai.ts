@@ -24,6 +24,7 @@ export interface BuildPromptInput {
 
 // Cleans text by removing problematic characters and normalizing whitespace
 function cleanString(text: string): string {
+  if (!text) return "";
   return (
     text
       // Remove null bytes and other control characters (except newlines and tabs)

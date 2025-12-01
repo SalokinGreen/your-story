@@ -3,9 +3,7 @@ import { StoryData } from "@/app/misc/structs";
 import { buildCreatorMessages } from "@/app/misc/creator_ai";
 import { ChatMessage } from "@/app/misc/ai";
 import { createClient } from "@supabase/supabase-js";
-import {
-  getModelConfig,
-} from "@/app/misc/ai_prices";
+import { getModelConfig } from "@/app/misc/ai_prices";
 import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
 
 export const runtime = "nodejs";
@@ -137,7 +135,10 @@ export async function POST(req: NextRequest) {
     apiUrl = "https://openrouter.ai/api/v1/chat/completions";
     if (!apiKey) {
       return NextResponse.json(
-        { error: "OpenRouter API key required. Please add your API key in Settings." },
+        {
+          error:
+            "OpenRouter API key required. Please add your API key in Settings.",
+        },
         { status: 400 }
       );
     }
@@ -147,7 +148,10 @@ export async function POST(req: NextRequest) {
     apiUrl = "https://api.deepseek.com/chat/completions";
     if (!apiKey) {
       return NextResponse.json(
-        { error: "DeepSeek API key required. Please add your API key in Settings." },
+        {
+          error:
+            "DeepSeek API key required. Please add your API key in Settings.",
+        },
         { status: 400 }
       );
     }

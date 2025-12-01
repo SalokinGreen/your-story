@@ -23,6 +23,7 @@ export function estimateTokens(text: string): number {
 
 // Cleans text by removing problematic characters and normalizing whitespace
 export function cleanString(text: string): string {
+  if (!text) return "";
   return text
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
     .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g, " ")

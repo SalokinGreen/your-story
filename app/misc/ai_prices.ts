@@ -130,24 +130,7 @@ export const AI_MODELS = {
       "A reasoning-focused model that excels at complex logic, planning, and structured generation. Perfect for intricate scenario design.",
     bannerUrl: undefined,
   },
-  "Mistral Medium 3.1": {
-    name: "Mistral Medium 3.1",
-    original_model: "Mistral Medium 3.1",
-    model: "mistralai/mistral-medium-3.1",
-    maxTokens: 131000,
-    maxOutputTokens: 131000,
-    provider: "openrouter",
-    supportsToolCalling: true,
-    cost: 1,
-    inputPrice: 0.4,
-    outputPrice: 2,
-    finetunes: [],
-    strengths: ["powerful", "cost-effective"],
-    weaknesses: ["logic"],
-    description:
-      "A small-sized model from Mistral, offering a balance between performance and cost, suitable for story generation..",
-    bannerUrl: undefined,
-  },
+
   "Grok Code Fast 1": {
     name: "Grok Code Fast 1",
     original_model: "Grok Code Fast 1",
@@ -290,6 +273,67 @@ export const AI_MODELS = {
     weaknesses: ["creativity", "logic"],
     description:
       "An extremely cost-effective model from Mistral, suitable for basic tasks where creativity and logic are less critical.",
+    bannerUrl: undefined,
+  },
+
+  // ============================================
+  // MISTRAL MODELS (Server-side API - Coins)
+  // ============================================
+
+  "Mistral Small 3.2": {
+    name: "Mistral Small 3.2",
+    original_model: "mistral-small-2506",
+    model: "mistral-small-2506",
+    maxTokens: 128000,
+    maxOutputTokens: 8000,
+    provider: "mistral",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.1,
+    outputPrice: 0.3,
+    finetunes: [],
+    strengths: ["fast", "cost-effective", "tool calling"],
+    weaknesses: ["creativity"],
+    description:
+      "Mistral's efficient small model. Great for fast responses and tool calling. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "Mistral Medium 3.1": {
+    name: "Mistral Medium 3.1",
+    original_model: "mistral-medium-2508",
+    model: "mistral-medium-2508",
+    maxTokens: 128000,
+    maxOutputTokens: 8000,
+    provider: "mistral",
+    supportsToolCalling: true,
+    cost: 2,
+    inputPrice: 0.4,
+    outputPrice: 2.0,
+    finetunes: [],
+    strengths: ["creativity", "storytelling", "multimodal"],
+    weaknesses: ["price"],
+    description:
+      "Mistral's frontier-class model with excellent creative writing capabilities. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  Codestral: {
+    name: "Codestral",
+    original_model: "codestral-2508",
+    model: "codestral-2508",
+    maxTokens: 128000,
+    maxOutputTokens: 8000,
+    provider: "mistral",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.3,
+    outputPrice: 0.9,
+    finetunes: [],
+    strengths: ["tool calling", "structured output", "logic"],
+    weaknesses: ["creativity"],
+    description:
+      "Mistral's code-optimized model, excellent for tool calling and structured tasks. Uses Coins.",
     bannerUrl: undefined,
   },
 } as const;
@@ -525,6 +569,15 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 12,
   },
+  mistral: {
+    id: "mistral",
+    name: "Mistral (Coins)",
+    description: "Balanced Mistral models - uses Coins for payment",
+    storyModel: "Mistral Medium 3.1",
+    toolsModel: "Codestral",
+    choicesModel: "Mistral Small 3.2",
+    estimatedCost: 4,
+  },
 };
 
 // ============================================
@@ -535,6 +588,7 @@ export interface APIKeysAvailable {
   openRouterKey?: boolean;
   deepseekKey?: boolean;
   novelaiKey?: boolean;
+  coinsEnabled?: boolean; // For Mistral models that use server-side API
 }
 
 /**
@@ -559,6 +613,8 @@ export function getAvailableModels(
         return !!keys.deepseekKey;
       case "novelai":
         return !!keys.novelaiKey;
+      case "mistral":
+        return !!keys.coinsEnabled;
       default:
         return false;
     }
@@ -576,7 +632,12 @@ export function getAvailableModelKeys(keys: APIKeysAvailable): string[] {
  * Check if user has any API key configured for AI generation
  */
 export function hasAnyAIKey(keys: APIKeysAvailable): boolean {
-  return !!(keys.openRouterKey || keys.deepseekKey || keys.novelaiKey);
+  return !!(
+    keys.openRouterKey ||
+    keys.deepseekKey ||
+    keys.novelaiKey ||
+    keys.coinsEnabled
+  );
 }
 
 /**
@@ -595,6 +656,8 @@ export function getRequiredKeyForModel(
       return "deepseekKey";
     case "novelai":
       return "novelaiKey";
+    case "mistral":
+      return "coinsEnabled";
     default:
       return null;
   }
@@ -618,7 +681,7 @@ export interface AIModelConfig {
   model: string;
   maxTokens: number;
   maxOutputTokens: number;
-  provider: "openrouter" | "deepseek" | "novelai";
+  provider: "openrouter" | "deepseek" | "novelai" | "mistral";
   supportsToolCalling?: boolean; // Whether this model supports function calling
   cost: number;
   inputPrice: number;

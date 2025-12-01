@@ -24,6 +24,17 @@ export default function AIConfigTab() {
   const { keys, hasKey } = useAPIKeys();
   const { addNotification } = useNotification();
 
+  // BYOK Mode toggle - true = use own keys, false = use coins
+  const [byokMode, setByokMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      // Default to BYOK if user has any keys configured
+      const stored = localStorage.getItem("byokMode");
+      if (stored !== null) return stored === "true";
+      return true; // Default to BYOK for now
+    }
+    return true;
+  });
+
   const [currentPreset, setCurrentPreset] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("aiPreset") || "main";
@@ -78,6 +89,34 @@ export default function AIConfigTab() {
     }
     return 4000;
   });
+  // Track if user is in custom input mode (separate from the value)
+  const [isCustomContextMode, setIsCustomContextMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("customMaxContext");
+      return (
+        stored === "-1" ||
+        (stored !== null &&
+          ![8000, 16000, 36000, 72000, 120000, 200000].includes(
+            parseInt(stored, 10)
+          ))
+      );
+    }
+    return false;
+  });
+  const [isCustomOutputMode, setIsCustomOutputMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("customMaxOutput");
+      return (
+        stored === "-1" ||
+        (stored !== null &&
+          ![1000, 2000, 4000, 8000].includes(parseInt(stored, 10)))
+      );
+    }
+    return false;
+  });
+  // Temporary input values for custom fields
+  const [customContextInput, setCustomContextInput] = useState("");
+  const [customOutputInput, setCustomOutputInput] = useState("");
 
   // NovelAI settings
   const [novelaiEnabled, setNovelaiEnabled] = useState(() => {
@@ -156,6 +195,16 @@ export default function AIConfigTab() {
       localStorage.setItem("novelaiTemperature", novelaiTemperature.toString());
     }
   }, [novelaiTemperature]);
+
+  // Persist BYOK mode
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("byokMode", byokMode.toString());
+    }
+  }, [byokMode]);
+
+  // Check if user has any AI keys configured
+  const hasAnyAIKey = hasKey("openRouterKey") || hasKey("deepseekKey");
 
   // Get current preset configuration
   const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["main"];
@@ -337,51 +386,179 @@ export default function AIConfigTab() {
 
   return (
     <div className="space-y-6">
+      {/* BYOK Mode Toggle */}
+      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className={`p-2 rounded-lg ${
+                byokMode
+                  ? "bg-green-100 dark:bg-green-900/30"
+                  : "bg-amber-100 dark:bg-amber-900/30"
+              }`}
+            >
+              <DynamicIcon
+                name={byokMode ? "Key" : "Coins"}
+                className={`w-5 h-5 ${
+                  byokMode
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-amber-600 dark:text-amber-400"
+                }`}
+              />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                {byokMode ? "Bring Your Own Key" : "Use Coins"}
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {byokMode
+                  ? "Using your own API keys - free generation"
+                  : "Using our API - costs coins per generation"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-xs font-medium ${
+                !byokMode
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-gray-400"
+              }`}
+            >
+              Coins
+            </span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={byokMode}
+                onChange={(e) => {
+                  const newValue = e.target.checked;
+                  setByokMode(newValue);
+                  if (!newValue) {
+                    // Switching to Coins mode - auto-select Mistral preset
+                    handlePresetChange("mistral");
+                    addNotification(
+                      "Switched to Coins mode with Mistral models",
+                      "success"
+                    );
+                  } else {
+                    // Switching to BYOK mode - switch to main preset if on mistral
+                    if (currentPreset === "mistral") {
+                      handlePresetChange("main");
+                    }
+                    addNotification(
+                      "Switched to BYOK mode - use your own API keys",
+                      "success"
+                    );
+                  }
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-amber-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600" />
+            </label>
+            <span
+              className={`text-xs font-medium ${
+                byokMode
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-gray-400"
+              }`}
+            >
+              BYOK
+            </span>
+          </div>
+        </div>
+
+        {/* Warning if no keys configured in BYOK mode */}
+        {byokMode && !hasAnyAIKey && (
+          <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+              <DynamicIcon name="AlertTriangle" className="w-3.5 h-3.5" />
+              No API keys configured. Add your OpenRouter or DeepSeek key in the
+              API Keys tab.
+            </p>
+          </div>
+        )}
+
+        {/* Info about Coins mode */}
+        {!byokMode && (
+          <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-xs text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+              <DynamicIcon name="Coins" className="w-3.5 h-3.5" />
+              Using Mistral models. Each generation costs coins based on token
+              usage.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Current Preset Banner */}
       <div
         className={`${
-          novelaiEnabled && hasKey("novelaiKey")
+          byokMode && novelaiEnabled && hasKey("novelaiKey")
             ? "bg-linear-to-r from-green-600 to-teal-600"
-            : "bg-linear-to-r from-purple-600 to-blue-600"
+            : byokMode
+            ? "bg-linear-to-r from-purple-600 to-blue-600"
+            : "bg-linear-to-r from-amber-500 to-orange-600"
         } rounded-lg p-4 text-white`}
       >
         <div className="flex items-center justify-between mb-2">
           <div>
             <div className="text-xl font-bold flex items-center gap-2">
               {preset.name}
-              {novelaiEnabled && hasKey("novelaiKey") && (
+              {byokMode ? (
+                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                  BYOK
+                </span>
+              ) : (
+                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                  💰 Coins
+                </span>
+              )}
+              {byokMode && novelaiEnabled && hasKey("novelaiKey") && (
                 <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
                   + NovelAI
                 </span>
               )}
             </div>
-            <div className="text-sm text-purple-100">{preset.description}</div>
+            <div className="text-sm text-white/70">{preset.description}</div>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold">~{estimatedCost}</div>
-            <div className="text-xs text-purple-100">
-              coins/gen
-              {novelaiEnabled && hasKey("novelaiKey") && novelaiSavings > 0 && (
-                <span className="text-green-200 ml-1">(-{novelaiSavings})</span>
-              )}
-            </div>
+            {byokMode ? (
+              <>
+                <div className="text-2xl font-bold text-green-200">FREE</div>
+                <div className="text-xs text-white/70">with your keys</div>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">~{estimatedCost}</div>
+                <div className="text-xs text-white/70">
+                  coins/gen
+                  {novelaiEnabled &&
+                    hasKey("novelaiKey") &&
+                    novelaiSavings > 0 && (
+                      <span className="text-green-200 ml-1">
+                        (-{novelaiSavings})
+                      </span>
+                    )}
+                </div>
+              </>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-1 text-xs mt-2">
           <div>
-            <span className="text-purple-200">Story:</span>{" "}
-            {novelaiEnabled && hasKey("novelaiKey") ? (
+            <span className="text-white/60">Story:</span>{" "}
+            {byokMode && novelaiEnabled && hasKey("novelaiKey") ? (
               <span className="text-green-200">NovelAI GLM-4-6 (BYOK)</span>
             ) : (
               effectiveStoryModel
             )}
           </div>
           <div>
-            <span className="text-purple-200">Tools:</span>{" "}
-            {effectiveToolsModel}
+            <span className="text-white/60">Tools:</span> {effectiveToolsModel}
           </div>
           <div>
-            <span className="text-purple-200">Choices:</span>{" "}
+            <span className="text-white/60">Choices:</span>{" "}
             {effectiveChoicesModel}
           </div>
         </div>
@@ -397,12 +574,27 @@ export default function AIConfigTab() {
           onChange={(e) => handlePresetChange(e.target.value)}
           className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
-          {Object.entries(MODEL_PRESETS).map(([key, presetConfig]) => (
-            <option key={key} value={key}>
-              {presetConfig.name} - ~
-              {getPresetEstimatedCost(key, effectiveContextSize)} coins
-            </option>
-          ))}
+          {Object.entries(MODEL_PRESETS)
+            .filter(([key]) => {
+              // In BYOK mode, hide Mistral preset (coins only)
+              // In Coins mode, show only Mistral preset
+              if (byokMode) {
+                return key !== "mistral";
+              } else {
+                return key === "mistral" || key === "custom";
+              }
+            })
+            .map(([key, presetConfig]) => (
+              <option key={key} value={key}>
+                {presetConfig.name}
+                {byokMode
+                  ? " - FREE with your keys"
+                  : ` - ~${getPresetEstimatedCost(
+                      key,
+                      effectiveContextSize
+                    )} coins`}
+              </option>
+            ))}
         </select>
       </div>
 
@@ -413,10 +605,10 @@ export default function AIConfigTab() {
             Memory Size
           </label>
           <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
-            {customMaxContext === 0
-              ? "Model Default"
-              : customMaxContext === -1
-              ? "Custom"
+            {isCustomContextMode
+              ? customMaxContext > 0
+                ? `${(customMaxContext / 1000).toFixed(0)}K tokens`
+                : "Custom"
               : `${(customMaxContext / 1000).toFixed(0)}K tokens`}
           </span>
         </div>
@@ -431,13 +623,24 @@ export default function AIConfigTab() {
                 <button
                   key={val}
                   onClick={() => {
-                    setCustomMaxContext(val);
-                    if (typeof window !== "undefined") {
-                      localStorage.setItem("customMaxContext", String(val));
+                    if (val === -1) {
+                      setIsCustomContextMode(true);
+                      setCustomContextInput(
+                        customMaxContext > 0 ? String(customMaxContext) : ""
+                      );
+                    } else {
+                      setIsCustomContextMode(false);
+                      setCustomMaxContext(val);
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("customMaxContext", String(val));
+                      }
                     }
                   }}
                   className={`w-4 h-4 rounded-full border-2 -mt-1 transition-all ${
-                    customMaxContext === val
+                    (val === -1 && isCustomContextMode) ||
+                    (val !== -1 &&
+                      !isCustomContextMode &&
+                      customMaxContext === val)
                       ? "bg-white border-white scale-125 shadow-lg"
                       : "bg-gray-800 border-gray-500 hover:border-white hover:scale-110"
                   }`}
@@ -459,12 +662,13 @@ export default function AIConfigTab() {
             🧠 Memory
           </span>
         </div>
-        {customMaxContext === -1 && (
+        {isCustomContextMode && (
           <div className="flex items-center gap-2 mt-2 pl-16">
             <input
               type="number"
-              value={customMaxContext === -1 ? "" : customMaxContext}
+              value={customContextInput}
               onChange={(e) => {
+                setCustomContextInput(e.target.value);
                 const val = parseInt(e.target.value, 10) || 0;
                 if (val > 0) {
                   setCustomMaxContext(val);
@@ -493,8 +697,10 @@ export default function AIConfigTab() {
             Response Length
           </label>
           <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
-            {customMaxOutput === -1
-              ? "Custom"
+            {isCustomOutputMode
+              ? customMaxOutput > 0
+                ? `${(customMaxOutput / 1000).toFixed(0)}K tokens`
+                : "Custom"
               : `${(customMaxOutput / 1000).toFixed(0)}K tokens`}
           </span>
         </div>
@@ -509,13 +715,24 @@ export default function AIConfigTab() {
                 <button
                   key={val}
                   onClick={() => {
-                    setCustomMaxOutput(val);
-                    if (typeof window !== "undefined") {
-                      localStorage.setItem("customMaxOutput", String(val));
+                    if (val === -1) {
+                      setIsCustomOutputMode(true);
+                      setCustomOutputInput(
+                        customMaxOutput > 0 ? String(customMaxOutput) : ""
+                      );
+                    } else {
+                      setIsCustomOutputMode(false);
+                      setCustomMaxOutput(val);
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("customMaxOutput", String(val));
+                      }
                     }
                   }}
                   className={`w-4 h-4 rounded-full border-2 -mt-1 transition-all ${
-                    customMaxOutput === val
+                    (val === -1 && isCustomOutputMode) ||
+                    (val !== -1 &&
+                      !isCustomOutputMode &&
+                      customMaxOutput === val)
                       ? "bg-white border-white scale-125 shadow-lg"
                       : "bg-gray-800 border-gray-500 hover:border-white hover:scale-110"
                   }`}
@@ -535,12 +752,13 @@ export default function AIConfigTab() {
             📝 Length
           </span>
         </div>
-        {customMaxOutput === -1 && (
+        {isCustomOutputMode && (
           <div className="flex items-center gap-2 mt-2 pl-16">
             <input
               type="number"
-              value={customMaxOutput === -1 ? "" : customMaxOutput}
+              value={customOutputInput}
               onChange={(e) => {
+                setCustomOutputInput(e.target.value);
                 const val = parseInt(e.target.value, 10) || 0;
                 if (val > 0) {
                   setCustomMaxOutput(val);

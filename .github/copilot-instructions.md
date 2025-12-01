@@ -71,15 +71,18 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - No fixed truncation limits - uses actual model context window from ai_prices.ts.
   - **State Changes in Context**: buildStoryPrompt prepends `stateChanges` from the previous assistant part to the user's choice message, informing the story stage about mechanical game state updates.
 - app/misc/toolExecutor.ts: Executes tool calls from AI responses locally on the frontend, mapping AI tool names to XML command format. Modifies storyData directly and returns `{ responses: CommandResponse[], stateChanges: string[] }`. The `stateChanges` array contains human-readable descriptions of game state modifications for tools like stat/resource changes, item updates, conditions, etc.
-- app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter). Includes getModelConfig() helper for dynamic model selection. Exports AI_MODELS constant with 9 predefined models (Prometheus, Hades, Hermes, Hercules, Poseidon, Chronos, Athena, Zeus, Hephaestus).
+- app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter, Mistral). Includes getModelConfig() helper for dynamic model selection. Exports AI_MODELS constant with models from multiple providers:
+  - **BYOK providers** (user provides API key): OpenRouter, DeepSeek, NovelAI
+  - **Coins provider** (server-side key, user pays with coins): Mistral (mistral-small-2506, mistral-medium-2508, codestral-2508)
+  - **APIKeysAvailable**: Interface with `coinsEnabled` flag for Mistral models
 - app/misc/generation.ts: **Frontend generation orchestrator**. Exports generateStoryTurn() which handles the complete 3-stage generation flow:
   - Stage 1: Calls buildStoryPrompt(), streams story content via /api/generate-stream
   - Stage 2: Calls buildToolPrompt() in a loop, executes tools locally via executeTools(), supports multi-round tool calling
   - Stage 3: Calls buildChoicesPrompt(), parses choice syntax from AI response
   - All context building, prompt construction, and tool execution happens on the frontend
   - Backend is just a thin AI proxy (no storyData parsing or tool execution)
-- app/api/generate/route.ts: **Thin AI proxy** (non-streaming, BYOK). Accepts { messages, tools?, model, maxTokens, temperature, openRouterKey?, deepseekKey? }. Validates auth, requires user-provided API keys, forwards to AI provider (DeepSeek/OpenRouter), returns { content, toolCalls?, meta }. No token billing.
-- app/api/generate-stream/route.ts: **Thin AI proxy** (SSE streaming, BYOK). Same interface as /api/generate. Streams events: { type: "content", content }, { type: "tool_calls", toolCalls }, { type: "done", meta }. No token billing.
+- app/api/generate/route.ts: **Thin AI proxy** (non-streaming). Supports BYOK (OpenRouter/DeepSeek) and Coins (Mistral). Accepts { messages, tools?, model, maxTokens, temperature, openRouterKey?, deepseekKey? }. Validates auth, forwards to AI provider, returns { content, toolCalls?, meta }. Mistral models deduct coins after successful generation.
+- app/api/generate-stream/route.ts: **Thin AI proxy** (SSE streaming). Supports BYOK and Coins modes. Streams events: { type: "content", content }, { type: "tool_calls", toolCalls }, { type: "done", meta }. Mistral models check balance before generation and deduct coins after.
 - app/api/novelai/generate-stream/route.ts: **NovelAI BYOK proxy** (SSE streaming). Accepts { messages, novelaiKey, maxTokens, temperature }. Converts chat messages to completion prompt, forwards to NovelAI GLM-4-6, streams back. No token deduction (BYOK). Story stage only.
 - app/misc/novelai.ts: NovelAI types and utilities. Exports NOVELAI_MODEL ("glm-4-6"), NOVELAI_DEFAULT_PARAMS, convertMessagesToPrompt(), buildNovelAIRequest(), NOVELAI_CONTEXT_SIZE (8192).
 - app/api/tts/generate/route.ts: POST endpoint for Speechify text-to-speech generation; supports BYOK via speechifyKey field; deducts tokens only when using server key.
@@ -200,8 +203,9 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - Streams content via /api/generate-stream
   - Executes tools locally on storyData via toolExecutor.ts
   - Parses choices from AI response
-- **Multi-provider support**: Automatically routes to DeepSeek or OpenRouter based on model parameter.
-- Requires DEEPSEEK_API_KEY for DeepSeek models, OPENROUTER_API_KEY for OpenRouter models.
+- **Multi-provider support**: Automatically routes to DeepSeek, OpenRouter, or Mistral based on model parameter.
+- Requires DEEPSEEK_API_KEY for DeepSeek models, OPENROUTER_API_KEY for OpenRouter models, MISTRAL_API_KEY for Mistral (Coins mode).
+- Mistral models (mistral-small-2506, mistral-medium-2508, codestral-2508) use server-side key - users pay with coins.
 - Optional: DEFAULT_AI_MODEL, DEEPSEEK_MODEL, NEXT_PUBLIC_SITE_URL environment variables.
 - Deducts tokens based on actual usage; returns updated balance in response meta.
 - **Context allocation**: Uses (maxTokens - maxOutputTokens) then allocates 75% to history, 25% to memory.
@@ -217,6 +221,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Environment: Create .env.local with:
   - DEEPSEEK_API_KEY=<your_key>
   - OPENROUTER_API_KEY=<your_key>
+  - MISTRAL_API_KEY=<your_key> (server-side for Coins mode)
   - SPEECHIFY_API_KEY=<your_key>
   - DEEPGRAM_API_KEY=<your_key>
   - NEXT_PUBLIC_SUPABASE_URL=<your_url>

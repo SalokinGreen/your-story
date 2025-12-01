@@ -5,9 +5,9 @@
  * forwards to AI provider, returns raw response. All context building and
  * tool execution happens on the frontend.
  *
- * BYOK (Bring Your Own Key) model:
- * - Users must provide their own API keys
- * - No token deduction - users pay providers directly
+ * Provider modes:
+ * - BYOK (OpenRouter/DeepSeek): Users provide their own API keys, no token billing
+ * - Coins (Mistral): Server-side API key, users pay with coins
  *
  * Request: { messages, tools?, model, maxTokens, openRouterKey?, deepseekKey? }
  * Response: { content, toolCalls?, meta }
@@ -15,7 +15,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getModelConfig } from "@/app/misc/ai_prices";
+import { getModelConfig, calculateTokenCost } from "@/app/misc/ai_prices";
+import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import { logger } from "@/app/misc/logger";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -73,17 +74,21 @@ interface AIResponse {
 
 async function callAI(
   messages: ChatMessage[],
-  provider: "deepseek" | "openrouter",
+  provider: "deepseek" | "openrouter" | "mistral",
   model: string,
   apiKey: string,
   maxTokens: number,
   temperature: number,
   tools?: any[]
 ): Promise<AIResponse> {
-  const endpoint =
-    provider === "deepseek"
-      ? "https://api.deepseek.com/chat/completions"
-      : "https://openrouter.ai/api/v1/chat/completions";
+  let endpoint: string;
+  if (provider === "deepseek") {
+    endpoint = "https://api.deepseek.com/chat/completions";
+  } else if (provider === "mistral") {
+    endpoint = "https://api.mistral.ai/v1/chat/completions";
+  } else {
+    endpoint = "https://openrouter.ai/api/v1/chat/completions";
+  }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -98,7 +103,7 @@ async function callAI(
   const requestBody: any = {
     model,
     messages: messages.map((m) => {
-      const msg: any = { role: m.role, content: m.content };
+      const msg: any = { role: m.role, content: m.content || "" };
       if (m.tool_calls) {
         // Re-serialize tool call arguments to strings if they're objects
         // (AI APIs expect arguments as JSON strings, not parsed objects)
@@ -142,15 +147,16 @@ async function callAI(
 }
 
 function getApiKey(
-  provider: "deepseek" | "openrouter",
+  provider: "deepseek" | "openrouter" | "mistral",
   openRouterKey?: string,
   deepseekKey?: string
 ): string | null {
   if (provider === "deepseek") {
-    // DeepSeek requires user's own key - no server fallback
     return deepseekKey || null;
+  } else if (provider === "mistral") {
+    // Mistral uses server-side API key - users pay with coins
+    return process.env.MISTRAL_API_KEY || null;
   } else {
-    // OpenRouter requires user's own key - no server fallback
     return openRouterKey || null;
   }
 }
@@ -197,29 +203,52 @@ export async function POST(req: NextRequest) {
     // Get model config
     const modelConfig = getModelConfig(model);
 
-    // Get API key from user's provided keys
+    // Get API key from user's provided keys (or server key for Mistral)
     const apiKey = getApiKey(
-      modelConfig.provider as "deepseek" | "openrouter",
+      modelConfig.provider as "deepseek" | "openrouter" | "mistral",
       openRouterKey,
       deepseekKey
     );
 
     if (!apiKey) {
-      const providerName =
-        modelConfig.provider === "deepseek" ? "DeepSeek" : "OpenRouter";
+      let errorMessage: string;
+      if (modelConfig.provider === "mistral") {
+        errorMessage =
+          "Mistral API is not configured on the server. Please contact support.";
+      } else {
+        const providerName =
+          modelConfig.provider === "deepseek" ? "DeepSeek" : "OpenRouter";
+        errorMessage = `No API key configured for ${providerName}. Please add your API key in Settings.`;
+      }
       return NextResponse.json(
         {
-          error: `No API key configured for ${providerName}. Please add your API key in Settings.`,
+          error: errorMessage,
           code: "NO_API_KEY",
         },
         { status: 400 }
       );
     }
 
+    // Check token balance for Mistral (Coins mode) before making request
+    if (modelConfig.provider === "mistral") {
+      const balance = await getUserTokenBalance(user.id, supabase);
+      const estimatedCost = Math.max(1, modelConfig.cost || 1);
+      const currentBalance = balance?.total ?? 0;
+      if (currentBalance < estimatedCost) {
+        return NextResponse.json(
+          {
+            error: `Insufficient coins. You need at least ${estimatedCost} coins for this model. Current balance: ${currentBalance}`,
+            code: "INSUFFICIENT_BALANCE",
+          },
+          { status: 402 }
+        );
+      }
+    }
+
     // Call AI
     const aiResponse = await callAI(
       messages,
-      modelConfig.provider as "deepseek" | "openrouter",
+      modelConfig.provider as "deepseek" | "openrouter" | "mistral",
       modelConfig.model,
       apiKey,
       maxTokens,
@@ -244,6 +273,31 @@ export async function POST(req: NextRequest) {
       hasToolCalls: !!toolCalls,
     });
 
+    // Deduct tokens for Mistral (Coins mode)
+    let tokenCost = 0;
+    let newBalance: number | undefined;
+    if (
+      modelConfig.provider === "mistral" &&
+      (usage.prompt_tokens > 0 || usage.completion_tokens > 0)
+    ) {
+      tokenCost = calculateTokenCost(
+        model,
+        usage.prompt_tokens,
+        usage.completion_tokens
+      );
+      const deductResult = await deductTokens(user.id, tokenCost, supabase);
+      if (!deductResult.success) {
+        logger.warn("Failed to deduct tokens for Mistral generation", {
+          userId: user.id,
+          tokenCost,
+          error: deductResult.error,
+        });
+      } else {
+        const balanceResult = await getUserTokenBalance(user.id, supabase);
+        newBalance = balanceResult?.total;
+      }
+    }
+
     return NextResponse.json({
       content,
       toolCalls: toolCalls || [],
@@ -256,6 +310,8 @@ export async function POST(req: NextRequest) {
           completionTokens: usage.completion_tokens,
           totalTokens: usage.total_tokens,
         },
+        tokenCost: tokenCost > 0 ? tokenCost : undefined,
+        newBalance,
       },
     });
   } catch (error: any) {
