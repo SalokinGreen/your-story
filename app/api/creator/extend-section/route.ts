@@ -52,6 +52,29 @@ function getApiKey(
   }
 }
 
+/**
+ * Extract text content from delta, handling both plain strings
+ * and Magistral's array format with thinking/text content parts.
+ */
+function extractTextContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part?.type === "text" && typeof part.text === "string")
+          return part.text;
+        return "";
+      })
+      .join("");
+  }
+  if (content && typeof content === "object" && "text" in content) {
+    const obj = content as { text?: unknown };
+    if (typeof obj.text === "string") return obj.text;
+  }
+  return "";
+}
+
 export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
 
@@ -265,16 +288,19 @@ export async function POST(req: NextRequest) {
 
               // Handle content
               const delta = json.choices?.[0]?.delta;
-              if (delta?.content) {
-                fullContent += delta.content;
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      type: "content",
-                      content: delta.content,
-                    })}\n\n`
-                  )
-                );
+              if (delta?.content !== undefined && delta?.content !== null) {
+                const textContent = extractTextContent(delta.content);
+                if (textContent) {
+                  fullContent += textContent;
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "content",
+                        content: textContent,
+                      })}\n\n`
+                    )
+                  );
+                }
               }
             } catch {
               // Skip non-JSON lines

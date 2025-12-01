@@ -43,6 +43,42 @@ interface RequestBody {
   deepseekKey?: string;
 }
 
+/**
+ * Extract text content from delta, handling both plain strings
+ * and Magistral's array format with thinking/text content parts.
+ */
+function extractTextContent(content: unknown): string {
+  // Plain string (most models)
+  if (typeof content === "string") {
+    return content;
+  }
+
+  // Array format (Magistral thinking models)
+  // Format: [{ type: "thinking", thinking: [...] }, { type: "text", text: "..." }, ...]
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part?.type === "text" && typeof part.text === "string") {
+          return part.text;
+        }
+        // Skip thinking chunks - we only want the final answer
+        return "";
+      })
+      .join("");
+  }
+
+  // Single object with text property
+  if (content && typeof content === "object" && "text" in content) {
+    const obj = content as { text?: unknown };
+    if (typeof obj.text === "string") {
+      return obj.text;
+    }
+  }
+
+  return "";
+}
+
 function getApiKey(
   provider: "deepseek" | "openrouter" | "mistral",
   openRouterKey?: string,
@@ -310,16 +346,19 @@ export async function POST(req: NextRequest) {
               const parsed = JSON.parse(data);
               const delta = parsed.choices?.[0]?.delta;
 
-              if (delta?.content) {
-                fullContent += delta.content;
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      type: "content",
-                      content: delta.content,
-                    })}\n\n`
-                  )
-                );
+              if (delta?.content !== undefined && delta?.content !== null) {
+                const textContent = extractTextContent(delta.content);
+                if (textContent) {
+                  fullContent += textContent;
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "content",
+                        content: textContent,
+                      })}\n\n`
+                    )
+                  );
+                }
               }
 
               if (delta?.tool_calls) {

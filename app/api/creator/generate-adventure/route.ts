@@ -57,6 +57,29 @@ function getApiKey(
   }
 }
 
+/**
+ * Extract text content from delta, handling both plain strings
+ * and Magistral's array format with thinking/text content parts.
+ */
+function extractTextContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part?.type === "text" && typeof part.text === "string")
+          return part.text;
+        return "";
+      })
+      .join("");
+  }
+  if (content && typeof content === "object" && "text" in content) {
+    const obj = content as { text?: unknown };
+    if (typeof obj.text === "string") return obj.text;
+  }
+  return "";
+}
+
 async function streamAIResponse(
   messages: { role: string; content: string }[],
   modelConfig: ReturnType<typeof getModelConfig>,
@@ -148,17 +171,20 @@ async function streamAIResponse(
         const parsed = JSON.parse(data);
         const delta = parsed.choices?.[0]?.delta;
 
-        if (delta?.content) {
-          fullContent += delta.content;
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "stage_content",
-                stage,
-                content: delta.content,
-              })}\n\n`
-            )
-          );
+        if (delta?.content !== undefined && delta?.content !== null) {
+          const textContent = extractTextContent(delta.content);
+          if (textContent) {
+            fullContent += textContent;
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "stage_content",
+                  stage,
+                  content: textContent,
+                })}\n\n`
+              )
+            );
+          }
         }
 
         if (parsed.usage) {
