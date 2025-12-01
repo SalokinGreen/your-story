@@ -387,6 +387,14 @@ export async function generateStoryTurn(
       });
     }
 
+    // Debug: Log maxTokens being sent
+    console.log(
+      "[Generation] Story stage - maxTokens:",
+      options.customMaxOutput || 4000,
+      "model:",
+      options.storyModel
+    );
+
     if (!storyResponse.ok) {
       const errorText = await storyResponse.text().catch(() => "");
       throw new Error(

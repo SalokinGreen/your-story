@@ -125,6 +125,14 @@ export async function POST(req: NextRequest) {
           return;
         }
 
+        // Debug: Log received maxTokens
+        console.log(
+          "[API] generate-stream received - maxTokens:",
+          maxTokens,
+          "model:",
+          model
+        );
+
         // Get model config
         const modelConfig = getModelConfig(model);
 
@@ -231,6 +239,14 @@ export async function POST(req: NextRequest) {
           requestBody.tools = tools;
           requestBody.tool_choice = "auto";
         }
+
+        // Debug: Log the max_tokens being sent to provider
+        console.log(
+          "[API] Sending to",
+          modelConfig.provider,
+          "- max_tokens:",
+          requestBody.max_tokens
+        );
 
         // Make streaming request
         const response = await fetch(endpoint, {
