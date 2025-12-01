@@ -734,7 +734,7 @@ const COMPLEXITY_COUNTS: Record<
     resources: 3,
     abilities: 4,
     plotBeats: 8,
-    lore: 6,
+    lore: 12,
     achievements: 8,
     quests: 4,
     relationships: 4,
@@ -747,7 +747,7 @@ const COMPLEXITY_COUNTS: Record<
     resources: 4,
     abilities: 8,
     plotBeats: 12,
-    lore: 12,
+    lore: 20,
     achievements: 12,
     quests: 8,
     relationships: 8,
@@ -760,7 +760,7 @@ const COMPLEXITY_COUNTS: Record<
     resources: 5,
     abilities: 14,
     plotBeats: 18,
-    lore: 18,
+    lore: 30,
     achievements: 18,
     quests: 12,
     relationships: 12,
@@ -1080,11 +1080,54 @@ ITEM GRADES (rarity):
 - "legendary" (+4, 50 dur)
 - "mythic" (+5, infinite dur)
 
+LORE ENTRY GUIDELINES:
+Create DETAILED, RICH lore entries. Each entry should be 2-4 paragraphs with specific names, dates, and vivid descriptions.
+
+REQUIRED LORE CATEGORIES (distribute entries across all):
+
+1. KEY NPCs (at least 3-4 entries):
+   - Important characters the player will meet or hear about
+   - Include their appearance, personality, motivations, secrets, and relationship to the main plot
+   - Example: "Lord Varen Blackwood" - detailed backstory, current goals, secret vulnerabilities
+
+2. LOCATIONS (at least 3-4 entries):
+   - Major places in the world (cities, dungeons, landmarks)
+   - Describe atmosphere, notable features, dangers, and history
+   - Include what the player might find there and who controls it
+
+3. FACTIONS & ORGANIZATIONS (at least 2-3 entries):
+   - Groups with power and influence in the world
+   - Their goals, methods, leaders, symbols, and relationship to other factions
+   - How they might help or hinder the player
+
+4. HISTORY & PAST EVENTS (at least 2-3 entries):
+   - Important historical events that shaped the current world
+   - Ancient wars, fallen kingdoms, legendary heroes, catastrophes
+   - How these events affect the present situation
+
+5. UPCOMING THREATS & EVENTS (at least 2-3 entries):
+   - Looming dangers or prophecies about the future
+   - Secret plots being hatched, approaching deadlines, gathering storms
+   - Set these as secret=true with beats_trigger for dramatic reveals
+
+6. WORLD LORE (remaining entries):
+   - Magic systems, religions, customs, creatures, artifacts
+   - Cultural details, legends, mysteries to uncover
+   - Anything that adds depth and flavor to the world
+
+LORE CONTENT QUALITY:
+- Be SPECIFIC: Use proper nouns, exact numbers, vivid descriptions
+- Be DETAILED: 2-4 paragraphs per entry, not just 1-2 sentences
+- Be INTERCONNECTED: Reference other lore entries, NPCs, and locations
+- Include HOOKS: Details that hint at quests, secrets, or opportunities
+
 LORE TRIGGERS (make lore dynamic):
-- on_triggers: words/phrases that reveal this lore
-- off_triggers: words/phrases that hide this lore
-- beats_trigger: plot beat indices (0-based) that reveal this lore
+- on_triggers: words/phrases that reveal this lore (character names, location mentions)
+- off_triggers: words/phrases that hide this lore (rare, use sparingly)
+- beats_trigger: plot beat indices (0-based) that reveal this lore (great for secrets)
 - var_on_triggers: boolean variable names that reveal when true
+- secrtet: true for hidden lore the AI knows but player hasn't discovered yet
+- alwaysOn: true for fundamental world facts player should always have access to
 
 RELATIONSHIP VALUES: -100 (mortal enemy) to +100 (devoted ally)
 
@@ -1095,8 +1138,8 @@ OUTPUT JSON SCHEMA:
   ],
   "lore": [
     {
-      "title": "string",
-      "content": "string (detailed lore text)",
+      "title": "string (specific name - 'Lord Varen Blackwood' not 'The Villain')",
+      "content": "string (2-4 DETAILED paragraphs with specific names, descriptions, history, motivations, and connections to other lore)",
       "secrtet": boolean,
       "on": boolean,
       "alwaysOn": boolean,
@@ -1148,6 +1191,18 @@ IMPORTANT: Each preset MUST include abilities. Use the abilities generated in th
 - You may also create 1-2 unique abilities per preset for specialization
 - Adjust ability grades to reflect each preset's proficiency
 
+CRITICAL - PRESET INTROS:
+The "intro" field is a COMPLETE REPLACEMENT for the default intro, NOT an addition to it.
+Each preset intro must be a FULL, STANDALONE opening narrative (3-5 paragraphs) that:
+- Sets the scene and atmosphere
+- Establishes this specific character's situation and perspective
+- Creates immersion and hooks the player
+- Is as detailed and polished as the main adventure intro
+Do NOT write short intros expecting them to be appended - they replace the intro entirely!
+
+PRESET PLAYER SUMMARY:
+The "playerSummary" is also a COMPLETE REPLACEMENT (2-3 paragraphs) describing this specific character's background, personality, skills, and history.
+
 STAT VALUES FOR PRESETS:
 - Range: 1-100 where 50 is human average
 - Player characters typically have 40-70 in most stats
@@ -1158,11 +1213,11 @@ STAT VALUES FOR PRESETS:
     {
       "id": "preset-xxx",
       "name": "string",
-      "description": "string",
+      "description": "string (1-2 sentence hook for selection screen)",
       "icon": "emoji",
       "playerName": "string",
-      "playerSummary": "string",
-      "intro": "string (unique opening for this preset)",
+      "playerSummary": "string (2-3 paragraphs - COMPLETE character background, NOT a fragment)",
+      "intro": "string (3-5 paragraphs - COMPLETE opening narrative, NOT a fragment. This REPLACES the default intro entirely!)",
       "stats": [{ "name": "string", "value": number, "description": "string", "symbol": "emoji" }],
       "resources": [{ "name": "string", "value": number, "maxValue": number, "description": "string", "symbol": "emoji" }],
       "inventory": [{ "name": "string", "quantity": number, "description": "string", "type": "string", "grade": "string", "symbol": "emoji" }],
@@ -2057,8 +2112,19 @@ EXISTING CONTENT SUMMARY:`;
     lore: {
       instruction: `Generate ${Math.round(
         counts.lore * durationMultiplier
-      )} lore entries with dynamic triggers.`,
-      schema: `{ "lore": [{ "title": "string", "content": "string", "secret": boolean, "on": boolean, "alwaysOn": boolean, "on_triggers": ["string"], "off_triggers": ["string"], "beats_trigger": [number], "var_on_triggers": ["string"] }] }`,
+      )} DETAILED lore entries with dynamic triggers.
+
+REQUIRED LORE CATEGORIES (distribute across all):
+- KEY NPCs (3-4): Important characters with appearance, personality, motivations, secrets
+- LOCATIONS (3-4): Major places with atmosphere, features, dangers, history
+- FACTIONS (2-3): Organizations with goals, methods, leaders, relationships
+- HISTORY (2-3): Past events that shaped the world
+- UPCOMING THREATS (2-3): Looming dangers, prophecies, secret plots (set secret=true)
+- WORLD LORE: Magic, religions, customs, creatures, artifacts
+
+Each entry must be 2-4 paragraphs with specific names, dates, and vivid descriptions.
+Use on_triggers (character/location names), beats_trigger (for dramatic reveals), and alwaysOn (for core world facts).`,
+      schema: `{ "lore": [{ "title": "string (specific name)", "content": "string (2-4 detailed paragraphs)", "secrtet": boolean, "on": boolean, "alwaysOn": boolean, "on_triggers": ["string"], "off_triggers": ["string"], "beats_trigger": [number], "var_on_triggers": ["string"] }] }`,
       count: Math.round(counts.lore * durationMultiplier),
     },
     achievements: {
@@ -2092,8 +2158,12 @@ EXISTING CONTENT SUMMARY:`;
     presets: {
       instruction: `Generate ${Math.round(
         counts.presets * durationMultiplier
-      )} character presets with unique stats, abilities, and items.`,
-      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string", "intro": "string", "stats": [...], "resources": [...], "inventory": [...], "abilities": [...], "authorNotes": "string" }] }`,
+      )} character presets with unique stats, abilities, and items.
+
+CRITICAL: Each preset's "intro" is a COMPLETE REPLACEMENT (3-5 paragraphs) for the default intro, NOT an addition.
+Each preset's "playerSummary" is a COMPLETE REPLACEMENT (2-3 paragraphs) for the default player background.
+Write full, standalone content - not fragments!`,
+      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string (2-3 paragraphs)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "stats": [...], "resources": [...], "inventory": [...], "abilities": [...], "authorNotes": "string" }] }`,
       count: Math.round(counts.presets * durationMultiplier),
     },
     mythic: {
@@ -2444,8 +2514,20 @@ ${existingItemsPreview || "(none)"}`;
       schema: `{ "inventory": [{ "name": "string", "description": "string", "type": "normal|consumable|story|misc", "grade": "common|uncommon|rare|epic|mythic", "stat": "string (optional)", "symbol": "emoji", "durability": number, "maxDurability": number }] }`,
     },
     lore: {
-      instruction: `Generate ${count} NEW lore entries that expand the world. Include dynamic triggers.`,
-      schema: `{ "lore": [{ "title": "string", "content": "string", "secret": boolean, "on": boolean, "alwaysOn": boolean, "on_triggers": ["string"], "off_triggers": ["string"], "beats_trigger": [number], "var_on_triggers": ["string"] }] }`,
+      instruction: `Generate ${count} NEW DETAILED lore entries that expand the world.
+
+Consider adding entries from categories that may be underrepresented:
+- NPCs: Important characters with appearance, personality, motivations, secrets
+- Locations: Major places with atmosphere, features, dangers, history  
+- Factions: Organizations with goals, methods, leaders
+- History: Past events that shaped the current situation
+- Threats: Looming dangers, prophecies, secret plots (set secret=true)
+- World Details: Magic, religions, customs, creatures, artifacts
+
+Each entry MUST be 2-4 paragraphs with specific names, dates, and vivid descriptions.
+Use on_triggers for dynamic reveal (character names, location mentions), beats_trigger for plot-gated secrets.
+Ensure new lore references and connects to existing lore entries.`,
+      schema: `{ "lore": [{ "title": "string (specific name)", "content": "string (2-4 detailed paragraphs)", "secrtet": boolean, "on": boolean, "alwaysOn": boolean, "on_triggers": ["string"], "off_triggers": ["string"], "beats_trigger": [number], "var_on_triggers": ["string"] }] }`,
     },
     achievements: {
       instruction: `Generate ${count} NEW achievements with ai_hint for precise triggering.`,
@@ -2464,8 +2546,12 @@ ${existingItemsPreview || "(none)"}`;
       schema: `{ "relationships": [{ "name": "string", "value": number (-100 to 100), "description": "string", "symbol": "emoji" }] }`,
     },
     presets: {
-      instruction: `Generate ${count} NEW character presets with unique stats, abilities, and items.`,
-      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string", "intro": "string", "stats": [...], "resources": [...], "inventory": [...], "abilities": [...], "authorNotes": "string" }] }`,
+      instruction: `Generate ${count} NEW character presets with unique stats, abilities, and items.
+
+CRITICAL: Each preset's "intro" is a COMPLETE REPLACEMENT (3-5 paragraphs) for the default intro, NOT an addition.
+Each preset's "playerSummary" is a COMPLETE REPLACEMENT (2-3 paragraphs) for the default player background.
+Write full, standalone content - not fragments!`,
+      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string (2-3 paragraphs)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "stats": [...], "resources": [...], "inventory": [...], "abilities": [...], "authorNotes": "string" }] }`,
     },
     mythic: {
       instruction: "",

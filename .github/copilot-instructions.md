@@ -120,6 +120,26 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/api/users/[userId]/role/route.ts: PATCH user role (admin only).
 - app/api/profiles/[userId]/route.ts: GET/PATCH user profile data.
 
+#### Big Adventure Creator
+
+- app/api/creator/generate-adventure/route.ts: SSE streaming endpoint for full adventure generation. Runs 4 stages (core, mechanics, content, advanced) with per-stage output limits. Supports BYOK (OpenRouter, DeepSeek, NovelAI).
+- app/api/creator/regenerate-section/route.ts: Regenerate a specific section of an existing adventure.
+- app/api/creator/extend-section/route.ts: Add more content to an existing section (lore, achievements, etc.).
+- app/misc/big_adventure_ai.ts: Big Adventure AI configuration and prompt builders. Key exports:
+  - `GenerationStage`: "core" | "mechanics" | "content" | "advanced"
+  - `BigAdventureConfig`: Full configuration with complexity, duration, RPG system, feature toggles
+  - `COMPLEXITY_COUNTS`: Target counts per complexity level (simple: 12 lore, moderate: 20 lore, complex: 30 lore)
+  - `buildBigAdventureMessages()`: Constructs prompts for each stage
+  - `STYLE_PRESETS`: Narrative tone presets (grimdark, whimsical, cinematic, etc.)
+  - `PROMPT_TEMPLATES`: Genre-specific starter prompts
+  - **Lore Generation Guidelines**: Requires detailed 2-4 paragraph entries across categories:
+    - KEY NPCs (3-4): Important characters with appearance, personality, motivations, secrets
+    - LOCATIONS (3-4): Major places with atmosphere, features, dangers, history
+    - FACTIONS (2-3): Organizations with goals, methods, leaders
+    - HISTORY (2-3): Past events that shaped the world
+    - UPCOMING THREATS (2-3): Looming dangers, prophecies (set secrtet=true, use beats_trigger)
+    - WORLD LORE: Magic, religions, customs, creatures, artifacts
+
 ### Components
 
 - app/components/AuthForm.tsx: Sign up/sign in form.

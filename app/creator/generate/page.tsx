@@ -1785,7 +1785,7 @@ ${result.description || ""}`;
         setGenerating(false);
       }
     },
-    [user, thumbnailPrompt, bannerPrompt, imageModel, addNotification]
+    [user, thumbnailPrompt, bannerPrompt, imageModel, addNotification, apiKeys.openRouterKey]
   );
 
   // Save adventure
@@ -1857,7 +1857,7 @@ ${result.description || ""}`;
     } finally {
       setIsSaving(false);
     }
-  }, [result, config, addNotification, router, user]);
+  }, [result, config, addNotification, router, user, thumbnailUrl, bannerUrl]);
 
   // Auth check
   if (authLoading) {
