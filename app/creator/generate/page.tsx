@@ -183,7 +183,9 @@ function IterationSlider({
       <div className="flex-1">
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm text-blue-200">{label}</span>
-          <span className="text-sm font-mono text-purple-400">{localValue}x</span>
+          <span className="text-sm font-mono text-purple-400">
+            {localValue}x
+          </span>
         </div>
         <input
           type="range"
@@ -605,7 +607,21 @@ export default function BigAdventureCreatorPage() {
     stylePreset: "default",
   });
   const [selectedModel, setSelectedModel] = useState("Deepseek Chat");
+  const [novelaiKey, setNovelaiKey] = useState("");
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
+
+  // Load NovelAI key from localStorage on mount
+  useEffect(() => {
+    const storedKey = localStorage.getItem("novelaiKey");
+    if (storedKey) {
+      setNovelaiKey(storedKey);
+    }
+  }, []);
+
+  // Check if selected model is NovelAI
+  const isNovelAISelected =
+    (AI_MODELS as Record<string, { provider?: string }>)[selectedModel]
+      ?.provider === "novelai";
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -770,18 +786,30 @@ export default function BigAdventureCreatorPage() {
 
   // Calculate estimated cost
   const estimatedCost = useCallback(() => {
+    // NovelAI is free (BYOK)
+    if (isNovelAISelected) {
+      return 0;
+    }
     const estimate = estimateBigAdventureCost(config);
     return calculateTokenCost(
       selectedModel,
       estimate.inputTokens,
       estimate.outputTokens
     );
-  }, [config, selectedModel]);
+  }, [config, selectedModel, isNovelAISelected]);
 
   // Update config
   const updateConfig = useCallback((updates: Partial<BigAdventureConfig>) => {
     setConfig((prev) => ({ ...prev, ...updates }));
   }, []);
+
+  // Clamp max output tokens when model changes
+  useEffect(() => {
+    const modelMax = getModelMaxTokens();
+    if (config.maxOutputTokens > modelMax) {
+      updateConfig({ maxOutputTokens: modelMax });
+    }
+  }, [selectedModel, getModelMaxTokens, config.maxOutputTokens, updateConfig]);
 
   // Apply a prompt template
   const applyTemplate = useCallback(
@@ -819,8 +847,11 @@ export default function BigAdventureCreatorPage() {
 
   // Validation for step 1
   const [validationError, setValidationError] = useState<string | null>(null);
-  
-  const validateStep1 = useCallback((): { valid: boolean; error: string | null } => {
+
+  const validateStep1 = useCallback((): {
+    valid: boolean;
+    error: string | null;
+  } => {
     if (promptMode === "freeform") {
       if (!config.prompt.trim()) {
         return { valid: false, error: "Please enter an adventure concept" };
@@ -830,25 +861,37 @@ export default function BigAdventureCreatorPage() {
         return { valid: false, error: "Please select a template" };
       }
       if (!config.prompt.trim()) {
-        return { valid: false, error: "Please select a template to generate your prompt" };
+        return {
+          valid: false,
+          error: "Please select a template to generate your prompt",
+        };
       }
     } else if (promptMode === "guided") {
       // Check required questions
-      const missingRequired = PROMPT_BUILDER_QUESTIONS
-        .filter(q => q.required && !guidedAnswers[q.id]?.trim())
-        .map(q => q.question.replace(/\?$/, ''));
-      
+      const missingRequired = PROMPT_BUILDER_QUESTIONS.filter(
+        (q) => q.required && !guidedAnswers[q.id]?.trim()
+      ).map((q) => q.question.replace(/\?$/, ""));
+
       if (missingRequired.length > 0) {
-        return { 
-          valid: false, 
-          error: `Please fill in required fields: ${missingRequired.slice(0, 2).join(", ")}${missingRequired.length > 2 ? ` (+${missingRequired.length - 2} more)` : ""}`
+        return {
+          valid: false,
+          error: `Please fill in required fields: ${missingRequired
+            .slice(0, 2)
+            .join(", ")}${
+            missingRequired.length > 2
+              ? ` (+${missingRequired.length - 2} more)`
+              : ""
+          }`,
         };
       }
-      
+
       // Generate prompt from answers if not already done
       const generatedPrompt = buildPromptFromAnswers(guidedAnswers);
       if (!generatedPrompt.trim()) {
-        return { valid: false, error: "Please answer at least the required questions" };
+        return {
+          valid: false,
+          error: "Please answer at least the required questions",
+        };
       }
     }
     return { valid: true, error: null };
@@ -858,15 +901,18 @@ export default function BigAdventureCreatorPage() {
     const validation = validateStep1();
     if (!validation.valid) {
       setValidationError(validation.error);
-      addNotification(validation.error || "Please fill in required fields", "warning");
+      addNotification(
+        validation.error || "Please fill in required fields",
+        "warning"
+      );
       return;
     }
-    
+
     // If in guided mode, finalize the prompt before proceeding
     if (promptMode === "guided") {
       finalizeGuidedPrompt();
     }
-    
+
     setValidationError(null);
     setConfigStep(2);
   }, [validateStep1, promptMode, finalizeGuidedPrompt, addNotification]);
@@ -879,9 +925,9 @@ export default function BigAdventureCreatorPage() {
       return !!selectedTemplate && !!config.prompt.trim();
     } else if (promptMode === "guided") {
       // Check if all required questions are answered
-      return PROMPT_BUILDER_QUESTIONS
-        .filter(q => q.required)
-        .every(q => !!guidedAnswers[q.id]?.trim());
+      return PROMPT_BUILDER_QUESTIONS.filter((q) => q.required).every(
+        (q) => !!guidedAnswers[q.id]?.trim()
+      );
     }
     return false;
   }, [promptMode, config.prompt, selectedTemplate, guidedAnswers]);
@@ -935,6 +981,15 @@ export default function BigAdventureCreatorPage() {
       return;
     }
 
+    // Check for NovelAI key if using NovelAI model
+    if (isNovelAISelected && !novelaiKey.trim()) {
+      addNotification(
+        "Please enter your NovelAI API key to use this model",
+        "warning"
+      );
+      return;
+    }
+
     const token = await getAuthToken();
     if (!token) {
       addNotification("Please sign in to generate adventures", "warning");
@@ -973,6 +1028,7 @@ export default function BigAdventureCreatorPage() {
         body: JSON.stringify({
           config,
           model: selectedModel,
+          novelaiKey: isNovelAISelected ? novelaiKey : undefined,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -1052,8 +1108,13 @@ export default function BigAdventureCreatorPage() {
                   }
 
                   // Log if continuation was needed
-                  if (event.continuationAttempts && event.continuationAttempts > 0) {
-                    console.log(`Stage ${event.stage} required ${event.continuationAttempts} continuation(s)`);
+                  if (
+                    event.continuationAttempts &&
+                    event.continuationAttempts > 0
+                  ) {
+                    console.log(
+                      `Stage ${event.stage} required ${event.continuationAttempts} continuation(s)`
+                    );
                   }
 
                   // Save autosave after each stage completion
@@ -1094,9 +1155,15 @@ export default function BigAdventureCreatorPage() {
 
               case "stage_continuation":
                 // JSON was incomplete, continuing generation
-                console.log(`Stage ${event.stage} continuation attempt ${event.attempt}/${event.maxAttempts}`);
+                console.log(
+                  `Stage ${event.stage} continuation attempt ${event.attempt}/${event.maxAttempts}`
+                );
                 // Optionally show a subtle indicator that continuation is happening
-                setLiveContent((prev) => prev + `\n\n/* Continuing generation (${event.attempt}/${event.maxAttempts})... */\n`);
+                setLiveContent(
+                  (prev) =>
+                    prev +
+                    `\n\n/* Continuing generation (${event.attempt}/${event.maxAttempts})... */\n`
+                );
                 break;
 
               case "stage_warning":
@@ -1158,7 +1225,14 @@ export default function BigAdventureCreatorPage() {
       setCurrentStage(null);
       abortControllerRef.current = null;
     }
-  }, [config, selectedModel, addNotification, sessionId]);
+  }, [
+    config,
+    selectedModel,
+    novelaiKey,
+    isNovelAISelected,
+    addNotification,
+    sessionId,
+  ]);
 
   // Cancel generation
   const cancelGeneration = useCallback(() => {
@@ -2080,8 +2154,14 @@ export default function BigAdventureCreatorPage() {
                   {getTotalGenerationTasks(config)} stages
                 </span>
                 Estimated cost:{" "}
-                <span className="text-amber-400 font-medium">
-                  ~{estimatedCost()} coins
+                <span
+                  className={`font-medium ${
+                    isNovelAISelected ? "text-green-400" : "text-amber-400"
+                  }`}
+                >
+                  {isNovelAISelected
+                    ? "Free (BYOK)"
+                    : `~${estimatedCost()} coins`}
                 </span>
               </div>
             )}
@@ -2103,7 +2183,10 @@ export default function BigAdventureCreatorPage() {
                 {/* Prompt Mode Selector */}
                 <div className="flex gap-2 mb-4">
                   <button
-                    onClick={() => { setPromptMode("freeform"); setValidationError(null); }}
+                    onClick={() => {
+                      setPromptMode("freeform");
+                      setValidationError(null);
+                    }}
                     className={`flex-1 px-4 py-2 rounded-lg text-sm transition-colors ${
                       promptMode === "freeform"
                         ? "bg-purple-600 text-white"
@@ -2113,7 +2196,10 @@ export default function BigAdventureCreatorPage() {
                     ✏️ Write Your Own
                   </button>
                   <button
-                    onClick={() => { setPromptMode("template"); setValidationError(null); }}
+                    onClick={() => {
+                      setPromptMode("template");
+                      setValidationError(null);
+                    }}
                     className={`flex-1 px-4 py-2 rounded-lg text-sm transition-colors ${
                       promptMode === "template"
                         ? "bg-purple-600 text-white"
@@ -2123,7 +2209,10 @@ export default function BigAdventureCreatorPage() {
                     📋 Use Template
                   </button>
                   <button
-                    onClick={() => { setPromptMode("guided"); setValidationError(null); }}
+                    onClick={() => {
+                      setPromptMode("guided");
+                      setValidationError(null);
+                    }}
                     className={`flex-1 px-4 py-2 rounded-lg text-sm transition-colors ${
                       promptMode === "guided"
                         ? "bg-purple-600 text-white"
@@ -2413,13 +2502,35 @@ export default function BigAdventureCreatorPage() {
                         </option>
                       ))}
                     </select>
-                    {(AI_MODELS as Record<string, { provider?: string }>)[
-                      selectedModel
-                    ]?.provider === "novelai" && (
-                      <p className="text-xs text-amber-400 mt-2">
-                        ⚠️ NovelAI requires your own API key. Configure it in
-                        Story → Menu → AI Config.
-                      </p>
+                    {isNovelAISelected && (
+                      <div className="mt-3 p-3 bg-amber-900/20 border border-amber-700/30 rounded-lg">
+                        <label className="block text-sm text-amber-300 mb-2">
+                          🔑 NovelAI API Key (BYOK - No token cost)
+                        </label>
+                        <input
+                          type="password"
+                          value={novelaiKey}
+                          onChange={(e) => {
+                            setNovelaiKey(e.target.value);
+                            localStorage.setItem("novelaiKey", e.target.value);
+                          }}
+                          placeholder="Enter your NovelAI API key..."
+                          className="w-full bg-blue-900/50 border border-amber-700/50 rounded-lg px-4 py-2 text-white placeholder-amber-300/50 focus:outline-none focus:border-amber-500/50 transition-all text-sm"
+                        />
+                        <p className="text-xs text-amber-300/60 mt-2">
+                          Your key is stored locally and never sent to our
+                          servers. Get your key from{" "}
+                          <a
+                            href="https://novelai.net/settings"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-amber-400 hover:underline"
+                          >
+                            NovelAI Settings
+                          </a>
+                          .
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2735,15 +2846,19 @@ export default function BigAdventureCreatorPage() {
                         Max Output Tokens per Task
                       </label>
                       <span className="text-sm font-mono text-purple-400">
-                        {config.maxOutputTokens} / {getModelMaxTokens()}
+                        {Math.min(config.maxOutputTokens, getModelMaxTokens())}{" "}
+                        / {getModelMaxTokens()}
                       </span>
                     </div>
                     <input
                       type="range"
-                      min={2000}
+                      min={Math.min(500, getModelMaxTokens())}
                       max={getModelMaxTokens()}
-                      step={500}
-                      value={config.maxOutputTokens}
+                      step={getModelMaxTokens() <= 2000 ? 100 : 500}
+                      value={Math.min(
+                        config.maxOutputTokens,
+                        getModelMaxTokens()
+                      )}
                       onChange={(e) =>
                         updateConfig({
                           maxOutputTokens: parseInt(e.target.value),
@@ -2754,6 +2869,11 @@ export default function BigAdventureCreatorPage() {
                     <p className="text-xs text-blue-300/50 mt-1">
                       Higher values = more detailed content but higher cost.
                       Model max: {getModelMaxTokens()}
+                      {getModelMaxTokens() <= 2000 && (
+                        <span className="text-amber-400 ml-2">
+                          ⚠️ This model has limited output capacity
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -2927,33 +3047,39 @@ export default function BigAdventureCreatorPage() {
                             "content",
                             "advanced",
                           ] as GenerationStage[]
-                        ).map((stage) => (
-                          <div key={stage} className="flex items-center gap-4">
-                            <span className="text-sm text-blue-200 w-24">
-                              {getStageInfo(stage).name}
-                            </span>
-                            <input
-                              type="range"
-                              min={2000}
-                              max={getModelMaxTokens()}
-                              step={500}
-                              value={
-                                config.stageConfigs?.[stage]?.maxOutputTokens ??
-                                config.maxOutputTokens
-                              }
-                              onChange={(e) =>
-                                updateStageConfig(stage, {
-                                  maxOutputTokens: parseInt(e.target.value),
-                                })
-                              }
-                              className="flex-1 h-1.5 bg-blue-900/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
-                            />
-                            <span className="text-sm font-mono text-purple-400 w-16 text-right">
-                              {config.stageConfigs?.[stage]?.maxOutputTokens ??
-                                config.maxOutputTokens}
-                            </span>
-                          </div>
-                        ))}
+                        ).map((stage) => {
+                          const stageValue = Math.min(
+                            config.stageConfigs?.[stage]?.maxOutputTokens ??
+                              config.maxOutputTokens,
+                            getModelMaxTokens()
+                          );
+                          return (
+                            <div
+                              key={stage}
+                              className="flex items-center gap-4"
+                            >
+                              <span className="text-sm text-blue-200 w-24">
+                                {getStageInfo(stage).name}
+                              </span>
+                              <input
+                                type="range"
+                                min={Math.min(500, getModelMaxTokens())}
+                                max={getModelMaxTokens()}
+                                step={getModelMaxTokens() <= 2000 ? 100 : 500}
+                                value={stageValue}
+                                onChange={(e) =>
+                                  updateStageConfig(stage, {
+                                    maxOutputTokens: parseInt(e.target.value),
+                                  })
+                                }
+                                className="flex-1 h-1.5 bg-blue-900/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                              />
+                              <span className="text-sm font-mono text-purple-400 w-16 text-right">
+                                {stageValue}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -2963,7 +3089,8 @@ export default function BigAdventureCreatorPage() {
                         Per-Stage Custom Instructions
                       </h4>
                       <p className="text-xs text-purple-300/50 mb-4">
-                        Give the AI specific guidance for each generation stage. These instructions directly influence what gets created.
+                        Give the AI specific guidance for each generation stage.
+                        These instructions directly influence what gets created.
                       </p>
                       <div className="space-y-4">
                         {(
@@ -2976,46 +3103,51 @@ export default function BigAdventureCreatorPage() {
                         ).map((stage) => {
                           const info = getStageInfo(stage);
                           return (
-                          <div key={stage} className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-purple-200">
-                                {info.emoji}{" "}
-                                {info.name}
-                              </span>
-                              {!config.stageConfigs?.[stage]?.enabled && (
-                                <span className="text-xs text-blue-400/50">
-                                  (disabled)
+                            <div key={stage} className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-purple-200">
+                                  {info.emoji} {info.name}
                                 </span>
-                              )}
+                                {!config.stageConfigs?.[stage]?.enabled && (
+                                  <span className="text-xs text-blue-400/50">
+                                    (disabled)
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-blue-300/60 leading-relaxed">
+                                {info.detailedDescription}
+                              </p>
+                              <div className="text-xs text-purple-400/70 flex flex-wrap gap-1">
+                                <span className="font-medium">Creates:</span>
+                                {info.generates.map((item, i) => (
+                                  <span
+                                    key={i}
+                                    className="bg-purple-900/30 px-1.5 py-0.5 rounded"
+                                  >
+                                    {item.split(" (")[0]}
+                                  </span>
+                                ))}
+                              </div>
+                              <textarea
+                                value={
+                                  config.stageConfigs?.[stage]
+                                    ?.customInstructions ?? ""
+                                }
+                                onChange={(e) =>
+                                  updateStageConfig(stage, {
+                                    customInstructions: e.target.value,
+                                  })
+                                }
+                                placeholder={info.instructionHint}
+                                rows={2}
+                                className="w-full px-3 py-2 bg-blue-900/30 border border-purple-700/30 rounded-lg text-white placeholder-purple-300/40 text-sm resize-none focus:outline-none focus:border-purple-500/50"
+                                disabled={
+                                  !config.stageConfigs?.[stage]?.enabled
+                                }
+                              />
                             </div>
-                            <p className="text-xs text-blue-300/60 leading-relaxed">
-                              {info.detailedDescription}
-                            </p>
-                            <div className="text-xs text-purple-400/70 flex flex-wrap gap-1">
-                              <span className="font-medium">Creates:</span>
-                              {info.generates.map((item, i) => (
-                                <span key={i} className="bg-purple-900/30 px-1.5 py-0.5 rounded">
-                                  {item.split(" (")[0]}
-                                </span>
-                              ))}
-                            </div>
-                            <textarea
-                              value={
-                                config.stageConfigs?.[stage]
-                                  ?.customInstructions ?? ""
-                              }
-                              onChange={(e) =>
-                                updateStageConfig(stage, {
-                                  customInstructions: e.target.value,
-                                })
-                              }
-                              placeholder={info.instructionHint}
-                              rows={2}
-                              className="w-full px-3 py-2 bg-blue-900/30 border border-purple-700/30 rounded-lg text-white placeholder-purple-300/40 text-sm resize-none focus:outline-none focus:border-purple-500/50"
-                              disabled={!config.stageConfigs?.[stage]?.enabled}
-                            />
-                          </div>
-                        )})}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -3031,12 +3163,28 @@ export default function BigAdventureCreatorPage() {
                       {getTotalGenerationTasks(config)} stages
                     </span>
                   </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-blue-200">API Calls</span>
+                    <span className="text-sm text-blue-300">
+                      {getTotalGenerationTasks(config)} min –{" "}
+                      {getTotalGenerationTasks(config) * 4} max
+                      <span className="text-blue-400/60 ml-1">
+                        (up to 3 retries/stage)
+                      </span>
+                    </span>
+                  </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-blue-200">
                       Estimated Cost
                     </span>
-                    <span className="text-lg text-amber-400 font-bold">
-                      ~{estimatedCost()} coins
+                    <span
+                      className={`text-lg font-bold ${
+                        isNovelAISelected ? "text-green-400" : "text-amber-400"
+                      }`}
+                    >
+                      {isNovelAISelected
+                        ? "Free (BYOK)"
+                        : `~${estimatedCost()} coins`}
                     </span>
                   </div>
                 </div>

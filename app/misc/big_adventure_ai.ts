@@ -1030,17 +1030,26 @@ Remember: Output ONLY the JSON object, nothing else.`;
 
   if (stage === "content") {
     // Get content iteration multipliers (default to 1x if not set)
-    const contentIterations = config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
-    
+    const contentIterations =
+      config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
+
     // Apply both duration multiplier AND content iterations for each category
-    const plotBeatCount = Math.round(counts.plotBeats * durationMultiplier * contentIterations.plotBeats);
-    const loreCount = Math.round(counts.lore * durationMultiplier * contentIterations.lore);
+    const plotBeatCount = Math.round(
+      counts.plotBeats * durationMultiplier * contentIterations.plotBeats
+    );
+    const loreCount = Math.round(
+      counts.lore * durationMultiplier * contentIterations.lore
+    );
     const achievementCount = Math.round(
       counts.achievements * durationMultiplier * contentIterations.achievements
     );
-    const questCount = Math.round(counts.quests * durationMultiplier * contentIterations.quests);
+    const questCount = Math.round(
+      counts.quests * durationMultiplier * contentIterations.quests
+    );
     const relationshipCount = Math.round(
-      counts.relationships * durationMultiplier * contentIterations.relationships
+      counts.relationships *
+        durationMultiplier *
+        contentIterations.relationships
     );
     const inventoryCount = Math.round(3 * contentIterations.inventory); // Base 3 items times multiplier
 
@@ -1396,7 +1405,9 @@ export function detectIncompleteJSON(content: string): {
   let jsonContent = content.trim();
 
   // Remove markdown code blocks if present
-  const jsonBlockMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)(?:\s*```)?$/);
+  const jsonBlockMatch = jsonContent.match(
+    /```(?:json)?\s*([\s\S]*?)(?:\s*```)?$/
+  );
   if (jsonBlockMatch) {
     jsonContent = jsonBlockMatch[1].trim();
   }
@@ -1404,7 +1415,11 @@ export function detectIncompleteJSON(content: string): {
   // Find JSON start
   const startIndex = jsonContent.indexOf("{");
   if (startIndex === -1) {
-    return { isIncomplete: true, lastValidPosition: 0, truncatedContent: jsonContent };
+    return {
+      isIncomplete: true,
+      lastValidPosition: 0,
+      truncatedContent: jsonContent,
+    };
   }
 
   // Count brackets to detect incomplete JSON
@@ -1480,7 +1495,9 @@ export function attemptJSONRepair(content: string): string {
   let jsonContent = content.trim();
 
   // Remove markdown code blocks if present
-  const jsonBlockMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)(?:\s*```)?$/);
+  const jsonBlockMatch = jsonContent.match(
+    /```(?:json)?\s*([\s\S]*?)(?:\s*```)?$/
+  );
   if (jsonBlockMatch) {
     jsonContent = jsonBlockMatch[1].trim();
   }
@@ -1536,7 +1553,9 @@ export function attemptJSONRepair(content: string): string {
   // If we're in a string, try to close it
   if (inString) {
     // Find a reasonable place to truncate (last complete value)
-    const truncateMatch = jsonContent.slice(0, lastGoodIndex + 1).match(/^([\s\S]*[}\]",:\d])/);
+    const truncateMatch = jsonContent
+      .slice(0, lastGoodIndex + 1)
+      .match(/^([\s\S]*[}\]",:\d])/);
     if (truncateMatch) {
       jsonContent = truncateMatch[1];
       // Recount stack after truncation
@@ -1544,8 +1563,14 @@ export function attemptJSONRepair(content: string): string {
       inString = false;
       for (let i = 0; i < jsonContent.length; i++) {
         const char = jsonContent[i];
-        if (char === "\\") { i++; continue; }
-        if (char === '"') { inString = !inString; continue; }
+        if (char === "\\") {
+          i++;
+          continue;
+        }
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
         if (!inString) {
           if (char === "{") stack.push("}");
           else if (char === "[") stack.push("]");
@@ -1770,7 +1795,7 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
 
 /**
  * Get the total number of generation tasks
- * 
+ *
  * Note: Each stage runs once. Content iteration multipliers (lore x5, etc.)
  * increase the AMOUNT of content generated per stage, not the number of API calls.
  * This returns the actual number of stages that will be run.
@@ -1781,7 +1806,7 @@ export function getTotalGenerationTasks(config: BigAdventureConfig): number {
 
 /**
  * Estimate token cost for a full generation
- * 
+ *
  * Note: Each stage runs once. Higher content iterations mean more content
  * is requested in a single prompt, which may require more output tokens.
  */
@@ -1793,7 +1818,8 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
 } {
   const stages = getStagesToRun(config);
   const stageConfigs = config.stageConfigs || DEFAULT_STAGE_CONFIGS;
-  const contentIterations = config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
+  const contentIterations =
+    config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
 
   // Rough estimates for input tokens per stage
   const inputEstimates: Record<GenerationStage, number> = {
@@ -1814,15 +1840,15 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
     if (stage === "content") {
       // Calculate content multiplier to estimate additional output needed
       // Higher iterations = more content = needs more output tokens
-      const avgContentMultiplier = (
-        contentIterations.lore +
-        contentIterations.achievements +
-        contentIterations.plotBeats +
-        contentIterations.relationships +
-        contentIterations.quests +
-        contentIterations.inventory
-      ) / 6; // Average of all multipliers
-      
+      const avgContentMultiplier =
+        (contentIterations.lore +
+          contentIterations.achievements +
+          contentIterations.plotBeats +
+          contentIterations.relationships +
+          contentIterations.quests +
+          contentIterations.inventory) /
+        6; // Average of all multipliers
+
       // Scale output estimate by average multiplier (capped at 2x since it's one response)
       const outputMultiplier = Math.min(2, avgContentMultiplier);
       outputForStage = Math.round(outputForStage * outputMultiplier);

@@ -28,9 +28,13 @@ import {
   detectIncompleteJSON,
   buildContinuationPrompt,
 } from "@/app/misc/big_adventure_ai";
+import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+// NovelAI API endpoint
+const NOVELAI_API_URL = "https://text.novelai.net/oa/v1/completions";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // Allow up to 5 minutes for full adventure generation
@@ -39,14 +43,18 @@ interface RequestBody {
   config: BigAdventureConfig;
   model?: string;
   openRouterKey?: string;
+  novelaiKey?: string;
 }
 
 function getApiKey(
-  provider: "deepseek" | "openrouter",
-  userProvidedKey?: string
+  provider: "deepseek" | "openrouter" | "novelai",
+  userProvidedKey?: string,
+  novelaiKey?: string
 ): string {
   if (provider === "deepseek") {
     return process.env.DEEPSEEK_API_KEY || "";
+  } else if (provider === "novelai") {
+    return novelaiKey || "";
   } else {
     return userProvidedKey || process.env.OPENROUTER_API_KEY || "";
   }
@@ -66,6 +74,19 @@ async function streamAIResponse(
   promptTokens: number;
   completionTokens: number;
 }> {
+  // Handle NovelAI separately (uses completions API, not chat)
+  if (modelConfig.provider === "novelai") {
+    return streamNovelAIResponse(
+      messages,
+      apiKey,
+      maxOutputTokens,
+      temperature,
+      controller,
+      encoder,
+      stage
+    );
+  }
+
   const endpoint =
     modelConfig.provider === "deepseek"
       ? "https://api.deepseek.com/chat/completions"
@@ -156,6 +177,109 @@ async function streamAIResponse(
   return { content: fullContent, promptTokens, completionTokens };
 }
 
+// NovelAI-specific streaming function (uses completions API)
+async function streamNovelAIResponse(
+  messages: { role: string; content: string }[],
+  apiKey: string,
+  maxOutputTokens: number,
+  temperature: number,
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+  stage: GenerationStage
+): Promise<{
+  content: string;
+  promptTokens: number;
+  completionTokens: number;
+}> {
+  // Convert chat messages to prompt string for completions API
+  const prompt = convertMessagesToPrompt(
+    messages.map((m) => ({
+      role: m.role as "system" | "user" | "assistant" | "tool",
+      content: m.content,
+    }))
+  );
+
+  const requestBody = {
+    model: NOVELAI_MODEL,
+    prompt: prompt,
+    max_tokens: Math.min(maxOutputTokens, 2048), // NovelAI has lower limits
+    temperature: temperature,
+    top_p: 0.95,
+    top_k: 40,
+    stream: true,
+  };
+
+  const response = await fetch(NOVELAI_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`NovelAI API error: ${response.status} - ${errorText}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("No response body from NovelAI");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let fullContent = "";
+  // Estimate tokens (NovelAI doesn't return usage in streaming)
+  const promptTokens = Math.ceil(prompt.length / 4);
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("data:")) continue;
+
+      const data = trimmed.slice(5).trim();
+      if (!data || data === "[DONE]") continue;
+
+      try {
+        const parsed = JSON.parse(data);
+        // Completions API format: choices[0].text
+        const textContent =
+          parsed.choices?.[0]?.text ||
+          parsed.choices?.[0]?.delta?.content ||
+          parsed.text ||
+          "";
+        if (textContent) {
+          fullContent += textContent;
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "stage_content",
+                stage,
+                content: textContent,
+              })}\n\n`
+            )
+          );
+        }
+      } catch {
+        // Skip malformed JSON
+      }
+    }
+  }
+
+  const completionTokens = Math.ceil(fullContent.length / 4);
+  return { content: fullContent, promptTokens, completionTokens };
+}
+
 async function generateStage(
   config: BigAdventureConfig,
   stage: GenerationStage,
@@ -220,10 +344,13 @@ async function generateStage(
 
   // Check if JSON is incomplete and attempt continuation
   let incompleteCheck = detectIncompleteJSON(fullContent);
-  
-  while (incompleteCheck.isIncomplete && continuationAttempts < MAX_CONTINUATIONS) {
+
+  while (
+    incompleteCheck.isIncomplete &&
+    continuationAttempts < MAX_CONTINUATIONS
+  ) {
     continuationAttempts++;
-    
+
     // Notify about continuation attempt
     controller.enqueue(
       encoder.encode(
@@ -237,7 +364,9 @@ async function generateStage(
       )
     );
 
-    logger.info(`Stage ${stage} JSON incomplete, attempting continuation ${continuationAttempts}/${MAX_CONTINUATIONS}`);
+    logger.info(
+      `Stage ${stage} JSON incomplete, attempting continuation ${continuationAttempts}/${MAX_CONTINUATIONS}`
+    );
 
     // Build continuation prompt
     const continuationPrompt = buildContinuationPrompt(
@@ -274,7 +403,9 @@ async function generateStage(
   }
 
   if (incompleteCheck.isIncomplete) {
-    logger.warn(`Stage ${stage} JSON still incomplete after ${MAX_CONTINUATIONS} continuation attempts`);
+    logger.warn(
+      `Stage ${stage} JSON still incomplete after ${MAX_CONTINUATIONS} continuation attempts`
+    );
     controller.enqueue(
       encoder.encode(
         `data: ${JSON.stringify({
@@ -306,11 +437,11 @@ async function generateStage(
     )
   );
 
-  return { 
-    result, 
-    promptTokens: totalPromptTokens, 
-    completionTokens: totalCompletionTokens, 
-    rawContent: fullContent 
+  return {
+    result,
+    promptTokens: totalPromptTokens,
+    completionTokens: totalCompletionTokens,
+    rawContent: fullContent,
   };
 }
 
@@ -358,7 +489,12 @@ export async function POST(req: NextRequest) {
 
         // Parse request
         const body: RequestBody = await req.json();
-        const { config, model = "Deepseek Chat", openRouterKey } = body;
+        const {
+          config,
+          model = "Deepseek Chat",
+          openRouterKey,
+          novelaiKey,
+        } = body;
 
         if (!config || !config.prompt) {
           controller.enqueue(
@@ -375,33 +511,37 @@ export async function POST(req: NextRequest) {
 
         // Get model config
         const modelConfig = getModelConfig(model);
+        const isNovelAI = modelConfig.provider === "novelai";
 
-        // Estimate total cost and check tokens
+        // Estimate total cost and check tokens (skip for NovelAI - BYOK)
         const stages = getStagesToRun(config);
-        const estimatedCost = stages.length * 5; // Rough estimate: 5 coins per stage
+        const estimatedCost = isNovelAI ? 0 : stages.length * 5; // Rough estimate: 5 coins per stage
 
-        const hasTokens = await hasEnoughTokens(
-          user.id,
-          estimatedCost,
-          supabase
-        );
-        if (!hasTokens) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "error",
-                error: `Insufficient tokens. Estimated cost: ${estimatedCost} coins`,
-              })}\n\n`
-            )
+        if (!isNovelAI) {
+          const hasTokens = await hasEnoughTokens(
+            user.id,
+            estimatedCost,
+            supabase
           );
-          controller.close();
-          return;
+          if (!hasTokens) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "error",
+                  error: `Insufficient tokens. Estimated cost: ${estimatedCost} coins`,
+                })}\n\n`
+              )
+            );
+            controller.close();
+            return;
+          }
         }
 
         // Get API key
         const apiKey = getApiKey(
-          modelConfig.provider as "deepseek" | "openrouter",
-          openRouterKey
+          modelConfig.provider as "deepseek" | "openrouter" | "novelai",
+          openRouterKey,
+          novelaiKey
         );
 
         if (!apiKey) {
@@ -497,18 +637,23 @@ export async function POST(req: NextRequest) {
           finalResult.storyTemplate.nsfw = config.nsfw;
         }
 
-        // Calculate token cost
-        const tokenCost = calculateTokenCost(
-          model,
-          totalPromptTokens,
-          totalCompletionTokens
-        );
+        // Calculate token cost (0 for NovelAI - BYOK)
+        let tokenCost = 0;
+        let balance = { total: -1 }; // -1 indicates BYOK/no balance tracking
 
-        // Deduct tokens
-        await deductTokens(user.id, tokenCost, supabase);
-        const balance = (await getUserTokenBalance(user.id, supabase)) || {
-          total: 0,
-        };
+        if (!isNovelAI) {
+          tokenCost = calculateTokenCost(
+            model,
+            totalPromptTokens,
+            totalCompletionTokens
+          );
+
+          // Deduct tokens
+          await deductTokens(user.id, tokenCost, supabase);
+          balance = (await getUserTokenBalance(user.id, supabase)) || {
+            total: 0,
+          };
+        }
 
         logger.action("Big adventure generation complete", {
           userId: user.id,

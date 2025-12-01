@@ -37,14 +37,18 @@ interface RequestBody {
   maxOutputTokens?: number;
   additionalInstructions?: string;
   openRouterKey?: string;
+  novelaiKey?: string;
 }
 
 function getApiKey(
-  provider: "deepseek" | "openrouter",
-  userProvidedKey?: string
+  provider: "deepseek" | "openrouter" | "novelai",
+  userProvidedKey?: string,
+  novelaiKey?: string
 ): string {
   if (provider === "deepseek") {
     return process.env.DEEPSEEK_API_KEY || "";
+  } else if (provider === "novelai") {
+    return novelaiKey || "";
   } else {
     return userProvidedKey || process.env.OPENROUTER_API_KEY || "";
   }
@@ -102,6 +106,7 @@ export async function POST(req: NextRequest) {
           maxOutputTokens = 4000,
           additionalInstructions,
           openRouterKey,
+          novelaiKey,
         } = body;
 
         if (!section || !REGENERATE_SECTIONS[section]) {
@@ -156,8 +161,9 @@ export async function POST(req: NextRequest) {
 
         // Get API key
         const apiKey = getApiKey(
-          modelConfig.provider as "deepseek" | "openrouter",
-          openRouterKey
+          modelConfig.provider as "deepseek" | "openrouter" | "novelai",
+          openRouterKey,
+          novelaiKey
         );
 
         if (!apiKey) {

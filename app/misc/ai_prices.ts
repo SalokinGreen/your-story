@@ -386,7 +386,7 @@ export interface AIModelConfig {
   model: string;
   maxTokens: number;
   maxOutputTokens: number;
-  provider: "openrouter" | "deepseek";
+  provider: "openrouter" | "deepseek" | "novelai";
   supportsToolCalling?: boolean; // Whether this model supports function calling
   cost: number;
   inputPrice: number;
