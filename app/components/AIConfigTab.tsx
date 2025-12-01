@@ -577,11 +577,11 @@ export default function AIConfigTab() {
           {Object.entries(MODEL_PRESETS)
             .filter(([key]) => {
               // In BYOK mode, hide Mistral preset (coins only)
-              // In Coins mode, show only Mistral preset
+              // In Coins mode, show only Mistral preset (no custom allowed)
               if (byokMode) {
                 return key !== "mistral";
               } else {
-                return key === "mistral" || key === "custom";
+                return key === "mistral";
               }
             })
             .map(([key, presetConfig]) => (
