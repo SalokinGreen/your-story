@@ -86,10 +86,10 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/api/novelai/generate-stream/route.ts: **NovelAI BYOK proxy** (SSE streaming). Accepts { messages, novelaiKey, maxTokens, temperature }. Converts chat messages to completion prompt, forwards to NovelAI GLM-4-6, streams back. No token deduction (BYOK). Story stage only.
 - app/misc/novelai.ts: NovelAI types and utilities. Exports NOVELAI_MODEL ("glm-4-6"), NOVELAI_DEFAULT_PARAMS, convertMessagesToPrompt(), buildNovelAIRequest(), NOVELAI_CONTEXT_SIZE (8192).
 - app/api/tts/generate/route.ts: POST endpoint for Speechify text-to-speech generation; supports BYOK via speechifyKey field; deducts tokens only when using server key.
-- app/api/stt/transcribe/route.ts: POST endpoint for Deepgram speech-to-text transcription; accepts FormData with audio file; supports BYOK via deepgramKey field; deducts tokens only when using server key.
+- app/api/stt/transcribe/route.ts: POST endpoint for Voxtral speech-to-text transcription (Mistral API); accepts FormData with audio file; uses server MISTRAL_API_KEY; deducts 2 coins per transcription.
 - app/api/settings/api-keys/route.ts: GET/POST/DELETE encrypted API key storage. Uses AES-256-GCM encryption with API_KEY_ENCRYPTION_SECRET env var.
 - app/misc/APIKeysContext.tsx: React context for managing API keys. Supports localStorage (default) and optional encrypted server storage. Includes OpenRouter OAuth PKCE flow.
-- app/components/APIKeysModal.tsx: Settings modal for API key management with tabs for OpenRouter (OAuth + manual), DeepSeek, NovelAI, Speechify, Deepgram.
+- app/components/APIKeysModal.tsx: Settings modal for API key management with tabs for OpenRouter (OAuth + manual), DeepSeek, NovelAI, Speechify.
 
 ### API Routes
 
@@ -186,10 +186,10 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Toast notifications via NotificationContext; use addNotification("message", "success"|"failure"|"warning").
 - Profile page: Admin controls must always be at the very bottom (see comment in profile/[userId]/page.tsx).
 - **AI Config Menu**: Model selection saved to localStorage as "aiPreset", with presets defined in MODEL_PRESETS. Custom presets allow per-stage model overrides.
-- **API Keys Settings**: Users must provide their own API keys via Settings modal (gear icon in header). Supports OpenRouter (OAuth + manual), DeepSeek, NovelAI, Speechify, Deepgram. Keys stored in localStorage (default) or encrypted on server (optional).
+- **API Keys Settings**: Users must provide their own API keys via Settings modal (gear icon in header). Supports OpenRouter (OAuth + manual), DeepSeek, NovelAI, Speechify. Keys stored in localStorage (default) or encrypted on server (optional).
 - **NovelAI Settings**: BYOK integration for story generation only. Settings saved to localStorage (novelaiEnabled, novelaiKey, novelaiTemperature). When enabled, story stage uses NovelAI GLM-4-6 while tools/choices stages use OpenRouter/DeepSeek.
 - **TTS Settings**: All TTS preferences saved to localStorage (ttsEnabled, ttsLastVoice, ttsAutoGenerate, ttsVolume, ttsCustomVoices).
-- **STT Settings**: Speech-to-text preferences saved to localStorage (sttEnabled, deepgramKey). STTButton in ChoicesModal sends audio to /api/stt/transcribe with auto-stop after 3s silence.
+- **STT Settings**: Speech-to-text uses Voxtral (Mistral API) and costs 2 coins per transcription. Settings saved to localStorage (sttEnabled). STTButton in ChoicesModal sends audio to /api/stt/transcribe with auto-stop after 3s silence.
 - **Hidden Messages**: AI can use ||double pipes|| syntax for hidden text (DM notes). Players can't see hidden text unless "showHiddenMessages" is enabled in localStorage. When revealed, hidden text appears with purple highlighting.
 
 ### AI API Patterns
@@ -221,9 +221,8 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Environment: Create .env.local with:
   - DEEPSEEK_API_KEY=<your_key>
   - OPENROUTER_API_KEY=<your_key>
-  - MISTRAL_API_KEY=<your_key> (server-side for Coins mode)
+  - MISTRAL_API_KEY=<your_key> (server-side for Coins mode and STT)
   - SPEECHIFY_API_KEY=<your_key>
-  - DEEPGRAM_API_KEY=<your_key>
   - NEXT_PUBLIC_SUPABASE_URL=<your_url>
   - NEXT_PUBLIC_SUPABASE_KEY=<your_anon_key>
   - SUPABASE_URL=<your_url> (same as NEXT_PUBLIC)

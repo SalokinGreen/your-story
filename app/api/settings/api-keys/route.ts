@@ -74,7 +74,6 @@ interface APIKeys {
   deepseekKey?: string;
   novelaiKey?: string;
   speechifyKey?: string;
-  deepgramKey?: string;
 }
 
 async function getUser(req: NextRequest) {

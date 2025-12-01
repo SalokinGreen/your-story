@@ -732,8 +732,19 @@ ${
 
   // Add last 20 scene parts for context (INCLUDING PAST TOOL CALLS)
   const recentParts = storyData.scene.parts.slice(-20);
+  let lastWasToolResponse = false; // Track if last message was a tool response
+
   for (const part of recentParts) {
     if (part.user) {
+      // If last message was a tool response, add an assistant acknowledgment first
+      // This is required by Mistral which doesn't allow user messages after tool messages
+      if (lastWasToolResponse) {
+        messages.push({
+          role: "assistant",
+          content: "Understood. Processing player action.",
+        });
+        lastWasToolResponse = false;
+      }
       messages.push({
         role: "user",
         content: cleanString(part.content),
@@ -757,6 +768,7 @@ ${
               tool_call_id: response.toolCallId,
             });
           }
+          lastWasToolResponse = true;
         }
 
         console.log(
@@ -766,6 +778,7 @@ ${
         );
       } else {
         // Regular assistant message without tools
+        lastWasToolResponse = false;
         const assistantContent = part.raw || part.content;
         messages.push({
           role: "assistant",
@@ -773,6 +786,14 @@ ${
         });
       }
     }
+  }
+
+  // If last part was tool responses, add acknowledgment before new user message
+  if (lastWasToolResponse) {
+    messages.push({
+      role: "assistant",
+      content: "Game state updated. Ready for new content.",
+    });
   }
 
   // Add the new story content
@@ -805,6 +826,12 @@ ${
           tool_call_id: response.toolCallId,
         });
       }
+
+      // Add assistant acknowledgment after tool responses (required by Mistral)
+      messages.push({
+        role: "assistant",
+        content: "Tools executed. Reviewing if additional changes are needed.",
+      });
     }
 
     // Ask if anything else is needed

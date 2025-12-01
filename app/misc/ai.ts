@@ -379,8 +379,19 @@ Narrative Best Practices:
       }
     }
 
+    let lastWasToolResponse = false; // Track if last message was a tool response
+
     partsToInclude.forEach((part) => {
       if (part.user) {
+        // If last message was a tool response, add an assistant acknowledgment first
+        // This is required by Mistral which doesn't allow user messages after tool messages
+        if (lastWasToolResponse) {
+          context.push({
+            role: "assistant",
+            content: "Understood. Processing player action.",
+          });
+          lastWasToolResponse = false;
+        }
         // User message
         context.push({ role: "user", content: cleanString(part.content) });
       } else {
@@ -397,6 +408,7 @@ Narrative Best Practices:
         }
 
         context.push(assistantMessage);
+        lastWasToolResponse = false;
 
         // Add tool responses as separate tool messages
         if (part.toolResponses && part.toolResponses.length > 0) {
@@ -413,9 +425,18 @@ Narrative Best Practices:
               } ${response.message}`,
             });
           }
+          lastWasToolResponse = true;
         }
       }
     });
+
+    // If last part was tool responses, add acknowledgment before any new user message
+    if (lastWasToolResponse) {
+      context.push({
+        role: "assistant",
+        content: "Game state updated. Ready for new content.",
+      });
+    }
   }
 
   // Build new user message with command responses and/or user choice

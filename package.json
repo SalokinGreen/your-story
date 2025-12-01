@@ -10,7 +10,6 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@deepgram/sdk": "^4.11.2",
     "@speechify/api-sdk": "^2.5.4",
     "@supabase/supabase-js": "^2.81.1",
     "@vercel/analytics": "^1.5.0",

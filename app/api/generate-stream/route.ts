@@ -223,6 +223,8 @@ export async function POST(req: NextRequest) {
           temperature,
           max_tokens: maxTokens,
           stream: true,
+          // Request usage statistics in streaming mode (required for Mistral/OpenAI)
+          stream_options: { include_usage: true },
         };
 
         if (tools && tools.length > 0) {
@@ -411,7 +413,7 @@ export async function POST(req: NextRequest) {
                   totalTokens: promptTokens + completionTokens,
                 },
                 tokenCost: tokenCost > 0 ? tokenCost : undefined,
-                newBalance,
+                balance: newBalance,
               },
             })}\n\n`
           )

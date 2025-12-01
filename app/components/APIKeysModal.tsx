@@ -355,48 +355,6 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </a>
                 </p>
               </div>
-
-              {/* Deepgram Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                      <DynamicIcon name="Mic" className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                        Deepgram
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Speech-to-Text
-                      </p>
-                    </div>
-                  </div>
-                  {hasKey("deepgramKey") && (
-                    <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                      <DynamicIcon name="CheckCircle" className="w-3.5 h-3.5" />
-                      Configured
-                    </span>
-                  )}
-                </div>
-                <input
-                  type={showKeys ? "text" : "password"}
-                  value={keys.deepgramKey}
-                  onChange={(e) => setKey("deepgramKey", e.target.value)}
-                  placeholder="deepgram-..."
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-mono"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  <a
-                    href="https://console.deepgram.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-500 hover:underline"
-                  >
-                    Get an API key →
-                  </a>
-                </p>
-              </div>
             </>
           )}
         </div>

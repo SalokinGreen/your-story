@@ -104,8 +104,6 @@ export default function STTButton({
     setState("processing");
 
     try {
-      // Get BYOK key from localStorage if available
-      const deepgramKey = localStorage.getItem("deepgramKey") || "";
       const sttEnabled = localStorage.getItem("sttEnabled") !== "false";
 
       if (!sttEnabled) {
@@ -114,9 +112,6 @@ export default function STTButton({
 
       const formData = new FormData();
       formData.append("audio", audioBlob, "recording.webm");
-      if (deepgramKey) {
-        formData.append("deepgramKey", deepgramKey);
-      }
 
       const response = await authenticatedFetch("/api/stt/transcribe", {
         method: "POST",

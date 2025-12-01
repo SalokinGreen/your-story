@@ -131,7 +131,7 @@ export default function LorePage(storyData: StoryData) {
                     {loreItem.title}
                   </h4>
                   <p className="text-xs text-blue-200/40 line-clamp-2">
-                    {loreItem.content.substring(0, 80)}...
+                    {(loreItem.content || "").substring(0, 80)}...
                   </p>
                   <div className="flex flex-wrap gap-1 mt-1.5">
                     {loreItem.relatedCharacters?.length > 0 && (
