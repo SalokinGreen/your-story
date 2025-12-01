@@ -150,19 +150,51 @@ function IterationSlider({
   max?: number;
   description?: string;
 }) {
+  // Use local state to handle dragging smoothly
+  const [localValue, setLocalValue] = useState(value);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Sync with external value when not dragging
+  useEffect(() => {
+    if (!isDragging) {
+      setLocalValue(value);
+    }
+  }, [value, isDragging]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = parseInt(e.target.value);
+    setLocalValue(newValue);
+    // Call onChange immediately for responsive feedback
+    onChange(newValue);
+  };
+
+  const handleMouseDown = () => {
+    setIsDragging(true);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    // Ensure final value is committed
+    onChange(localValue);
+  };
+
   return (
     <div className="flex items-center gap-4">
       <div className="flex-1">
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm text-blue-200">{label}</span>
-          <span className="text-sm font-mono text-purple-400">{value}x</span>
+          <span className="text-sm font-mono text-purple-400">{localValue}x</span>
         </div>
         <input
           type="range"
           min={min}
           max={max}
-          value={value}
-          onChange={(e) => onChange(parseInt(e.target.value))}
+          value={localValue}
+          onChange={handleChange}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onTouchStart={handleMouseDown}
+          onTouchEnd={handleMouseUp}
           className="w-full h-1.5 bg-blue-900/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
         />
         {description && (
@@ -950,6 +982,11 @@ export default function BigAdventureCreatorPage() {
                     setPartialResults(currentPartialResults);
                   }
 
+                  // Log if continuation was needed
+                  if (event.continuationAttempts && event.continuationAttempts > 0) {
+                    console.log(`Stage ${event.stage} required ${event.continuationAttempts} continuation(s)`);
+                  }
+
                   // Save autosave after each stage completion
                   const autosaveData: BigAdventureAutosave = {
                     id: currentSessionId,
@@ -984,6 +1021,19 @@ export default function BigAdventureCreatorPage() {
                   setFailedStages((prev) => [...prev, event.stage]);
                 }
                 setCurrentStage(null);
+                break;
+
+              case "stage_continuation":
+                // JSON was incomplete, continuing generation
+                console.log(`Stage ${event.stage} continuation attempt ${event.attempt}/${event.maxAttempts}`);
+                // Optionally show a subtle indicator that continuation is happening
+                setLiveContent((prev) => prev + `\n\n/* Continuing generation (${event.attempt}/${event.maxAttempts})... */\n`);
+                break;
+
+              case "stage_warning":
+                // Warning about incomplete content
+                console.warn(`Stage ${event.stage} warning: ${event.message}`);
+                addNotification(event.message, "warning");
                 break;
 
               case "stage_error":
@@ -1958,7 +2008,7 @@ export default function BigAdventureCreatorPage() {
             {!isGenerating && !result && (
               <div className="text-sm text-blue-300/60">
                 <span className="mr-4">
-                  {getTotalGenerationTasks(config)} tasks
+                  {getTotalGenerationTasks(config)} stages
                 </span>
                 Estimated cost:{" "}
                 <span className="text-amber-400 font-medium">
@@ -2901,7 +2951,7 @@ export default function BigAdventureCreatorPage() {
                       Generation Summary
                     </span>
                     <span className="text-sm text-purple-400 font-medium">
-                      {getTotalGenerationTasks(config)} tasks
+                      {getTotalGenerationTasks(config)} stages
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -2945,7 +2995,7 @@ export default function BigAdventureCreatorPage() {
                 This may take a few minutes. Feel free to grab a coffee! ☕
               </p>
               <div className="mt-4 text-sm text-blue-300/60">
-                Progress: {completedTasks} / {totalTasks} tasks
+                Progress: {completedTasks} / {totalTasks} stages
                 {currentIteration > 1 && currentStage && (
                   <span className="ml-2 text-purple-400">
                     (Iteration {currentIteration})

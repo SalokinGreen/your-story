@@ -976,15 +976,20 @@ Remember: Output ONLY the JSON object, nothing else.`;
   }
 
   if (stage === "content") {
-    const plotBeatCount = Math.round(counts.plotBeats * durationMultiplier);
-    const loreCount = Math.round(counts.lore * durationMultiplier);
+    // Get content iteration multipliers (default to 1x if not set)
+    const contentIterations = config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
+    
+    // Apply both duration multiplier AND content iterations for each category
+    const plotBeatCount = Math.round(counts.plotBeats * durationMultiplier * contentIterations.plotBeats);
+    const loreCount = Math.round(counts.lore * durationMultiplier * contentIterations.lore);
     const achievementCount = Math.round(
-      counts.achievements * durationMultiplier
+      counts.achievements * durationMultiplier * contentIterations.achievements
     );
-    const questCount = Math.round(counts.quests * durationMultiplier);
+    const questCount = Math.round(counts.quests * durationMultiplier * contentIterations.quests);
     const relationshipCount = Math.round(
-      counts.relationships * durationMultiplier
+      counts.relationships * durationMultiplier * contentIterations.relationships
     );
+    const inventoryCount = Math.round(3 * contentIterations.inventory); // Base 3 items times multiplier
 
     return `${basePrompt}
 
@@ -992,7 +997,7 @@ STAGE 3: STORY CONTENT
 Generate inventory, lore, relationships, achievements, quests, and plot beats.
 
 TARGET COUNTS:
-- Starting Inventory: 3-5 items
+- Starting Inventory: ${inventoryCount}-${inventoryCount + 2} items
 - Lore Entries: ${loreCount}
 - Relationships: ${relationshipCount}
 - Achievements: ${achievementCount}
@@ -1327,7 +1332,192 @@ export function buildBigAdventureMessages(
 }
 
 /**
+ * Check if JSON content appears to be incomplete (cut off mid-generation)
+ * Returns info about the incomplete state if detected
+ */
+export function detectIncompleteJSON(content: string): {
+  isIncomplete: boolean;
+  lastValidPosition: number;
+  truncatedContent: string;
+} {
+  let jsonContent = content.trim();
+
+  // Remove markdown code blocks if present
+  const jsonBlockMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)(?:\s*```)?$/);
+  if (jsonBlockMatch) {
+    jsonContent = jsonBlockMatch[1].trim();
+  }
+
+  // Find JSON start
+  const startIndex = jsonContent.indexOf("{");
+  if (startIndex === -1) {
+    return { isIncomplete: true, lastValidPosition: 0, truncatedContent: jsonContent };
+  }
+
+  // Count brackets to detect incomplete JSON
+  let braceCount = 0;
+  let bracketCount = 0;
+  let inString = false;
+  let escaped = false;
+  let lastValidPosition = startIndex;
+
+  for (let i = startIndex; i < jsonContent.length; i++) {
+    const char = jsonContent[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"' && !escaped) {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === "{") braceCount++;
+      else if (char === "}") {
+        braceCount--;
+        if (braceCount === 0) lastValidPosition = i;
+      } else if (char === "[") bracketCount++;
+      else if (char === "]") bracketCount--;
+    }
+  }
+
+  // JSON is incomplete if braces/brackets don't balance
+  const isIncomplete = braceCount !== 0 || bracketCount !== 0 || inString;
+
+  return {
+    isIncomplete,
+    lastValidPosition,
+    truncatedContent: jsonContent.slice(startIndex),
+  };
+}
+
+/**
+ * Build a continuation prompt to complete truncated JSON
+ */
+export function buildContinuationPrompt(
+  truncatedContent: string,
+  stage: GenerationStage
+): string {
+  // Get the last ~500 characters to provide context
+  const contextLength = Math.min(500, truncatedContent.length);
+  const lastContent = truncatedContent.slice(-contextLength);
+
+  return `Your previous response was cut off mid-generation. Here's where you stopped:
+
+...${lastContent}
+
+CRITICAL: Continue EXACTLY from where you left off. Do not restart, do not add explanations.
+Just output the remaining JSON content to complete the ${stage} stage response.
+The output must be valid JSON when combined with what came before.`;
+}
+
+/**
+ * Attempt to repair incomplete JSON by closing open brackets/braces
+ * This is a best-effort fallback when continuation isn't possible
+ */
+export function attemptJSONRepair(content: string): string {
+  let jsonContent = content.trim();
+
+  // Remove markdown code blocks if present
+  const jsonBlockMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)(?:\s*```)?$/);
+  if (jsonBlockMatch) {
+    jsonContent = jsonBlockMatch[1].trim();
+  }
+
+  const startIndex = jsonContent.indexOf("{");
+  if (startIndex === -1) return jsonContent;
+
+  jsonContent = jsonContent.slice(startIndex);
+
+  // Track what needs closing
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+  let lastGoodIndex = 0;
+
+  for (let i = 0; i < jsonContent.length; i++) {
+    const char = jsonContent[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"' && !escaped) {
+      inString = !inString;
+      if (!inString) lastGoodIndex = i;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === "{") {
+        stack.push("}");
+        lastGoodIndex = i;
+      } else if (char === "[") {
+        stack.push("]");
+        lastGoodIndex = i;
+      } else if (char === "}" || char === "]") {
+        if (stack.length > 0 && stack[stack.length - 1] === char) {
+          stack.pop();
+          lastGoodIndex = i;
+        }
+      } else if (char === "," || char === ":") {
+        lastGoodIndex = i;
+      }
+    }
+  }
+
+  // If we're in a string, try to close it
+  if (inString) {
+    // Find a reasonable place to truncate (last complete value)
+    const truncateMatch = jsonContent.slice(0, lastGoodIndex + 1).match(/^([\s\S]*[}\]",:\d])/);
+    if (truncateMatch) {
+      jsonContent = truncateMatch[1];
+      // Recount stack after truncation
+      stack.length = 0;
+      inString = false;
+      for (let i = 0; i < jsonContent.length; i++) {
+        const char = jsonContent[i];
+        if (char === "\\") { i++; continue; }
+        if (char === '"') { inString = !inString; continue; }
+        if (!inString) {
+          if (char === "{") stack.push("}");
+          else if (char === "[") stack.push("]");
+          else if (char === "}" || char === "]") stack.pop();
+        }
+      }
+    }
+  }
+
+  // Remove trailing incomplete elements (like partial keys or values)
+  // Match trailing patterns like: , "key or , "key": or , "key": "value
+  jsonContent = jsonContent.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, "");
+  jsonContent = jsonContent.replace(/,\s*$/, "");
+
+  // Close remaining brackets/braces
+  while (stack.length > 0) {
+    jsonContent += stack.pop();
+  }
+
+  return jsonContent;
+}
+
+/**
  * Parse the JSON response from a stage
+ * Returns result and whether the content appeared truncated
  */
 export function parseBigAdventureStageOutput(
   content: string,
@@ -1350,7 +1540,22 @@ export function parseBigAdventureStageOutput(
       jsonContent = jsonContent.slice(startIndex, endIndex + 1);
     }
 
-    const parsed = JSON.parse(jsonContent);
+    // First attempt: try to parse as-is
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonContent);
+    } catch (parseError) {
+      // Second attempt: try to repair the JSON
+      console.warn("Initial JSON parse failed, attempting repair...");
+      const repairedContent = attemptJSONRepair(content);
+      try {
+        parsed = JSON.parse(repairedContent);
+        console.log("JSON repair successful!");
+      } catch (repairError) {
+        // Repair failed, throw original error
+        throw parseError;
+      }
+    }
 
     // Map the parsed content to BigAdventureResult based on stage
     if (stage === "core") {
@@ -1511,36 +1716,21 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
 }
 
 /**
- * Get the total number of generation tasks (accounting for iterations)
+ * Get the total number of generation tasks
+ * 
+ * Note: Each stage runs once. Content iteration multipliers (lore x5, etc.)
+ * increase the AMOUNT of content generated per stage, not the number of API calls.
+ * This returns the actual number of stages that will be run.
  */
 export function getTotalGenerationTasks(config: BigAdventureConfig): number {
-  const stages = getStagesToRun(config);
-  const stageConfigs = config.stageConfigs || DEFAULT_STAGE_CONFIGS;
-  const contentIterations =
-    config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
-
-  let total = 0;
-
-  for (const stage of stages) {
-    if (stage === "content") {
-      // Content stage has sub-iterations
-      total += contentIterations.lore;
-      total += contentIterations.achievements;
-      total += contentIterations.plotBeats;
-      total += contentIterations.relationships;
-      total += contentIterations.quests;
-      total += contentIterations.inventory;
-    } else {
-      // Other stages use their iteration count
-      total += stageConfigs[stage]?.iterations || 1;
-    }
-  }
-
-  return total;
+  return getStagesToRun(config).length;
 }
 
 /**
  * Estimate token cost for a full generation
+ * 
+ * Note: Each stage runs once. Higher content iterations mean more content
+ * is requested in a single prompt, which may require more output tokens.
  */
 export function estimateBigAdventureCost(config: BigAdventureConfig): {
   inputTokens: number;
@@ -1550,8 +1740,7 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
 } {
   const stages = getStagesToRun(config);
   const stageConfigs = config.stageConfigs || DEFAULT_STAGE_CONFIGS;
-  const contentIterations =
-    config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
+  const contentIterations = config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
 
   // Rough estimates for input tokens per stage
   const inputEstimates: Record<GenerationStage, number> = {
@@ -1567,33 +1756,34 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
   for (const stage of stages) {
     const stageConfig = stageConfigs[stage] || DEFAULT_STAGE_CONFIGS[stage];
     const baseInput = inputEstimates[stage];
-    const outputPerTask = stageConfig.maxOutputTokens || config.maxOutputTokens;
+    let outputForStage = stageConfig.maxOutputTokens || config.maxOutputTokens;
 
     if (stage === "content") {
-      // Content has multiple sub-iterations
-      const contentTasks =
+      // Calculate content multiplier to estimate additional output needed
+      // Higher iterations = more content = needs more output tokens
+      const avgContentMultiplier = (
         contentIterations.lore +
         contentIterations.achievements +
         contentIterations.plotBeats +
         contentIterations.relationships +
         contentIterations.quests +
-        contentIterations.inventory;
-
-      // Each iteration adds context from previous
-      totalInput += baseInput * contentTasks;
-      totalOutput += outputPerTask * contentTasks;
-    } else {
-      const iterations = stageConfig.iterations || 1;
-      totalInput += baseInput * iterations;
-      totalOutput += outputPerTask * iterations;
+        contentIterations.inventory
+      ) / 6; // Average of all multipliers
+      
+      // Scale output estimate by average multiplier (capped at 2x since it's one response)
+      const outputMultiplier = Math.min(2, avgContentMultiplier);
+      outputForStage = Math.round(outputForStage * outputMultiplier);
     }
+
+    totalInput += baseInput;
+    totalOutput += outputForStage;
   }
 
   return {
     inputTokens: totalInput,
     outputTokens: totalOutput,
     totalStages: stages.length,
-    totalTasks: getTotalGenerationTasks(config),
+    totalTasks: stages.length, // Now matches getTotalGenerationTasks
   };
 }
 

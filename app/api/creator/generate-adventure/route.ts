@@ -25,6 +25,8 @@ import {
   getStageInfo,
   BigAdventureResult,
   DEFAULT_STAGE_CONFIGS,
+  detectIncompleteJSON,
+  buildContinuationPrompt,
 } from "@/app/misc/big_adventure_ai";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -50,46 +52,20 @@ function getApiKey(
   }
 }
 
-async function generateStage(
-  config: BigAdventureConfig,
-  stage: GenerationStage,
-  previousResults: Partial<BigAdventureResult> | undefined,
+async function streamAIResponse(
+  messages: { role: string; content: string }[],
   modelConfig: ReturnType<typeof getModelConfig>,
   apiKey: string,
+  maxOutputTokens: number,
+  temperature: number,
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
-  iteration: number = 1
+  stage: GenerationStage
 ): Promise<{
-  result: Partial<BigAdventureResult> | null;
+  content: string;
   promptTokens: number;
   completionTokens: number;
-  rawContent: string;
 }> {
-  const stageInfo = getStageInfo(stage);
-
-  // Get stage-specific max output tokens
-  const stageConfig =
-    config.stageConfigs?.[stage] || DEFAULT_STAGE_CONFIGS[stage];
-  const maxOutputTokens = stageConfig.maxOutputTokens || config.maxOutputTokens;
-
-  // Send stage start event
-  controller.enqueue(
-    encoder.encode(
-      `data: ${JSON.stringify({
-        type: "stage_start",
-        stage,
-        stageName: stageInfo.name,
-        stageNumber: stageInfo.number,
-        iteration,
-        maxOutputTokens,
-      })}\n\n`
-    )
-  );
-
-  // Build messages for this stage
-  const messages = buildBigAdventureMessages(config, stage, previousResults);
-
-  // Build request
   const endpoint =
     modelConfig.provider === "deepseek"
       ? "https://api.deepseek.com/chat/completions"
@@ -107,8 +83,8 @@ async function generateStage(
 
   const requestBody = {
     model: modelConfig.model,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
-    temperature: config.temperature ?? 0.8, // Use config temperature or default to 0.8 for creativity
+    messages,
+    temperature,
     max_tokens: maxOutputTokens,
     stream: true,
   };
@@ -135,7 +111,6 @@ async function generateStage(
   let promptTokens = 0;
   let completionTokens = 0;
 
-  // Process stream
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -157,7 +132,6 @@ async function generateStage(
 
         if (delta?.content) {
           fullContent += delta.content;
-          // Stream content chunks for this stage
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
@@ -169,7 +143,6 @@ async function generateStage(
           );
         }
 
-        // Capture usage from final chunk
         if (parsed.usage) {
           promptTokens = parsed.usage.prompt_tokens || 0;
           completionTokens = parsed.usage.completion_tokens || 0;
@@ -180,7 +153,140 @@ async function generateStage(
     }
   }
 
-  // Parse the stage output
+  return { content: fullContent, promptTokens, completionTokens };
+}
+
+async function generateStage(
+  config: BigAdventureConfig,
+  stage: GenerationStage,
+  previousResults: Partial<BigAdventureResult> | undefined,
+  modelConfig: ReturnType<typeof getModelConfig>,
+  apiKey: string,
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+  iteration: number = 1
+): Promise<{
+  result: Partial<BigAdventureResult> | null;
+  promptTokens: number;
+  completionTokens: number;
+  rawContent: string;
+}> {
+  const stageInfo = getStageInfo(stage);
+  const MAX_CONTINUATIONS = 3; // Maximum number of continuation attempts
+
+  // Get stage-specific max output tokens
+  const stageConfig =
+    config.stageConfigs?.[stage] || DEFAULT_STAGE_CONFIGS[stage];
+  const maxOutputTokens = stageConfig.maxOutputTokens || config.maxOutputTokens;
+
+  // Send stage start event
+  controller.enqueue(
+    encoder.encode(
+      `data: ${JSON.stringify({
+        type: "stage_start",
+        stage,
+        stageName: stageInfo.name,
+        stageNumber: stageInfo.number,
+        iteration,
+        maxOutputTokens,
+      })}\n\n`
+    )
+  );
+
+  // Build initial messages for this stage
+  const messages = buildBigAdventureMessages(config, stage, previousResults);
+  const temperature = config.temperature ?? 0.8;
+
+  let fullContent = "";
+  let totalPromptTokens = 0;
+  let totalCompletionTokens = 0;
+  let continuationAttempts = 0;
+
+  // Initial generation
+  const initialResult = await streamAIResponse(
+    messages.map((m) => ({ role: m.role, content: m.content })),
+    modelConfig,
+    apiKey,
+    maxOutputTokens,
+    temperature,
+    controller,
+    encoder,
+    stage
+  );
+
+  fullContent = initialResult.content;
+  totalPromptTokens += initialResult.promptTokens;
+  totalCompletionTokens += initialResult.completionTokens;
+
+  // Check if JSON is incomplete and attempt continuation
+  let incompleteCheck = detectIncompleteJSON(fullContent);
+  
+  while (incompleteCheck.isIncomplete && continuationAttempts < MAX_CONTINUATIONS) {
+    continuationAttempts++;
+    
+    // Notify about continuation attempt
+    controller.enqueue(
+      encoder.encode(
+        `data: ${JSON.stringify({
+          type: "stage_continuation",
+          stage,
+          attempt: continuationAttempts,
+          maxAttempts: MAX_CONTINUATIONS,
+          message: `JSON incomplete, continuing generation (attempt ${continuationAttempts}/${MAX_CONTINUATIONS})...`,
+        })}\n\n`
+      )
+    );
+
+    logger.info(`Stage ${stage} JSON incomplete, attempting continuation ${continuationAttempts}/${MAX_CONTINUATIONS}`);
+
+    // Build continuation prompt
+    const continuationPrompt = buildContinuationPrompt(
+      incompleteCheck.truncatedContent,
+      stage
+    );
+
+    // Create continuation messages - include assistant's partial response
+    const continuationMessages = [
+      ...messages.map((m) => ({ role: m.role, content: m.content })),
+      { role: "assistant", content: fullContent },
+      { role: "user", content: continuationPrompt },
+    ];
+
+    // Request continuation with smaller output limit
+    const continuationResult = await streamAIResponse(
+      continuationMessages,
+      modelConfig,
+      apiKey,
+      Math.min(maxOutputTokens, 4000), // Use smaller limit for continuation
+      0.3, // Lower temperature for more deterministic continuation
+      controller,
+      encoder,
+      stage
+    );
+
+    // Append continuation to full content
+    fullContent += continuationResult.content;
+    totalPromptTokens += continuationResult.promptTokens;
+    totalCompletionTokens += continuationResult.completionTokens;
+
+    // Check again
+    incompleteCheck = detectIncompleteJSON(fullContent);
+  }
+
+  if (incompleteCheck.isIncomplete) {
+    logger.warn(`Stage ${stage} JSON still incomplete after ${MAX_CONTINUATIONS} continuation attempts`);
+    controller.enqueue(
+      encoder.encode(
+        `data: ${JSON.stringify({
+          type: "stage_warning",
+          stage,
+          message: `Response may be incomplete after ${MAX_CONTINUATIONS} continuation attempts. Attempting repair...`,
+        })}\n\n`
+      )
+    );
+  }
+
+  // Parse the stage output (will attempt repair if needed)
   const result = parseBigAdventureStageOutput(fullContent, stage);
 
   // Send stage complete event with partial result
@@ -191,15 +297,21 @@ async function generateStage(
         stage,
         stageName: stageInfo.name,
         success: result !== null,
-        promptTokens,
-        completionTokens,
+        promptTokens: totalPromptTokens,
+        completionTokens: totalCompletionTokens,
         iteration,
+        continuationAttempts,
         partialResult: result,
       })}\n\n`
     )
   );
 
-  return { result, promptTokens, completionTokens, rawContent: fullContent };
+  return { 
+    result, 
+    promptTokens: totalPromptTokens, 
+    completionTokens: totalCompletionTokens, 
+    rawContent: fullContent 
+  };
 }
 
 export async function POST(req: NextRequest) {
