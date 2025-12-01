@@ -6,6 +6,7 @@ import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
 import { parseCreatorOutput } from "@/app/misc/creator_ai";
 import { DynamicIcon } from "./DynamicIcon";
+import { AI_MODELS } from "@/app/misc/ai_prices";
 
 interface CreatorAIChatProps {
   isOpen: boolean;
@@ -59,7 +60,19 @@ export default function CreatorAIChat({
     }
     return "Deepseek Chat";
   });
+  const [novelaiKey, setNovelaiKey] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("novelaiKey") || "";
+    }
+    return "";
+  });
+  const [showKeyInput, setShowKeyInput] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Check if NovelAI is selected
+  const isNovelAISelected =
+    (AI_MODELS as Record<string, { provider?: string }>)[model]?.provider ===
+    "novelai";
 
   // Save chat history to localStorage
   useEffect(() => {
@@ -75,6 +88,13 @@ export default function CreatorAIChat({
     }
   }, [model]);
 
+  // Save NovelAI key to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined" && novelaiKey) {
+      localStorage.setItem("novelaiKey", novelaiKey);
+    }
+  }, [novelaiKey]);
+
   // Scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -82,6 +102,20 @@ export default function CreatorAIChat({
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
+
+    // Validate NovelAI key if using NovelAI
+    if (isNovelAISelected && !novelaiKey.trim()) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Please enter your NovelAI API key to use NovelAI models. Click the key icon next to the model selector.",
+        },
+      ]);
+      setShowKeyInput(true);
+      return;
+    }
 
     const userMsg: ChatMessage = { role: "user", content: input };
     setMessages((prev) => [...prev, userMsg]);
@@ -100,6 +134,7 @@ export default function CreatorAIChat({
           currentStoryData: currentStoryData,
           adventureMetadata: adventureMetadata,
           model: model,
+          novelaiKey: isNovelAISelected ? novelaiKey : undefined,
         }),
       });
 
@@ -191,27 +226,80 @@ export default function CreatorAIChat({
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="bg-gray-100 dark:bg-blue-950 border-none text-xs rounded-md px-2 py-1 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer max-w-[150px] truncate"
-              title="Select AI model"
-            >
-              <optgroup label="Recommended">
-                <option value="Deepseek Chat">Deepseek Chat (Best)</option>
-                <option value="Gemini 2.5 Flash">Gemini 2.5 Flash</option>
-                <option value="Mistral Medium 3.1">Mistral Medium 3.1</option>
-              </optgroup>
-              <optgroup label="Advanced">
-                <option value="Deepseek R1">DeepSeek R1 (Reasoning)</option>
-                <option value="Grok 4 Fast">Grok 4 Fast (Creative)</option>
-                <option value="GLM 4.6">GLM 4.6 (Long Context)</option>
-              </optgroup>
-              <optgroup label="Budget">
-                <option value="Gemini 2.5 Flash Lite">Gemini Flash Lite</option>
-                <option value="Grok Code Fast 1">Grok Code Fast</option>
-              </optgroup>
-            </select>
+            <div className="flex items-center gap-1">
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className={`bg-gray-100 dark:bg-blue-950 border-none text-xs rounded-md px-2 py-1 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer max-w-[150px] truncate ${
+                  isNovelAISelected ? "ring-1 ring-green-500" : ""
+                }`}
+                title="Select AI model"
+              >
+                <optgroup label="Recommended">
+                  <option value="Deepseek Chat">Deepseek Chat (Best)</option>
+                  <option value="Gemini 2.5 Flash">Gemini 2.5 Flash</option>
+                  <option value="Mistral Medium 3.1">Mistral Medium 3.1</option>
+                </optgroup>
+                <optgroup label="Advanced">
+                  <option value="Deepseek R1">DeepSeek R1 (Reasoning)</option>
+                  <option value="Grok 4 Fast">Grok 4 Fast (Creative)</option>
+                  <option value="GLM 4.6">GLM 4.6 (Long Context)</option>
+                </optgroup>
+                <optgroup label="Budget">
+                  <option value="Gemini 2.5 Flash Lite">
+                    Gemini Flash Lite
+                  </option>
+                  <option value="Grok Code Fast 1">Grok Code Fast</option>
+                </optgroup>
+                <optgroup label="BYOK (Free)">
+                  <option value="NovelAI GLM-4-6">NovelAI (Your Key)</option>
+                </optgroup>
+              </select>
+              {isNovelAISelected && (
+                <button
+                  onClick={() => setShowKeyInput(!showKeyInput)}
+                  className={`p-1.5 rounded-md transition-colors ${
+                    novelaiKey
+                      ? "text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30"
+                      : "text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                  }`}
+                  title={
+                    novelaiKey
+                      ? "NovelAI key configured"
+                      : "Enter NovelAI API key"
+                  }
+                >
+                  <DynamicIcon name="Key" className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {/* NovelAI Key Input Popup */}
+            {showKeyInput && isNovelAISelected && (
+              <div className="absolute top-16 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3 z-50 w-72">
+                <div className="flex items-center gap-2 mb-2">
+                  <DynamicIcon name="Key" className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    NovelAI API Key
+                  </span>
+                </div>
+                <input
+                  type="password"
+                  value={novelaiKey}
+                  onChange={(e) => setNovelaiKey(e.target.value)}
+                  placeholder="Enter your NovelAI key..."
+                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                />
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Free to use with your own subscription. Key is stored locally.
+                </p>
+                <button
+                  onClick={() => setShowKeyInput(false)}
+                  className="mt-2 w-full px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded-md transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            )}
             {messages.length > 0 && (
               <button
                 onClick={handleClearChat}
@@ -391,15 +479,21 @@ function MessageItem({
         }`}
       >
         <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
-        {!isUser && meta?.cost && (
+        {!isUser && (meta?.cost !== undefined || meta?.isByok) && (
           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50 flex items-center justify-between text-xs">
             <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
               <DynamicIcon name="Info" className="w-3 h-3" />
               Generation cost
             </span>
-            <span className="font-semibold text-amber-600 dark:text-amber-400">
-              {meta.cost} {meta.cost === 1 ? "coin" : "coins"}
-            </span>
+            {meta?.isByok ? (
+              <span className="font-semibold text-green-600 dark:text-green-400">
+                Free (BYOK)
+              </span>
+            ) : (
+              <span className="font-semibold text-amber-600 dark:text-amber-400">
+                {meta.cost} {meta.cost === 1 ? "coin" : "coins"}
+              </span>
+            )}
           </div>
         )}
         {data && (
