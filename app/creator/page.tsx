@@ -65,6 +65,13 @@ import {
   getLocalAdventure,
   deleteLocalAdventure,
 } from "@/app/misc/localAdventureManager";
+import {
+  OPENROUTER_IMAGE_MODELS,
+  estimateImageCost,
+} from "@/app/misc/ai_prices";
+import { getAuthToken } from "@/app/misc/getAuthToken";
+
+type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
 type CreatorStep =
   | "basic"
   | "preset"
@@ -672,6 +679,17 @@ function AdventureCreatorContent() {
   const [bannerUrl, setBannerUrl] = useState("");
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+
+  // AI Image Generation state
+  const [generatingThumbnail, setGeneratingThumbnail] = useState(false);
+  const [generatingBanner, setGeneratingBanner] = useState(false);
+  const [imageModel, setImageModel] = useState<ImageModelKey>("Nano Banana");
+  const [thumbnailPrompt, setThumbnailPrompt] = useState("");
+  const [bannerPrompt, setBannerPrompt] = useState("");
+  const [showAIImageModal, setShowAIImageModal] = useState<
+    "thumbnail" | "banner" | null
+  >(null);
+
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -2022,6 +2040,98 @@ function AdventureCreatorContent() {
       addNotification(`Upload failed: ${error.message}`, "failure");
     } finally {
       setUploadingBanner(false);
+    }
+  };
+
+  // Get default AI image prompt based on adventure data
+  const getDefaultImagePrompt = (type: "thumbnail" | "banner") => {
+    const base = `Please create a ${
+      type === "thumbnail" ? "cover" : "wide banner"
+    } for my text adventure:
+
+${title || "Untitled Adventure"}
+${shortDescription || ""}
+${description || ""}`;
+    return base;
+  };
+
+  // Generate and upload AI image
+  const generateAIImage = async (type: "thumbnail" | "banner") => {
+    const token = await getAuthToken();
+    if (!token) {
+      addNotification("Please sign in to generate images", "warning");
+      return;
+    }
+
+    const prompt = type === "thumbnail" ? thumbnailPrompt : bannerPrompt;
+    if (!prompt.trim()) {
+      addNotification("Please enter a prompt", "warning");
+      return;
+    }
+
+    const setGenerating =
+      type === "thumbnail" ? setGeneratingThumbnail : setGeneratingBanner;
+    const setUrl = type === "thumbnail" ? setThumbnailUrl : setBannerUrl;
+
+    setGenerating(true);
+    setShowAIImageModal(null);
+
+    try {
+      // Call image generation API
+      const response = await fetch("/api/creator/generate-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          prompt,
+          model: imageModel,
+          imageType: type,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Image generation failed");
+      }
+
+      const { imageUrl, meta } = await response.json();
+
+      // Fetch the image and upload to Supabase storage
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const imageResponse = await fetch(imageUrl);
+      const imageBlob = await imageResponse.blob();
+
+      const fileName = `${Date.now()}-ai-${type}.webp`;
+      const filePath = `${session.user.id}/adventure-${type}s/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("adventure-images")
+        .upload(filePath, imageBlob, { cacheControl: "3600", upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from("adventure-images")
+        .getPublicUrl(filePath);
+
+      setUrl(data.publicUrl);
+      addNotification(
+        `${type === "thumbnail" ? "Thumbnail" : "Banner"} generated! Cost: ${
+          meta.cost
+        } coins`,
+        "success"
+      );
+    } catch (error: any) {
+      console.error("Error generating image:", error);
+      addNotification(error.message || "Image generation failed", "failure");
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -3687,7 +3797,7 @@ function AdventureCreatorContent() {
                     Thumbnail Image
                   </label>
                   <p className="text-xs text-blue-300/60 mb-3">
-                    Recommended: 400?300px (or 320?180px), max 5MB
+                    Recommended: 400×300px (or 320×180px), max 5MB
                   </p>
                   <div className="flex items-start gap-4">
                     {thumbnailUrl && (
@@ -3705,19 +3815,19 @@ function AdventureCreatorContent() {
                         </button>
                       </div>
                     )}
-                    <div className="flex-1">
+                    <div className="flex-1 space-y-2">
                       <input
                         type="file"
                         accept="image/*"
                         onChange={handleThumbnailUpload}
-                        disabled={uploadingThumbnail}
+                        disabled={uploadingThumbnail || generatingThumbnail}
                         className="hidden"
                         id="thumbnail-upload"
                       />
                       <label
                         htmlFor="thumbnail-upload"
                         className={`block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
-                          uploadingThumbnail
+                          uploadingThumbnail || generatingThumbnail
                             ? "opacity-50 cursor-not-allowed"
                             : ""
                         }`}
@@ -3736,6 +3846,31 @@ function AdventureCreatorContent() {
                           </>
                         )}
                       </label>
+                      <button
+                        onClick={() => {
+                          if (!thumbnailPrompt) {
+                            setThumbnailPrompt(
+                              getDefaultImagePrompt("thumbnail")
+                            );
+                          }
+                          setShowAIImageModal("thumbnail");
+                        }}
+                        disabled={generatingThumbnail || uploadingThumbnail}
+                        className={`w-full px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors text-center flex items-center justify-center gap-2 ${
+                          generatingThumbnail || uploadingThumbnail
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
+                        }`}
+                      >
+                        {generatingThumbnail ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>🎨 AI Generate</>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -3746,7 +3881,7 @@ function AdventureCreatorContent() {
                     Banner Image
                   </label>
                   <p className="text-xs text-blue-300/60 mb-3">
-                    Recommended: 1200?400px, max 5MB
+                    Recommended: 1200×400px, max 5MB
                   </p>
                   <div className="flex items-start gap-4">
                     {bannerUrl && (
@@ -3764,19 +3899,21 @@ function AdventureCreatorContent() {
                         </button>
                       </div>
                     )}
-                    <div className="flex-1">
+                    <div className="flex-1 space-y-2">
                       <input
                         type="file"
                         accept="image/*"
                         onChange={handleBannerUpload}
-                        disabled={uploadingBanner}
+                        disabled={uploadingBanner || generatingBanner}
                         className="hidden"
                         id="banner-upload"
                       />
                       <label
                         htmlFor="banner-upload"
                         className={`block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors text-center cursor-pointer ${
-                          uploadingBanner ? "opacity-50 cursor-not-allowed" : ""
+                          uploadingBanner || generatingBanner
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
                         }`}
                       >
                         {uploadingBanner ? (
@@ -3793,6 +3930,29 @@ function AdventureCreatorContent() {
                           </>
                         )}
                       </label>
+                      <button
+                        onClick={() => {
+                          if (!bannerPrompt) {
+                            setBannerPrompt(getDefaultImagePrompt("banner"));
+                          }
+                          setShowAIImageModal("banner");
+                        }}
+                        disabled={generatingBanner || uploadingBanner}
+                        className={`w-full px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors text-center flex items-center justify-center gap-2 ${
+                          generatingBanner || uploadingBanner
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
+                        }`}
+                      >
+                        {generatingBanner ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>🎨 AI Generate</>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -11756,6 +11916,113 @@ function AdventureCreatorContent() {
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
       />
+
+      {/* AI Image Generation Modal */}
+      {showAIImageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-blue-950 border border-blue-700/50 rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white">
+                🎨 AI{" "}
+                {showAIImageModal === "thumbnail" ? "Thumbnail" : "Banner"}{" "}
+                Generation
+              </h3>
+              <button
+                onClick={() => setShowAIImageModal(null)}
+                className="text-blue-400 hover:text-blue-300"
+              >
+                <DynamicIcon name="X" className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Model Selection */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-blue-300/80 mb-2">
+                Image Model
+              </label>
+              <select
+                value={imageModel}
+                onChange={(e) => setImageModel(e.target.value as ImageModelKey)}
+                className="w-full px-4 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+              >
+                {Object.entries(OPENROUTER_IMAGE_MODELS).map(([key]) => (
+                  <option key={key} value={key}>
+                    {key} (~{estimateImageCost(key)} coins)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Prompt */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-blue-300/80 mb-2">
+                Prompt
+              </label>
+              <textarea
+                value={
+                  showAIImageModal === "thumbnail"
+                    ? thumbnailPrompt
+                    : bannerPrompt
+                }
+                onChange={(e) =>
+                  showAIImageModal === "thumbnail"
+                    ? setThumbnailPrompt(e.target.value)
+                    : setBannerPrompt(e.target.value)
+                }
+                rows={6}
+                className="w-full px-4 py-3 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                placeholder="Describe your image..."
+              />
+              <button
+                onClick={() => {
+                  const defaultPrompt = getDefaultImagePrompt(showAIImageModal);
+                  if (showAIImageModal === "thumbnail") {
+                    setThumbnailPrompt(defaultPrompt);
+                  } else {
+                    setBannerPrompt(defaultPrompt);
+                  }
+                }}
+                className="mt-2 text-xs text-blue-400 hover:text-blue-300"
+              >
+                ↻ Reset to default prompt
+              </button>
+            </div>
+
+            {/* Cost Display */}
+            <div className="mb-4 p-3 bg-blue-900/30 rounded-lg border border-blue-800/50">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-blue-300/80">Estimated Cost:</span>
+                <span className="font-medium text-purple-300">
+                  ~{estimateImageCost(imageModel)} coins
+                </span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowAIImageModal(null)}
+                className="px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => generateAIImage(showAIImageModal)}
+                disabled={
+                  (showAIImageModal === "thumbnail"
+                    ? !thumbnailPrompt.trim()
+                    : !bannerPrompt.trim()) ||
+                  generatingThumbnail ||
+                  generatingBanner
+                }
+                className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-blue-900/40 disabled:text-blue-300/50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                🎨 Generate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <CreatorAIChat
         isOpen={isAIMenuOpen}

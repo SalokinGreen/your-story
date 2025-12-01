@@ -301,9 +301,10 @@ export const OPENROUTER_IMAGE_MODELS = {
     maxTokens: 65000,
     maxOutputTokens: 32000,
     provider: "openrouter",
-    inputPrice: 2,
-    outputPrice: 12,
-    cost: 20,
+    // Actual billing: ~$0.14 for ~1500-1700 output tokens = ~$90/1M output
+    inputPrice: 2.5, // $/1M tokens (text input)
+    outputPrice: 90, // $/1M tokens (image generation, slightly padded)
+    cost: 300, // Fallback flat cost
   },
   "Nano Banana": {
     name: "Nano Banana",
@@ -312,9 +313,10 @@ export const OPENROUTER_IMAGE_MODELS = {
     maxTokens: 33000,
     maxOutputTokens: 32000,
     provider: "openrouter",
-    inputPrice: 0.3,
-    outputPrice: 2.5,
-    cost: 5,
+    // Actual OpenRouter pricing: ~$0.038 for ~1300 output tokens = ~$29/1M output
+    inputPrice: 0.3, // $/1M tokens (text input is cheap)
+    outputPrice: 30, // $/1M tokens (image output is expensive)
+    cost: 80, // Fallback flat cost (~$0.04 × 2 markup × 1000)
   },
   "Flux 2 Pro": {
     name: "Flux 2 Pro",
@@ -325,7 +327,7 @@ export const OPENROUTER_IMAGE_MODELS = {
     provider: "openrouter",
     inputPrice: 3.66,
     outputPrice: 3.66,
-    cost: 10,
+    cost: 60, // ~$0.03 per image × 2 markup × 1000 coins/$
   },
   "Flux 2 Flex": {
     name: "Flux 2 Flex",
@@ -336,7 +338,7 @@ export const OPENROUTER_IMAGE_MODELS = {
     provider: "openrouter",
     inputPrice: 14.64,
     outputPrice: 14.64,
-    cost: 20,
+    cost: 30, // ~$0.015 per image × 2 markup × 1000 coins/$
   },
   "GPT-5 Image": {
     name: "GPT-5 Image",
@@ -361,6 +363,51 @@ export const OPENROUTER_IMAGE_MODELS = {
     cost: 10,
   },
 };
+
+// Helper type for image models
+export type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
+
+/**
+ * Check if an image model is a pure image generation model (Flux) vs chat-based (Gemini/GPT)
+ */
+export function isPureImageModel(modelId: string): boolean {
+  return modelId.includes("flux") || modelId.includes("black-forest-labs");
+}
+
+/**
+ * Estimate cost for image generation (for display purposes)
+ * @param modelKey - Key from OPENROUTER_IMAGE_MODELS
+ * @returns Estimated cost in coins
+ */
+export function estimateImageCost(modelKey: string): number {
+  const model = OPENROUTER_IMAGE_MODELS[modelKey as ImageModelKey];
+  if (!model) {
+    return 5; // Default minimum
+  }
+
+  // For pure image models (Flux), use flat cost since no token usage
+  if (isPureImageModel(model.model)) {
+    return model.cost;
+  }
+
+  // For chat-based models, estimate based on typical token usage
+  // Input: ~300 tokens for prompt, Output: ~1000 tokens for image URL/response
+  const estimatedInputTokens = 300;
+  const estimatedOutputTokens = 1000;
+
+  // Calculate raw cost in dollars (prices are per 1M tokens)
+  const inputCost = (estimatedInputTokens / 1_000_000) * model.inputPrice;
+  const outputCost = (estimatedOutputTokens / 1_000_000) * model.outputPrice;
+  const rawCost = inputCost + outputCost;
+
+  // Apply markup and convert to coins
+  const costWithMarkup = rawCost * MARKUP_MULTIPLIER;
+  const costInCoins = Math.ceil(costWithMarkup * COINS_PER_DOLLAR);
+
+  // Ensure minimum cost
+  return Math.max(costInCoins, MINIMUM_COST);
+}
+
 export interface ModelPreset {
   id: string;
   name: string;

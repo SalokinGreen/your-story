@@ -53,7 +53,10 @@ import {
   AI_MODELS,
   calculateTokenCost,
   getModelConfig,
+  OPENROUTER_IMAGE_MODELS,
+  estimateImageCost,
 } from "@/app/misc/ai_prices";
+import { createClient } from "@supabase/supabase-js";
 import {
   Adventure,
   Stat,
@@ -700,6 +703,19 @@ export default function BigAdventureCreatorPage() {
   const [guidedAnswers, setGuidedAnswers] = useState<Record<string, string>>(
     {}
   );
+
+  // AI Image generation state
+  type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
+  const [generatingThumbnail, setGeneratingThumbnail] = useState(false);
+  const [generatingBanner, setGeneratingBanner] = useState(false);
+  const [imageModel, setImageModel] = useState<ImageModelKey>("Nano Banana");
+  const [thumbnailPrompt, setThumbnailPrompt] = useState("");
+  const [bannerPrompt, setBannerPrompt] = useState("");
+  const [showThumbnailPromptEditor, setShowThumbnailPromptEditor] =
+    useState(false);
+  const [showBannerPromptEditor, setShowBannerPromptEditor] = useState(false);
 
   // Abort controller for cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -1649,6 +1665,120 @@ export default function BigAdventureCreatorPage() {
     }
   }, [addNotification]);
 
+  // Generate default image prompt from adventure data
+  const getDefaultImagePrompt = useCallback(
+    (type: "thumbnail" | "banner") => {
+      if (!result) return "";
+      const base = `Please create a ${
+        type === "thumbnail" ? "cover" : "wide banner"
+      } for my text adventure:
+
+${result.title || "Untitled Adventure"}
+${result.shortDescription || ""}
+${result.description || ""}`;
+      return base;
+    },
+    [result]
+  );
+
+  // Initialize prompts when result changes
+  useEffect(() => {
+    if (result && !thumbnailPrompt) {
+      setThumbnailPrompt(getDefaultImagePrompt("thumbnail"));
+    }
+    if (result && !bannerPrompt) {
+      setBannerPrompt(getDefaultImagePrompt("banner"));
+    }
+  }, [result, thumbnailPrompt, bannerPrompt, getDefaultImagePrompt]);
+
+  // Generate and upload image
+  const generateImage = useCallback(
+    async (type: "thumbnail" | "banner") => {
+      if (!user) {
+        addNotification("Please sign in to generate images", "warning");
+        return;
+      }
+
+      const token = await getAuthToken();
+      if (!token) {
+        addNotification("Authentication required", "warning");
+        return;
+      }
+
+      const prompt = type === "thumbnail" ? thumbnailPrompt : bannerPrompt;
+      if (!prompt.trim()) {
+        addNotification("Please enter a prompt", "warning");
+        return;
+      }
+
+      const setGenerating =
+        type === "thumbnail" ? setGeneratingThumbnail : setGeneratingBanner;
+      const setUrl = type === "thumbnail" ? setThumbnailUrl : setBannerUrl;
+
+      setGenerating(true);
+
+      try {
+        // Call image generation API
+        const response = await fetch("/api/creator/generate-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            prompt,
+            model: imageModel,
+            imageType: type,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Image generation failed");
+        }
+
+        const { imageUrl, meta } = await response.json();
+
+        // Upload to Supabase storage
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // Fetch the image and convert to blob
+        const imageResponse = await fetch(imageUrl);
+        const imageBlob = await imageResponse.blob();
+
+        const fileName = `${Date.now()}-ai-${type}.webp`;
+        const filePath = `${user.id}/adventure-${type}s/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("adventure-images")
+          .upload(filePath, imageBlob, { cacheControl: "3600", upsert: false });
+
+        if (uploadError) throw uploadError;
+
+        const { data } = supabase.storage
+          .from("adventure-images")
+          .getPublicUrl(filePath);
+
+        setUrl(data.publicUrl);
+        addNotification(
+          `${type === "thumbnail" ? "Thumbnail" : "Banner"} generated! Cost: ${
+            meta.cost
+          } coins`,
+          "success"
+        );
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        addNotification(errorMessage || "Image generation failed", "failure");
+      } finally {
+        setGenerating(false);
+      }
+    },
+    [user, thumbnailPrompt, bannerPrompt, imageModel, addNotification]
+  );
+
   // Save adventure
   const saveAdventure = useCallback(async () => {
     if (!result || !user) return;
@@ -1684,6 +1814,8 @@ export default function BigAdventureCreatorPage() {
         storyTemplate: result.storyTemplate,
         startingChoices: result.startingChoices,
         presets: result.storyTemplate?.presets,
+        thumbnailUrl: thumbnailUrl || undefined,
+        bannerUrl: bannerUrl || undefined,
         isPublished: false,
         isFeatured: false,
         playCount: 0,
@@ -3880,6 +4012,218 @@ export default function BigAdventureCreatorPage() {
 
             {/* Adventure Visualization */}
             <AdventureVisualization result={result} />
+
+            {/* AI Cover Generation */}
+            <div className="bg-blue-950/50 rounded-xl p-6 border border-blue-700/30">
+              <h4 className="text-lg font-semibold text-blue-200 mb-4 flex items-center gap-2">
+                🎨 AI Cover Generation
+                <span className="text-xs font-normal text-blue-400/60">
+                  (optional)
+                </span>
+              </h4>
+
+              {/* Model Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-blue-300/80 mb-2">
+                  Image Model
+                </label>
+                <select
+                  value={imageModel}
+                  onChange={(e) =>
+                    setImageModel(e.target.value as ImageModelKey)
+                  }
+                  className="w-full md:w-auto px-4 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                >
+                  {Object.entries(OPENROUTER_IMAGE_MODELS).map(([key]) => (
+                    <option key={key} value={key}>
+                      {key} (~{estimateImageCost(key)} coins)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Thumbnail Generation */}
+                <div className="bg-blue-900/30 rounded-lg p-4 border border-blue-800/40">
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="text-sm font-semibold text-blue-200">
+                      📷 Thumbnail
+                    </h5>
+                    <span className="text-xs text-blue-400/60">
+                      400×300px (4:3)
+                    </span>
+                  </div>
+
+                  {thumbnailUrl ? (
+                    <div className="relative mb-4">
+                      <img
+                        src={thumbnailUrl}
+                        alt="Thumbnail preview"
+                        className="w-full h-32 object-cover rounded-lg border border-blue-700/40"
+                      />
+                      <button
+                        onClick={() => setThumbnailUrl("")}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-full h-32 bg-blue-950/50 rounded-lg border border-dashed border-blue-700/40 flex items-center justify-center mb-4">
+                      <span className="text-blue-400/40 text-sm">
+                        No thumbnail yet
+                      </span>
+                    </div>
+                  )}
+
+                  {showThumbnailPromptEditor ? (
+                    <div className="space-y-2 mb-3">
+                      <textarea
+                        value={thumbnailPrompt}
+                        onChange={(e) => setThumbnailPrompt(e.target.value)}
+                        rows={4}
+                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/50 rounded-lg text-white text-sm resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        placeholder="Describe your cover image..."
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowThumbnailPromptEditor(false)}
+                          className="text-xs px-3 py-1.5 bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+                        >
+                          Done
+                        </button>
+                        <button
+                          onClick={() =>
+                            setThumbnailPrompt(
+                              getDefaultImagePrompt("thumbnail")
+                            )
+                          }
+                          className="text-xs px-3 py-1.5 bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowThumbnailPromptEditor(true)}
+                      className="text-xs text-blue-400 hover:text-blue-300 mb-3 flex items-center gap-1"
+                    >
+                      ✏️ Edit prompt
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => generateImage("thumbnail")}
+                    disabled={generatingThumbnail || !thumbnailPrompt.trim()}
+                    className="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:bg-blue-900/40 disabled:text-blue-300/50 text-white rounded-lg font-medium transition-colors text-sm flex items-center justify-center gap-2"
+                  >
+                    {generatingThumbnail ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        🎨 Generate Thumbnail
+                        <span className="text-purple-300/70">
+                          (~{estimateImageCost(imageModel)} coins)
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Banner Generation */}
+                <div className="bg-blue-900/30 rounded-lg p-4 border border-blue-800/40">
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="text-sm font-semibold text-blue-200">
+                      🖼️ Banner
+                    </h5>
+                    <span className="text-xs text-blue-400/60">
+                      1200×400px (3:1)
+                    </span>
+                  </div>
+
+                  {bannerUrl ? (
+                    <div className="relative mb-4">
+                      <img
+                        src={bannerUrl}
+                        alt="Banner preview"
+                        className="w-full h-32 object-cover rounded-lg border border-blue-700/40"
+                      />
+                      <button
+                        onClick={() => setBannerUrl("")}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-full h-32 bg-blue-950/50 rounded-lg border border-dashed border-blue-700/40 flex items-center justify-center mb-4">
+                      <span className="text-blue-400/40 text-sm">
+                        No banner yet
+                      </span>
+                    </div>
+                  )}
+
+                  {showBannerPromptEditor ? (
+                    <div className="space-y-2 mb-3">
+                      <textarea
+                        value={bannerPrompt}
+                        onChange={(e) => setBannerPrompt(e.target.value)}
+                        rows={4}
+                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/50 rounded-lg text-white text-sm resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        placeholder="Describe your banner image..."
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowBannerPromptEditor(false)}
+                          className="text-xs px-3 py-1.5 bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+                        >
+                          Done
+                        </button>
+                        <button
+                          onClick={() =>
+                            setBannerPrompt(getDefaultImagePrompt("banner"))
+                          }
+                          className="text-xs px-3 py-1.5 bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowBannerPromptEditor(true)}
+                      className="text-xs text-blue-400 hover:text-blue-300 mb-3 flex items-center gap-1"
+                    >
+                      ✏️ Edit prompt
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => generateImage("banner")}
+                    disabled={generatingBanner || !bannerPrompt.trim()}
+                    className="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:bg-blue-900/40 disabled:text-blue-300/50 text-white rounded-lg font-medium transition-colors text-sm flex items-center justify-center gap-2"
+                  >
+                    {generatingBanner ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        🎨 Generate Banner
+                        <span className="text-purple-300/70">
+                          (~{estimateImageCost(imageModel)} coins)
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* Actions */}
             <div className="flex flex-wrap gap-3 justify-center">
