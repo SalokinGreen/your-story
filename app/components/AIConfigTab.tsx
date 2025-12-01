@@ -75,6 +75,19 @@ export default function AIConfigTab() {
     }
     return 1;
   });
+  const [embeddingsEnabled, setEmbeddingsEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("embeddingsEnabled") === "true";
+    }
+    return false;
+  });
+  const [embeddingThreshold, setEmbeddingThreshold] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("embeddingThreshold");
+      return stored ? parseFloat(stored) : 0.25;
+    }
+    return 0.25;
+  });
   const [customMaxContext, setCustomMaxContext] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("customMaxContext");
@@ -854,6 +867,90 @@ export default function AIConfigTab() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Semantic Search (Embeddings) Section */}
+      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+          <DynamicIcon name="Search" className="w-4 h-4" />
+          Semantic Search
+        </h4>
+
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Enable Embeddings
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Use AI to find relevant lore and memories contextually
+            </p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={embeddingsEnabled}
+              onChange={(e) => {
+                const newValue = e.target.checked;
+                setEmbeddingsEnabled(newValue);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("embeddingsEnabled", String(newValue));
+                }
+              }}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
+          </label>
+        </div>
+
+        {embeddingsEnabled && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-gray-700 dark:text-gray-300">
+                Similarity Threshold
+              </label>
+              <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+                {embeddingThreshold.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                🌊 Relaxed
+              </span>
+              <input
+                type="range"
+                min="0.1"
+                max="0.5"
+                step="0.05"
+                value={embeddingThreshold}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setEmbeddingThreshold(val);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("embeddingThreshold", String(val));
+                  }
+                }}
+                className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+              />
+              <span className="text-xs text-green-600 dark:text-green-400 whitespace-nowrap">
+                🎯 Precise
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Lower = more results (broader matching) • Higher = fewer results (stricter matching)
+            </p>
+          </div>
+        )}
+
+        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p className="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-1.5">
+            <DynamicIcon name="Info" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <span>
+              When enabled, uses Mistral embeddings to semantically search lore and memories.
+              Activates automatically for stories with 30+ lore entries or 50+ memories.
+              Cost: ~0.5 coins per 100 turns.
+            </span>
+          </p>
+        </div>
       </div>
 
       {/* NovelAI Section */}

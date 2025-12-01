@@ -8,6 +8,7 @@ import {
   buildChoicesPrompt,
   ChatMessage,
   buildInfoMessage,
+  EmbeddingContext,
 } from "../misc/ai_staged";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { getModelConfig, MODEL_PRESETS } from "../misc/ai_prices";
@@ -30,6 +31,14 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [prunedParts, setPrunedParts] = useState(0);
+  const [embeddingsEnabled, setEmbeddingsEnabled] = useState(false);
+  const [embeddingThreshold, setEmbeddingThreshold] = useState(0.25);
+  const [embeddingStats, setEmbeddingStats] = useState<{
+    loreCount: number;
+    memoryCount: number;
+    totalLore: number;
+    totalMemory: number;
+  } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -51,6 +60,19 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   };
 
   useEffect(() => {
+    // Check embeddings setting
+    const embEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("embeddingsEnabled") === "true"
+        : false;
+    setEmbeddingsEnabled(embEnabled);
+    
+    const embThreshold =
+      typeof window !== "undefined"
+        ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
+        : 0.25;
+    setEmbeddingThreshold(embThreshold);
+
     // Get current preset and custom model overrides from localStorage
     const currentPreset =
       typeof window !== "undefined"
@@ -100,6 +122,22 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
 
     const maxTokens = modelConfig.maxTokens;
 
+    // Calculate embedding stats - what WOULD be sent if embeddings were active
+    const activeLoreCount = storyData.lore.filter((l) => l.on !== false).length;
+    const totalLoreCount = storyData.lore.length;
+    const totalMemoryCount = storyData.memory.length;
+    
+    // Embeddings would retrieve up to 8 lore and 15 memories (defaults from EMBEDDING_CONFIG)
+    const embeddingLoreLimit = Math.min(8, activeLoreCount);
+    const embeddingMemoryLimit = Math.min(15, totalMemoryCount);
+    
+    setEmbeddingStats({
+      loreCount: embeddingLoreLimit,
+      memoryCount: embeddingMemoryLimit,
+      totalLore: totalLoreCount,
+      totalMemory: totalMemoryCount,
+    });
+
     console.log("🔍 Context Viewer Debug:", {
       modelName: modelConfig.name,
       maxTokens,
@@ -107,11 +145,31 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       memoryEntries: storyData.memory.length,
       loreEntries: storyData.lore.filter((l) => l.on !== false).length,
       activeStage,
+      embeddingsEnabled: embEnabled,
     });
 
     // Build messages using the SAME functions as generation.ts
     let contextMessages: ChatMessage[] = [];
     let prunedCount = 0;
+
+    // If embeddings are enabled, simulate what the embedding context would look like
+    // We can't do a real semantic search without a query, so we show top entries by recency/importance
+    let simulatedEmbeddingContext: EmbeddingContext | undefined = undefined;
+    
+    if (embEnabled && activeStage === "story") {
+      // Simulate embedding retrieval: show first 8 lore titles and first 15 memories
+      // In reality, these would be semantically selected based on user's choice
+      const activeLore = storyData.lore.filter(l => l.enabled !== false && l.on !== false);
+      const simulatedLoreTitles = activeLore.slice(0, 8).map(l => l.title);
+      const simulatedMemories = storyData.memory.slice(-15); // Most recent 15
+      
+      if (storyData.lore.length > 30 || storyData.memory.length > 50) {
+        simulatedEmbeddingContext = {
+          loreTitles: simulatedLoreTitles,
+          memories: simulatedMemories,
+        };
+      }
+    }
 
     switch (activeStage) {
       case "story":
@@ -119,6 +177,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           storyData,
           userChoice: undefined,
           modelName: effectiveStoryModel,
+          embeddingContext: simulatedEmbeddingContext,
         });
         contextMessages = storyPrompt.messages;
         prunedCount = storyPrompt.prunedParts;
@@ -127,6 +186,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         const toolPrompt = buildToolPrompt({
           storyData,
           storyContent: "(Story content from previous stage would go here)",
+          embeddingContext: simulatedEmbeddingContext,
         });
         contextMessages = toolPrompt.messages;
         break;
@@ -134,6 +194,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         const choicesPrompt = buildChoicesPrompt({
           storyData,
           storyContent: "(Story content from previous stage would go here)",
+          embeddingContext: simulatedEmbeddingContext,
         });
         contextMessages = choicesPrompt.messages;
         break;
@@ -142,8 +203,8 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     setMessages(contextMessages);
     setPrunedParts(prunedCount);
 
-    // Build info string for display
-    const infoStr = buildInfoMessage(storyData);
+    // Build info string for display (with embedding context if applicable)
+    const infoStr = buildInfoMessage(storyData, simulatedEmbeddingContext);
     setContextString(infoStr);
 
     // Estimate tokens (rough approximation: 1 token ≈ 4 characters)
@@ -469,6 +530,60 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                 })}
               </div>
             </details>
+
+            {/* Embeddings Info */}
+            {embeddingStats && (
+              <div className={`text-xs p-2 rounded border ${
+                embeddingsEnabled
+                  ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700"
+                  : "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+              }`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <DynamicIcon name="Search" className={`w-3 h-3 ${
+                    embeddingsEnabled
+                      ? "text-purple-600 dark:text-purple-400"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`} />
+                  <span className={`font-semibold ${
+                    embeddingsEnabled
+                      ? "text-purple-700 dark:text-purple-400"
+                      : "text-gray-600 dark:text-gray-400"
+                  }`}>
+                    Semantic Search {embeddingsEnabled ? "(Enabled)" : "(Disabled)"}
+                  </span>
+                </div>
+                <div className={embeddingsEnabled
+                  ? "text-purple-800 dark:text-purple-300"
+                  : "text-gray-600 dark:text-gray-400"
+                }>
+                  {embeddingsEnabled ? (
+                    <>
+                      <p>During generation, AI retrieves the most relevant:</p>
+                      <ul className="list-disc list-inside ml-2 mt-1">
+                        <li><strong>{Math.min(8, embeddingStats.totalLore)} lore</strong> entries (from {embeddingStats.totalLore} total)</li>
+                        <li><strong>{Math.min(15, embeddingStats.totalMemory)} memories</strong> (from {embeddingStats.totalMemory} total)</li>
+                      </ul>
+                      <p className="mt-1">Threshold: <strong>{embeddingThreshold.toFixed(2)}</strong> ({embeddingThreshold <= 0.2 ? "relaxed" : embeddingThreshold >= 0.4 ? "strict" : "balanced"})</p>
+                      {(embeddingStats.totalLore > 30 || embeddingStats.totalMemory > 50) ? (
+                        <p className="mt-1 italic text-purple-600 dark:text-purple-400">
+                          Context below shows simulated selection. Live uses semantic search.
+                        </p>
+                      ) : (
+                        <p className="mt-1 italic text-purple-600 dark:text-purple-400">
+                          Thresholds not met (&gt;30 lore or &gt;50 memories). Using full context.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p>Lore: {embeddingStats.totalLore} entries ({storyData.lore.filter(l => l.on !== false).length} active)</p>
+                      <p>Memory: {embeddingStats.totalMemory} entries (all included if ≤50)</p>
+                      <p className="mt-1">Enable in Settings → AI → Semantic Search</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
               <DynamicIcon name="Info" className="w-3 h-3 inline mr-1" />

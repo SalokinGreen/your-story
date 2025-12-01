@@ -103,12 +103,13 @@ import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
 import SyncConflictModal from "../components/SyncConflictModal";
 import SyncIndicator from "../components/SyncIndicator";
-import { authenticatedFetch } from "../misc/getAuthToken";
+import { authenticatedFetch, getAuthToken } from "../misc/getAuthToken";
 import {
   encryptStoryData,
   decryptStoryData,
   isEncrypted,
 } from "../misc/encryption";
+import { syncLoreEmbeddings, syncNewMemories, getExistingEmbeddingKeys } from "../misc/embeddings";
 import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
 import { DynamicIcon } from "../components/DynamicIcon";
@@ -2082,6 +2083,89 @@ function StoryPageContent() {
     loadStory();
   }, [storyId, addNotification, user, getEncryptionPassword]);
 
+  // Sync lore and memory embeddings when story is first loaded (if embeddings enabled and dirty)
+  useEffect(() => {
+    if (!storyData || !storyDbId || storyDbId.startsWith("local_")) return;
+
+    const embeddingsEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("embeddingsEnabled") === "true"
+        : false;
+
+    if (!embeddingsEnabled) return;
+
+    // Only sync lore if we have enough entries and it's dirty (or first load)
+    const shouldSyncLore = storyData.lore.length >= 5 && storyData.loreEmbeddingsDirty !== false;
+    
+    // Always sync memories on load if we have any
+    const shouldSyncMemories = storyData.memory.length > 0;
+
+    if (!shouldSyncLore && !shouldSyncMemories) return;
+
+    // Fire and forget - sync embeddings in background
+    getAuthToken().then(async (token) => {
+      if (!token) return;
+
+      // First, get existing embedding keys to avoid re-generating
+      let existingKeys: { lore: string[]; memory: string[]; scene: string[] } = {
+        lore: [],
+        memory: [],
+        scene: [],
+      };
+      
+      try {
+        existingKeys = await getExistingEmbeddingKeys(storyDbId, token);
+        console.log(`[Embeddings] Found existing keys: ${existingKeys.lore.length} lore, ${existingKeys.memory.length} memories`);
+      } catch (err) {
+        console.warn("[Embeddings] Failed to get existing keys, will sync all:", err);
+      }
+
+      // Sync lore if needed
+      if (shouldSyncLore) {
+        syncLoreEmbeddings(
+          storyDbId,
+          storyData.lore.map((l) => ({ title: l.title, content: l.content })),
+          token
+        )
+          .then((result) => {
+            if (result.synced > 0 || result.cleaned > 0) {
+              console.log(
+                `[Embeddings] Lore sync: ${result.synced} entries, ${result.cleaned} cleaned`
+              );
+            }
+            // Clear the dirty flag after successful sync
+            if (storyData.loreEmbeddingsDirty !== false) {
+              storyData.loreEmbeddingsDirty = false;
+              setStoryData({ ...storyData });
+            }
+          })
+          .catch((err) => {
+            console.warn("[Embeddings] Lore sync failed:", err.message);
+          });
+      }
+
+      // Sync memories if we have any
+      if (shouldSyncMemories) {
+        syncNewMemories(
+          storyDbId,
+          storyData.memory,
+          new Set(existingKeys.memory), // Pass existing keys to skip already-synced
+          token
+        )
+          .then((result) => {
+            if (result.synced > 0 || result.cleaned > 0) {
+              console.log(`[Embeddings] Memory sync: ${result.synced} entries, ${result.cleaned} cleaned`);
+            }
+          })
+          .catch((err) => {
+            console.warn("[Embeddings] Memory sync failed:", err.message);
+          });
+      }
+    });
+    // Only run when storyDbId or dirty flag changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyDbId, storyData?.loreEmbeddingsDirty]);
+
   //Applypresetandstartstory
   const handlePresetSelect = async (preset: Preset) => {
     if (!storyData) return;
@@ -2332,6 +2416,11 @@ function StoryPageContent() {
   function updateStoryData(updates: Partial<StoryData>) {
     if (!storyData) return;
 
+    // If lore is being updated, mark embeddings as dirty (will sync on next generation)
+    if (updates.lore) {
+      updates.loreEmbeddingsDirty = true;
+    }
+
     //Getcurrentmodelconfigfordynamicmemorycap
     const modelKey =
       typeof window !== "undefined"
@@ -2437,6 +2526,14 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? parseInt(localStorage.getItem("customMaxOutput") || "4000", 10)
           : 4000;
+      const embeddingsEnabled =
+        typeof window !== "undefined"
+          ? localStorage.getItem("embeddingsEnabled") === "true"
+          : false;
+      const embeddingThreshold =
+        typeof window !== "undefined"
+          ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
+          : 0.25;
 
       // Track parallel completion of tools and choices
       let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -2464,6 +2561,9 @@ function StoryPageContent() {
           novelaiTemperature,
           openRouterKey,
           deepseekKey,
+          storyId: storyDbId || undefined,
+          enableEmbeddings: embeddingsEnabled,
+          embeddingThreshold,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -4299,6 +4399,14 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxOutput") || "4000", 10)
         : 4000;
+    const embeddingsEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("embeddingsEnabled") === "true"
+        : false;
+    const embeddingThreshold =
+      typeof window !== "undefined"
+        ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
+        : 0.25;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -4343,6 +4451,9 @@ function StoryPageContent() {
             novelaiTemperature,
             openRouterKey,
             deepseekKey,
+            storyId: storyDbId || undefined,
+            enableEmbeddings: embeddingsEnabled,
+            embeddingThreshold,
           },
           {
             onStoryContent: (chunk: string, fullContent: string) => {
@@ -4604,6 +4715,14 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxOutput") || "4000", 10)
         : 4000;
+    const embeddingsEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("embeddingsEnabled") === "true"
+        : false;
+    const embeddingThreshold =
+      typeof window !== "undefined"
+        ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
+        : 0.25;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -4632,6 +4751,9 @@ function StoryPageContent() {
           novelaiTemperature,
           openRouterKey,
           deepseekKey,
+          storyId: storyDbId || undefined,
+          enableEmbeddings: embeddingsEnabled,
+          embeddingThreshold,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {

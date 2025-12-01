@@ -1963,6 +1963,9 @@ export function executeCommandWithResponse(
       on: onTriggerArray.length === 0, // If no triggers, show from start
     });
 
+    // Mark lore embeddings as dirty for re-sync
+    storyData.loreEmbeddingsDirty = true;
+
     logger.action("New lore created via command response", {
       title: loreTitle,
     });
@@ -2162,6 +2165,11 @@ export function executeCommandWithResponse(
       };
     }
 
+    // Mark lore embeddings as dirty if content or title changed
+    if (changes.includes("content") || changes.includes("title")) {
+      storyData.loreEmbeddingsDirty = true;
+    }
+
     logger.action("Lore updated via command response", {
       title: loreEntry.title,
       changes,
@@ -2207,6 +2215,10 @@ export function executeCommandWithResponse(
     }
 
     loreEntry.content = loreEntry.content.trim() + "\n" + newText;
+
+    // Mark lore embeddings as dirty for re-sync
+    storyData.loreEmbeddingsDirty = true;
+
     logger.action("Content added to lore via command response", {
       title: loreEntry.title,
       addedText: newText,
@@ -2260,6 +2272,10 @@ export function executeCommandWithResponse(
     }
 
     loreEntry.content = loreEntry.content.replace(oldText, newText);
+
+    // Mark lore embeddings as dirty for re-sync
+    storyData.loreEmbeddingsDirty = true;
+
     logger.action("Lore content replaced via command response", {
       title: loreEntry.title,
       oldText,
@@ -2316,6 +2332,9 @@ export function executeCommandWithResponse(
     // Clean up multiple spaces and newlines
     loreEntry.content = loreEntry.content.replace(/  +/g, " ");
     loreEntry.content = loreEntry.content.replace(/\n{3,}/g, "\n\n");
+
+    // Mark lore embeddings as dirty for re-sync
+    storyData.loreEmbeddingsDirty = true;
 
     logger.action("Content deleted from lore via command response", {
       title: loreEntry.title,

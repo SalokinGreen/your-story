@@ -190,6 +190,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - **NovelAI Settings**: BYOK integration for story generation only. Settings saved to localStorage (novelaiEnabled, novelaiKey, novelaiTemperature). When enabled, story stage uses NovelAI GLM-4-6 while tools/choices stages use OpenRouter/DeepSeek.
 - **TTS Settings**: All TTS preferences saved to localStorage (ttsEnabled, ttsLastVoice, ttsAutoGenerate, ttsVolume, ttsCustomVoices).
 - **STT Settings**: Speech-to-text uses Voxtral (Mistral API) and costs 2 coins per transcription. Settings saved to localStorage (sttEnabled). STTButton in ChoicesModal sends audio to /api/stt/transcribe with auto-stop after 3s silence.
+- **Embeddings Settings**: Semantic search settings saved to localStorage (embeddingsEnabled, embeddingThreshold). When enabled, uses Mistral embeddings to find relevant lore/memories. embeddingThreshold (0.1-0.5, default 0.25) controls strictness: lower = more results (relaxed), higher = fewer results (strict). Auto-activates for stories with 30+ lore or 50+ memories. Cost: ~0.5 coins per 100 turns.
 - **Hidden Messages**: AI can use ||double pipes|| syntax for hidden text (DM notes). Players can't see hidden text unless "showHiddenMessages" is enabled in localStorage. When revealed, hidden text appears with purple highlighting.
 
 ### AI API Patterns
@@ -210,6 +211,37 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Deducts tokens based on actual usage; returns updated balance in response meta.
 - **Context allocation**: Uses (maxTokens - maxOutputTokens) then allocates 75% to history, 25% to memory.
 - **Model selection**: Client reads from localStorage "aiPreset" key and MODEL_PRESETS, or custom models from "aiModelStory"/"aiModelTools"/"aiModelChoices".
+
+### Embedding System (Semantic Search)
+
+- **Purpose**: Uses Mistral's mistral-embed model (1024 dimensions, $0.10/M tokens) for semantic search of lore and memories.
+- **Database**: `story_embeddings` table with pgvector extension in Supabase (see docs/embeddings-migration.sql).
+- **When to use**: Automatically enabled when `options.enableEmbeddings=true` and story has >30 lore entries or >50 memories.
+- **API Routes**:
+  - `/api/embeddings/generate` - Generate embeddings for texts array
+  - `/api/embeddings/search` - Semantic search using pgvector RPC
+  - `/api/embeddings/upsert` - Insert/update embedding records
+  - `/api/embeddings/cleanup` - Remove orphaned embeddings
+- **Client utilities** (`app/misc/embeddings.ts`):
+  - `searchRelevantContext(storyId, query, authToken, options)` - Retrieve relevant lore/memories
+  - `upsertEmbeddings(storyId, entries, authToken)` - Sync entries to database
+  - `syncNewMemories(storyId, memories, existingKeys, authToken)` - Background memory sync
+  - `syncLoreEmbeddings(storyId, lore, authToken)` - Full lore sync
+  - `buildSearchQuery(userChoice, recentParts)` - Build query from context
+- **Integration in generation.ts**:
+  - Stage 0 (before story): Retrieves embedding context if enabled and thresholds met
+  - Stage 4 (after tools): Background sync of new memories (fire-and-forget)
+  - `EmbeddingContext` interface passed to `buildStoryPrompt()` and `buildInfoMessage()`
+- **Integration in story/page.tsx**:
+  - On story load: Syncs lore embeddings if `embeddingsEnabled=true`, 5+ lore entries, and `loreEmbeddingsDirty !== false`
+  - On lore update via menu: Sets `loreEmbeddingsDirty = true`, triggering sync on next render
+  - Clears dirty flag after successful sync
+- **Dirty flag (`loreEmbeddingsDirty`)**: Tracks when lore content has changed and needs re-embedding
+  - Set by: `updateStoryData({ lore })`, AI lore commands (create_lore, lore_update, lore_add_content, lore_replace_content, lore_delete_content)
+  - Checked by: useEffect in page.tsx that triggers sync only when dirty
+  - Cleared after: Successful embedding sync
+- **Cost**: ~$0.00005 per turn (~0.5 coins per 100-turn playthrough). Negligible.
+- **Fallback**: If embedding search fails, falls back to trigger-based lore and full memory list.
 
 ## Developer workflows
 

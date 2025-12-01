@@ -332,6 +332,7 @@ export interface StoryData {
   customTables?: CustomTable[]; // Creator-defined random tables
   variables?: Variable[]; // Dynamic tracked variables (numbers, booleans, lists)
   starting_choices?: StartingChoice[]; // Optional custom starting choices from adventure
+  loreEmbeddingsDirty?: boolean; // Flag indicating lore has changed and needs re-embedding
 }
 
 // Mythic GME state tracking

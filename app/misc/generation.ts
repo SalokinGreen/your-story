@@ -23,6 +23,7 @@ import {
   buildChoicesPrompt,
   buildActionAnalysisPrompt,
   ChatMessage,
+  EmbeddingContext,
 } from "@/app/misc/ai_staged";
 import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
@@ -34,6 +35,10 @@ import {
   findItemMatch,
   findAbilityMatch,
 } from "@/app/misc/fuzzyMatch";
+import {
+  getRelevantContextForGeneration,
+  syncNewMemories,
+} from "@/app/misc/embeddings";
 
 // ============================================================
 // TYPES
@@ -55,6 +60,10 @@ export interface GenerationOptions {
   // BYOK API keys (required for non-NovelAI models)
   openRouterKey?: string;
   deepseekKey?: string;
+  // Embedding-based context retrieval
+  storyId?: string; // Required for embedding search
+  enableEmbeddings?: boolean; // Whether to use embedding-based context
+  embeddingThreshold?: number; // Similarity threshold (0.1-0.5, default 0.25)
 }
 
 export interface GenerationCallbacks {
@@ -329,6 +338,63 @@ export async function generateStoryTurn(
 
   try {
     // ========================================
+    // STAGE 0: Embedding-based context retrieval (if enabled)
+    // ========================================
+    let embeddingContext: EmbeddingContext | undefined;
+
+    if (
+      options.enableEmbeddings &&
+      options.storyId &&
+      (storyData.lore.length > 30 || storyData.memory.length > 50)
+    ) {
+      logger.action("Stage 0: Retrieving embedding context");
+
+      try {
+        // Get recent story parts for context
+        const recentParts = storyData.scene.parts
+          .filter((p) => !p.user)
+          .slice(-3)
+          .map((p) => p.content);
+
+        const contextResult = await getRelevantContextForGeneration(
+          options.storyId,
+          userChoice,
+          recentParts,
+          token,
+          {
+            loreLimit: 10,
+            memoryLimit: 20,
+            minSimilarity: options.embeddingThreshold ?? 0.25,
+          }
+        );
+
+        if (!contextResult.error) {
+          embeddingContext = {
+            loreTitles: contextResult.loreTitles,
+            memories: contextResult.memories,
+          };
+          logger.action("Embedding context retrieved", {
+            loreCount: embeddingContext.loreTitles.length,
+            memoryCount: embeddingContext.memories.length,
+          });
+        } else {
+          logger.action("Embedding search failed, falling back to triggers", {
+            error: contextResult.error,
+          });
+        }
+      } catch (embeddingError: unknown) {
+        // Non-fatal: fall back to trigger-based context
+        const message =
+          embeddingError instanceof Error
+            ? embeddingError.message
+            : "Unknown error";
+        logger.action("Embedding retrieval error, falling back to triggers", {
+          error: message,
+        });
+      }
+    }
+
+    // ========================================
     // STAGE 1: Story Generation
     // ========================================
     callbacks.onStoryStart?.();
@@ -340,6 +406,7 @@ export async function generateStoryTurn(
       commandResponses,
       modelName: options.storyModel,
       customMaxContext: options.customMaxContext,
+      embeddingContext,
     });
 
     if (storyPrompt.prunedParts > 0) {
@@ -453,6 +520,7 @@ export async function generateStoryTurn(
           storyContent,
           existingToolCalls: allToolCalls,
           existingToolResponses: allToolResponses,
+          embeddingContext,
         });
 
         // Try primary model first, then fallback on rate limit
@@ -608,6 +676,7 @@ export async function generateStoryTurn(
       const choicesPrompt = buildChoicesPrompt({
         storyData,
         storyContent,
+        embeddingContext,
       });
 
       const choicesResponse = await fetch("/api/generate-stream", {
@@ -679,6 +748,37 @@ export async function generateStoryTurn(
     );
     await Promise.all(parallelTasks);
     console.log("[Generation] All parallel tasks complete");
+
+    // ========================================
+    // STAGE 4: Sync new memories to embeddings (background, non-blocking)
+    // ========================================
+    if (
+      options.enableEmbeddings &&
+      options.storyId &&
+      storyData.memory.length > 0
+    ) {
+      // Fire and forget - don't block generation completion
+      const memoryCount = storyData.memory.length;
+      syncNewMemories(
+        options.storyId,
+        storyData.memory,
+        new Set(), // We'll embed all memories; duplicates handled by upsert
+        token
+      )
+        .then((result) => {
+          if (result.synced > 0 || result.cleaned > 0) {
+            logger.action("Synced memories to embeddings", {
+              synced: result.synced,
+              cleaned: result.cleaned,
+              total: memoryCount,
+            });
+          }
+        })
+        .catch((err) => {
+          // Non-fatal - just log
+          logger.action("Memory embedding sync failed", { error: err.message });
+        });
+    }
 
     // ========================================
     // BUILD SCENE PART

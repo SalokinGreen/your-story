@@ -3,6 +3,7 @@ import {
   Choice,
   CommandResponse,
   AbilityGrade,
+  StoryLore,
 } from "@/app/misc/structs";
 import { getRPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
@@ -15,6 +16,16 @@ export type ChatMessage = {
   tool_calls?: any[];
   tool_call_id?: string;
 };
+
+/**
+ * Context retrieved from embedding search
+ */
+export interface EmbeddingContext {
+  /** Lore titles that are semantically relevant */
+  loreTitles: string[];
+  /** Memory contents that are semantically relevant */
+  memories: string[];
+}
 
 // Estimate tokens from text (rough approximation: ~4 chars per token)
 export function estimateTokens(text: string): number {
@@ -43,7 +54,11 @@ function getChaosDescription(chaos: number): string {
 }
 
 // Build info message - shared across all stages
-export function buildInfoMessage(storyData: StoryData): string {
+// Optional embeddingContext allows embedding-enhanced lore/memory retrieval
+export function buildInfoMessage(
+  storyData: StoryData,
+  embeddingContext?: EmbeddingContext
+): string {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
   // Build stats section
@@ -125,37 +140,87 @@ export function buildInfoMessage(storyData: StoryData): string {
         .join("\n")}`
     : "";
 
-  // Build lore section - only send always-on lore, recently triggered lore, or manually revealed lore
+  // Build lore section - use embeddings if available, otherwise fallback to trigger-based
   const currentPartIndex = storyData.scene.parts.length;
-  const activeLore = storyData.lore.filter((l) => {
-    if (l.enabled === false) return false; // Explicitly disabled in editor
-    if (l.alwaysOn) return true; // Always include always-on lore
 
-    // Check if manually revealed via show_lore command in any scene part
-    const wasRevealed = storyData.scene.parts.some((p) =>
-      p.revealedLore?.some(
-        (title) => title.toLowerCase() === l.title.toLowerCase()
-      )
-    );
-    if (wasRevealed) return true;
-
-    // Standard trigger-based logic
-    if (l.on === false) return false; // Explicitly turned off
-    if (!l.lastTriggeredIndex) return l.on === true; // Fallback for old lore without tracking
-    return currentPartIndex - l.lastTriggeredIndex <= 15; // Only recent triggers (last 15 parts)
+  // Always-on lore is always included
+  const alwaysOnLore = storyData.lore.filter((l) => {
+    if (l.enabled === false) return false;
+    return l.alwaysOn === true;
   });
+
+  // If we have embedding context AND threshold is met, use embedding-based selection
+  let activeLore: StoryLore[];
+  if (embeddingContext && embeddingContext.loreTitles.length > 0 && storyData.lore.length > 30) {
+    // Get lore entries matching embedding-retrieved titles
+    const embeddingLoreTitles = new Set(
+      embeddingContext.loreTitles.map((t) => t.toLowerCase())
+    );
+    const embeddingLore = storyData.lore.filter(
+      (l) =>
+        l.enabled !== false &&
+        !l.alwaysOn && // Not already in alwaysOnLore
+        embeddingLoreTitles.has(l.title.toLowerCase())
+    );
+    // Embedding mode: only alwaysOn + embedding-matched lore
+    activeLore = [...alwaysOnLore, ...embeddingLore];
+  } else {
+    // Fallback to trigger-based logic (for small lore sets or no embeddings)
+    // Start with always-on and manually revealed lore
+    const baseLore = storyData.lore.filter((l) => {
+      if (l.enabled === false) return false;
+      if (l.alwaysOn) return true;
+      const wasRevealed = storyData.scene.parts.some((p) =>
+        p.revealedLore?.some(
+          (title) => title.toLowerCase() === l.title.toLowerCase()
+        )
+      );
+      return wasRevealed;
+    });
+
+    const triggerLore = storyData.lore.filter((l) => {
+      if (l.enabled === false) return false;
+      if (l.alwaysOn) return false; // Already in baseLore
+      const wasRevealed = storyData.scene.parts.some((p) =>
+        p.revealedLore?.some(
+          (title) => title.toLowerCase() === l.title.toLowerCase()
+        )
+      );
+      if (wasRevealed) return false; // Already in baseLore
+
+      // Standard trigger-based logic
+      if (l.on === false) return false;
+      if (!l.lastTriggeredIndex) return l.on === true;
+      return currentPartIndex - l.lastTriggeredIndex <= 15;
+    });
+    activeLore = [...baseLore, ...triggerLore];
+  }
+
   const loreSection = activeLore.length
-    ? `Lore:\n${activeLore
-        .map((l) => `- ${l.title}: ${cleanString(l.content)}`)
-        .join("\n")}`
+    ? `Lore:\n----\n${activeLore
+        .map((l) => `${l.title}\n${cleanString(l.content)}`)
+        .join("\n----\n")}`
     : "";
 
-  // Build memory section
-  const memorySection = storyData.memory.length
-    ? `Memory (story developments so far):\n${storyData.memory
-        .map((m) => `- ${m}`)
-        .join("\n")}`
-    : "";
+  // Build memory section - use embeddings if available for large memory sets
+  let memorySection: string;
+  if (
+    embeddingContext &&
+    embeddingContext.memories.length > 0 &&
+    storyData.memory.length > 50
+  ) {
+    // Use embedding-retrieved memories for large memory sets
+    memorySection = `Memory (relevant story developments):\n${embeddingContext.memories
+      .map((m) => `- ${m}`)
+      .join("\n")}`;
+  } else {
+    // Use all memories for smaller sets (or when no embeddings)
+    memorySection = storyData.memory.length
+      ? `Memory (story developments so far):\n${storyData.memory
+          .map((m) => `- ${m}`)
+          .join("\n")}`
+      : "";
+  }
 
   // Build plot beats section
   const unfulfilledBeats = storyData.plot_beats.filter((b) => !b.fulfilled);
@@ -347,12 +412,14 @@ export function buildStoryPrompt({
   commandResponses,
   modelName = "Deepseek Chat",
   customMaxContext,
+  embeddingContext,
 }: {
   storyData: StoryData;
   userChoice?: string;
   commandResponses?: CommandResponse[];
   modelName?: string;
   customMaxContext?: number;
+  embeddingContext?: EmbeddingContext;
 }): { messages: ChatMessage[]; prunedParts: number } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
@@ -485,7 +552,7 @@ ${
     : ""
 }`;
 
-  const infoMessage = buildInfoMessage(storyData);
+  const infoMessage = buildInfoMessage(storyData, embeddingContext);
   const cleanedSystemPrompt = cleanString(systemPrompt);
   const cleanedInfoMessage = cleanString(infoMessage);
 
@@ -602,12 +669,14 @@ export function buildToolPrompt({
   commandResponses,
   existingToolCalls,
   existingToolResponses,
+  embeddingContext,
 }: {
   storyData: StoryData;
   storyContent: string; // The story text just generated
   commandResponses?: CommandResponse[];
   existingToolCalls?: any[]; // Tool calls from previous iterations
   existingToolResponses?: CommandResponse[]; // Tool responses from previous iterations
+  embeddingContext?: EmbeddingContext;
 }): { messages: ChatMessage[] } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
@@ -723,7 +792,7 @@ ${
     : ""
 }`;
 
-  const infoMessage = buildInfoMessage(storyData);
+  const infoMessage = buildInfoMessage(storyData, embeddingContext);
 
   const messages: ChatMessage[] = [
     { role: "system", content: cleanString(systemPrompt) },
@@ -864,9 +933,11 @@ ${
 export function buildChoicesPrompt({
   storyData,
   storyContent,
+  embeddingContext,
 }: {
   storyData: StoryData;
   storyContent: string; // The story text just generated
+  embeddingContext?: EmbeddingContext;
 }): { messages: ChatMessage[] } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
@@ -1127,7 +1198,7 @@ Example: "Take a risk <table: ${
       : ""
   }`;
 
-  const infoMessage = buildInfoMessage(storyData);
+  const infoMessage = buildInfoMessage(storyData, embeddingContext);
 
   const messages: ChatMessage[] = [
     { role: "system", content: cleanString(systemPrompt) },
