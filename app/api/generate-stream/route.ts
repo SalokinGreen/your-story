@@ -8,7 +8,7 @@
  *
  * Provider modes:
  * - BYOK (OpenRouter/DeepSeek): Users provide their own API keys, no token billing
- * - Coins (Mistral): Server-side API key, users pay with coins
+ * - Coins (Mistral/DeepInfra): Server-side API key, users pay with coins
  *
  * Request: { messages, tools?, model, maxTokens, openRouterKey?, deepseekKey? }
  * Response: SSE stream with events: content, tool_calls, done, error
@@ -16,7 +16,11 @@
 
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getModelConfig, calculateTokenCost } from "@/app/misc/ai_prices";
+import {
+  getModelConfig,
+  calculateTokenCost,
+  calculateCostFromEstimatedCost,
+} from "@/app/misc/ai_prices";
 import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import { logger } from "@/app/misc/logger";
 
@@ -80,7 +84,7 @@ function extractTextContent(content: unknown): string {
 }
 
 function getApiKey(
-  provider: "deepseek" | "openrouter" | "mistral",
+  provider: "deepseek" | "openrouter" | "mistral" | "deepinfra",
   openRouterKey?: string,
   deepseekKey?: string
 ): string | null {
@@ -89,6 +93,9 @@ function getApiKey(
   } else if (provider === "mistral") {
     // Mistral uses server-side API key - users pay with coins
     return process.env.MISTRAL_API_KEY || null;
+  } else if (provider === "deepinfra") {
+    // DeepInfra uses server-side API key - users pay with coins
+    return process.env.DEEPINFRA_API_KEY || null;
   } else {
     return openRouterKey || null;
   }
@@ -172,9 +179,13 @@ export async function POST(req: NextRequest) {
         // Get model config
         const modelConfig = getModelConfig(model);
 
-        // Get API key from user's provided keys (or server key for Mistral)
+        // Get API key from user's provided keys (or server key for Mistral/DeepInfra)
         const apiKey = getApiKey(
-          modelConfig.provider as "deepseek" | "openrouter" | "mistral",
+          modelConfig.provider as
+            | "deepseek"
+            | "openrouter"
+            | "mistral"
+            | "deepinfra",
           openRouterKey,
           deepseekKey
         );
@@ -184,9 +195,16 @@ export async function POST(req: NextRequest) {
           if (modelConfig.provider === "mistral") {
             errorMessage =
               "Mistral API is not configured on the server. Please contact support.";
+          } else if (modelConfig.provider === "deepinfra") {
+            errorMessage =
+              "DeepInfra API is not configured on the server. Please contact support.";
           } else {
+            const providerNames: Record<string, string> = {
+              deepseek: "DeepSeek",
+              openrouter: "OpenRouter",
+            };
             const providerName =
-              modelConfig.provider === "deepseek" ? "DeepSeek" : "OpenRouter";
+              providerNames[modelConfig.provider] || modelConfig.provider;
             errorMessage = `No API key configured for ${providerName}. Please add your API key in Settings.`;
           }
           controller.enqueue(
@@ -202,8 +220,11 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // Check token balance for Mistral (Coins mode) before making request
-        if (modelConfig.provider === "mistral") {
+        // Check token balance for Coins mode providers (Mistral/DeepInfra) before making request
+        if (
+          modelConfig.provider === "mistral" ||
+          modelConfig.provider === "deepinfra"
+        ) {
           const balance = await getUserTokenBalance(user.id, supabase);
           // Estimate minimum cost (at least 1 coin)
           const estimatedCost = Math.max(1, modelConfig.cost || 1);
@@ -229,6 +250,8 @@ export async function POST(req: NextRequest) {
           endpoint = "https://api.deepseek.com/chat/completions";
         } else if (modelConfig.provider === "mistral") {
           endpoint = "https://api.mistral.ai/v1/chat/completions";
+        } else if (modelConfig.provider === "deepinfra") {
+          endpoint = "https://api.deepinfra.com/v1/openai/chat/completions";
         } else {
           endpoint = "https://openrouter.ai/api/v1/chat/completions";
         }
@@ -325,11 +348,13 @@ export async function POST(req: NextRequest) {
         let toolCalls: any[] = [];
         let promptTokens = 0;
         let completionTokens = 0;
+        let estimatedCost: number | undefined; // DeepInfra provides this
+        let streamComplete = false;
 
         // Process stream
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done || streamComplete) break;
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
@@ -340,11 +365,15 @@ export async function POST(req: NextRequest) {
             if (!trimmed || !trimmed.startsWith("data:")) continue;
 
             const data = trimmed.slice(5).trim();
-            if (data === "[DONE]") continue;
+            if (data === "[DONE]") {
+              streamComplete = true;
+              break;
+            }
 
             try {
               const parsed = JSON.parse(data);
               const delta = parsed.choices?.[0]?.delta;
+              const finishReason = parsed.choices?.[0]?.finish_reason;
 
               if (delta?.content !== undefined && delta?.content !== null) {
                 const textContent = extractTextContent(delta.content);
@@ -384,6 +413,20 @@ export async function POST(req: NextRequest) {
               if (parsed.usage) {
                 promptTokens = parsed.usage.prompt_tokens || 0;
                 completionTokens = parsed.usage.completion_tokens || 0;
+                // DeepInfra provides estimated_cost in dollars
+                if (parsed.usage.estimated_cost !== undefined) {
+                  estimatedCost = parsed.usage.estimated_cost;
+                }
+              }
+
+              // Check for natural completion - break out of stream processing
+              if (
+                finishReason === "stop" ||
+                finishReason === "end_turn" ||
+                finishReason === "length"
+              ) {
+                streamComplete = true;
+                break;
               }
             } catch (e) {
               // Skip malformed JSON
@@ -430,20 +473,37 @@ export async function POST(req: NextRequest) {
           promptTokens,
           completionTokens,
           hasToolCalls: parsedToolCalls.length > 0,
+          estimatedCost,
         });
 
-        // Deduct tokens for Mistral (Coins mode) - other providers are BYOK
+        // Deduct tokens for Coins mode providers (Mistral/DeepInfra) - other providers are BYOK
         let tokenCost = 0;
         let newBalance: number | undefined;
         if (
-          modelConfig.provider === "mistral" &&
-          (promptTokens > 0 || completionTokens > 0)
+          (modelConfig.provider === "mistral" ||
+            modelConfig.provider === "deepinfra") &&
+          (promptTokens > 0 ||
+            completionTokens > 0 ||
+            estimatedCost !== undefined)
         ) {
-          tokenCost = calculateTokenCost(model, promptTokens, completionTokens);
+          // Use estimated_cost from DeepInfra if available, otherwise calculate from tokens
+          if (
+            modelConfig.provider === "deepinfra" &&
+            estimatedCost !== undefined
+          ) {
+            tokenCost = calculateCostFromEstimatedCost(estimatedCost);
+          } else {
+            tokenCost = calculateTokenCost(
+              model,
+              promptTokens,
+              completionTokens
+            );
+          }
           const deductResult = await deductTokens(user.id, tokenCost, supabase);
           if (!deductResult.success) {
-            logger.warn("Failed to deduct tokens for Mistral generation", {
+            logger.warn("Failed to deduct tokens for generation", {
               userId: user.id,
+              provider: modelConfig.provider,
               tokenCost,
               error: deductResult.error,
             });

@@ -224,9 +224,10 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - Streams content via /api/generate-stream
   - Executes tools locally on storyData via toolExecutor.ts
   - Parses choices from AI response
-- **Multi-provider support**: Automatically routes to DeepSeek, OpenRouter, or Mistral based on model parameter.
-- Requires DEEPSEEK_API_KEY for DeepSeek models, OPENROUTER_API_KEY for OpenRouter models, MISTRAL_API_KEY for Mistral (Coins mode).
+- **Multi-provider support**: Automatically routes to DeepSeek, OpenRouter, Mistral, or DeepInfra based on model parameter.
+- Requires DEEPSEEK_API_KEY for DeepSeek models, OPENROUTER_API_KEY for OpenRouter models, MISTRAL_API_KEY for Mistral (Coins mode), DEEPINFRA_API_KEY for DeepInfra (Coins mode).
 - Mistral models (mistral-small-2506, mistral-medium-2508, codestral-2508) use server-side key - users pay with coins.
+- DeepInfra models (DeepSeek V3.2/V3.1/R1, Qwen3, Llama 3, Gemma 3, etc.) use server-side key - users pay with coins.
 - Optional: DEFAULT_AI_MODEL, DEEPSEEK_MODEL, NEXT_PUBLIC_SITE_URL environment variables.
 - Deducts tokens based on actual usage; returns updated balance in response meta.
 - **Context allocation**: Uses (maxTokens - maxOutputTokens) then allocates 75% to history, 25% to memory.
@@ -274,6 +275,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - DEEPSEEK_API_KEY=<your_key>
   - OPENROUTER_API_KEY=<your_key>
   - MISTRAL_API_KEY=<your_key> (server-side for Coins mode and STT)
+  - DEEPINFRA_API_KEY=<your_key> (server-side for Coins mode)
   - SPEECHIFY_API_KEY=<your_key>
   - NEXT_PUBLIC_SUPABASE_URL=<your_url>
   - NEXT_PUBLIC_SUPABASE_KEY=<your_anon_key>

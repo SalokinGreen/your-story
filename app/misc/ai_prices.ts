@@ -427,6 +427,294 @@ export const AI_MODELS = {
       "Mistral's code-optimized model, excellent for tool calling and structured tasks. Uses Coins.",
     bannerUrl: undefined,
   },
+
+  // ============================================
+  // DEEPINFRA MODELS (Coins - Server-side API key)
+  // ============================================
+
+  "DeepInfra DeepSeek V3.2": {
+    name: "DeepInfra DeepSeek V3.2",
+    original_model: "deepseek-ai/DeepSeek-V3.2-Exp",
+    model: "deepseek-ai/DeepSeek-V3.2-Exp",
+    maxTokens: 160000,
+    maxOutputTokens: 16000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.21,
+    outputPrice: 0.32,
+    finetunes: [],
+    strengths: ["cost-effective", "creative", "long context"],
+    weaknesses: [],
+    description:
+      "DeepSeek V3.2 via DeepInfra. Very cost-effective with excellent performance. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra DeepSeek V3.1": {
+    name: "DeepInfra DeepSeek V3.1",
+    original_model: "deepseek-ai/DeepSeek-V3.1",
+    model: "deepseek-ai/DeepSeek-V3.1",
+    maxTokens: 160000,
+    maxOutputTokens: 16000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.21,
+    outputPrice: 0.79,
+    finetunes: [],
+    strengths: ["cost-effective", "creative", "long context"],
+    weaknesses: [],
+    description:
+      "DeepSeek V3.1 via DeepInfra. Solid performance at low cost. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra DeepSeek R1": {
+    name: "DeepInfra DeepSeek R1",
+    original_model: "deepseek-ai/DeepSeek-R1",
+    model: "deepseek-ai/DeepSeek-R1",
+    maxTokens: 160000,
+    maxOutputTokens: 32000,
+    provider: "deepinfra",
+    supportsToolCalling: false,
+    cost: 2,
+    inputPrice: 0.7,
+    outputPrice: 2.4,
+    finetunes: [],
+    strengths: ["reasoning", "complex logic", "planning"],
+    weaknesses: ["speed", "no tool calling"],
+    description:
+      "DeepSeek R1 reasoning model via DeepInfra. Excellent for complex problem solving. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra DeepSeek R1-0528": {
+    name: "DeepInfra DeepSeek R1-0528",
+    original_model: "deepseek-ai/DeepSeek-R1-0528",
+    model: "deepseek-ai/DeepSeek-R1-0528",
+    maxTokens: 160000,
+    maxOutputTokens: 32000,
+    provider: "deepinfra",
+    supportsToolCalling: false,
+    cost: 2,
+    inputPrice: 0.5,
+    outputPrice: 2.15,
+    finetunes: [],
+    strengths: ["reasoning", "creative", "complex logic", "planning"],
+    weaknesses: ["speed", "no tool calling"],
+    description:
+      "DeepSeek R1-0528 reasoning model via DeepInfra. Latest R1 with improved creative writing. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra Qwen3 235B": {
+    name: "DeepInfra Qwen3 235B",
+    original_model: "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    model: "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    maxTokens: 256000,
+    maxOutputTokens: 16000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.09,
+    outputPrice: 0.57,
+    finetunes: [],
+    strengths: ["powerful", "cost-effective", "long context"],
+    weaknesses: [],
+    description:
+      "Qwen3 235B via DeepInfra. Powerful model at excellent price. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra Qwen3 32B": {
+    name: "DeepInfra Qwen3 32B",
+    original_model: "Qwen/Qwen3-32B",
+    model: "Qwen/Qwen3-32B",
+    maxTokens: 40000,
+    maxOutputTokens: 8000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.1,
+    outputPrice: 0.28,
+    finetunes: [],
+    strengths: ["fast", "cost-effective"],
+    weaknesses: ["context size"],
+    description: "Qwen3 32B via DeepInfra. Fast and affordable. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra Llama 3.3 70B": {
+    name: "DeepInfra Llama 3.3 70B",
+    original_model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    maxTokens: 128000,
+    maxOutputTokens: 8000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.13,
+    outputPrice: 0.38,
+    finetunes: [],
+    strengths: ["fast", "reliable", "cost-effective"],
+    weaknesses: [],
+    description:
+      "Meta's Llama 3.3 70B Turbo via DeepInfra. Fast and reliable. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra Llama 3.1 8B": {
+    name: "DeepInfra Llama 3.1 8B",
+    original_model: "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+    model: "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+    maxTokens: 128000,
+    maxOutputTokens: 8000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.02,
+    outputPrice: 0.03,
+    finetunes: [],
+    strengths: ["ultra fast", "extremely cost-effective"],
+    weaknesses: ["smaller model"],
+    description:
+      "Llama 3.1 8B Turbo via DeepInfra. Ultra-cheap for simple tasks. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra Gemma 3 27B": {
+    name: "DeepInfra Gemma 3 27B",
+    original_model: "google/gemma-3-27b-it",
+    model: "google/gemma-3-27b-it",
+    maxTokens: 128000,
+    maxOutputTokens: 8000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.09,
+    outputPrice: 0.16,
+    finetunes: [],
+    strengths: ["balanced", "cost-effective"],
+    weaknesses: [],
+    description:
+      "Google's Gemma 3 27B via DeepInfra. Good balance of quality and cost. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra Mistral Small 3.2": {
+    name: "DeepInfra Mistral Small 3.2",
+    original_model: "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+    model: "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+    maxTokens: 125000,
+    maxOutputTokens: 8000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.075,
+    outputPrice: 0.2,
+    finetunes: [],
+    strengths: ["fast", "cost-effective", "tool calling"],
+    weaknesses: [],
+    description:
+      "Mistral Small 3.2 via DeepInfra. Great for tool calling at low cost. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra GLM 4.6": {
+    name: "DeepInfra GLM 4.6",
+    original_model: "zai-org/GLM-4.6",
+    model: "zai-org/GLM-4.6",
+    maxTokens: 200000,
+    maxOutputTokens: 16000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.15,
+    outputPrice: 0.6,
+    finetunes: [],
+    strengths: ["creative", "long context", "nsfw"],
+    weaknesses: [],
+    description:
+      "GLM 4.6 via DeepInfra. Excellent for creative writing. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra Qwen3 Next 80B": {
+    name: "DeepInfra Qwen3 Next 80B",
+    original_model: "Qwen/Qwen3-Next-80B-A3B-Instruct",
+    model: "Qwen/Qwen3-Next-80B-A3B-Instruct",
+    maxTokens: 256000,
+    maxOutputTokens: 16000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.14,
+    outputPrice: 1.1,
+    finetunes: [],
+    strengths: ["powerful", "long context", "MoE", "256k context"],
+    weaknesses: [],
+    description:
+      "Qwen3 Next 80B A3B MoE model via DeepInfra. Powerful with 256k context. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra Phi 4": {
+    name: "DeepInfra Phi 4",
+    original_model: "microsoft/phi-4",
+    model: "microsoft/phi-4",
+    maxTokens: 16000,
+    maxOutputTokens: 8000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.07,
+    outputPrice: 0.14,
+    finetunes: [],
+    strengths: ["fast", "cost-effective", "small"],
+    weaknesses: ["context size"],
+    description:
+      "Microsoft Phi 4 via DeepInfra. Very cheap for simple tasks like choice generation. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra GPT-OSS 20B": {
+    name: "DeepInfra GPT-OSS 20B",
+    original_model: "openai/gpt-oss-20b",
+    model: "openai/gpt-oss-20b",
+    maxTokens: 128000,
+    maxOutputTokens: 16000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.03,
+    outputPrice: 0.14,
+    finetunes: [],
+    strengths: ["ultra cheap", "fast", "long context", "tool calling"],
+    weaknesses: [],
+    description:
+      "OpenAI's open-weight GPT-OSS 20B MoE model via DeepInfra. Extremely cheap with 131k context. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
+  "DeepInfra Qwen3 30B A3B": {
+    name: "DeepInfra Qwen3 30B A3B",
+    original_model: "Qwen/Qwen3-30B-A3B",
+    model: "Qwen/Qwen3-30B-A3B",
+    maxTokens: 40000,
+    maxOutputTokens: 8000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.08,
+    outputPrice: 0.29,
+    finetunes: [],
+    strengths: ["fast", "cost-effective", "MoE"],
+    weaknesses: ["context size"],
+    description:
+      "Qwen3 30B A3B MoE model via DeepInfra. Fast and very affordable. Uses Coins.",
+    bannerUrl: undefined,
+  },
 } as const;
 export const OPENROUTER_IMAGE_MODELS = {
   "Nano Banana Pro": {
@@ -632,6 +920,87 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     choicesModel: "Ministral 8B",
     estimatedCost: 2,
   },
+  deepseek: {
+    id: "deepseek",
+    name: "DeepSeek Standard",
+    description: "DeepSeek V3.2 story/tools, Phi 4 choices - uses Coins",
+    storyModel: "DeepInfra DeepSeek V3.2",
+    toolsModel: "DeepInfra DeepSeek V3.2",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 2,
+  },
+  deepseekBrain: {
+    id: "deepseekBrain",
+    name: "DeepSeek Brain",
+    description: "DeepSeek R1-0528 reasoning for story - uses Coins",
+    storyModel: "DeepInfra DeepSeek R1-0528",
+    toolsModel: "DeepInfra DeepSeek V3.2",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 3,
+  },
+  ultraBudget: {
+    id: "ultraBudget",
+    name: "Ultra Budget",
+    description: "Maximum savings with GPT-OSS 20B - uses Coins",
+    storyModel: "DeepInfra GPT-OSS 20B",
+    toolsModel: "DeepInfra GPT-OSS 20B",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 1,
+  },
+  qwenBudget: {
+    id: "qwenBudget",
+    name: "Qwen Budget",
+    description: "Qwen3 30B MoE for story, Qwen3 32B tools - uses Coins",
+    storyModel: "DeepInfra Qwen3 30B A3B",
+    toolsModel: "DeepInfra Qwen3 32B",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 1,
+  },
+  qwenPremium: {
+    id: "qwenPremium",
+    name: "Qwen Premium",
+    description: "Qwen3 Next 80B for story with 256k context - uses Coins",
+    storyModel: "DeepInfra Qwen3 Next 80B",
+    toolsModel: "DeepInfra Qwen3 32B",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 2,
+  },
+  glmCreative: {
+    id: "glmCreative",
+    name: "GLM Creative",
+    description: "GLM 4.6 for creative/NSFW writing - uses Coins",
+    storyModel: "DeepInfra GLM 4.6",
+    toolsModel: "DeepInfra DeepSeek V3.2",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 2,
+  },
+  gemmaBalanced: {
+    id: "gemmaBalanced",
+    name: "Gemma Balanced",
+    description: "Google Gemma 3 27B for all stages - uses Coins",
+    storyModel: "DeepInfra Gemma 3 27B",
+    toolsModel: "DeepInfra Gemma 3 27B",
+    choicesModel: "DeepInfra Llama 3.1 8B",
+    estimatedCost: 1,
+  },
+  byokDeepseek: {
+    id: "byokDeepseek",
+    name: "BYOK DeepSeek",
+    description: "DeepSeek Chat for all stages - uses your DeepSeek API key",
+    storyModel: "Deepseek Chat",
+    toolsModel: "Deepseek Chat",
+    choicesModel: "Deepseek Chat",
+    estimatedCost: 0,
+  },
+  byokOpenRouter: {
+    id: "byokOpenRouter",
+    name: "BYOK OpenRouter",
+    description: "Gemini Flash for all stages - uses your OpenRouter API key",
+    storyModel: "Gemini 2.5 Flash",
+    toolsModel: "Gemini 2.5 Flash",
+    choicesModel: "Gemini 2.5 Flash Lite",
+    estimatedCost: 0,
+  },
 };
 
 // ============================================
@@ -642,13 +1011,14 @@ export interface APIKeysAvailable {
   openRouterKey?: boolean;
   deepseekKey?: boolean;
   novelaiKey?: boolean;
-  coinsEnabled?: boolean; // For Mistral models that use server-side API
+  coinsEnabled?: boolean; // For Mistral and DeepInfra models that use server-side API
 }
 
 /**
  * Filter AI models based on which API keys the user has configured
  * - OpenRouter models: Shown when user has OpenRouter key
  * - DeepSeek models: Shown only when user has DeepSeek API key
+ * - DeepInfra models: Shown when coins are enabled (server-side API)
  * - NovelAI models: Shown only when user has NovelAI key
  *
  * @param keys - Object indicating which keys the user has
@@ -665,6 +1035,8 @@ export function getAvailableModels(
         return !!keys.openRouterKey;
       case "deepseek":
         return !!keys.deepseekKey;
+      case "deepinfra":
+        return !!keys.coinsEnabled;
       case "novelai":
         return !!keys.novelaiKey;
       case "mistral":
@@ -708,6 +1080,8 @@ export function getRequiredKeyForModel(
       return "openRouterKey";
     case "deepseek":
       return "deepseekKey";
+    case "deepinfra":
+      return "coinsEnabled";
     case "novelai":
       return "novelaiKey";
     case "mistral":
@@ -735,7 +1109,7 @@ export interface AIModelConfig {
   model: string;
   maxTokens: number;
   maxOutputTokens: number;
-  provider: "openrouter" | "deepseek" | "novelai" | "mistral";
+  provider: "openrouter" | "deepseek" | "novelai" | "mistral" | "deepinfra";
   supportsToolCalling?: boolean; // Whether this model supports function calling
   cost: number;
   inputPrice: number;
@@ -800,6 +1174,21 @@ export function calculateTokenCost(
 
   // Apply markup and convert to coins
   const costWithMarkup = rawCost * MARKUP_MULTIPLIER;
+  const costInCoins = Math.ceil(costWithMarkup * COINS_PER_DOLLAR);
+
+  // Ensure minimum cost
+  return Math.max(costInCoins, MINIMUM_COST);
+}
+
+/**
+ * Calculate cost in coins from provider's estimated_cost (in dollars)
+ * Used for DeepInfra which provides estimated_cost in the response
+ * @param estimatedCost - The estimated cost in dollars from the provider
+ * @returns Cost in coins (minimum 1)
+ */
+export function calculateCostFromEstimatedCost(estimatedCost: number): number {
+  // Apply markup and convert to coins
+  const costWithMarkup = estimatedCost * MARKUP_MULTIPLIER;
   const costInCoins = Math.ceil(costWithMarkup * COINS_PER_DOLLAR);
 
   // Ensure minimum cost

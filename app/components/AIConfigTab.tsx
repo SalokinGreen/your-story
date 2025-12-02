@@ -11,6 +11,7 @@ import {
   getPresetEstimatedCost,
   getCustomEstimatedCost,
   getStoryStageCost,
+  getModelConfig,
 } from "@/app/misc/ai_prices";
 import {
   getUserSettings,
@@ -560,9 +561,20 @@ export default function AIConfigTab() {
           <div>
             <span className="text-white/60">Story:</span>{" "}
             {byokMode && novelaiEnabled && hasKey("novelaiKey") ? (
-              <span className="text-green-200">NovelAI GLM-4-6 (BYOK)</span>
+              <span className="text-green-200">
+                NovelAI GLM-4-6 (BYOK) - 8K context
+              </span>
             ) : (
-              effectiveStoryModel
+              <>
+                {effectiveStoryModel}
+                <span className="text-white/40 ml-1">
+                  -{" "}
+                  {Math.round(
+                    getModelConfig(effectiveStoryModel).maxTokens / 1000
+                  )}
+                  K context
+                </span>
+              </>
             )}
           </div>
           <div>
@@ -587,12 +599,14 @@ export default function AIConfigTab() {
         >
           {Object.entries(MODEL_PRESETS)
             .filter(([key]) => {
-              // In BYOK mode, only show custom preset
-              // In Coins mode, show all presets except custom
+              // BYOK presets start with "byok" - only show in BYOK mode
+              const isByokPreset = key.startsWith("byok");
               if (byokMode) {
-                return key === "custom";
+                // In BYOK mode, show custom preset and BYOK presets
+                return key === "custom" || isByokPreset;
               } else {
-                return key !== "custom";
+                // In Coins mode, show all presets except custom and BYOK presets
+                return key !== "custom" && !isByokPreset;
               }
             })
             .map(([key, presetConfig]) => (

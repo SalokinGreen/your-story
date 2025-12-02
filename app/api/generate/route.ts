@@ -7,7 +7,7 @@
  *
  * Provider modes:
  * - BYOK (OpenRouter/DeepSeek): Users provide their own API keys, no token billing
- * - Coins (Mistral): Server-side API key, users pay with coins
+ * - Coins (Mistral/DeepInfra): Server-side API key, users pay with coins
  *
  * Request: { messages, tools?, model, maxTokens, openRouterKey?, deepseekKey? }
  * Response: { content, toolCalls?, meta }
@@ -15,7 +15,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getModelConfig, calculateTokenCost } from "@/app/misc/ai_prices";
+import {
+  getModelConfig,
+  calculateTokenCost,
+  calculateCostFromEstimatedCost,
+} from "@/app/misc/ai_prices";
 import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import { logger } from "@/app/misc/logger";
 
@@ -69,12 +73,13 @@ interface AIResponse {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
+    estimated_cost?: number; // DeepInfra provides this in dollars
   };
 }
 
 async function callAI(
   messages: ChatMessage[],
-  provider: "deepseek" | "openrouter" | "mistral",
+  provider: "deepseek" | "openrouter" | "mistral" | "deepinfra",
   model: string,
   apiKey: string,
   maxTokens: number,
@@ -86,6 +91,8 @@ async function callAI(
     endpoint = "https://api.deepseek.com/chat/completions";
   } else if (provider === "mistral") {
     endpoint = "https://api.mistral.ai/v1/chat/completions";
+  } else if (provider === "deepinfra") {
+    endpoint = "https://api.deepinfra.com/v1/openai/chat/completions";
   } else {
     endpoint = "https://openrouter.ai/api/v1/chat/completions";
   }
@@ -147,7 +154,7 @@ async function callAI(
 }
 
 function getApiKey(
-  provider: "deepseek" | "openrouter" | "mistral",
+  provider: "deepseek" | "openrouter" | "mistral" | "deepinfra",
   openRouterKey?: string,
   deepseekKey?: string
 ): string | null {
@@ -156,6 +163,9 @@ function getApiKey(
   } else if (provider === "mistral") {
     // Mistral uses server-side API key - users pay with coins
     return process.env.MISTRAL_API_KEY || null;
+  } else if (provider === "deepinfra") {
+    // DeepInfra uses server-side API key - users pay with coins
+    return process.env.DEEPINFRA_API_KEY || null;
   } else {
     return openRouterKey || null;
   }
@@ -203,9 +213,13 @@ export async function POST(req: NextRequest) {
     // Get model config
     const modelConfig = getModelConfig(model);
 
-    // Get API key from user's provided keys (or server key for Mistral)
+    // Get API key from user's provided keys (or server key for Mistral/DeepInfra)
     const apiKey = getApiKey(
-      modelConfig.provider as "deepseek" | "openrouter" | "mistral",
+      modelConfig.provider as
+        | "deepseek"
+        | "openrouter"
+        | "mistral"
+        | "deepinfra",
       openRouterKey,
       deepseekKey
     );
@@ -215,9 +229,16 @@ export async function POST(req: NextRequest) {
       if (modelConfig.provider === "mistral") {
         errorMessage =
           "Mistral API is not configured on the server. Please contact support.";
+      } else if (modelConfig.provider === "deepinfra") {
+        errorMessage =
+          "DeepInfra API is not configured on the server. Please contact support.";
       } else {
+        const providerNames: Record<string, string> = {
+          deepseek: "DeepSeek",
+          openrouter: "OpenRouter",
+        };
         const providerName =
-          modelConfig.provider === "deepseek" ? "DeepSeek" : "OpenRouter";
+          providerNames[modelConfig.provider] || modelConfig.provider;
         errorMessage = `No API key configured for ${providerName}. Please add your API key in Settings.`;
       }
       return NextResponse.json(
@@ -229,8 +250,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check token balance for Mistral (Coins mode) before making request
-    if (modelConfig.provider === "mistral") {
+    // Check token balance for Coins mode providers (Mistral/DeepInfra) before making request
+    if (
+      modelConfig.provider === "mistral" ||
+      modelConfig.provider === "deepinfra"
+    ) {
       const balance = await getUserTokenBalance(user.id, supabase);
       const estimatedCost = Math.max(1, modelConfig.cost || 1);
       const currentBalance = balance?.total ?? 0;
@@ -248,7 +272,11 @@ export async function POST(req: NextRequest) {
     // Call AI
     const aiResponse = await callAI(
       messages,
-      modelConfig.provider as "deepseek" | "openrouter" | "mistral",
+      modelConfig.provider as
+        | "deepseek"
+        | "openrouter"
+        | "mistral"
+        | "deepinfra",
       modelConfig.model,
       apiKey,
       maxTokens,
@@ -273,22 +301,34 @@ export async function POST(req: NextRequest) {
       hasToolCalls: !!toolCalls,
     });
 
-    // Deduct tokens for Mistral (Coins mode)
+    // Deduct tokens for Coins mode providers (Mistral/DeepInfra)
     let tokenCost = 0;
     let newBalance: number | undefined;
     if (
-      modelConfig.provider === "mistral" &&
-      (usage.prompt_tokens > 0 || usage.completion_tokens > 0)
+      (modelConfig.provider === "mistral" ||
+        modelConfig.provider === "deepinfra") &&
+      (usage.prompt_tokens > 0 ||
+        usage.completion_tokens > 0 ||
+        usage.estimated_cost !== undefined)
     ) {
-      tokenCost = calculateTokenCost(
-        model,
-        usage.prompt_tokens,
-        usage.completion_tokens
-      );
+      // Use estimated_cost from DeepInfra if available, otherwise calculate from tokens
+      if (
+        modelConfig.provider === "deepinfra" &&
+        usage.estimated_cost !== undefined
+      ) {
+        tokenCost = calculateCostFromEstimatedCost(usage.estimated_cost);
+      } else {
+        tokenCost = calculateTokenCost(
+          model,
+          usage.prompt_tokens,
+          usage.completion_tokens
+        );
+      }
       const deductResult = await deductTokens(user.id, tokenCost, supabase);
       if (!deductResult.success) {
-        logger.warn("Failed to deduct tokens for Mistral generation", {
+        logger.warn("Failed to deduct tokens for generation", {
           userId: user.id,
+          provider: modelConfig.provider,
           tokenCost,
           error: deductResult.error,
         });
