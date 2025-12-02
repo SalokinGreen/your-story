@@ -40,6 +40,9 @@ interface RequestBody {
   openRouterKey?: string;
   deepseekKey?: string;
   novelaiKey?: string;
+  // Resume support
+  skipStages?: GenerationStage[];
+  existingResults?: Partial<BigAdventureResult>;
 }
 
 function getApiKey(
@@ -538,6 +541,8 @@ export async function POST(req: NextRequest) {
           openRouterKey,
           deepseekKey,
           novelaiKey,
+          skipStages = [],
+          existingResults,
         } = body;
 
         if (!config || !config.prompt) {
@@ -621,8 +626,28 @@ export async function POST(req: NextRequest) {
         let totalCompletionTokens = 0;
         const rawOutputs: Record<string, string> = {};
 
+        // Initialize with existing results if resuming
+        if (existingResults) {
+          stageResults.push(existingResults);
+        }
+
         for (let i = 0; i < stages.length; i++) {
           const stage = stages[i];
+
+          // Skip stages that were already completed (resume support)
+          if (skipStages.includes(stage)) {
+            logger.info(`Skipping already completed stage: ${stage}`);
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "stage_skipped",
+                  stage,
+                  message: "Already completed (resumed)",
+                })}\n\n`
+              )
+            );
+            continue;
+          }
 
           // Merge previous results for context
           const previousResults =

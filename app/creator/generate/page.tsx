@@ -712,6 +712,8 @@ function BigAdventureCreatorPage() {
   >({});
   const [tokenCost, setTokenCost] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  // Resume mode - when user is resuming from autosaved partial progress
+  const [resumeMode, setResumeMode] = useState(false);
 
   // Regeneration state
   const [regeneratingSection, setRegeneratingSection] =
@@ -1084,21 +1086,31 @@ function BigAdventureCreatorPage() {
     setShowAutosaveModal(false);
     setPendingAutosave(null);
 
-    // Jump to results if all stages were completed
-    if (
+    // Check if all stages were completed
+    const allStagesCompleted =
       pendingAutosave.completedStages.length >=
-      getStagesToRun(pendingAutosave.config).length
-    ) {
+      getStagesToRun(pendingAutosave.config).length;
+
+    if (allStagesCompleted) {
       // Reconstruct result from partial results
       if (pendingAutosave.partialResults.title) {
         setResult(pendingAutosave.partialResults as BigAdventureResult);
+        addNotification(
+          "Progress restored! Your adventure is ready.",
+          "success"
+        );
       }
+    } else {
+      // Partial progress - enable resume mode and jump to step 4
+      setResumeMode(true);
+      setConfigStep(4);
+      // Set up stages for display
+      setStages(getStagesToRun(pendingAutosave.config));
+      addNotification(
+        `Progress restored! ${pendingAutosave.completedStages.length} of ${getStagesToRun(pendingAutosave.config).length} stages completed. Click "Continue Generation" to resume.`,
+        "success"
+      );
     }
-
-    addNotification(
-      "Progress restored! You can continue generating.",
-      "success"
-    );
   }, [pendingAutosave, addNotification]);
 
   // Handle autosave discard
@@ -1336,18 +1348,29 @@ function BigAdventureCreatorPage() {
     const stagesToRun = getStagesToRun(config);
     const tasks = getTotalGenerationTasks(config);
 
+    // In resume mode, preserve existing progress
+    const isResuming = resumeMode && completedStages.length > 0;
+    const skipStages = isResuming ? completedStages : [];
+    const resumedPartialResults = isResuming ? partialResults : {};
+
     setIsGenerating(true);
     setStages(stagesToRun);
     setTotalTasks(tasks);
-    setCompletedTasks(0);
+    // In resume mode, start from existing progress
+    setCompletedTasks(isResuming ? completedStages.length : 0);
     setCurrentStage(null);
     setCurrentIteration(0);
-    setCompletedStages([]);
+    // Don't reset completed stages in resume mode
+    if (!isResuming) {
+      setCompletedStages([]);
+      setPartialResults({});
+    }
     setFailedStages([]);
     setLiveContent("");
     setResult(null);
-    setPartialResults({});
     setTokenCost(0);
+    // Clear resume mode now that we're generating
+    setResumeMode(false);
 
     // Initialize autosave
     const currentSessionId = sessionId || generateSessionId();
@@ -1368,6 +1391,9 @@ function BigAdventureCreatorPage() {
           novelaiKey: isNovelAISelected ? novelaiKey : undefined,
           openRouterKey: apiKeys.openRouterKey,
           deepseekKey: apiKeys.deepseekKey,
+          // Pass skip stages and existing results for resume
+          skipStages: skipStages.length > 0 ? skipStages : undefined,
+          existingResults: Object.keys(resumedPartialResults).length > 0 ? resumedPartialResults : undefined,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -1383,8 +1409,9 @@ function BigAdventureCreatorPage() {
 
       const decoder = new TextDecoder();
       let buffer = "";
-      let currentPartialResults: Partial<BigAdventureResult> = {};
-      let currentCompletedStages: GenerationStage[] = [];
+      // Initialize with existing results if resuming
+      let currentPartialResults: Partial<BigAdventureResult> = isResuming ? { ...resumedPartialResults } : {};
+      let currentCompletedStages: GenerationStage[] = isResuming ? [...completedStages] : [];
       let currentLiveContent = "";
 
       while (true) {
@@ -1422,6 +1449,12 @@ function BigAdventureCreatorPage() {
               case "stage_content":
                 currentLiveContent += event.content;
                 setLiveContent(currentLiveContent);
+                break;
+
+              case "stage_skipped":
+                // Stage was already completed (resume mode)
+                console.log(`Stage ${event.stage} skipped: ${event.message}`);
+                // Don't increment completedTasks - it was already counted
                 break;
 
               case "stage_complete":
@@ -1572,6 +1605,11 @@ function BigAdventureCreatorPage() {
     isNovelAISelected,
     addNotification,
     sessionId,
+    resumeMode,
+    completedStages,
+    partialResults,
+    apiKeys.openRouterKey,
+    apiKeys.deepseekKey,
   ]);
 
   // Auto-start generation when quick start is ready and user is authenticated
@@ -3919,9 +3957,63 @@ ${result.description || ""}`;
                   </div>
                 </div>
 
+                {/* Resume Mode Progress Display */}
+                {resumeMode && completedStages.length > 0 && (
+                  <div className="bg-linear-to-r from-amber-900/30 to-orange-900/30 rounded-lg p-4 border border-amber-500/30">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-amber-400 text-lg">⏸️</span>
+                      <h4 className="font-medium text-amber-200">
+                        Resumed Progress
+                      </h4>
+                    </div>
+                    <p className="text-sm text-amber-300/70 mb-3">
+                      You have {completedStages.length} of {stages.length} stages completed. 
+                      Click &quot;Continue Generation&quot; to pick up where you left off, or &quot;Start Fresh&quot; to begin again.
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {stages.map((stage) => {
+                        const info = getStageInfo(stage);
+                        const isCompleted = completedStages.includes(stage);
+                        return (
+                          <span
+                            key={stage}
+                            className={`px-2 py-1 rounded text-xs ${
+                              isCompleted
+                                ? "bg-green-900/40 text-green-300 border border-green-700/30"
+                                : "bg-blue-900/30 text-blue-300/60 border border-blue-700/30"
+                            }`}
+                          >
+                            {info.emoji} {info.name} {isCompleted ? "✓" : "○"}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setResumeMode(false);
+                        setCompletedStages([]);
+                        setPartialResults({});
+                        clearAutosave();
+                        addNotification("Cleared previous progress. Ready to start fresh.", "success");
+                      }}
+                      className="text-xs text-amber-400/70 hover:text-amber-300 underline"
+                    >
+                      Start Fresh (discard progress)
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex gap-3 pt-4">
                   <button
-                    onClick={() => setConfigStep(3)}
+                    onClick={() => {
+                      setConfigStep(3);
+                      // Clear resume mode if going back
+                      if (resumeMode) {
+                        setResumeMode(false);
+                        setCompletedStages([]);
+                        setPartialResults({});
+                      }
+                    }}
                     className="px-6 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
                   >
                     ← Back
@@ -3929,9 +4021,13 @@ ${result.description || ""}`;
                   <button
                     onClick={startGeneration}
                     disabled={!config.prompt.trim()}
-                    className="flex-1 px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-blue-300/50 text-white rounded-lg font-medium transition-colors"
+                    className={`flex-1 px-6 py-3 text-white rounded-lg font-medium transition-colors ${
+                      resumeMode
+                        ? "bg-linear-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-blue-300/50"
+                        : "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-blue-300/50"
+                    }`}
                   >
-                    ✨ Generate Adventure
+                    {resumeMode ? "🔄 Continue Generation" : "✨ Generate Adventure"}
                   </button>
                 </div>
               </div>

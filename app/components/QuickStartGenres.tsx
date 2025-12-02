@@ -73,8 +73,8 @@ const sizePresets = [
     name: "Quick",
     value: "quick",
     tokens: 20000,
-    timeMin: 2,
-    timeMax: 4,
+    timeMin: 4,
+    timeMax: 6,
     description: "Basic adventure, fewer details",
     estimatedCoins: 8, // ~$0.007
   },
@@ -82,8 +82,8 @@ const sizePresets = [
     name: "Standard",
     value: "standard",
     tokens: 50000,
-    timeMin: 5,
-    timeMax: 8,
+    timeMin: 8,
+    timeMax: 12,
     description: "Well-rounded adventure",
     estimatedCoins: 18, // ~$0.017
   },
@@ -91,8 +91,8 @@ const sizePresets = [
     name: "Detailed",
     value: "detailed",
     tokens: 100000,
-    timeMin: 10,
-    timeMax: 15,
+    timeMin: 18,
+    timeMax: 25,
     description: "Rich lore and content",
     estimatedCoins: 35, // ~$0.033
   },
@@ -100,8 +100,8 @@ const sizePresets = [
     name: "Epic",
     value: "epic",
     tokens: 200000,
-    timeMin: 18,
-    timeMax: 25,
+    timeMin: 35,
+    timeMax: 50,
     description: "Maximum depth and detail",
     estimatedCoins: 68, // ~$0.065
   },
