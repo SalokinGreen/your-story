@@ -608,7 +608,7 @@ function BigAdventureCreatorPage() {
     rpgSystem: "1d20",
     complexity: "moderate",
     nsfw: false,
-    includeMythic: false,
+    includeMythic: true,
     includeUpgradeShop: true,
     includeCustomTables: true,
     includePresets: true,
