@@ -758,13 +758,13 @@ function BigAdventureCreatorPage() {
     }
   }, [extensionByokMode, extensionModel]);
 
-  // Filter extension models based on BYOK mode (exclude NovelAI since it doesn't work for JSON)
+  // Filter extension models based on BYOK mode
+  // Note: NovelAI may not work well for complex JSON sections, but user can try
   const filteredExtensionModels = Object.entries(AI_MODELS).filter(
     ([, model]) => {
       const provider = (model as { provider?: string }).provider;
-      if (provider === "novelai") return false; // NovelAI doesn't work well for JSON generation
       if (extensionByokMode) {
-        return provider === "openrouter" || provider === "deepseek";
+        return provider === "openrouter" || provider === "deepseek" || provider === "novelai";
       } else {
         return provider === "mistral" || provider === "deepinfra";
       }
@@ -1615,6 +1615,7 @@ function BigAdventureCreatorPage() {
             additionalInstructions: customInstructions || undefined,
             openRouterKey: apiKeys.openRouterKey,
             deepseekKey: apiKeys.deepseekKey,
+            novelaiKey,
           }),
         });
 
@@ -1759,6 +1760,7 @@ function BigAdventureCreatorPage() {
             model: extensionModel,
             openRouterKey: apiKeys.openRouterKey,
             deepseekKey: apiKeys.deepseekKey,
+            novelaiKey,
           }),
         });
 
