@@ -590,6 +590,8 @@ function BigAdventureCreatorPage() {
   const [isQuickStart, setIsQuickStart] = useState(false);
   const [quickStartReady, setQuickStartReady] = useState(false);
   const [autoPublishAndPlay, setAutoPublishAndPlay] = useState(false);
+  // Track if initial config load has been done (to prevent re-loading after Quick Start clears URL)
+  const initialLoadDoneRef = useRef<boolean>(false);
 
   // Autosave state
   const [pendingAutosave, setPendingAutosave] =
@@ -982,6 +984,12 @@ function BigAdventureCreatorPage() {
 
   // Load autosave, config draft, and templates on mount
   useEffect(() => {
+    // Only run once - prevent re-running when URL params change
+    if (initialLoadDoneRef.current) {
+      return;
+    }
+    initialLoadDoneRef.current = true;
+
     // Skip loading saved config if this is a quick start - Quick Start effect will set the config
     if (isQuickStartMount) {
       // Still load templates and history, just skip autosave/draft
