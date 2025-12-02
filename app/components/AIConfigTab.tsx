@@ -220,8 +220,8 @@ export default function AIConfigTab() {
   // Check if user has any AI keys configured
   const hasAnyAIKey = hasKey("openRouterKey") || hasKey("deepseekKey");
 
-  // Get current preset configuration (fallback to mistral if preset not found)
-  const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["mistral"];
+  // Get current preset configuration (fallback to mistralLarge if preset not found)
+  const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["mistralLarge"];
   const effectiveStoryModel =
     currentPreset === "custom" && storyModel ? storyModel : preset.storyModel;
   const effectiveToolsModel =
@@ -449,10 +449,10 @@ export default function AIConfigTab() {
                   const newValue = e.target.checked;
                   setByokMode(newValue);
                   if (!newValue) {
-                    // Switching to Coins mode - auto-select Mistral preset
-                    handlePresetChange("mistral");
+                    // Switching to Coins mode - auto-select Mistral Large preset
+                    handlePresetChange("mistralLarge");
                     addNotification(
-                      "Switched to Coins mode with Mistral models",
+                      "Switched to Coins mode with Mistral Large models",
                       "success"
                     );
                   } else {
