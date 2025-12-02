@@ -620,7 +620,7 @@ function BigAdventureCreatorPage() {
     temperature: 0.7,
     stylePreset: "default",
   });
-  const [selectedModel, setSelectedModel] = useState("Mistral Large");
+  const [selectedModel, setSelectedModel] = useState("Mistral Large 3.0");
   const [novelaiKey, setNovelaiKey] = useState("");
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
   const [byokMode, setByokMode] = useState(() => {
@@ -663,7 +663,7 @@ function BigAdventureCreatorPage() {
     }
     // If in Coins mode but current model is BYOK-only, switch to default coins model
     if (!byokMode && isBYOKProvider) {
-      setSelectedModel("Mistral Large");
+      setSelectedModel("Mistral Large 3.0");
     }
   }, [byokMode, selectedModel]);
 
@@ -979,11 +979,11 @@ function BigAdventureCreatorPage() {
         stylePreset: genreStyleMap[genre] || "default",
       });
 
-      // Use Mistral Large for ALL stages (Coins mode)
+      // Use Mistral Large 3.0 for ALL stages (Coins mode)
       setByokMode(false);
-      setSelectedModel("Mistral Large");
+      setSelectedModel("Mistral Large 3.0");
       setExtensionByokMode(false);
-      setExtensionModel("Mistral Large");
+      setExtensionModel("Mistral Large 3.0");
 
       // Enable auto-publish and play for quick start
       setAutoPublishAndPlay(true);
@@ -1634,7 +1634,7 @@ function BigAdventureCreatorPage() {
       setQuickStartReady(false);
       setIsQuickStart(false); // Clear quick start flag once we start
       addNotification(
-        `Quick Start: Generating ${config.genre} adventure with Mistral Large...`,
+        `Quick Start: Generating ${config.genre} adventure with Mistral Large 3.0...`,
         "success"
       );
       // Call startGeneration directly, no delay needed
@@ -2425,7 +2425,7 @@ ${result.description || ""}`;
             Preparing Your Adventure
           </h2>
           <p className="text-blue-300/60">
-            Setting up {config.genre} adventure with Mistral Large...
+            Setting up {config.genre} adventure with Mistral Large 3.0...
           </p>
         </div>
       </div>
@@ -3196,7 +3196,6 @@ ${result.description || ""}`;
                       <option value="long">Long (4-6+ hours)</option>
                     </select>
                   </div>
-
                 </div>
 
                 <div>
@@ -3377,9 +3376,7 @@ ${result.description || ""}`;
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span
-                          className={`text-lg ${
-                            byokMode ? "opacity-50" : ""
-                          }`}
+                          className={`text-lg ${byokMode ? "opacity-50" : ""}`}
                         >
                           🪙
                         </span>
