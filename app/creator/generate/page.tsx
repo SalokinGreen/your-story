@@ -664,7 +664,10 @@ export default function BigAdventureCreatorPage() {
 
   // Get the selected extension model config
   const extensionModelConfig = getModelConfig(extensionModel);
-  const extensionMaxOutput = Math.min(extensionModelConfig.maxOutputTokens || 8000, 65000);
+  const extensionMaxOutput = Math.min(
+    extensionModelConfig.maxOutputTokens || 8000,
+    65000
+  );
 
   // Content preview expansion state
   const [expandedSections, setExpandedSections] = useState<
@@ -1387,12 +1390,25 @@ export default function BigAdventureCreatorPage() {
         setRegenerationContent("");
       }
     },
-    [result, config, user, addNotification, apiKeys.openRouterKey, apiKeys.deepseekKey, extensionModel, extensionOutputSize]
+    [
+      result,
+      config,
+      user,
+      addNotification,
+      apiKeys.openRouterKey,
+      apiKeys.deepseekKey,
+      extensionModel,
+      extensionOutputSize,
+    ]
   );
 
   // Extend a section (add more content)
   const handleExtendSection = useCallback(
-    async (section: RegenerateSection, maxOutputTokens: number = 4000, customInstructions?: string) => {
+    async (
+      section: RegenerateSection,
+      maxOutputTokens: number = 4000,
+      customInstructions?: string
+    ) => {
       if (!result || !user) return;
 
       if (!canExtendSection(section)) {
@@ -1488,7 +1504,10 @@ export default function BigAdventureCreatorPage() {
                   );
                 } else {
                   // Parsing failed - show error to user
-                  console.error("Extend section: Failed to parse result", event.rawContent);
+                  console.error(
+                    "Extend section: Failed to parse result",
+                    event.rawContent
+                  );
                   addNotification(
                     `Failed to parse extended ${REGENERATE_SECTIONS[section].name} - check console for details`,
                     "warning"
@@ -1511,7 +1530,15 @@ export default function BigAdventureCreatorPage() {
         setExtensionContent("");
       }
     },
-    [result, config, user, addNotification, apiKeys.openRouterKey, apiKeys.deepseekKey, extensionModel]
+    [
+      result,
+      config,
+      user,
+      addNotification,
+      apiKeys.openRouterKey,
+      apiKeys.deepseekKey,
+      extensionModel,
+    ]
   );
 
   // Export adventure as JSON
@@ -1787,7 +1814,14 @@ ${result.description || ""}`;
         setGenerating(false);
       }
     },
-    [user, thumbnailPrompt, bannerPrompt, imageModel, addNotification, apiKeys.openRouterKey]
+    [
+      user,
+      thumbnailPrompt,
+      bannerPrompt,
+      imageModel,
+      addNotification,
+      apiKeys.openRouterKey,
+    ]
   );
 
   // Save adventure
@@ -3423,7 +3457,9 @@ ${result.description || ""}`;
                   {result.title || "Untitled Adventure"}
                 </h3>
                 <button
-                  onClick={() => handleRegenerateSection("title", extensionInstructions)}
+                  onClick={() =>
+                    handleRegenerateSection("title", extensionInstructions)
+                  }
                   disabled={regeneratingSection !== null}
                   className="text-xs px-2 py-1 bg-blue-800/50 hover:bg-blue-700/50 disabled:bg-blue-900/30 disabled:text-blue-300/30 text-blue-300 rounded transition-colors"
                   title="Regenerate title & descriptions"
@@ -3510,9 +3546,15 @@ ${result.description || ""}`;
                       items={result.storyTemplate.stats || []}
                       isExpanded={expandedSections.has("stats")}
                       onToggleExpand={() => toggleSectionExpanded("stats")}
-                      onRegenerate={() => handleRegenerateSection("stats", extensionInstructions)}
+                      onRegenerate={() =>
+                        handleRegenerateSection("stats", extensionInstructions)
+                      }
                       onExtend={() =>
-                        handleExtendSection("stats", extensionOutputSize, extensionInstructions)
+                        handleExtendSection(
+                          "stats",
+                          extensionOutputSize,
+                          extensionInstructions
+                        )
                       }
                       isRegenerating={regeneratingSection === "stats"}
                       isExtending={extendingSection === "stats"}
@@ -3546,9 +3588,18 @@ ${result.description || ""}`;
                       items={result.storyTemplate.resources || []}
                       isExpanded={expandedSections.has("resources")}
                       onToggleExpand={() => toggleSectionExpanded("resources")}
-                      onRegenerate={() => handleRegenerateSection("resources", extensionInstructions)}
+                      onRegenerate={() =>
+                        handleRegenerateSection(
+                          "resources",
+                          extensionInstructions
+                        )
+                      }
                       onExtend={() =>
-                        handleExtendSection("resources", extensionOutputSize, extensionInstructions)
+                        handleExtendSection(
+                          "resources",
+                          extensionOutputSize,
+                          extensionInstructions
+                        )
                       }
                       isRegenerating={regeneratingSection === "resources"}
                       isExtending={extendingSection === "resources"}
@@ -3582,9 +3633,18 @@ ${result.description || ""}`;
                       items={result.storyTemplate.abilities || []}
                       isExpanded={expandedSections.has("abilities")}
                       onToggleExpand={() => toggleSectionExpanded("abilities")}
-                      onRegenerate={() => handleRegenerateSection("abilities", extensionInstructions)}
+                      onRegenerate={() =>
+                        handleRegenerateSection(
+                          "abilities",
+                          extensionInstructions
+                        )
+                      }
                       onExtend={() =>
-                        handleExtendSection("abilities", extensionOutputSize, extensionInstructions)
+                        handleExtendSection(
+                          "abilities",
+                          extensionOutputSize,
+                          extensionInstructions
+                        )
                       }
                       isRegenerating={regeneratingSection === "abilities"}
                       isExtending={extendingSection === "abilities"}
@@ -3618,9 +3678,18 @@ ${result.description || ""}`;
                       items={result.storyTemplate.plot_beats || []}
                       isExpanded={expandedSections.has("plotBeats")}
                       onToggleExpand={() => toggleSectionExpanded("plotBeats")}
-                      onRegenerate={() => handleRegenerateSection("plotBeats", extensionInstructions)}
+                      onRegenerate={() =>
+                        handleRegenerateSection(
+                          "plotBeats",
+                          extensionInstructions
+                        )
+                      }
                       onExtend={() =>
-                        handleExtendSection("plotBeats", extensionOutputSize, extensionInstructions)
+                        handleExtendSection(
+                          "plotBeats",
+                          extensionOutputSize,
+                          extensionInstructions
+                        )
                       }
                       isRegenerating={regeneratingSection === "plotBeats"}
                       isExtending={extendingSection === "plotBeats"}
@@ -3648,9 +3717,15 @@ ${result.description || ""}`;
                       items={result.storyTemplate.lore || []}
                       isExpanded={expandedSections.has("lore")}
                       onToggleExpand={() => toggleSectionExpanded("lore")}
-                      onRegenerate={() => handleRegenerateSection("lore", extensionInstructions)}
+                      onRegenerate={() =>
+                        handleRegenerateSection("lore", extensionInstructions)
+                      }
                       onExtend={() =>
-                        handleExtendSection("lore", extensionOutputSize, extensionInstructions)
+                        handleExtendSection(
+                          "lore",
+                          extensionOutputSize,
+                          extensionInstructions
+                        )
                       }
                       isRegenerating={regeneratingSection === "lore"}
                       isExtending={extendingSection === "lore"}
@@ -3681,10 +3756,17 @@ ${result.description || ""}`;
                         toggleSectionExpanded("achievements")
                       }
                       onRegenerate={() =>
-                        handleRegenerateSection("achievements", extensionInstructions)
+                        handleRegenerateSection(
+                          "achievements",
+                          extensionInstructions
+                        )
                       }
                       onExtend={() =>
-                        handleExtendSection("achievements", extensionOutputSize, extensionInstructions)
+                        handleExtendSection(
+                          "achievements",
+                          extensionOutputSize,
+                          extensionInstructions
+                        )
                       }
                       isRegenerating={regeneratingSection === "achievements"}
                       isExtending={extendingSection === "achievements"}
@@ -3720,9 +3802,15 @@ ${result.description || ""}`;
                       items={result.storyTemplate.quests || []}
                       isExpanded={expandedSections.has("quests")}
                       onToggleExpand={() => toggleSectionExpanded("quests")}
-                      onRegenerate={() => handleRegenerateSection("quests", extensionInstructions)}
+                      onRegenerate={() =>
+                        handleRegenerateSection("quests", extensionInstructions)
+                      }
                       onExtend={() =>
-                        handleExtendSection("quests", extensionOutputSize, extensionInstructions)
+                        handleExtendSection(
+                          "quests",
+                          extensionOutputSize,
+                          extensionInstructions
+                        )
                       }
                       isRegenerating={regeneratingSection === "quests"}
                       isExtending={extendingSection === "quests"}
@@ -3753,10 +3841,17 @@ ${result.description || ""}`;
                         toggleSectionExpanded("relationships")
                       }
                       onRegenerate={() =>
-                        handleRegenerateSection("relationships", extensionInstructions)
+                        handleRegenerateSection(
+                          "relationships",
+                          extensionInstructions
+                        )
                       }
                       onExtend={() =>
-                        handleExtendSection("relationships", extensionOutputSize, extensionInstructions)
+                        handleExtendSection(
+                          "relationships",
+                          extensionOutputSize,
+                          extensionInstructions
+                        )
                       }
                       isRegenerating={regeneratingSection === "relationships"}
                       isExtending={extendingSection === "relationships"}
@@ -3797,9 +3892,18 @@ ${result.description || ""}`;
                       items={result.storyTemplate.presets || []}
                       isExpanded={expandedSections.has("presets")}
                       onToggleExpand={() => toggleSectionExpanded("presets")}
-                      onRegenerate={() => handleRegenerateSection("presets", extensionInstructions)}
+                      onRegenerate={() =>
+                        handleRegenerateSection(
+                          "presets",
+                          extensionInstructions
+                        )
+                      }
                       onExtend={() =>
-                        handleExtendSection("presets", extensionOutputSize, extensionInstructions)
+                        handleExtendSection(
+                          "presets",
+                          extensionOutputSize,
+                          extensionInstructions
+                        )
                       }
                       isRegenerating={regeneratingSection === "presets"}
                       isExtending={extendingSection === "presets"}
@@ -3832,9 +3936,18 @@ ${result.description || ""}`;
                       items={result.storyTemplate.inventory || []}
                       isExpanded={expandedSections.has("inventory")}
                       onToggleExpand={() => toggleSectionExpanded("inventory")}
-                      onRegenerate={() => handleRegenerateSection("inventory", extensionInstructions)}
+                      onRegenerate={() =>
+                        handleRegenerateSection(
+                          "inventory",
+                          extensionInstructions
+                        )
+                      }
                       onExtend={() =>
-                        handleExtendSection("inventory", extensionOutputSize, extensionInstructions)
+                        handleExtendSection(
+                          "inventory",
+                          extensionOutputSize,
+                          extensionInstructions
+                        )
                       }
                       isRegenerating={regeneratingSection === "inventory"}
                       isExtending={extendingSection === "inventory"}
@@ -3869,7 +3982,12 @@ ${result.description || ""}`;
                       items={result.storyTemplate.variables || []}
                       isExpanded={expandedSections.has("variables")}
                       onToggleExpand={() => toggleSectionExpanded("variables")}
-                      onRegenerate={() => handleRegenerateSection("variables", extensionInstructions)}
+                      onRegenerate={() =>
+                        handleRegenerateSection(
+                          "variables",
+                          extensionInstructions
+                        )
+                      }
                       onExtend={() => {}}
                       isRegenerating={regeneratingSection === "variables"}
                       isExtending={false}
@@ -3912,7 +4030,10 @@ ${result.description || ""}`;
                         toggleSectionExpanded("startingChoices")
                       }
                       onRegenerate={() =>
-                        handleRegenerateSection("startingChoices", extensionInstructions)
+                        handleRegenerateSection(
+                          "startingChoices",
+                          extensionInstructions
+                        )
                       }
                       onExtend={() => {}}
                       isRegenerating={regeneratingSection === "startingChoices"}
@@ -3952,10 +4073,17 @@ ${result.description || ""}`;
                             toggleSectionExpanded("customTables")
                           }
                           onRegenerate={() =>
-                            handleRegenerateSection("customTables", extensionInstructions)
+                            handleRegenerateSection(
+                              "customTables",
+                              extensionInstructions
+                            )
                           }
                           onExtend={() =>
-                            handleExtendSection("customTables", extensionOutputSize, extensionInstructions)
+                            handleExtendSection(
+                              "customTables",
+                              extensionOutputSize,
+                              extensionInstructions
+                            )
                           }
                           isRegenerating={
                             regeneratingSection === "customTables"
@@ -3983,14 +4111,19 @@ ${result.description || ""}`;
 
                   {/* Extension model selector */}
                   <div className="mt-4">
-                    <label className="block text-sm text-blue-300/60 mb-2">Model for Extend/Regenerate:</label>
+                    <label className="block text-sm text-blue-300/60 mb-2">
+                      Model for Extend/Regenerate:
+                    </label>
                     <select
                       value={extensionModel}
                       onChange={(e) => {
                         setExtensionModel(e.target.value);
                         // Clamp output size to new model's max
                         const newConfig = getModelConfig(e.target.value);
-                        const newMax = Math.min(newConfig.maxOutputTokens || 8000, 65000);
+                        const newMax = Math.min(
+                          newConfig.maxOutputTokens || 8000,
+                          65000
+                        );
                         if (extensionOutputSize > newMax) {
                           setExtensionOutputSize(newMax);
                         }
@@ -4001,7 +4134,8 @@ ${result.description || ""}`;
                         .filter(([, model]) => model.provider !== "novelai") // NovelAI doesn't work well for JSON generation
                         .map(([key, model]) => (
                           <option key={key} value={key}>
-                            {model.name} (max {(model.maxOutputTokens / 1000).toFixed(0)}K output)
+                            {model.name} (max{" "}
+                            {(model.maxOutputTokens / 1000).toFixed(0)}K output)
                           </option>
                         ))}
                     </select>
@@ -4016,11 +4150,18 @@ ${result.description || ""}`;
                         min="2000"
                         max={extensionMaxOutput}
                         step="1000"
-                        value={Math.min(extensionOutputSize, extensionMaxOutput)}
-                        onChange={(e) => setExtensionOutputSize(parseInt(e.target.value))}
+                        value={Math.min(
+                          extensionOutputSize,
+                          extensionMaxOutput
+                        )}
+                        onChange={(e) =>
+                          setExtensionOutputSize(parseInt(e.target.value))
+                        }
                         className="flex-1 max-w-48 h-2 bg-blue-900/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
                       />
-                      <span className="text-purple-400 font-medium min-w-12 text-center">{(extensionOutputSize / 1000).toFixed(0)}K</span>
+                      <span className="text-purple-400 font-medium min-w-12 text-center">
+                        {(extensionOutputSize / 1000).toFixed(0)}K
+                      </span>
                     </div>
                   </div>
 
@@ -4028,10 +4169,20 @@ ${result.description || ""}`;
                   <div className="mt-2 text-xs text-blue-400/60 flex items-center gap-2">
                     <span>💰 Estimated cost:</span>
                     <span className="text-purple-400 font-medium">
-                      ~${((extensionModelConfig.inputPrice * 4000 / 1000000) + (extensionModelConfig.outputPrice * extensionOutputSize / 1000000)).toFixed(4)}
+                      ~$
+                      {(
+                        (extensionModelConfig.inputPrice * 4000) / 1000000 +
+                        (extensionModelConfig.outputPrice *
+                          extensionOutputSize) /
+                          1000000
+                      ).toFixed(4)}
                     </span>
                     <span className="text-blue-400/40">
-                      ({extensionModelConfig.provider === "deepseek" ? "DeepSeek" : "OpenRouter"} BYOK)
+                      (
+                      {extensionModelConfig.provider === "deepseek"
+                        ? "DeepSeek"
+                        : "OpenRouter"}{" "}
+                      BYOK)
                     </span>
                   </div>
 

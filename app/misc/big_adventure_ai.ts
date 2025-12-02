@@ -1133,6 +1133,8 @@ LORE TRIGGERS (make lore dynamic):
 - secrtet: true for hidden lore the AI knows but player hasn't discovered yet
 - alwaysOn: true for fundamental world facts player should always have access to
 
+CRITICAL: EVERY lore entry MUST have on_triggers with 3-5 variations OR set alwaysOn=true. Empty on_triggers arrays are NOT allowed!
+
 RELATIONSHIP VALUES: -100 (mortal enemy) to +100 (devoted ally)
 
 OUTPUT JSON SCHEMA:
@@ -1142,15 +1144,15 @@ OUTPUT JSON SCHEMA:
   ],
   "lore": [
     {
-      "title": "string (specific name - 'Lord Varen Blackwood' not 'The Villain')",
+      "title": "Lord Varen Blackwood",
       "content": "string (2-4 DETAILED paragraphs with specific names, descriptions, history, motivations, and connections to other lore)",
-      "secrtet": boolean,
-      "on": boolean,
-      "alwaysOn": boolean,
-      "on_triggers": ["string"],
-      "off_triggers": ["string"],
-      "beats_trigger": [number],
-      "var_on_triggers": ["string"]
+      "secrtet": false,
+      "on": false,
+      "alwaysOn": false,
+      "on_triggers": ["Varen", "Blackwood", "Lord Blackwood", "the lord", "Lord Varen"],
+      "off_triggers": [],
+      "beats_trigger": [],
+      "var_on_triggers": []
     }
   ],
   "relationships": [
@@ -1621,16 +1623,16 @@ export function attemptJSONRepair(content: string): string {
     // Find the last complete array/object element before truncation
     // Look for patterns like: }, or }, { or ], or ]
     const truncated = jsonContent.slice(0, lastValidPosition + 1);
-    
+
     // Remove any trailing partial element after a comma
-    // This handles cases like: [..., {"name": "test", "value": 
+    // This handles cases like: [..., {"name": "test", "value":
     let cleaned = truncated.replace(/,\s*\{[^}]*$/, ""); // Partial object at end of array
     cleaned = cleaned.replace(/,\s*\[[^\]]*$/, ""); // Partial array at end
     cleaned = cleaned.replace(/,\s*"[^"]*"?\s*:?\s*(?:"[^"]*)?$/, ""); // Partial key-value
     cleaned = cleaned.replace(/,\s*$/, ""); // Trailing comma
-    
+
     jsonContent = cleaned;
-    
+
     // Recount stack after truncation
     stack.length = 0;
     inString = false;
@@ -1662,7 +1664,7 @@ export function attemptJSONRepair(content: string): string {
   // Final cleanup - remove trailing incomplete elements more aggressively
   // Handle case where we have a trailing comma before closing bracket
   jsonContent = jsonContent.replace(/,(\s*[}\]])/, "$1");
-  
+
   // Close remaining brackets/braces
   while (stack.length > 0) {
     jsonContent += stack.pop();
@@ -2153,8 +2155,9 @@ TRIGGERS - CRITICAL:
 - ALWAYS include nicknames: ["Naomy", "Nao", "Lady Naomy", "Miss Blackwood"]
 - Be thorough! List every form/alias a player might naturally use
 - Use beats_trigger for plot-gated dramatic reveals
-- Use alwaysOn for core world facts the player should always know`,
-      schema: `{ "lore": [{ "title": "string (specific name)", "content": "string (2-4 detailed paragraphs)", "secrtet": boolean, "on": boolean, "alwaysOn": boolean, "on_triggers": ["string (include ALL variations/aliases!)"], "off_triggers": ["string"], "beats_trigger": [number], "var_on_triggers": ["string"] }] }`,
+- Use alwaysOn for core world facts the player should always know
+- EVERY lore entry MUST have on_triggers OR alwaysOn=true - no empty triggers!`,
+      schema: `{ "lore": [{ "title": "Lord Varen Blackwood", "content": "string (2-4 detailed paragraphs)", "secrtet": false, "on": false, "alwaysOn": false, "on_triggers": ["Varen", "Blackwood", "Lord Blackwood", "the lord"], "off_triggers": [], "beats_trigger": [], "var_on_triggers": [] }] }`,
       count: Math.round(counts.lore * durationMultiplier),
     },
     achievements: {
@@ -2574,8 +2577,9 @@ TRIGGERS - IMPORTANT:
 - Include all variations: ["gun", "guns", "pistol", "pistols"]
 - Include nicknames/aliases: ["Naomy", "Nao", "Lady Naomy"]
 - Use beats_trigger for plot-gated secrets
+- EVERY lore entry MUST have on_triggers OR alwaysOn=true - no empty triggers!
 Ensure new lore references and connects to existing lore entries.`,
-      schema: `{ "lore": [{ "title": "string (specific name)", "content": "string (2-4 detailed paragraphs)", "secrtet": boolean, "on": boolean, "alwaysOn": boolean, "on_triggers": ["string (include variations!)"], "off_triggers": ["string"], "beats_trigger": [number], "var_on_triggers": ["string"] }] }`,
+      schema: `{ "lore": [{ "title": "Captain Sera Vex", "content": "string (2-4 detailed paragraphs)", "secrtet": false, "on": false, "alwaysOn": false, "on_triggers": ["Sera", "Vex", "Captain Vex", "the captain"], "off_triggers": [], "beats_trigger": [], "var_on_triggers": [] }] }`,
     },
     achievements: {
       instruction: `Generate NEW achievements with ai_hint for precise triggering. Generate as many as possible.`,
@@ -2639,9 +2643,13 @@ ${context}
 
 ORIGINAL PROMPT:
 "${config.prompt}"
-${styleModifier ? `\nSTYLE DIRECTION: ${styleModifier}` : ""}${customInstructions ? `\n\nCUSTOM INSTRUCTIONS:\n${customInstructions}` : ""}
+${styleModifier ? `\nSTYLE DIRECTION: ${styleModifier}` : ""}${
+    customInstructions ? `\n\nCUSTOM INSTRUCTIONS:\n${customInstructions}` : ""
+  }
 
-TASK: Add MORE ${sectionInfo.name} entries. Generate as many as your output budget allows.
+TASK: Add MORE ${
+    sectionInfo.name
+  } entries. Generate as many as your output budget allows.
 ${sectionPrompt.instruction}
 
 IMPORTANT:

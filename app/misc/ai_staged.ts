@@ -220,9 +220,7 @@ export function buildInfoMessage(
   } else {
     // Use all memories for smaller sets (or when no embeddings)
     memorySection = storyData.memory.length
-      ? `## Memory\n${storyData.memory
-          .map((m) => `- ${m}`)
-          .join("\n")}`
+      ? `## Memory\n${storyData.memory.map((m) => `- ${m}`).join("\n")}`
       : "";
   }
 
@@ -313,9 +311,7 @@ export function buildInfoMessage(
             : ""
         }${
           inactiveQuests.length
-            ? `${
-                activeQuests.length ? "\n" : ""
-              }### Inactive\n${inactiveQuests
+            ? `${activeQuests.length ? "\n" : ""}### Inactive\n${inactiveQuests
                 .map((q) => `- ${q.title}`)
                 .join("\n")}`
             : ""
