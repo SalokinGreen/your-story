@@ -1107,7 +1107,9 @@ function BigAdventureCreatorPage() {
       // Set up stages for display
       setStages(getStagesToRun(pendingAutosave.config));
       addNotification(
-        `Progress restored! ${pendingAutosave.completedStages.length} of ${getStagesToRun(pendingAutosave.config).length} stages completed. Click "Continue Generation" to resume.`,
+        `Progress restored! ${pendingAutosave.completedStages.length} of ${
+          getStagesToRun(pendingAutosave.config).length
+        } stages completed. Click "Continue Generation" to resume.`,
         "success"
       );
     }
@@ -1393,7 +1395,10 @@ function BigAdventureCreatorPage() {
           deepseekKey: apiKeys.deepseekKey,
           // Pass skip stages and existing results for resume
           skipStages: skipStages.length > 0 ? skipStages : undefined,
-          existingResults: Object.keys(resumedPartialResults).length > 0 ? resumedPartialResults : undefined,
+          existingResults:
+            Object.keys(resumedPartialResults).length > 0
+              ? resumedPartialResults
+              : undefined,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -1410,8 +1415,12 @@ function BigAdventureCreatorPage() {
       const decoder = new TextDecoder();
       let buffer = "";
       // Initialize with existing results if resuming
-      let currentPartialResults: Partial<BigAdventureResult> = isResuming ? { ...resumedPartialResults } : {};
-      let currentCompletedStages: GenerationStage[] = isResuming ? [...completedStages] : [];
+      let currentPartialResults: Partial<BigAdventureResult> = isResuming
+        ? { ...resumedPartialResults }
+        : {};
+      let currentCompletedStages: GenerationStage[] = isResuming
+        ? [...completedStages]
+        : [];
       let currentLiveContent = "";
 
       while (true) {
@@ -3967,8 +3976,10 @@ ${result.description || ""}`;
                       </h4>
                     </div>
                     <p className="text-sm text-amber-300/70 mb-3">
-                      You have {completedStages.length} of {stages.length} stages completed. 
-                      Click &quot;Continue Generation&quot; to pick up where you left off, or &quot;Start Fresh&quot; to begin again.
+                      You have {completedStages.length} of {stages.length}{" "}
+                      stages completed. Click &quot;Continue Generation&quot; to
+                      pick up where you left off, or &quot;Start Fresh&quot; to
+                      begin again.
                     </p>
                     <div className="flex flex-wrap gap-2 mb-3">
                       {stages.map((stage) => {
@@ -3994,7 +4005,10 @@ ${result.description || ""}`;
                         setCompletedStages([]);
                         setPartialResults({});
                         clearAutosave();
-                        addNotification("Cleared previous progress. Ready to start fresh.", "success");
+                        addNotification(
+                          "Cleared previous progress. Ready to start fresh.",
+                          "success"
+                        );
                       }}
                       className="text-xs text-amber-400/70 hover:text-amber-300 underline"
                     >
@@ -4027,7 +4041,9 @@ ${result.description || ""}`;
                         : "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-blue-300/50"
                     }`}
                   >
-                    {resumeMode ? "🔄 Continue Generation" : "✨ Generate Adventure"}
+                    {resumeMode
+                      ? "🔄 Continue Generation"
+                      : "✨ Generate Adventure"}
                   </button>
                 </div>
               </div>
