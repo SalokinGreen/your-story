@@ -336,7 +336,7 @@ async function generateStage(
   rawContent: string;
 }> {
   const stageInfo = getStageInfo(stage);
-  
+
   // NovelAI has very limited output (2048 tokens), so it needs many more continuations
   // Other providers can generate much more per call
   const MAX_CONTINUATIONS = modelConfig.provider === "novelai" ? 50 : 5;

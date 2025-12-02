@@ -1376,6 +1376,39 @@ export function getModelConfig(modelKey: string): AIModelConfig {
     return AI_MODELS[modelKey as AIModelKey] as unknown as AIModelConfig;
   }
 
+  // Check if this looks like a UUID (custom model)
+  // UUIDs are 36 chars with format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  const isUUID =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      modelKey
+    );
+
+  if (isUUID) {
+    // Custom models are always OpenRouter BYOK - return a generic OpenRouter config
+    // The actual model ID will be resolved from user settings on the frontend
+    console.warn(
+      `Custom model UUID "${modelKey}" passed to getModelConfig. Using OpenRouter fallback. ` +
+        `For proper handling, pass the actual model ID instead of UUID.`
+    );
+    return {
+      name: "Custom Model",
+      original_model: modelKey,
+      model: modelKey, // This won't work directly - frontend should pass modelId
+      maxTokens: 128000,
+      maxOutputTokens: 8000,
+      provider: "openrouter", // Custom models are always OpenRouter
+      supportsToolCalling: true,
+      cost: 0,
+      inputPrice: 0,
+      outputPrice: 0,
+      finetunes: [],
+      strengths: [],
+      weaknesses: [],
+      description: "Custom user-defined model",
+      bannerUrl: undefined,
+    };
+  }
+
   // Fallback to Deepseek Chat if key not found
   console.warn(
     `Model key "${modelKey}" not found, falling back to Deepseek Chat`

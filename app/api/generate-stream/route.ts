@@ -20,9 +20,11 @@ import {
   getModelConfig,
   calculateTokenCost,
   calculateCostFromEstimatedCost,
+  AIModelConfig,
 } from "@/app/misc/ai_prices";
 import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import { logger } from "@/app/misc/logger";
+import { getUserSettings, CustomModel } from "@/app/misc/user_settings";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -101,6 +103,64 @@ function getApiKey(
   }
 }
 
+/**
+ * Check if a string looks like a UUID (custom model ID)
+ */
+function isUUID(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    str
+  );
+}
+
+/**
+ * Resolve a model key to its config, handling custom models stored in user settings
+ */
+async function resolveModelConfig(
+  modelKey: string,
+  userId: string,
+  supabase: any // eslint-disable-line @typescript-eslint/no-explicit-any
+): Promise<{ config: AIModelConfig; actualModelId: string }> {
+  // If it's a known model, use it directly
+  if (!isUUID(modelKey)) {
+    const config = getModelConfig(modelKey);
+    return { config, actualModelId: config.model };
+  }
+
+  // It's a UUID - look up custom model from user settings
+  const settings = await getUserSettings(userId, supabase);
+  const customModels = settings?.custom_models || [];
+  const customModel = customModels.find((m: CustomModel) => m.id === modelKey);
+
+  if (customModel) {
+    // Found custom model - create config for OpenRouter
+    const config: AIModelConfig = {
+      name: customModel.name,
+      original_model: customModel.modelId,
+      model: customModel.modelId, // Actual OpenRouter model ID
+      maxTokens: customModel.contextSize,
+      maxOutputTokens: customModel.maxOutputTokens,
+      provider: "openrouter", // Custom models are always OpenRouter
+      supportsToolCalling: true,
+      cost: 0,
+      inputPrice: customModel.inputPrice || 0,
+      outputPrice: customModel.outputPrice || 0,
+      finetunes: [],
+      strengths: [],
+      weaknesses: [],
+      description: "Custom user-defined model",
+      bannerUrl: undefined,
+    };
+    return { config, actualModelId: customModel.modelId };
+  }
+
+  // UUID not found in custom models - fall back to default
+  console.warn(
+    `Custom model UUID "${modelKey}" not found in user settings, falling back to default`
+  );
+  const config = getModelConfig(modelKey); // Will return DeepSeek fallback
+  return { config, actualModelId: config.model };
+}
+
 export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
 
@@ -176,8 +236,12 @@ export async function POST(req: NextRequest) {
           model
         );
 
-        // Get model config
-        const modelConfig = getModelConfig(model);
+        // Get model config (resolves custom models from user settings)
+        const { config: modelConfig, actualModelId } = await resolveModelConfig(
+          model,
+          user.id,
+          supabase
+        );
 
         // Get API key from user's provided keys (or server key for Mistral/DeepInfra)
         const apiKey = getApiKey(

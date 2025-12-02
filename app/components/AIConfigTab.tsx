@@ -593,7 +593,8 @@ export default function AIConfigTab() {
             )}
           </div>
           <div>
-            <span className="text-white/60">Tools:</span> {getModelDisplayName(effectiveToolsModel)}
+            <span className="text-white/60">Tools:</span>{" "}
+            {getModelDisplayName(effectiveToolsModel)}
           </div>
           <div>
             <span className="text-white/60">Choices:</span>{" "}

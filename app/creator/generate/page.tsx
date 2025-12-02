@@ -875,7 +875,7 @@ function BigAdventureCreatorPage() {
       };
 
       // Genre-specific RPG system recommendations
-      const genreRpgMap: Record<string, string> = {
+      const genreRpgMap: Record<string, RPGSystemType> = {
         fantasy: "1d20", // Classic D&D-style for fantasy
         "sci-fi": "yze", // Year Zero Engine for gritty sci-fi
         horror: "percentile", // Percentile for horror (Call of Cthulhu style)
@@ -902,10 +902,7 @@ function BigAdventureCreatorPage() {
       };
 
       // Genre-specific duration
-      const genreDurationMap: Record<
-        string,
-        "short" | "medium" | "long" | "campaign"
-      > = {
+      const genreDurationMap: Record<string, "short" | "medium" | "long"> = {
         fantasy: "medium",
         "sci-fi": "long",
         horror: "short", // Horror works well as shorter, intense experiences
@@ -926,15 +923,19 @@ function BigAdventureCreatorPage() {
       setConfig({
         prompt: finalPrompt,
         genre: genreCapitalized,
-        rpgSystem: genreRpgMap[genre] || "1d20",
-        complexity: genreComplexityMap[genre] || "moderate",
+        rpgSystem: (genreRpgMap[genre] || "1d20") as RPGSystemType,
+        complexity: (genreComplexityMap[genre] ||
+          "moderate") as ComplexityLevel,
         nsfw: false,
         includeMythic: true,
         includeUpgradeShop: true,
         includeCustomTables: true,
         includePresets: true,
         includeStartingChoices: true,
-        targetDuration: genreDurationMap[genre] || "medium",
+        targetDuration: (genreDurationMap[genre] || "medium") as
+          | "short"
+          | "medium"
+          | "long",
         maxOutputTokens: 100000, // High output for comprehensive generation
         stageConfigs: {
           core: { ...DEFAULT_STAGE_CONFIGS.core, maxOutputTokens: 100000 },
