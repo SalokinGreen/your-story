@@ -215,7 +215,7 @@ describe("Lore Manipulation Commands", () => {
       chapters: [],
       quests: [],
       momentum: 0,
-      maxMomentum: 100,
+      maxMomentum: 5,
       relationships: [],
     } as StoryData;
   });

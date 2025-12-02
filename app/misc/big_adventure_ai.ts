@@ -1827,7 +1827,7 @@ export function mergeBigAdventureResults(
       achievements: [],
       lore: [],
       momentum: 0,
-      maxMomentum: 100,
+      maxMomentum: 5,
       points: 0,
       earnedPointsFromBeats: [],
       earnedPointsFromChapters: [],
