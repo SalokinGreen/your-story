@@ -581,7 +581,7 @@ function ExpandableContentCard({
 export default function BigAdventureCreatorPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { keys: apiKeys } = useAPIKeys();
+  const { keys: apiKeys, hasKey } = useAPIKeys();
   const { addNotification } = useNotification();
 
   // Autosave state
@@ -614,8 +614,15 @@ export default function BigAdventureCreatorPage() {
   const [selectedModel, setSelectedModel] = useState("Deepseek Chat");
   const [novelaiKey, setNovelaiKey] = useState("");
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
+  const [byokMode, setByokMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("bigAdventureByokMode");
+      return stored === "true";
+    }
+    return false;
+  });
 
-  // Load NovelAI key from localStorage on mount
+  // Load NovelAI key from localStorage on mount and sync byokMode
   useEffect(() => {
     const storedKey = localStorage.getItem("novelaiKey");
     if (storedKey) {
@@ -623,10 +630,47 @@ export default function BigAdventureCreatorPage() {
     }
   }, []);
 
+  // Persist byokMode to localStorage
+  useEffect(() => {
+    localStorage.setItem("bigAdventureByokMode", byokMode.toString());
+  }, [byokMode]);
+
+  // When switching modes, auto-select a compatible model
+  useEffect(() => {
+    const currentModelConfig = (AI_MODELS as Record<string, { provider?: string }>)[selectedModel];
+    const currentProvider = currentModelConfig?.provider;
+    const isBYOKProvider = currentProvider === "openrouter" || currentProvider === "deepseek" || currentProvider === "novelai";
+    const isCoinsProvider = currentProvider === "mistral" || currentProvider === "deepinfra";
+    
+    // If in BYOK mode but current model is coins-only, switch to default BYOK model
+    if (byokMode && isCoinsProvider) {
+      setSelectedModel("Deepseek Chat");
+    }
+    // If in Coins mode but current model is BYOK-only, switch to default coins model
+    if (!byokMode && isBYOKProvider) {
+      setSelectedModel("deepinfra/deepseek-v3-0324");
+    }
+  }, [byokMode, selectedModel]);
+
   // Check if selected model is NovelAI
   const isNovelAISelected =
     (AI_MODELS as Record<string, { provider?: string }>)[selectedModel]
       ?.provider === "novelai";
+
+  // Filter models based on BYOK mode
+  const filteredModels = Object.entries(AI_MODELS).filter(([, model]) => {
+    const provider = (model as { provider?: string }).provider;
+    if (byokMode) {
+      // BYOK mode: show openrouter, deepseek, novelai
+      return provider === "openrouter" || provider === "deepseek" || provider === "novelai";
+    } else {
+      // Coins mode: show mistral, deepinfra
+      return provider === "mistral" || provider === "deepinfra";
+    }
+  });
+
+  // Check if user has any BYOK keys configured
+  const hasAnyBYOKKey = hasKey("openRouterKey") || hasKey("deepseekKey") || novelaiKey.length > 0;
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -811,19 +855,25 @@ export default function BigAdventureCreatorPage() {
     return modelConfig.maxOutputTokens || 8000;
   }, [selectedModel]);
 
-  // Calculate estimated cost
+  // Calculate estimated cost (returns both coins and dollars)
   const estimatedCost = useCallback(() => {
-    // NovelAI is free (BYOK)
-    if (isNovelAISelected) {
-      return 0;
-    }
     const estimate = estimateBigAdventureCost(config);
-    return calculateTokenCost(
+    const modelConfig = getModelConfig(selectedModel);
+    
+    // Calculate dollar cost from token prices (per million tokens)
+    const dollarCost = 
+      (modelConfig.inputPrice * estimate.inputTokens) / 1000000 +
+      (modelConfig.outputPrice * estimate.outputTokens) / 1000000;
+    
+    // Calculate coin cost
+    const coinCost = calculateTokenCost(
       selectedModel,
       estimate.inputTokens,
       estimate.outputTokens
     );
-  }, [config, selectedModel, isNovelAISelected]);
+    
+    return { coins: coinCost, dollars: dollarCost };
+  }, [config, selectedModel]);
 
   // Update config
   const updateConfig = useCallback((updates: Partial<BigAdventureConfig>) => {
@@ -2333,12 +2383,12 @@ ${result.description || ""}`;
                 Estimated cost:{" "}
                 <span
                   className={`font-medium ${
-                    isNovelAISelected ? "text-green-400" : "text-amber-400"
+                    byokMode ? "text-green-400" : "text-amber-400"
                   }`}
                 >
-                  {isNovelAISelected
-                    ? "Free (BYOK)"
-                    : `~${estimatedCost()} coins`}
+                  {byokMode
+                    ? `~$${estimatedCost().dollars.toFixed(3)}`
+                    : `~${estimatedCost().coins} coins`}
                 </span>
               </div>
             )}
@@ -2665,20 +2715,69 @@ ${result.description || ""}`;
                     <label className="block text-sm text-blue-300/60 mb-2">
                       AI Model
                     </label>
+                    
+                    {/* BYOK/Coins Toggle */}
+                    <div className="mb-3 p-3 bg-blue-900/30 rounded-lg border border-blue-700/30">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-lg ${byokMode ? "opacity-50" : ""}`}>🪙</span>
+                          <div>
+                            <p className="text-sm font-medium text-white">
+                              {byokMode ? "Using Your API Keys" : "Using Coins"}
+                            </p>
+                            <p className="text-xs text-blue-300/60">
+                              {byokMode 
+                                ? "Free generation with your own keys" 
+                                : "Pay with coins from your balance"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-medium ${!byokMode ? "text-amber-400" : "text-gray-500"}`}>
+                            Coins
+                          </span>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={byokMode}
+                              onChange={(e) => setByokMode(e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-10 h-5 bg-amber-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600" />
+                          </label>
+                          <span className={`text-xs font-medium ${byokMode ? "text-green-400" : "text-gray-500"}`}>
+                            BYOK
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
                     <select
                       value={selectedModel}
                       onChange={(e) => setSelectedModel(e.target.value)}
                       className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500/50 transition-all"
                     >
-                      {Object.entries(AI_MODELS).map(([key, model]) => (
+                      {filteredModels.map(([key, model]) => (
                         <option key={key} value={key}>
                           {model.name}{" "}
-                          {model.cost > 0
-                            ? `(${model.cost} coin base)`
-                            : "(Free - BYOK)"}
+                          {byokMode 
+                            ? "(Free - BYOK)"
+                            : model.cost > 0
+                              ? `(~${model.cost} coins base)`
+                              : "(Free)"}
                         </option>
                       ))}
                     </select>
+                    
+                    {/* BYOK mode warning if no keys configured */}
+                    {byokMode && !hasAnyBYOKKey && (
+                      <div className="mt-2 p-2 bg-red-900/20 border border-red-700/30 rounded-lg">
+                        <p className="text-xs text-red-300">
+                          ⚠️ No API keys configured. Add keys in Settings (gear icon in header).
+                        </p>
+                      </div>
+                    )}
+                    
                     {isNovelAISelected && (
                       <div className="mt-3 p-3 bg-amber-900/20 border border-amber-700/30 rounded-lg">
                         <label className="block text-sm text-amber-300 mb-2">
@@ -3356,12 +3455,12 @@ ${result.description || ""}`;
                     </span>
                     <span
                       className={`text-lg font-bold ${
-                        isNovelAISelected ? "text-green-400" : "text-amber-400"
+                        byokMode ? "text-green-400" : "text-amber-400"
                       }`}
                     >
-                      {isNovelAISelected
-                        ? "Free (BYOK)"
-                        : `~${estimatedCost()} coins`}
+                      {byokMode
+                        ? `~$${estimatedCost().dollars.toFixed(3)}`
+                        : `~${estimatedCost().coins} coins`}
                     </span>
                   </div>
                 </div>
