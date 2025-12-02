@@ -1057,14 +1057,22 @@ export default function AIConfigTab() {
                   onChange={(e) => setStoryModel(e.target.value)}
                   className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  {Object.entries(AI_MODELS).map(([key, config]) => (
-                    <option key={key} value={key}>
-                      {config.name} ({config.cost} coin
-                      {config.cost > 1 ? "s" : ""},{" "}
-                      {(config.maxTokens / 1000).toFixed(0)}K)
-                    </option>
-                  ))}
-                  {customModels.length > 0 && (
+                  {Object.entries(AI_MODELS)
+                    .filter(([, config]) => {
+                      const isBYOKProvider =
+                        config.provider === "openrouter" ||
+                        config.provider === "deepseek" ||
+                        config.provider === "novelai";
+                      return byokMode ? isBYOKProvider : !isBYOKProvider;
+                    })
+                    .map(([key, config]) => (
+                      <option key={key} value={key}>
+                        {config.name} ({config.cost} coin
+                        {config.cost > 1 ? "s" : ""},{" "}
+                        {(config.maxTokens / 1000).toFixed(0)}K)
+                      </option>
+                    ))}
+                  {byokMode && customModels.length > 0 && (
                     <optgroup label="Custom Models">
                       {customModels.map((model) => (
                         <option key={model.id} value={model.id}>
@@ -1087,14 +1095,22 @@ export default function AIConfigTab() {
                   onChange={(e) => setToolsModel(e.target.value)}
                   className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  {Object.entries(AI_MODELS).map(([key, config]) => (
-                    <option key={key} value={key}>
-                      {config.name} ({(config as any).cost || 1} coin
-                      {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
-                      {(config.maxTokens / 1000).toFixed(0)}K)
-                    </option>
-                  ))}
-                  {customModels.length > 0 && (
+                  {Object.entries(AI_MODELS)
+                    .filter(([, config]) => {
+                      const isBYOKProvider =
+                        config.provider === "openrouter" ||
+                        config.provider === "deepseek" ||
+                        config.provider === "novelai";
+                      return byokMode ? isBYOKProvider : !isBYOKProvider;
+                    })
+                    .map(([key, config]) => (
+                      <option key={key} value={key}>
+                        {config.name} ({(config as any).cost || 1} coin
+                        {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
+                        {(config.maxTokens / 1000).toFixed(0)}K)
+                      </option>
+                    ))}
+                  {byokMode && customModels.length > 0 && (
                     <optgroup label="Custom Models">
                       {customModels.map((model) => (
                         <option key={model.id} value={model.id}>
@@ -1117,14 +1133,22 @@ export default function AIConfigTab() {
                   onChange={(e) => setChoicesModel(e.target.value)}
                   className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  {Object.entries(AI_MODELS).map(([key, config]) => (
-                    <option key={key} value={key}>
-                      {config.name} ({(config as any).cost || 1} coin
-                      {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
-                      {(config.maxTokens / 1000).toFixed(0)}K)
-                    </option>
-                  ))}
-                  {customModels.length > 0 && (
+                  {Object.entries(AI_MODELS)
+                    .filter(([, config]) => {
+                      const isBYOKProvider =
+                        config.provider === "openrouter" ||
+                        config.provider === "deepseek" ||
+                        config.provider === "novelai";
+                      return byokMode ? isBYOKProvider : !isBYOKProvider;
+                    })
+                    .map(([key, config]) => (
+                      <option key={key} value={key}>
+                        {config.name} ({(config as any).cost || 1} coin
+                        {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
+                        {(config.maxTokens / 1000).toFixed(0)}K)
+                      </option>
+                    ))}
+                  {byokMode && customModels.length > 0 && (
                     <optgroup label="Custom Models">
                       {customModels.map((model) => (
                         <option key={model.id} value={model.id}>
