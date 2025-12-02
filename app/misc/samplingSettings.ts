@@ -5,6 +5,7 @@
  * These settings only apply to the story stage for creative narrative generation.
  *
  * Provider support:
+ * - OpenRouter: All parameters supported (passed through to underlying model)
  * - DeepInfra: All parameters supported
  * - Mistral: temperature, top_p, presence_penalty, frequency_penalty
  */
@@ -246,10 +247,11 @@ export function findSamplingPreset(
 /**
  * Filter sampling settings for a specific provider
  * Mistral doesn't support min_p, top_k, repetition_penalty
+ * OpenRouter and DeepInfra support all settings
  */
 export function filterSettingsForProvider(
   settings: SamplingSettings,
-  provider: "mistral" | "deepinfra"
+  provider: "mistral" | "deepinfra" | "openrouter"
 ): Partial<SamplingSettings> {
   if (provider === "mistral") {
     return {
@@ -259,7 +261,7 @@ export function filterSettingsForProvider(
       frequency_penalty: settings.frequency_penalty,
     };
   }
-  // DeepInfra supports all settings
+  // OpenRouter and DeepInfra support all settings
   return settings;
 }
 
@@ -274,10 +276,7 @@ export function validateSamplingSettings(
     top_p: Math.max(0, Math.min(1, settings.top_p ?? 1.0)),
     min_p: Math.max(0, Math.min(1, settings.min_p ?? 0)),
     top_k: Math.max(0, Math.min(1000, Math.floor(settings.top_k ?? 0))),
-    presence_penalty: Math.max(
-      -2,
-      Math.min(2, settings.presence_penalty ?? 0)
-    ),
+    presence_penalty: Math.max(-2, Math.min(2, settings.presence_penalty ?? 0)),
     frequency_penalty: Math.max(
       -2,
       Math.min(2, settings.frequency_penalty ?? 0)

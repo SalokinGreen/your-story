@@ -365,15 +365,16 @@ export async function POST(req: NextRequest) {
           stream_options: { include_usage: true },
         };
 
-        // Apply sampling settings for Coins mode providers (Mistral/DeepInfra)
+        // Apply sampling settings for supported providers (Mistral/DeepInfra/OpenRouter)
         if (
           samplingSettings &&
           (modelConfig.provider === "mistral" ||
-            modelConfig.provider === "deepinfra")
+            modelConfig.provider === "deepinfra" ||
+            modelConfig.provider === "openrouter")
         ) {
           const filteredSettings = filterSettingsForProvider(
             samplingSettings,
-            modelConfig.provider as "mistral" | "deepinfra"
+            modelConfig.provider as "mistral" | "deepinfra" | "openrouter"
           );
 
           // Override temperature from sampling settings if provided
@@ -381,7 +382,7 @@ export async function POST(req: NextRequest) {
             requestBody.temperature = filteredSettings.temperature;
           }
 
-          // Apply common settings (both providers)
+          // Apply common settings (all providers)
           if (filteredSettings.top_p !== undefined) {
             requestBody.top_p = filteredSettings.top_p;
           }
@@ -392,8 +393,11 @@ export async function POST(req: NextRequest) {
             requestBody.frequency_penalty = filteredSettings.frequency_penalty;
           }
 
-          // Apply DeepInfra-only settings
-          if (modelConfig.provider === "deepinfra") {
+          // Apply extended settings (DeepInfra and OpenRouter support all)
+          if (
+            modelConfig.provider === "deepinfra" ||
+            modelConfig.provider === "openrouter"
+          ) {
             if (
               filteredSettings.min_p !== undefined &&
               filteredSettings.min_p > 0

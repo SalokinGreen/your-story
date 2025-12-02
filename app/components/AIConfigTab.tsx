@@ -1371,8 +1371,11 @@ export default function AIConfigTab() {
         )}
       </div>
 
-      {/* Sampling Settings - Only for Coins mode */}
-      <SamplingSettingsTab byokMode={byokMode} />
+      {/* Sampling Settings - For Coins mode and OpenRouter */}
+      <SamplingSettingsTab
+        byokMode={byokMode}
+        hasOpenRouterKey={hasKey("openRouterKey")}
+      />
     </div>
   );
 }

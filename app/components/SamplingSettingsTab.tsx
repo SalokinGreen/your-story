@@ -91,10 +91,12 @@ function SliderControl({
 
 interface SamplingSettingsTabProps {
   byokMode: boolean;
+  hasOpenRouterKey?: boolean;
 }
 
 export default function SamplingSettingsTab({
   byokMode,
+  hasOpenRouterKey = false,
 }: SamplingSettingsTabProps) {
   const { user } = useAuth();
   const { addNotification } = useNotification();
@@ -234,15 +236,17 @@ export default function SamplingSettingsTab({
     allPresets.find((p) => p.id === currentPresetId) ||
     BUILT_IN_SAMPLING_PRESETS[0];
 
-  // Only show for Coins mode (DeepInfra/Mistral)
-  if (byokMode) {
+  // Only show for Coins mode (DeepInfra/Mistral) or OpenRouter BYOK
+  // Hide only for DeepSeek-only BYOK mode
+  if (byokMode && !hasOpenRouterKey) {
     return (
       <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
         <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
           <DynamicIcon name="Info" className="w-4 h-4" />
           <p className="text-sm">
-            Sampling settings are only available for Coins mode models
-            (DeepInfra/Mistral).
+            Sampling settings are available for Coins mode models
+            (DeepInfra/Mistral) or when using OpenRouter. DeepSeek uses default
+            sampling.
           </p>
         </div>
       </div>
@@ -496,7 +500,8 @@ export default function SamplingSettingsTab({
           <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
             <p className="text-xs text-amber-600 dark:text-amber-400 mb-3 flex items-center gap-1">
               <DynamicIcon name="AlertTriangle" className="w-3.5 h-3.5" />
-              The following settings only work with DeepInfra models
+              The following settings only work with DeepInfra and OpenRouter
+              models
             </p>
 
             <div className="space-y-4">
@@ -510,7 +515,6 @@ export default function SamplingSettingsTab({
                 description="Minimum probability threshold relative to most likely token"
                 leftLabel="Off"
                 rightLabel="Strict"
-                provider="deepinfra"
               />
 
               <SliderControl
@@ -523,7 +527,6 @@ export default function SamplingSettingsTab({
                 description="Only sample from top K tokens (0 = disabled)"
                 leftLabel="Off"
                 rightLabel="200"
-                provider="deepinfra"
               />
 
               <SliderControl
@@ -536,7 +539,6 @@ export default function SamplingSettingsTab({
                 description="Multiplicative penalty for repetition. >1 penalizes, <1 encourages"
                 leftLabel="Encourage"
                 rightLabel="Penalize"
-                provider="deepinfra"
               />
             </div>
           </div>
