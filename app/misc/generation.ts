@@ -39,6 +39,11 @@ import {
   getRelevantContextForGeneration,
   syncNewMemories,
 } from "@/app/misc/embeddings";
+import {
+  SamplingSettings,
+  getSamplingSettings,
+  filterSettingsForProvider,
+} from "@/app/misc/samplingSettings";
 
 // ============================================================
 // TYPES
@@ -64,6 +69,8 @@ export interface GenerationOptions {
   storyId?: string; // Required for embedding search
   enableEmbeddings?: boolean; // Whether to use embedding-based context
   embeddingThreshold?: number; // Similarity threshold (0.1-0.5, default 0.25)
+  // Sampling settings (for story stage only, Coins mode)
+  samplingSettings?: SamplingSettings;
 }
 
 export interface GenerationCallbacks {
@@ -436,21 +443,29 @@ export async function generateStoryTurn(
         }),
       });
     } else {
-      // Use standard API (DeepSeek/OpenRouter)
+      // Use standard API (DeepSeek/OpenRouter/Mistral/DeepInfra)
+      // Build request body with optional sampling settings
+      const storyRequestBody: Record<string, unknown> = {
+        messages: storyPrompt.messages,
+        model: options.storyModel,
+        maxTokens: options.customMaxOutput || 4000,
+        temperature: options.samplingSettings?.temperature ?? 0.7,
+        openRouterKey: options.openRouterKey,
+        deepseekKey: options.deepseekKey,
+      };
+
+      // Add sampling settings for Coins mode (Mistral/DeepInfra)
+      if (options.samplingSettings) {
+        storyRequestBody.samplingSettings = options.samplingSettings;
+      }
+
       storyResponse = await fetch("/api/generate-stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          messages: storyPrompt.messages,
-          model: options.storyModel,
-          maxTokens: options.customMaxOutput || 4000,
-          temperature: 0.7,
-          openRouterKey: options.openRouterKey,
-          deepseekKey: options.deepseekKey,
-        }),
+        body: JSON.stringify(storyRequestBody),
       });
     }
 

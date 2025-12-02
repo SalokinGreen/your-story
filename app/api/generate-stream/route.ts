@@ -25,6 +25,10 @@ import {
 import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import { logger } from "@/app/misc/logger";
 import { getUserSettings, CustomModel } from "@/app/misc/user_settings";
+import {
+  SamplingSettings,
+  filterSettingsForProvider,
+} from "@/app/misc/samplingSettings";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -47,6 +51,8 @@ interface RequestBody {
   temperature?: number;
   openRouterKey?: string;
   deepseekKey?: string;
+  // Sampling settings (for Coins mode: Mistral/DeepInfra)
+  samplingSettings?: SamplingSettings;
 }
 
 /**
@@ -213,6 +219,7 @@ export async function POST(req: NextRequest) {
           temperature = 0.7,
           openRouterKey,
           deepseekKey,
+          samplingSettings,
         } = body;
 
         if (!messages || messages.length === 0) {
@@ -357,6 +364,64 @@ export async function POST(req: NextRequest) {
           // Request usage statistics in streaming mode (required for Mistral/OpenAI)
           stream_options: { include_usage: true },
         };
+
+        // Apply sampling settings for Coins mode providers (Mistral/DeepInfra)
+        if (
+          samplingSettings &&
+          (modelConfig.provider === "mistral" ||
+            modelConfig.provider === "deepinfra")
+        ) {
+          const filteredSettings = filterSettingsForProvider(
+            samplingSettings,
+            modelConfig.provider as "mistral" | "deepinfra"
+          );
+
+          // Override temperature from sampling settings if provided
+          if (filteredSettings.temperature !== undefined) {
+            requestBody.temperature = filteredSettings.temperature;
+          }
+
+          // Apply common settings (both providers)
+          if (filteredSettings.top_p !== undefined) {
+            requestBody.top_p = filteredSettings.top_p;
+          }
+          if (filteredSettings.presence_penalty !== undefined) {
+            requestBody.presence_penalty = filteredSettings.presence_penalty;
+          }
+          if (filteredSettings.frequency_penalty !== undefined) {
+            requestBody.frequency_penalty = filteredSettings.frequency_penalty;
+          }
+
+          // Apply DeepInfra-only settings
+          if (modelConfig.provider === "deepinfra") {
+            if (
+              filteredSettings.min_p !== undefined &&
+              filteredSettings.min_p > 0
+            ) {
+              requestBody.min_p = filteredSettings.min_p;
+            }
+            if (
+              filteredSettings.top_k !== undefined &&
+              filteredSettings.top_k > 0
+            ) {
+              requestBody.top_k = filteredSettings.top_k;
+            }
+            if (
+              filteredSettings.repetition_penalty !== undefined &&
+              filteredSettings.repetition_penalty !== 1.0
+            ) {
+              requestBody.repetition_penalty =
+                filteredSettings.repetition_penalty;
+            }
+          }
+
+          console.log(
+            "[API] Applied sampling settings for",
+            modelConfig.provider,
+            ":",
+            filteredSettings
+          );
+        }
 
         if (tools && tools.length > 0) {
           requestBody.tools = tools;

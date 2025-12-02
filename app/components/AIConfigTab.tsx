@@ -19,6 +19,7 @@ import {
   CustomModel,
 } from "@/app/misc/user_settings";
 import { supabase } from "@/app/misc/supabase";
+import SamplingSettingsTab from "./SamplingSettingsTab";
 
 export default function AIConfigTab() {
   const { user } = useAuth();
@@ -1369,6 +1370,9 @@ export default function AIConfigTab() {
           </div>
         )}
       </div>
+
+      {/* Sampling Settings - Only for Coins mode */}
+      <SamplingSettingsTab byokMode={byokMode} />
     </div>
   );
 }

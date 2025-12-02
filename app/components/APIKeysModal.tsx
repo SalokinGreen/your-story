@@ -486,7 +486,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       setTtsVoice(e.target.value);
                       localStorage.setItem("ttsLastVoice", e.target.value);
                       addNotification(
-                        `Voice changed to ${e.target.options[e.target.selectedIndex].text}`,
+                        `Voice changed to ${
+                          e.target.options[e.target.selectedIndex].text
+                        }`,
                         "success"
                       );
                     }}

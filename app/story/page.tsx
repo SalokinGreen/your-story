@@ -142,6 +142,7 @@ import {
   tickCooldowns,
   ABILITY_GRADE_CONFIG,
 } from "../misc/abilitySystem";
+import { getSamplingSettings } from "../misc/samplingSettings";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -2591,6 +2592,7 @@ function StoryPageContent() {
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
+          samplingSettings: getSamplingSettings(),
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -4550,6 +4552,7 @@ function StoryPageContent() {
             storyId: storyDbId || undefined,
             enableEmbeddings: embeddingsEnabled,
             embeddingThreshold,
+            samplingSettings: getSamplingSettings(),
           },
           {
             onStoryContent: (chunk: string, fullContent: string) => {
@@ -4850,6 +4853,7 @@ function StoryPageContent() {
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
+          samplingSettings: getSamplingSettings(),
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
