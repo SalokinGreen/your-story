@@ -339,7 +339,7 @@ export const AI_MODELS = {
 
   "Ministral 3B": {
     name: "Ministral 3B",
-    original_model: "ministral-3b-2410",
+    original_model: "ministral-3b-2510",
     model: "ministral-3b-2410",
     maxTokens: 128000,
     maxOutputTokens: 8000,
@@ -357,15 +357,15 @@ export const AI_MODELS = {
   },
   "Ministral 8B": {
     name: "Ministral 8B",
-    original_model: "ministral-8b-2410",
+    original_model: "ministral-8b-2512",
     model: "ministral-8b-2410",
     maxTokens: 128000,
     maxOutputTokens: 8000,
     provider: "mistral",
     supportsToolCalling: true,
     cost: 1,
-    inputPrice: 0.04,
-    outputPrice: 0.04,
+    inputPrice: 0.15,
+    outputPrice: 0.15,
     finetunes: [],
     strengths: ["ultra cost-effective", "fast", "edge model"],
     weaknesses: ["creativity", "complex reasoning"],
@@ -953,7 +953,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     description: "Ministral 14B story with 256k context - uses Coins",
     storyModel: "Ministral 14B",
     toolsModel: "Codestral",
-    choicesModel: "Ministral 8B",
+    choicesModel: "Ministral 3B",
     estimatedCost: 2,
   },
   mistralBudgetBrain: {
@@ -962,7 +962,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     description: "Creative Small story, Codestral tools - uses Coins",
     storyModel: "Magistral Small 1.2",
     toolsModel: "Codestral",
-    choicesModel: "Ministral 8B",
+    choicesModel: "Ministral 3B",
     estimatedCost: 2,
   },
   deepseek: {

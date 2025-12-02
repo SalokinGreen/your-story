@@ -1243,3 +1243,77 @@ export function analysisToChoice(
     table: analysis.table || undefined,
   };
 }
+
+/**
+ * Generate choices only (used when intro_override bypasses AI story generation)
+ */
+export async function generateChoicesOnly(
+  storyData: StoryData,
+  options: {
+    choicesModel: string;
+    openRouterKey?: string;
+    deepseekKey?: string;
+  }
+): Promise<Choice[]> {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error("Authentication required");
+  }
+
+  // Get the last AI content from scene parts
+  const lastAIPart = [...storyData.scene.parts]
+    .reverse()
+    .find((p) => !p.user && p.content.trim());
+  const storyContent = lastAIPart?.content || "";
+
+  logger.action("Generating choices only (intro_override mode)", {
+    model: options.choicesModel,
+    contentLength: storyContent.length,
+  });
+
+  const choicesPrompt = buildChoicesPrompt({
+    storyData,
+    storyContent,
+  });
+
+  const choicesResponse = await fetch("/api/generate-stream", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      messages: choicesPrompt.messages,
+      model: options.choicesModel,
+      maxTokens: 1500,
+      temperature: 0.7,
+      openRouterKey: options.openRouterKey,
+      deepseekKey: options.deepseekKey,
+    }),
+  });
+
+  if (!choicesResponse.ok) {
+    const errorText = await choicesResponse.text().catch(() => "");
+    throw new Error(
+      `Choices generation failed: ${choicesResponse.status} - ${errorText}`
+    );
+  }
+
+  let choicesContent = "";
+
+  for await (const event of parseSSEStream(choicesResponse)) {
+    if (event.type === "error") {
+      throw new Error(event.error || "Choices generation failed");
+    }
+    if (event.type === "content" && event.content) {
+      choicesContent += event.content;
+    }
+  }
+
+  // Parse choices
+  const choices = parseChoices(choicesContent, storyData);
+
+  logger.action("Choices generation complete", { count: choices.length });
+
+  return choices;
+}

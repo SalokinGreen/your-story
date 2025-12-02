@@ -1504,6 +1504,7 @@ function StoryPageContent() {
   const [storyData, setStoryData] = useState<StoryData | null>(null);
   const [storyDbId, setStoryDbId] = useState<string | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const hasLoadedStoryRef = useRef<string | null>(null); // Track loaded story ID to prevent re-fetching on tab focus
   const [choices, setChoices] = useState<Choices>({ choices: [] });
   const [input, setInput] = useState<Record<string, boolean>>({});
   const [storyText, setStoryText] = useState("");
@@ -1865,8 +1866,17 @@ function StoryPageContent() {
       return;
     }
 
+    // Skip re-fetching if we've already loaded this story (prevents reload on tab focus)
+    if (hasLoadedStoryRef.current === storyId && storyData) {
+      console.log("Story already loaded, skipping re-fetch (tab focus protection)");
+      return;
+    }
+
     // Helper to setup UI state from loaded story data
     function setupUIFromStory(loadedStoryData: StoryData) {
+      // Mark this story as loaded to prevent re-fetching
+      hasLoadedStoryRef.current = storyId;
+      
       // Migrate Mythic state to include new performance tracking fields
       if (loadedStoryData.mythicState) {
         import("@/app/misc/mythicChaos").then(({ migrateMythicState }) => {
@@ -2217,15 +2227,17 @@ function StoryPageContent() {
           mythic_context_only: sc.mythic_context_only,
           // Use unified table field, with fallback to legacy fields
           table: sc.table || sc.mythic_table || sc.custom_table,
+          // Include intro_override so it can be used when this choice is selected
+          intro_override: sc.intro_override,
         }))
       : [{ text: "Start Story" }];
 
-    // Use intro override from first starting choice if available
-    const introContent =
-      updatedStoryData.starting_choices?.length &&
-      updatedStoryData.starting_choices[0].intro_override
-        ? updatedStoryData.starting_choices[0].intro_override
-        : updatedStoryData.intro;
+    // Determine intro content - priority order:
+    // 1. Preset's unique intro (if exists)
+    // 2. Adventure's default intro
+    // NOTE: starting_choices intro_override is applied AFTER the user selects a choice,
+    // not at preset selection time. The intro_override replaces the AI's first response.
+    const introContent = preset.intro || updatedStoryData.intro;
 
     //Addstartingscenepart
     updatedStoryData.scene.parts.push({
@@ -4442,6 +4454,75 @@ function StoryPageContent() {
           }, 9000);
         })
       : Promise.resolve();
+
+    // Check if this choice has intro_override (for starting choices)
+    // If so, skip AI generation and use the preset intro directly
+    if (choice.intro_override) {
+      logger.action("Using intro_override instead of AI generation", {
+        choice: choice.text,
+      });
+
+      // Add the intro_override as the AI response
+      const overridePart: ScenePart = {
+        content: choice.intro_override,
+        imageUrl: "",
+        user: false,
+        role: "assistant",
+        choices: [], // Will need to generate choices next
+      };
+      storyData.scene.parts.push(overridePart);
+
+      setStoryText(choice.intro_override);
+      setStoryData({ ...storyData });
+      setLoading(false);
+      setLoadingStage("choices");
+
+      // Wait for dice animation if showing
+      await diceAnimationPromise;
+
+      // Generate choices for this intro_override content
+      try {
+        const { generateChoicesOnly } = await import("../misc/generation");
+        const newChoices = await generateChoicesOnly(storyData, {
+          choicesModel,
+          openRouterKey,
+          deepseekKey,
+        });
+
+        // Update the part with choices
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            choices: newChoices,
+          };
+        }
+
+        setChoices({ choices: newChoices });
+        setStoryData({ ...storyData });
+        setLoadingStage(null);
+
+        // Save progress
+        saveProgress(storyData);
+        addNotification("Story continues...", "success");
+      } catch (error) {
+        console.error("Error generating choices:", error);
+        // Fallback to a simple "Continue" choice
+        const fallbackChoices = [{ text: "Continue" }];
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            choices: fallbackChoices,
+          };
+        }
+        setChoices({ choices: fallbackChoices });
+        setStoryData({ ...storyData });
+        setLoadingStage(null);
+        saveProgress(storyData);
+      }
+      return;
+    }
 
     try {
       // Run generation and dice animation in parallel

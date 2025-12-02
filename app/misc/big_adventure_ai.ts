@@ -1873,7 +1873,8 @@ export function getStagesToRun(
   const stageConfigs = config.stageConfigs || DEFAULT_STAGE_CONFIGS;
 
   // If model has very low output tokens (e.g., NovelAI with 1000), only run core and mechanics
-  const isLowOutputModel = maxOutputTokens !== undefined && maxOutputTokens < 4000;
+  const isLowOutputModel =
+    maxOutputTokens !== undefined && maxOutputTokens < 4000;
 
   if (stageConfigs.core?.enabled !== false) {
     stages.push("core");

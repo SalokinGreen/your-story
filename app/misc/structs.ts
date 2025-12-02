@@ -153,6 +153,7 @@ export interface Choice {
   mythic_check?: string; // Format: "question (likelihood)" e.g., "Is the door locked? (Likely)"
   mythic_context_only?: boolean; // When true with skill_used, mythic provides context only and doesn't override skill check result
   table?: string; // Unified table field - checks both custom tables AND mythic element tables
+  intro_override?: string; // Optional: For starting choices, use this text instead of AI generation
   // Legacy fields for backward compatibility (deprecated - use 'table' instead)
   mythic_table?: string;
   custom_table?: string;

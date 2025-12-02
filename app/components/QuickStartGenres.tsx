@@ -254,7 +254,7 @@ export default function QuickStartGenres() {
                   className="w-4 h-4 text-purple-400 mt-0.5 shrink-0"
                 />
                 <div className="text-sm text-purple-200/80">
-                  <p className="font-medium mb-1">Powered by DeepSeek V3</p>
+                  <p className="font-medium mb-1">Powered by Mistral Large!</p>
                   <p className="text-purple-300/60 text-xs">
                     AI will choose the best RPG system, complexity, and settings
                     for your genre.
