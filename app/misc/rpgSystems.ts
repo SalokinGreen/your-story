@@ -244,7 +244,7 @@ export const SYSTEM_1D20: RPGSystem = {
   },
 
   upgrades: {
-    statUpgradeAmount: 2, // +2 per upgrade (moderate on 1-20 scale)
+    statUpgradeAmount: 1, // +1 stat point per upgrade
     resourceUpgradeAmount: 10, // +10 per upgrade
     shopStatStartingValue: 30, // New stats start at 30 (below average)
   },
@@ -321,7 +321,7 @@ export const SYSTEM_1D100: RPGSystem = {
   },
 
   upgrades: {
-    statUpgradeAmount: 5, // +5 per upgrade (moderate on 1-100 scale)
+    statUpgradeAmount: 1, // +1 stat point per upgrade
     resourceUpgradeAmount: 10, // +10 per upgrade
     shopStatStartingValue: 40, // New stats start at 40 (below average)
   },
@@ -400,7 +400,7 @@ export const SYSTEM_PERCENTILE: RPGSystem = {
   },
 
   upgrades: {
-    statUpgradeAmount: 5, // +5 per upgrade (5% better chance on d100)
+    statUpgradeAmount: 1, // +1 stat point per upgrade
     resourceUpgradeAmount: 10, // +10 per upgrade
     shopStatStartingValue: 40, // New stats start at 40 (40% success rate)
   },
@@ -488,7 +488,7 @@ export const SYSTEM_PBTA: RPGSystem = {
   },
 
   upgrades: {
-    statUpgradeAmount: 10, // +10 stat = +0.5 modifier on average
+    statUpgradeAmount: 1, // +1 stat point per upgrade
     resourceUpgradeAmount: 5,
     shopStatStartingValue: 50, // 50 = 0 modifier (neutral)
   },
@@ -626,7 +626,7 @@ export const SYSTEM_FATE: RPGSystem = {
   },
 
   upgrades: {
-    statUpgradeAmount: 7, // +7 stat ≈ +1 ladder step (7% per 10-point bracket)
+    statUpgradeAmount: 1, // +1 stat point per upgrade
     resourceUpgradeAmount: 3, // Fate Points are precious
     shopStatStartingValue: 35, // 35 = Average (+1) ladder
   },
@@ -941,7 +941,7 @@ export const SYSTEM_YZE: RPGSystem = {
   },
 
   upgrades: {
-    statUpgradeAmount: 10, // +10 stat = +0.5 dice
+    statUpgradeAmount: 1, // +1 stat point per upgrade
     resourceUpgradeAmount: 1, // Small increments for stress management
     shopStatStartingValue: 40, // 40 = 2 base dice
   },
@@ -1107,7 +1107,7 @@ export const SYSTEM_EXPLOSIVE: RPGSystem = {
   },
 
   upgrades: {
-    statUpgradeAmount: 8, // +8 moves through die size brackets (17-point ranges)
+    statUpgradeAmount: 1, // +1 stat point per upgrade
     resourceUpgradeAmount: 5, // +5 per upgrade
     shopStatStartingValue: 25, // 25 = d6 (below average)
   },
@@ -1185,7 +1185,7 @@ export const SYSTEM_NARRATIVE: RPGSystem = {
   },
 
   upgrades: {
-    statUpgradeAmount: 5,
+    statUpgradeAmount: 1, // +1 stat point per upgrade
     resourceUpgradeAmount: 10,
     shopStatStartingValue: 50,
   },

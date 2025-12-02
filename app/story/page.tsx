@@ -4014,29 +4014,6 @@ function StoryPageContent() {
               }
             }
 
-            // Recover resource on success
-            if (choice.resource_used && matchedResource) {
-              // Ensure resource.value is a valid number (prevent NaN)
-              if (
-                typeof matchedResource.value !== "number" ||
-                isNaN(matchedResource.value)
-              ) {
-                matchedResource.value = 0;
-              }
-
-              const recovery = resourceReqs.recovery;
-              matchedResource.value = Math.min(
-                matchedResource.maxValue,
-                matchedResource.value + recovery
-              );
-              resourceUsedAfter = matchedResource.value;
-              logger.action("Resource recovered", {
-                resource: choice.resource_used,
-                amount: recovery,
-                newTotal: matchedResource.value,
-              });
-            }
-
             // Earn momentum on success (not when using guarantee or reroll)
             if (momentumMode === "none") {
               if (isCritical) {
@@ -4120,28 +4097,6 @@ function StoryPageContent() {
             }
           } else {
             skillCheckResult = "failure";
-
-            // On failure: Lose additional resource if one was used (DC-based penalty)
-            if (choice.resource_used && matchedResource) {
-              // Ensure resource.value is a valid number (prevent NaN)
-              if (
-                typeof matchedResource.value !== "number" ||
-                isNaN(matchedResource.value)
-              ) {
-                matchedResource.value = 0;
-              }
-
-              const penalty = resourceReqs.loss;
-              matchedResource.value = Math.max(
-                0,
-                matchedResource.value - penalty
-              );
-              logger.action("Resource lost (Failure)", {
-                resource: choice.resource_used,
-                penalty,
-                newTotal: matchedResource.value,
-              });
-            }
 
             // Handle item durability on failure (-2 durability for non-consumable items)
             if (choice.item_used) {

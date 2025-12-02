@@ -137,31 +137,13 @@ When referencing skills, resources, or items in choices and commands, you MUST u
   ✗ WRONG: use_item: Healing Potion (if the actual item is called "Health Potion")
 
 Resource System:
-- When a choice uses a resource (use_resource), that resource is AUTOMATICALLY at risk if the skill check fails.
+- When a choice uses a resource (use_resource), it signifies that action requires or risks that resource.
 - Choose resources that thematically fit the action: use Stamina for running/escaping, Health for combat/dangerous situations, Mana for spellcasting, etc.
-- Resource requirements are DYNAMIC based on DC:
-  * Required amount: DC ÷ ${
-    rpgSystem.resources.requiredDivisor
-  } (rounded down, minimum ${rpgSystem.resources.minRequired})
-  * If player has insufficient resource: dice roll receives -DC÷${
-    rpgSystem.resources.penaltyDivisor
-  } penalty (minimum -${rpgSystem.resources.minPenalty})
-  * On success: RECOVERS DC ÷ ${
-    rpgSystem.resources.recoverDivisor
-  } points (minimum ${rpgSystem.resources.minRecover}), capped at max value
-  * On failure: loses DC ÷ ${rpgSystem.resources.lossDivisor} points (minimum ${
-    rpgSystem.resources.minLoss
-  })
-- Example: DC ${rpgSystem.dc.medium * 2} requires ${Math.floor(
-    (rpgSystem.dc.medium * 2) / rpgSystem.resources.requiredDivisor
-  )} resource points. Insufficient resources = -${Math.floor(
-    (rpgSystem.dc.medium * 2) / rpgSystem.resources.penaltyDivisor
-  )} to dice roll. Success recovers ${Math.floor(
-    (rpgSystem.dc.medium * 2) / rpgSystem.resources.recoverDivisor
-  )} points, failure loses ${Math.floor(
-    (rpgSystem.dc.medium * 2) / rpgSystem.resources.lossDivisor
-  )} points.
-- This creates meaningful risk/reward - higher DC actions demand more resources but reward success with recovery.
+- Resource requirements are based on DC:
+  * Required amount: DC ÷ ${rpgSystem.resources.requiredDivisor} (rounded down, minimum ${rpgSystem.resources.minRequired})
+  * If player has insufficient resource: dice roll receives -DC÷${rpgSystem.resources.penaltyDivisor} penalty (minimum -${rpgSystem.resources.minPenalty})
+- YOU manage all resource gains and losses via tools (adjust_resource, set_resource) based on narrative outcomes.
+- Example: A player sprints to escape - on failure, YOU might deduct Stamina; on success, YOU decide if they're winded or energized.
 
 Guidelines:
 - Always provide at least six choices (more is better for player agency).

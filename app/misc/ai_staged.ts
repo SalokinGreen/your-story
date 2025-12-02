@@ -799,6 +799,17 @@ Memory Guidelines:
 - Avoid overusing memory for minor details or repetitive events
 - BAD: "Met a merchant" GOOD: "Met Aldric, a suspicious merchant in Darkwater who tried to sell cursed artifacts and fled when confronted"
 
+Ability Guidelines:
+- Use add_ability to grant new spells, skills, or techniques when the player learns/gains them from training, mentors, magical items, or story events
+- Ability grades: novice (+0), apprentice (+1), adept (+2), expert (+3), master (+4), legendary (+5)
+- Set appropriate costs (resource or variable) based on ability power - powerful abilities should cost more
+- Use cooldowns for abilities that shouldn't be spammable (0 = no cooldown)
+- Use remove_ability when abilities are lost (curse, injury, story event, sacrifice)
+- Use modify_ability to change costs, descriptions, or stat associations as abilities evolve
+- Use upgrade_ability when the player improves through training, practice, or story rewards
+- Use reset_ability_cooldown to refresh abilities (rest, special items, story events)
+- Example: add_ability(name="Fireball", description="Hurl a ball of flame", grade="apprentice", stat="Magic", cost=[{type:"resource", name:"Mana", amount:15}], cooldown=2)
+
 Relationship Guidelines:
 - Relationships change SLOWLY over time - trust and bonds are built through meaningful interactions
 - Use SMALL increments: +1 to +3 for positive interactions, -1 to -3 for negative ones
@@ -1077,31 +1088,13 @@ ${
 }
 
 Resource System:
-- When a choice uses a resource (use_resource), that resource is AUTOMATICALLY at risk if the skill check fails
+- When a choice uses a resource (use_resource), it signifies that action requires or risks that resource
 - Choose resources that thematically fit the action: use Stamina for running/escaping, Health for combat/dangerous situations, Mana for spellcasting, etc.
-- Resource requirements are DYNAMIC based on DC:
-  * Required amount: DC ÷ ${
-    rpgSystem.resources.requiredDivisor
-  } (rounded down, minimum ${rpgSystem.resources.minRequired})
-  * If player has insufficient resource: dice roll receives -DC÷${
-    rpgSystem.resources.penaltyDivisor
-  } penalty (minimum -${rpgSystem.resources.minPenalty})
-  * On success: RECOVERS DC ÷ ${
-    rpgSystem.resources.recoverDivisor
-  } points (minimum ${rpgSystem.resources.minRecover}), capped at max value
-  * On failure: loses DC ÷ ${rpgSystem.resources.lossDivisor} points (minimum ${
-    rpgSystem.resources.minLoss
-  })
-- Example: DC ${rpgSystem.dc.medium * 2} requires ${Math.floor(
-    (rpgSystem.dc.medium * 2) / rpgSystem.resources.requiredDivisor
-  )} resource points. Insufficient resources = -${Math.floor(
-    (rpgSystem.dc.medium * 2) / rpgSystem.resources.penaltyDivisor
-  )} to dice roll. Success recovers ${Math.floor(
-    (rpgSystem.dc.medium * 2) / rpgSystem.resources.recoverDivisor
-  )} points, failure loses ${Math.floor(
-    (rpgSystem.dc.medium * 2) / rpgSystem.resources.lossDivisor
-  )} points.
-- This creates meaningful risk/reward - higher DC actions demand more resources but reward success with recovery.
+- Resource requirements are based on DC:
+  * Required amount: DC ÷ ${rpgSystem.resources.requiredDivisor} (rounded down, minimum ${rpgSystem.resources.minRequired})
+  * If player has insufficient resource: dice roll receives -DC÷${rpgSystem.resources.penaltyDivisor} penalty (minimum -${rpgSystem.resources.minPenalty})
+- YOU manage all resource gains and losses via tools (adjust_resource, set_resource) based on narrative outcomes
+- Example: A player sprints to escape - on failure, YOU might deduct Stamina; on success, YOU decide if they're winded or energized
 
 Item Types:
 - normal: Advantage on use, breaks on failure (tools, weapons, armor)

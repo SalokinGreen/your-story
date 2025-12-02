@@ -68,6 +68,14 @@ const STATE_CHANGE_TOOLS = new Set([
   "damage_item",
   "upgrade_item",
   "set_item_durability",
+  // Abilities - tool names and command names
+  "add_ability",
+  "remove_ability",
+  "modify_ability",
+  "upgrade_ability",
+  "reset_ability_cooldown",
+  "reduce_cooldown",
+  "refresh_ability",
   // Conditions
   "add_condition",
   "upgrade_condition",
@@ -2019,6 +2027,9 @@ function convertToolToCommand(
 
     case "upgrade_ability":
       return `/upgrade_ability: ${args.name}`;
+
+    case "reset_ability_cooldown":
+      return `/refresh_ability: ${args.name}`;
 
     case "reduce_cooldown":
       return `/reduce_cooldown: ${args.name} | ${args.amount}`;
