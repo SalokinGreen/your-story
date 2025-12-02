@@ -620,7 +620,7 @@ function BigAdventureCreatorPage() {
     temperature: 0.7,
     stylePreset: "default",
   });
-  const [selectedModel, setSelectedModel] = useState("Deepseek Chat");
+  const [selectedModel, setSelectedModel] = useState("Mistral Large");
   const [novelaiKey, setNovelaiKey] = useState("");
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
   const [byokMode, setByokMode] = useState(() => {
@@ -663,7 +663,7 @@ function BigAdventureCreatorPage() {
     }
     // If in Coins mode but current model is BYOK-only, switch to default coins model
     if (!byokMode && isBYOKProvider) {
-      setSelectedModel("DeepInfra DeepSeek V3.2");
+      setSelectedModel("Mistral Large");
     }
   }, [byokMode, selectedModel]);
 
@@ -979,11 +979,11 @@ function BigAdventureCreatorPage() {
         stylePreset: genreStyleMap[genre] || "default",
       });
 
-      // Use DeepInfra DeepSeek V3.2 for ALL stages (Coins mode) - reliable fallback while Mistral Large is overloaded
+      // Use Mistral Large for ALL stages (Coins mode)
       setByokMode(false);
-      setSelectedModel("DeepInfra DeepSeek V3.2");
+      setSelectedModel("Mistral Large");
       setExtensionByokMode(false);
-      setExtensionModel("DeepInfra DeepSeek V3.2");
+      setExtensionModel("Mistral Large");
 
       // Enable auto-publish and play for quick start
       setAutoPublishAndPlay(true);
@@ -3197,119 +3197,6 @@ ${result.description || ""}`;
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm text-blue-300/60 mb-2">
-                      AI Model
-                    </label>
-
-                    {/* BYOK/Coins Toggle */}
-                    <div className="mb-3 p-3 bg-blue-900/30 rounded-lg border border-blue-700/30">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-lg ${
-                              byokMode ? "opacity-50" : ""
-                            }`}
-                          >
-                            🪙
-                          </span>
-                          <div>
-                            <p className="text-sm font-medium text-white">
-                              {byokMode ? "Using Your API Keys" : "Using Coins"}
-                            </p>
-                            <p className="text-xs text-blue-300/60">
-                              {byokMode
-                                ? "Free generation with your own keys"
-                                : "Pay with coins from your balance"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs font-medium ${
-                              !byokMode ? "text-amber-400" : "text-gray-500"
-                            }`}
-                          >
-                            Coins
-                          </span>
-                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={byokMode}
-                              onChange={(e) => setByokMode(e.target.checked)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-10 h-5 bg-amber-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600" />
-                          </label>
-                          <span
-                            className={`text-xs font-medium ${
-                              byokMode ? "text-green-400" : "text-gray-500"
-                            }`}
-                          >
-                            BYOK
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <select
-                      value={selectedModel}
-                      onChange={(e) => setSelectedModel(e.target.value)}
-                      className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500/50 transition-all"
-                    >
-                      {filteredModels.map(([key, model]) => (
-                        <option key={key} value={key}>
-                          {model.name}{" "}
-                          {byokMode
-                            ? "(Free - BYOK)"
-                            : model.cost > 0
-                            ? `(~${model.cost} coins base)`
-                            : "(Free)"}
-                        </option>
-                      ))}
-                    </select>
-
-                    {/* BYOK mode warning if no keys configured */}
-                    {byokMode && !hasAnyBYOKKey && (
-                      <div className="mt-2 p-2 bg-red-900/20 border border-red-700/30 rounded-lg">
-                        <p className="text-xs text-red-300">
-                          ⚠️ No API keys configured. Add keys in Settings (gear
-                          icon in header).
-                        </p>
-                      </div>
-                    )}
-
-                    {isNovelAISelected && (
-                      <div className="mt-3 p-3 bg-amber-900/20 border border-amber-700/30 rounded-lg">
-                        <label className="block text-sm text-amber-300 mb-2">
-                          🔑 NovelAI API Key (BYOK - No token cost)
-                        </label>
-                        <input
-                          type="password"
-                          value={novelaiKey}
-                          onChange={(e) => {
-                            setNovelaiKey(e.target.value);
-                            localStorage.setItem("novelaiKey", e.target.value);
-                          }}
-                          placeholder="Enter your NovelAI API key..."
-                          className="w-full bg-blue-900/50 border border-amber-700/50 rounded-lg px-4 py-2 text-white placeholder-amber-300/50 focus:outline-none focus:border-amber-500/50 transition-all text-sm"
-                        />
-                        <p className="text-xs text-amber-300/60 mt-2">
-                          Your key is stored locally and never sent to our
-                          servers. Get your key from{" "}
-                          <a
-                            href="https://novelai.net/settings"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-amber-400 hover:underline"
-                          >
-                            NovelAI Settings
-                          </a>
-                          .
-                        </p>
-                      </div>
-                    )}
-                  </div>
                 </div>
 
                 <div>
@@ -3479,6 +3366,121 @@ ${result.description || ""}`;
               title="Fine-tune Generation"
             >
               <div className="space-y-6">
+                {/* AI Model Selection */}
+                <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-700/30">
+                  <label className="block text-sm text-blue-300/60 mb-2">
+                    AI Model
+                  </label>
+
+                  {/* BYOK/Coins Toggle */}
+                  <div className="mb-3 p-3 bg-blue-900/30 rounded-lg border border-blue-700/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-lg ${
+                            byokMode ? "opacity-50" : ""
+                          }`}
+                        >
+                          🪙
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium text-white">
+                            {byokMode ? "Using Your API Keys" : "Using Coins"}
+                          </p>
+                          <p className="text-xs text-blue-300/60">
+                            {byokMode
+                              ? "Free generation with your own keys"
+                              : "Pay with coins from your balance"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs font-medium ${
+                            !byokMode ? "text-amber-400" : "text-gray-500"
+                          }`}
+                        >
+                          Coins
+                        </span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={byokMode}
+                            onChange={(e) => setByokMode(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-10 h-5 bg-amber-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600" />
+                        </label>
+                        <span
+                          className={`text-xs font-medium ${
+                            byokMode ? "text-green-400" : "text-gray-500"
+                          }`}
+                        >
+                          BYOK
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500/50 transition-all"
+                  >
+                    {filteredModels.map(([key, model]) => (
+                      <option key={key} value={key}>
+                        {model.name}{" "}
+                        {byokMode
+                          ? "(Free - BYOK)"
+                          : model.cost > 0
+                          ? `(~${model.cost} coins base)`
+                          : "(Free)"}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* BYOK mode warning if no keys configured */}
+                  {byokMode && !hasAnyBYOKKey && (
+                    <div className="mt-2 p-2 bg-red-900/20 border border-red-700/30 rounded-lg">
+                      <p className="text-xs text-red-300">
+                        ⚠️ No API keys configured. Add keys in Settings (gear
+                        icon in header).
+                      </p>
+                    </div>
+                  )}
+
+                  {isNovelAISelected && (
+                    <div className="mt-3 p-3 bg-amber-900/20 border border-amber-700/30 rounded-lg">
+                      <label className="block text-sm text-amber-300 mb-2">
+                        🔑 NovelAI API Key (BYOK - No token cost)
+                      </label>
+                      <input
+                        type="password"
+                        value={novelaiKey}
+                        onChange={(e) => {
+                          setNovelaiKey(e.target.value);
+                          localStorage.setItem("novelaiKey", e.target.value);
+                        }}
+                        placeholder="Enter your NovelAI API key..."
+                        className="w-full bg-blue-900/50 border border-amber-700/50 rounded-lg px-4 py-2 text-white placeholder-amber-300/50 focus:outline-none focus:border-amber-500/50 transition-all text-sm"
+                      />
+                      <p className="text-xs text-amber-300/60 mt-2">
+                        Your key is stored locally and never sent to our
+                        servers. Get your key from{" "}
+                        <a
+                          href="https://novelai.net/settings"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-amber-400 hover:underline"
+                        >
+                          NovelAI Settings
+                        </a>
+                        .
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {/* Config Templates */}
                 <div className="bg-purple-900/20 rounded-lg p-4 border border-purple-700/30">
                   <div className="flex items-center justify-between mb-3">
