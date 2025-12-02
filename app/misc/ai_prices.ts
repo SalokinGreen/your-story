@@ -4,7 +4,7 @@ export const AI_MODELS = {
     original_model: "Grok 4 Fast",
     model: "x-ai/grok-4-fast",
     maxTokens: 1000000,
-    maxOutputTokens: 30000,
+    maxOutputTokens: 100000,
     provider: "openrouter",
     supportsToolCalling: true,
     strengths: ["creative", "nsfw"],

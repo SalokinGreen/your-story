@@ -1122,7 +1122,11 @@ LORE CONTENT QUALITY:
 - Include HOOKS: Details that hint at quests, secrets, or opportunities
 
 LORE TRIGGERS (make lore dynamic):
-- on_triggers: words/phrases that reveal this lore (character names, location mentions)
+- on_triggers: words/phrases that reveal this lore when mentioned in the story
+  IMPORTANT: Triggers use WORD BOUNDARIES - "gun" won't match "guns" or "gunfire"
+  Include variations: ["gun", "guns", "pistol", "pistols", "firearm", "firearms"]
+  Include nicknames: ["Naomy", "Nao", "Lady Blackwood"]
+  Be thorough - list all forms and aliases a player might use
 - off_triggers: words/phrases that hide this lore (rare, use sparingly)
 - beats_trigger: plot beat indices (0-based) that reveal this lore (great for secrets)
 - var_on_triggers: boolean variable names that reveal when true
@@ -1250,7 +1254,9 @@ Initialize the Mythic Game Master Emulator for solo/GM-less play.
     advancedSections += `
 CUSTOM RANDOM TABLES (${tableCount}):
 Create thematic random tables for encounters, weather, events, loot, etc.
-Each entry has a weight (higher = more likely).
+Each table MUST have 20-50 entries for proper variety and randomness.
+Each entry has a weight (1-10, higher = more likely). Vary weights for interesting distributions.
+Examples: random encounters (30+ entries), weather effects (20+), loot tables (40+), NPC reactions (25+).
 `;
     schemaFields.push(`"customTables": [
     {
@@ -1566,7 +1572,7 @@ export function attemptJSONRepair(content: string): string {
   const stack: string[] = [];
   let inString = false;
   let escaped = false;
-  let lastGoodIndex = 0;
+  let lastValidPosition = 0; // Last position where JSON was structurally valid
 
   for (let i = 0; i < jsonContent.length; i++) {
     const char = jsonContent[i];
@@ -1583,63 +1589,80 @@ export function attemptJSONRepair(content: string): string {
 
     if (char === '"' && !escaped) {
       inString = !inString;
-      if (!inString) lastGoodIndex = i;
+      if (!inString) {
+        // Just closed a string - check if this completes a valid element
+        const nextNonSpace = jsonContent.slice(i + 1).match(/^\s*([,}\]:])/);
+        if (nextNonSpace) {
+          lastValidPosition = i;
+        }
+      }
       continue;
     }
 
     if (!inString) {
       if (char === "{") {
         stack.push("}");
-        lastGoodIndex = i;
       } else if (char === "[") {
         stack.push("]");
-        lastGoodIndex = i;
       } else if (char === "}" || char === "]") {
         if (stack.length > 0 && stack[stack.length - 1] === char) {
           stack.pop();
-          lastGoodIndex = i;
+          lastValidPosition = i;
         }
-      } else if (char === "," || char === ":") {
-        lastGoodIndex = i;
+      } else if (char === ",") {
+        // After a comma is a good truncation point if followed by valid content
+        lastValidPosition = i;
       }
     }
   }
 
-  // If we're in a string, try to close it
-  if (inString) {
-    // Find a reasonable place to truncate (last complete value)
-    const truncateMatch = jsonContent
-      .slice(0, lastGoodIndex + 1)
-      .match(/^([\s\S]*[}\]",:\d])/);
-    if (truncateMatch) {
-      jsonContent = truncateMatch[1];
-      // Recount stack after truncation
-      stack.length = 0;
-      inString = false;
-      for (let i = 0; i < jsonContent.length; i++) {
-        const char = jsonContent[i];
-        if (char === "\\") {
-          i++;
-          continue;
-        }
-        if (char === '"') {
-          inString = !inString;
-          continue;
-        }
-        if (!inString) {
-          if (char === "{") stack.push("}");
-          else if (char === "[") stack.push("]");
-          else if (char === "}" || char === "]") stack.pop();
+  // If we're in an unterminated string or have unclosed brackets, truncate to last valid position
+  if (inString || stack.length > 0) {
+    // Find the last complete array/object element before truncation
+    // Look for patterns like: }, or }, { or ], or ]
+    const truncated = jsonContent.slice(0, lastValidPosition + 1);
+    
+    // Remove any trailing partial element after a comma
+    // This handles cases like: [..., {"name": "test", "value": 
+    let cleaned = truncated.replace(/,\s*\{[^}]*$/, ""); // Partial object at end of array
+    cleaned = cleaned.replace(/,\s*\[[^\]]*$/, ""); // Partial array at end
+    cleaned = cleaned.replace(/,\s*"[^"]*"?\s*:?\s*(?:"[^"]*)?$/, ""); // Partial key-value
+    cleaned = cleaned.replace(/,\s*$/, ""); // Trailing comma
+    
+    jsonContent = cleaned;
+    
+    // Recount stack after truncation
+    stack.length = 0;
+    inString = false;
+    escaped = false;
+    for (let i = 0; i < jsonContent.length; i++) {
+      const char = jsonContent[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === "{") stack.push("}");
+        else if (char === "[") stack.push("]");
+        else if (char === "}" || char === "]") {
+          if (stack.length > 0) stack.pop();
         }
       }
     }
   }
 
-  // Remove trailing incomplete elements (like partial keys or values)
-  // Match trailing patterns like: , "key or , "key": or , "key": "value
-  jsonContent = jsonContent.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, "");
-  jsonContent = jsonContent.replace(/,\s*$/, "");
-
+  // Final cleanup - remove trailing incomplete elements more aggressively
+  // Handle case where we have a trailing comma before closing bracket
+  jsonContent = jsonContent.replace(/,(\s*[}\]])/, "$1");
+  
   // Close remaining brackets/braces
   while (stack.length > 0) {
     jsonContent += stack.pop();
@@ -2123,8 +2146,15 @@ REQUIRED LORE CATEGORIES (distribute across all):
 - WORLD LORE: Magic, religions, customs, creatures, artifacts
 
 Each entry must be 2-4 paragraphs with specific names, dates, and vivid descriptions.
-Use on_triggers (character/location names), beats_trigger (for dramatic reveals), and alwaysOn (for core world facts).`,
-      schema: `{ "lore": [{ "title": "string (specific name)", "content": "string (2-4 detailed paragraphs)", "secrtet": boolean, "on": boolean, "alwaysOn": boolean, "on_triggers": ["string"], "off_triggers": ["string"], "beats_trigger": [number], "var_on_triggers": ["string"] }] }`,
+
+TRIGGERS - CRITICAL:
+- Triggers use WORD BOUNDARIES - "gun" won't match "guns" or "gunfire"
+- ALWAYS include variations: ["gun", "guns", "pistol", "pistols", "firearm"]
+- ALWAYS include nicknames: ["Naomy", "Nao", "Lady Naomy", "Miss Blackwood"]
+- Be thorough! List every form/alias a player might naturally use
+- Use beats_trigger for plot-gated dramatic reveals
+- Use alwaysOn for core world facts the player should always know`,
+      schema: `{ "lore": [{ "title": "string (specific name)", "content": "string (2-4 detailed paragraphs)", "secrtet": boolean, "on": boolean, "alwaysOn": boolean, "on_triggers": ["string (include ALL variations/aliases!)"], "off_triggers": ["string"], "beats_trigger": [number], "var_on_triggers": ["string"] }] }`,
       count: Math.round(counts.lore * durationMultiplier),
     },
     achievements: {
@@ -2173,8 +2203,8 @@ Write full, standalone content - not fragments!`,
     customTables: {
       instruction: `Generate ${Math.round(
         counts.customTables * durationMultiplier
-      )} random tables (encounters, weather, events, etc).`,
-      schema: `{ "customTables": [{ "id": "table_xxx", "name": "string", "description": "string", "entries": [{ "text": "string", "weight": number }] }] }`,
+      )} random tables (encounters, weather, events, etc). Each table MUST have 20-50 entries for proper variety.`,
+      schema: `{ "customTables": [{ "id": "table_xxx", "name": "string", "description": "string", "entries": [{ "text": "string (20-50 entries per table!)", "weight": number (1-10) }] }] }`,
       count: Math.round(counts.customTables * durationMultiplier),
     },
     upgradeShop: {
@@ -2252,7 +2282,22 @@ export function parseRegenerateSectionOutput(
       jsonContent = jsonContent.slice(startIndex, endIndex + 1);
     }
 
-    const parsed = JSON.parse(jsonContent);
+    // First attempt: try to parse as-is
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonContent);
+    } catch (parseError) {
+      // Second attempt: try to repair the JSON
+      console.warn("Initial JSON parse failed, attempting repair...");
+      const repairedContent = attemptJSONRepair(content);
+      try {
+        parsed = JSON.parse(repairedContent);
+        console.log("JSON repair successful!");
+      } catch (repairError) {
+        // Repair failed, throw original error
+        throw parseError;
+      }
+    }
 
     // Map to BigAdventureResult based on section
     switch (section) {
@@ -2340,11 +2385,9 @@ export function buildExtendSectionMessages(
   config: BigAdventureConfig,
   section: RegenerateSection,
   existingResult: BigAdventureResult,
-  count: number = 3
+  customInstructions?: string
 ): { role: "system" | "user"; content: string }[] {
   const sectionInfo = REGENERATE_SECTIONS[section];
-  const counts = COMPLEXITY_COUNTS[config.complexity];
-  const durationMultiplier = DURATION_MULTIPLIERS[config.targetDuration];
   const rpgDesc = RPG_SYSTEM_DESCRIPTIONS[config.rpgSystem];
 
   // Get existing content based on section
@@ -2494,27 +2537,27 @@ ${existingItemsPreview || "(none)"}`;
     title: { instruction: "", schema: "" },
     intro: { instruction: "", schema: "" },
     stats: {
-      instruction: `Generate ${count} NEW stats that complement the existing ones. Avoid duplicating existing stats.`,
+      instruction: `Generate NEW stats that complement the existing ones. Avoid duplicating existing stats. Generate as many as possible to fill the output budget.`,
       schema: `{ "stats": [{ "name": "string", "description": "string", "value": number, "min": number, "max": number, "symbol": "emoji" }] }`,
     },
     resources: {
-      instruction: `Generate ${count} NEW resources that complement the existing ones. Avoid duplicating existing resources.`,
+      instruction: `Generate NEW resources that complement the existing ones. Avoid duplicating existing resources. Generate as many as possible.`,
       schema: `{ "resources": [{ "name": "string", "description": "string", "value": number, "min": number, "max": number, "symbol": "emoji", "stat": "string (optional)" }] }`,
     },
     abilities: {
-      instruction: `Generate ${count} NEW abilities that complement the existing ones. Vary grades from novice to master.`,
+      instruction: `Generate NEW abilities that complement the existing ones. Vary grades from novice to master. Generate as many as possible.`,
       schema: `{ "abilities": [{ "name": "string", "description": "string", "grade": "novice|apprentice|adept|expert|master", "stat": "string", "symbol": "emoji", "cost": [{ "type": "resource", "name": "string", "amount": number }], "cooldown": number }] }`,
     },
     variables: {
-      instruction: `Generate ${count} NEW variables.`,
+      instruction: `Generate NEW variables. Generate as many as possible.`,
       schema: `{ "variables": [{ "name": "string", "value": number, "symbol": "emoji" }] }`,
     },
     inventory: {
-      instruction: `Generate ${count} NEW inventory items that complement the existing ones. Mix item types.`,
+      instruction: `Generate NEW inventory items that complement the existing ones. Mix item types. Generate as many as possible.`,
       schema: `{ "inventory": [{ "name": "string", "description": "string", "type": "normal|consumable|story|misc", "grade": "common|uncommon|rare|epic|mythic", "stat": "string (optional)", "symbol": "emoji", "durability": number, "maxDurability": number }] }`,
     },
     lore: {
-      instruction: `Generate ${count} NEW DETAILED lore entries that expand the world.
+      instruction: `Generate NEW DETAILED lore entries that expand the world. Generate as many as the output budget allows.
 
 Consider adding entries from categories that may be underrepresented:
 - NPCs: Important characters with appearance, personality, motivations, secrets
@@ -2525,28 +2568,33 @@ Consider adding entries from categories that may be underrepresented:
 - World Details: Magic, religions, customs, creatures, artifacts
 
 Each entry MUST be 2-4 paragraphs with specific names, dates, and vivid descriptions.
-Use on_triggers for dynamic reveal (character names, location mentions), beats_trigger for plot-gated secrets.
+
+TRIGGERS - IMPORTANT:
+- Triggers use WORD BOUNDARIES - "gun" won't match "guns"
+- Include all variations: ["gun", "guns", "pistol", "pistols"]
+- Include nicknames/aliases: ["Naomy", "Nao", "Lady Naomy"]
+- Use beats_trigger for plot-gated secrets
 Ensure new lore references and connects to existing lore entries.`,
-      schema: `{ "lore": [{ "title": "string (specific name)", "content": "string (2-4 detailed paragraphs)", "secrtet": boolean, "on": boolean, "alwaysOn": boolean, "on_triggers": ["string"], "off_triggers": ["string"], "beats_trigger": [number], "var_on_triggers": ["string"] }] }`,
+      schema: `{ "lore": [{ "title": "string (specific name)", "content": "string (2-4 detailed paragraphs)", "secrtet": boolean, "on": boolean, "alwaysOn": boolean, "on_triggers": ["string (include variations!)"], "off_triggers": ["string"], "beats_trigger": [number], "var_on_triggers": ["string"] }] }`,
     },
     achievements: {
-      instruction: `Generate ${count} NEW achievements with ai_hint for precise triggering.`,
+      instruction: `Generate NEW achievements with ai_hint for precise triggering. Generate as many as possible.`,
       schema: `{ "achievements": [{ "title": "string", "description": "string", "ai_hint": "string", "points": number, "symbol": "emoji", "dateAchieved": null }] }`,
     },
     quests: {
-      instruction: `Generate ${count} NEW quests with objectives.`,
+      instruction: `Generate NEW quests with objectives. Generate as many as possible.`,
       schema: `{ "quests": [{ "id": "quest_xxx", "title": "string", "shortDescription": "string", "description": "string", "points": number, "active": boolean, "fulfilled": false }] }`,
     },
     plotBeats: {
-      instruction: `Generate ${count} NEW plot beats (story milestones).`,
+      instruction: `Generate NEW plot beats (story milestones). Generate as many as possible.`,
       schema: `{ "plot_beats": [{ "title": "string", "content": "string", "fulfilled": false, "points": number }] }`,
     },
     relationships: {
-      instruction: `Generate ${count} NEW NPC relationships (-100 to +100).`,
+      instruction: `Generate NEW NPC relationships (-100 to +100). Generate as many as possible.`,
       schema: `{ "relationships": [{ "name": "string", "value": number (-100 to 100), "description": "string", "symbol": "emoji" }] }`,
     },
     presets: {
-      instruction: `Generate ${count} NEW character presets with unique stats, abilities, and items.
+      instruction: `Generate NEW character presets with unique stats, abilities, and items. Generate as many as the output budget allows.
 
 CRITICAL: Each preset's "intro" is a COMPLETE REPLACEMENT (3-5 paragraphs) for the default intro, NOT an addition.
 Each preset's "playerSummary" is a COMPLETE REPLACEMENT (2-3 paragraphs) for the default player background.
@@ -2558,8 +2606,9 @@ Write full, standalone content - not fragments!`,
       schema: "",
     },
     customTables: {
-      instruction: `Generate ${count} NEW random tables (encounters, weather, events, etc).`,
-      schema: `{ "customTables": [{ "id": "table_xxx", "name": "string", "description": "string", "entries": [{ "text": "string", "weight": number }] }] }`,
+      instruction: `Generate NEW random tables (encounters, weather, events, etc). Generate as many tables as the output budget allows.
+Each table MUST have 20-50 entries for proper variety. Use weights 1-10 (higher = more common).`,
+      schema: `{ "customTables": [{ "id": "table_xxx", "name": "string", "description": "string", "entries": [{ "text": "string (20-50 entries per table!)", "weight": number (1-10) }] }] }`,
     },
     upgradeShop: {
       instruction: "",
@@ -2590,9 +2639,9 @@ ${context}
 
 ORIGINAL PROMPT:
 "${config.prompt}"
-${styleModifier ? `\nSTYLE DIRECTION: ${styleModifier}` : ""}
+${styleModifier ? `\nSTYLE DIRECTION: ${styleModifier}` : ""}${customInstructions ? `\n\nCUSTOM INSTRUCTIONS:\n${customInstructions}` : ""}
 
-TASK: Add ${count} NEW ${sectionInfo.name} entries.
+TASK: Add MORE ${sectionInfo.name} entries. Generate as many as your output budget allows.
 ${sectionPrompt.instruction}
 
 IMPORTANT:
@@ -2600,6 +2649,7 @@ IMPORTANT:
 - Make new items complement and expand on the existing content
 - Ensure new content fits the adventure's theme and tone
 - Use appropriate emoji symbols
+- Fill your entire output budget with quality content
 
 OUTPUT ONLY valid JSON matching this schema:
 ${sectionPrompt.schema}
@@ -2610,7 +2660,7 @@ Be creative and thematic. Ensure new content integrates well with existing eleme
     { role: "system", content: systemPrompt },
     {
       role: "user",
-      content: `Generate ${count} new ${sectionInfo.name} entries. Output ONLY valid JSON.`,
+      content: `Generate new ${sectionInfo.name} entries. Fill your output budget. Output ONLY valid JSON.`,
     },
   ];
 }
@@ -2639,7 +2689,23 @@ export function parseExtendSectionOutput(
       jsonContent = jsonContent.slice(startIndex, endIndex + 1);
     }
 
-    const parsed = JSON.parse(jsonContent);
+    // First attempt: try to parse as-is
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonContent);
+    } catch (parseError) {
+      // Second attempt: try to repair the JSON
+      console.warn("Initial JSON parse failed, attempting repair...");
+      const repairedContent = attemptJSONRepair(content);
+      try {
+        parsed = JSON.parse(repairedContent);
+        console.log("JSON repair successful!");
+      } catch (repairError) {
+        // Repair failed, throw original error
+        throw parseError;
+      }
+    }
+
     const template = existingResult.storyTemplate || {};
 
     // Merge new content with existing

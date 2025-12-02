@@ -29,7 +29,7 @@ interface RequestBody {
   section: RegenerateSection;
   config: BigAdventureConfig;
   existingResult: BigAdventureResult;
-  count?: number;
+  customInstructions?: string;
   model?: string;
   maxOutputTokens?: number;
   openRouterKey?: string;
@@ -123,9 +123,9 @@ export async function POST(req: NextRequest) {
           section,
           config,
           existingResult,
-          count = 3,
+          customInstructions,
           model = "Deepseek Chat",
-          maxOutputTokens = 2000,
+          maxOutputTokens = 4000,
           openRouterKey,
           deepseekKey,
           novelaiKey,
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
         const sectionInfo = REGENERATE_SECTIONS[section];
         logger.info("Extend section started", {
           section,
-          count,
+          maxOutputTokens,
           model,
           userId: user.id,
         });
@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
           config,
           section,
           existingResult,
-          count
+          customInstructions
         );
 
         // Send start event
@@ -210,7 +210,6 @@ export async function POST(req: NextRequest) {
               type: "extend_start",
               section,
               sectionName: sectionInfo.name,
-              count,
             })}\n\n`
           )
         );
@@ -333,7 +332,6 @@ export async function POST(req: NextRequest) {
 
         logger.info("Extend section complete", {
           section,
-          count,
         });
       } catch (error) {
         logger.error("Extend section error", { error });
