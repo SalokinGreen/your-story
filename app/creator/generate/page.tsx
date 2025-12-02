@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useCallback, useRef, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/app/misc/AuthContext";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
@@ -579,11 +579,17 @@ function ExpandableContentCard({
   );
 }
 
-export default function BigAdventureCreatorPage() {
+function BigAdventureCreatorPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { keys: apiKeys, hasKey } = useAPIKeys();
   const { addNotification } = useNotification();
+
+  // Quick start state (from home page genre buttons)
+  const [isQuickStart, setIsQuickStart] = useState(false);
+  const [quickStartReady, setQuickStartReady] = useState(false);
+  const [autoPublishAndPlay, setAutoPublishAndPlay] = useState(false);
 
   // Autosave state
   const [pendingAutosave, setPendingAutosave] =
@@ -655,7 +661,7 @@ export default function BigAdventureCreatorPage() {
     }
     // If in Coins mode but current model is BYOK-only, switch to default coins model
     if (!byokMode && isBYOKProvider) {
-      setSelectedModel("deepinfra/deepseek-v3-0324");
+      setSelectedModel("DeepInfra DeepSeek V3.2");
     }
   }, [byokMode, selectedModel]);
 
@@ -748,7 +754,7 @@ export default function BigAdventureCreatorPage() {
       setExtensionModel("Deepseek Chat");
     }
     if (!extensionByokMode && isBYOKProvider) {
-      setExtensionModel("deepinfra/deepseek-v3-0324");
+      setExtensionModel("DeepInfra DeepSeek V3.2");
     }
   }, [extensionByokMode, extensionModel]);
 
@@ -837,8 +843,153 @@ export default function BigAdventureCreatorPage() {
   // Abort controller for cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Handle quick start from home page genre buttons
+  useEffect(() => {
+    const quickStart = searchParams.get("quickStart");
+    const genre = searchParams.get("genre");
+    const prompt = searchParams.get("prompt");
+
+    console.log("[Quick Start Effect] Params:", {
+      quickStart,
+      genre,
+      prompt,
+      isQuickStart,
+      quickStartReady,
+    });
+
+    // Only run once when quickStart param is present
+    if (quickStart === "true" && genre && !isQuickStart && !quickStartReady) {
+      console.log("[Quick Start] Conditions met, initializing...");
+      setIsQuickStart(true);
+
+      // Genre-specific style presets
+      const genreStyleMap: Record<string, StylePreset> = {
+        fantasy: "default",
+        "sci-fi": "cinematic",
+        horror: "horror",
+        mystery: "default",
+        romance: "romantic",
+        western: "pulp",
+        comedy: "whimsical",
+        superheroes: "cinematic",
+      };
+
+      // Genre-specific RPG system recommendations
+      const genreRpgMap: Record<string, string> = {
+        fantasy: "1d20", // Classic D&D-style for fantasy
+        "sci-fi": "yze", // Year Zero Engine for gritty sci-fi
+        horror: "percentile", // Percentile for horror (Call of Cthulhu style)
+        mystery: "3d6", // 3d6 bell curve for mystery (predictable outcomes)
+        romance: "narrative", // Narrative for romance (story-focused)
+        western: "explosive", // Explosive dice for western action
+        comedy: "fate", // Fate for comedy (aspects and stunts fit humor)
+        superheroes: "explosive", // Explosive dice for superhero action
+      };
+
+      // Genre-specific complexity (some genres benefit from more depth)
+      const genreComplexityMap: Record<
+        string,
+        "simple" | "moderate" | "complex"
+      > = {
+        fantasy: "moderate",
+        "sci-fi": "complex", // Sci-fi often has more world-building
+        horror: "moderate",
+        mystery: "complex", // Mysteries need more intricate plots
+        romance: "simple", // Romance focuses on characters, not mechanics
+        western: "moderate",
+        comedy: "simple", // Comedy works best with lighter mechanics
+        superheroes: "moderate", // Balance of action and character development
+      };
+
+      // Genre-specific duration
+      const genreDurationMap: Record<
+        string,
+        "short" | "medium" | "long" | "campaign"
+      > = {
+        fantasy: "medium",
+        "sci-fi": "long",
+        horror: "short", // Horror works well as shorter, intense experiences
+        mystery: "medium",
+        romance: "short",
+        western: "medium",
+        comedy: "short", // Comedy is best in shorter, punchy adventures
+        superheroes: "medium", // Room for origin stories and villain arcs
+      };
+
+      // Build the prompt
+      const genreCapitalized = genre.charAt(0).toUpperCase() + genre.slice(1);
+      const finalPrompt = prompt
+        ? `${genreCapitalized} adventure: ${prompt}`
+        : `Create an engaging ${genre} adventure with compelling characters, intriguing plot hooks, and memorable locations.`;
+
+      // Set up quick start config with genre-appropriate settings
+      setConfig({
+        prompt: finalPrompt,
+        genre: genreCapitalized,
+        rpgSystem: genreRpgMap[genre] || "1d20",
+        complexity: genreComplexityMap[genre] || "moderate",
+        nsfw: false,
+        includeMythic: true,
+        includeUpgradeShop: true,
+        includeCustomTables: true,
+        includePresets: true,
+        includeStartingChoices: true,
+        targetDuration: genreDurationMap[genre] || "medium",
+        maxOutputTokens: 100000, // High output for comprehensive generation
+        stageConfigs: {
+          core: { ...DEFAULT_STAGE_CONFIGS.core, maxOutputTokens: 100000 },
+          mechanics: {
+            ...DEFAULT_STAGE_CONFIGS.mechanics,
+            maxOutputTokens: 100000,
+          },
+          content: {
+            ...DEFAULT_STAGE_CONFIGS.content,
+            maxOutputTokens: 100000,
+          },
+          advanced: {
+            ...DEFAULT_STAGE_CONFIGS.advanced,
+            maxOutputTokens: 100000,
+          },
+        },
+        contentIterations: { ...DEFAULT_CONTENT_ITERATIONS },
+        temperature: 0.8, // Slightly higher for creativity
+        stylePreset: genreStyleMap[genre] || "default",
+      });
+
+      // Use DeepInfra DeepSeek V3.2 for ALL stages (Coins mode) - reliable fallback while Mistral Large is overloaded
+      setByokMode(false);
+      setSelectedModel("DeepInfra DeepSeek V3.2");
+      setExtensionByokMode(false);
+      setExtensionModel("DeepInfra DeepSeek V3.2");
+
+      // Enable auto-publish and play for quick start
+      setAutoPublishAndPlay(true);
+
+      // Mark as ready to auto-start (will be handled by the auto-start effect)
+      // Use a small delay to ensure all state is settled
+      setTimeout(() => {
+        setQuickStartReady(true);
+      }, 100);
+
+      // Clear the URL params without navigation
+      window.history.replaceState({}, "", "/creator/generate");
+    }
+  }, [searchParams, isQuickStart, quickStartReady]);
+
+  // Check if this is a quick start on mount (before other effects run)
+  const isQuickStartMount = searchParams.get("quickStart") === "true";
+
   // Load autosave, config draft, and templates on mount
   useEffect(() => {
+    // Skip loading saved config if this is a quick start - Quick Start effect will set the config
+    if (isQuickStartMount) {
+      // Still load templates and history, just skip autosave/draft
+      setTemplates(loadConfigTemplates());
+      setHistory(loadGenerationHistory());
+      setSessionId(generateSessionId());
+      return;
+    }
+
     const autosave = loadAutosave();
     if (autosave && autosave.completedStages.length > 0) {
       setPendingAutosave(autosave);
@@ -863,7 +1014,7 @@ export default function BigAdventureCreatorPage() {
     setHistory(loadGenerationHistory());
     // Generate session ID for this session
     setSessionId(generateSessionId());
-  }, []);
+  }, [isQuickStartMount]);
 
   // Save config draft when it changes (debounced)
   useEffect(() => {
@@ -1394,6 +1545,36 @@ export default function BigAdventureCreatorPage() {
     isNovelAISelected,
     addNotification,
     sessionId,
+  ]);
+
+  // Auto-start generation when quick start is ready and user is authenticated
+  useEffect(() => {
+    console.log("[Auto-Start Effect] Checking:", {
+      quickStartReady,
+      hasUser: !!user,
+      authLoading,
+      isGenerating,
+    });
+    if (quickStartReady && user && !authLoading && !isGenerating) {
+      console.log("[Auto-Start] All conditions met! Starting generation...");
+      setQuickStartReady(false);
+      setIsQuickStart(false); // Clear quick start flag once we start
+      addNotification(
+        `Quick Start: Generating ${config.genre} adventure with Mistral Large...`,
+        "success"
+      );
+      // Call startGeneration directly, no delay needed
+      console.log("[Auto-Start] Calling startGeneration()...");
+      startGeneration();
+    }
+  }, [
+    quickStartReady,
+    user,
+    authLoading,
+    isGenerating,
+    startGeneration,
+    addNotification,
+    config.genre,
   ]);
 
   // Cancel generation
@@ -2032,11 +2213,145 @@ ${result.description || ""}`;
     }
   }, [result, config, addNotification, router, user, thumbnailUrl, bannerUrl]);
 
+  // Auto-publish and start playing when quick start generation completes
+  useEffect(() => {
+    if (!autoPublishAndPlay || !result || !user || isSaving) return;
+
+    const autoPublishAndStartPlaying = async () => {
+      setAutoPublishAndPlay(false); // Prevent re-running
+      setIsSaving(true);
+
+      try {
+        const token = await getAuthToken();
+        if (!token) {
+          throw new Error("Not authenticated");
+        }
+
+        // 1. Save the adventure as private
+        const adventure: Partial<Adventure> & { authorId: string } = {
+          title: result.title || "Untitled Adventure",
+          description: result.description || "",
+          shortDescription: result.shortDescription || "",
+          authorId: user.id,
+          tags: config.genre ? [config.genre] : [],
+          difficulty:
+            config.complexity === "simple"
+              ? "easy"
+              : config.complexity === "complex"
+              ? "hard"
+              : "medium",
+          estimatedDuration:
+            config.targetDuration === "short"
+              ? "1-2 hours"
+              : config.targetDuration === "long"
+              ? "4-6 hours"
+              : "2-4 hours",
+          nsfw: config.nsfw,
+          storyTemplate: result.storyTemplate,
+          startingChoices: result.startingChoices,
+          presets: result.storyTemplate?.presets,
+          visibility: "private", // Private by default for quick start
+          isPublished: false,
+          isFeatured: false,
+          playCount: 0,
+          popularity: 0,
+        };
+
+        addNotification("Saving adventure...", "success");
+
+        const adventureResponse = await fetch("/api/adventures", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(adventure),
+        });
+
+        if (!adventureResponse.ok) {
+          const error = await adventureResponse.json();
+          throw new Error(error.error || "Failed to save adventure");
+        }
+
+        const { adventure: savedAdventure } = await adventureResponse.json();
+
+        // 2. Create a new story from the adventure
+        addNotification("Starting your adventure...", "success");
+
+        const storyResponse = await fetch("/api/stories", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            adventureId: savedAdventure.id,
+            userId: user.id,
+            storyName: `${
+              savedAdventure.title
+            } - ${new Date().toLocaleDateString()}`,
+            storyData: {
+              ...result.storyTemplate,
+              starting_choices: result.startingChoices,
+            },
+            isPublic: false,
+          }),
+        });
+
+        if (!storyResponse.ok) {
+          const error = await storyResponse.json();
+          throw new Error(error.error || "Failed to start story");
+        }
+
+        const { story } = await storyResponse.json();
+
+        addNotification("Adventure ready! Let's play! 🎮", "success");
+
+        // 3. Navigate to the story page
+        router.push(`/story?storyId=${story.id}`);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        addNotification(errorMessage || "Failed to start adventure", "failure");
+        setAutoPublishAndPlay(false);
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    autoPublishAndStartPlaying();
+  }, [
+    autoPublishAndPlay,
+    result,
+    user,
+    isSaving,
+    config,
+    router,
+    addNotification,
+  ]);
+
   // Auth check
   if (authLoading) {
     return (
       <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Quick start loading - show while waiting for auth and preparing generation
+  if (isQuickStart && quickStartReady) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-white mb-2">
+            Preparing Your Adventure
+          </h2>
+          <p className="text-blue-300/60">
+            Setting up {config.genre} adventure with Mistral Large...
+          </p>
+        </div>
       </div>
     );
   }
@@ -4793,5 +5108,20 @@ ${result.description || ""}`;
         )}
       </main>
     </div>
+  );
+}
+
+// Wrap with Suspense for useSearchParams
+export default function BigAdventureCreatorPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <BigAdventureCreatorPage />
+    </Suspense>
   );
 }

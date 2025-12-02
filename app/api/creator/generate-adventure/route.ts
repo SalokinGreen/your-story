@@ -43,7 +43,7 @@ interface RequestBody {
 }
 
 function getApiKey(
-  provider: "deepseek" | "openrouter" | "novelai",
+  provider: "deepseek" | "openrouter" | "novelai" | "mistral" | "deepinfra",
   userProvidedOpenRouterKey?: string,
   userProvidedDeepseekKey?: string,
   novelaiKey?: string
@@ -52,6 +52,12 @@ function getApiKey(
     return userProvidedDeepseekKey || null;
   } else if (provider === "novelai") {
     return novelaiKey || null;
+  } else if (provider === "mistral") {
+    // Mistral uses server-side API key - users pay with coins
+    return process.env.MISTRAL_API_KEY || null;
+  } else if (provider === "deepinfra") {
+    // DeepInfra uses server-side API key - users pay with coins
+    return process.env.DEEPINFRA_API_KEY || null;
   } else {
     return userProvidedOpenRouterKey || null;
   }
@@ -107,10 +113,21 @@ async function streamAIResponse(
     );
   }
 
-  const endpoint =
-    modelConfig.provider === "deepseek"
-      ? "https://api.deepseek.com/chat/completions"
-      : "https://openrouter.ai/api/v1/chat/completions";
+  // Determine the correct endpoint based on provider
+  let endpoint: string;
+  switch (modelConfig.provider) {
+    case "deepseek":
+      endpoint = "https://api.deepseek.com/chat/completions";
+      break;
+    case "mistral":
+      endpoint = "https://api.mistral.ai/v1/chat/completions";
+      break;
+    case "deepinfra":
+      endpoint = "https://api.deepinfra.com/v1/openai/chat/completions";
+      break;
+    default:
+      endpoint = "https://openrouter.ai/api/v1/chat/completions";
+  }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -319,7 +336,10 @@ async function generateStage(
   rawContent: string;
 }> {
   const stageInfo = getStageInfo(stage);
-  const MAX_CONTINUATIONS = 5; // Maximum number of continuation attempts
+  
+  // NovelAI has very limited output (2048 tokens), so it needs many more continuations
+  // Other providers can generate much more per call
+  const MAX_CONTINUATIONS = modelConfig.provider === "novelai" ? 50 : 5;
 
   // Get stage-specific max output tokens
   const stageConfig =
@@ -541,24 +561,39 @@ export async function POST(req: NextRequest) {
 
         // Get API key (user-provided)
         const apiKey = getApiKey(
-          modelConfig.provider as "deepseek" | "openrouter" | "novelai",
+          modelConfig.provider as
+            | "deepseek"
+            | "openrouter"
+            | "novelai"
+            | "mistral"
+            | "deepinfra",
           openRouterKey,
           deepseekKey,
           novelaiKey
         );
 
         if (!apiKey) {
+          // For server-side providers (mistral/deepinfra), this means the server key is missing
           const providerName =
             modelConfig.provider === "deepseek"
               ? "DeepSeek"
               : modelConfig.provider === "openrouter"
               ? "OpenRouter"
+              : modelConfig.provider === "mistral"
+              ? "Mistral"
+              : modelConfig.provider === "deepinfra"
+              ? "DeepInfra"
               : "NovelAI";
+          const errorMessage =
+            modelConfig.provider === "mistral" ||
+            modelConfig.provider === "deepinfra"
+              ? `${providerName} server configuration error. Please try again later or use a different model.`
+              : `${providerName} API key required. Please add your API key in Settings.`;
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "error",
-                error: `${providerName} API key required. Please add your API key in Settings.`,
+                error: errorMessage,
               })}\n\n`
             )
           );

@@ -167,7 +167,7 @@ export const AI_MODELS = {
       "A popular and cost-effective model with large context window, suitable for tool calling and general tasks.",
     bannerUrl: undefined,
   },
-  "microsoft/phi-4": {
+  "Phi 4": {
     name: "Phi 4",
     original_model: "microsoft/phi-4",
     model: "microsoft/phi-4",
@@ -185,8 +185,8 @@ export const AI_MODELS = {
       "A small-sized model from Mistral, offering a balance between performance and cost, suitable for story generation..",
     bannerUrl: undefined,
   },
-  "qwen/qwen3-vl-30b-a3b-instruct": {
-    name: "Qwen 3 VL 30B A3B Instruct",
+  "Qwen 3 VL 30B": {
+    name: "Qwen 3 VL 30B",
     original_model: "qwen/qwen3-vl-30b-a3b-instruct",
     model: "qwen/qwen3-vl-30b-a3b-instruct",
     maxTokens: 250000,
@@ -427,12 +427,12 @@ export const AI_MODELS = {
       "Mistral's code-optimized model, excellent for tool calling and structured tasks. Uses Coins.",
     bannerUrl: undefined,
   },
-  "Mistral Large 2.0": {
-    name: "Mistral Large 2.0",
+  "Mistral Large 3.0": {
+    name: "Mistral Large 3.0",
     original_model: "mistral-large-2512",
-    model: "mistral-large-2512",
+    model: "mistral-large-latest",
     maxTokens: 256000,
-    maxOutputTokens: 8000,
+    maxOutputTokens: 100000,
     provider: "mistral",
     supportsToolCalling: true,
     cost: 3,
@@ -923,8 +923,8 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
   mistralLarge: {
     id: "mistralLarge",
     name: "Mistral Large",
-    description: "Mistral Large 2.0 for story with 256k context - uses Coins",
-    storyModel: "Mistral Large 2.0",
+    description: "Mistral Large 3.0 for story with 256k context - uses Coins",
+    storyModel: "Mistral Large 3.0",
     toolsModel: "Codestral",
     choicesModel: "Ministral 8B",
     estimatedCost: 5,

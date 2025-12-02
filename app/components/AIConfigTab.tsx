@@ -231,6 +231,21 @@ export default function AIConfigTab() {
       ? choicesModel
       : preset.choicesModel;
 
+  // Helper to get display name for a model key (handles both built-in and custom models)
+  const getModelDisplayName = (modelKey: string): string => {
+    // Check if it's a built-in model
+    if (modelKey in AI_MODELS) {
+      return AI_MODELS[modelKey as keyof typeof AI_MODELS].name;
+    }
+    // Check if it's a custom model (by UUID)
+    const customModel = customModels.find((m) => m.id === modelKey);
+    if (customModel) {
+      return customModel.name;
+    }
+    // Fallback to the key itself
+    return modelKey;
+  };
+
   const effectiveContextSize =
     customMaxContext > 0 ? customMaxContext : undefined;
 
@@ -566,7 +581,7 @@ export default function AIConfigTab() {
               </span>
             ) : (
               <>
-                {effectiveStoryModel}
+                {getModelDisplayName(effectiveStoryModel)}
                 <span className="text-white/40 ml-1">
                   -{" "}
                   {Math.round(
@@ -578,11 +593,11 @@ export default function AIConfigTab() {
             )}
           </div>
           <div>
-            <span className="text-white/60">Tools:</span> {effectiveToolsModel}
+            <span className="text-white/60">Tools:</span> {getModelDisplayName(effectiveToolsModel)}
           </div>
           <div>
             <span className="text-white/60">Choices:</span>{" "}
-            {effectiveChoicesModel}
+            {getModelDisplayName(effectiveChoicesModel)}
           </div>
         </div>
       </div>
