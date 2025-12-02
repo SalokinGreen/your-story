@@ -63,6 +63,50 @@ const genres = [
   },
 ];
 
+// Size presets with token counts and time estimates
+// Cost calculation: DeepInfra DeepSeek V3.2 pricing
+// Input: $0.21/M tokens, Output: $0.32/M tokens
+// Assumes ~4K input tokens per stage, 4 stages, output = tokens value
+// Formula: ((4000 * 4) * 0.21 + tokens * 0.32) / 1000000 * 100 (cents per coin)
+const sizePresets = [
+  {
+    name: "Quick",
+    value: "quick",
+    tokens: 20000,
+    timeMin: 2,
+    timeMax: 4,
+    description: "Basic adventure, fewer details",
+    estimatedCoins: 8, // ~$0.007
+  },
+  {
+    name: "Standard",
+    value: "standard",
+    tokens: 50000,
+    timeMin: 5,
+    timeMax: 8,
+    description: "Well-rounded adventure",
+    estimatedCoins: 18, // ~$0.017
+  },
+  {
+    name: "Detailed",
+    value: "detailed",
+    tokens: 100000,
+    timeMin: 10,
+    timeMax: 15,
+    description: "Rich lore and content",
+    estimatedCoins: 35, // ~$0.033
+  },
+  {
+    name: "Epic",
+    value: "epic",
+    tokens: 200000,
+    timeMin: 18,
+    timeMax: 25,
+    description: "Maximum depth and detail",
+    estimatedCoins: 68, // ~$0.065
+  },
+];
+
 /**
  * Quick start genre buttons for the landing page.
  * Opens a modal to optionally add a custom prompt, then generates an adventure.
@@ -73,6 +117,9 @@ export default function QuickStartGenres() {
     null
   );
   const [customPrompt, setCustomPrompt] = useState("");
+  const [sizeIndex, setSizeIndex] = useState(1); // Default to "Standard"
+
+  const selectedSize = sizePresets[sizeIndex];
 
   const handleGenreClick = (genre: (typeof genres)[0]) => {
     setSelectedGenre(genre);
@@ -86,6 +133,7 @@ export default function QuickStartGenres() {
     const params = new URLSearchParams({
       quickStart: "true",
       genre: selectedGenre.name.toLowerCase(),
+      size: selectedSize.value,
     });
 
     if (customPrompt.trim()) {
@@ -153,10 +201,49 @@ export default function QuickStartGenres() {
                 className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/30 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
                 rows={3}
               />
-              <p className="text-xs text-blue-300/50 mt-1">
-                The AI will generate a complete adventure with stats, lore,
-                quests, and more
-              </p>
+            </div>
+
+            {/* Size Slider */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-blue-200 mb-2">
+                Adventure Size
+              </label>
+              <div className="bg-blue-900/30 border border-blue-700/30 rounded-lg p-4">
+                {/* Slider */}
+                <input
+                  type="range"
+                  min={0}
+                  max={sizePresets.length - 1}
+                  value={sizeIndex}
+                  onChange={(e) => setSizeIndex(parseInt(e.target.value))}
+                  className="w-full h-2 bg-blue-800/50 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                />
+                {/* Labels */}
+                <div className="flex justify-between text-xs text-blue-400/60 mt-1 px-1">
+                  {sizePresets.map((preset) => (
+                    <span key={preset.value}>{preset.name}</span>
+                  ))}
+                </div>
+                {/* Selected info */}
+                <div className="mt-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-lg font-bold text-white">
+                      {selectedSize.name}
+                    </span>
+                    <span className="text-sm text-blue-300/60 ml-2">
+                      {selectedSize.description}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-purple-300">
+                      ~{selectedSize.timeMin}-{selectedSize.timeMax} min
+                    </div>
+                    <div className="text-xs text-amber-400">
+                      ~{selectedSize.estimatedCoins} coins
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Info Box */}
@@ -167,10 +254,10 @@ export default function QuickStartGenres() {
                   className="w-4 h-4 text-purple-400 mt-0.5 shrink-0"
                 />
                 <div className="text-sm text-purple-200/80">
-                  <p className="font-medium mb-1">Powered by Mistral Large</p>
+                  <p className="font-medium mb-1">Powered by DeepSeek V3</p>
                   <p className="text-purple-300/60 text-xs">
                     AI will choose the best RPG system, complexity, and settings
-                    for your genre. Generation takes about 2-3 minutes.
+                    for your genre.
                   </p>
                 </div>
               </div>

@@ -353,7 +353,10 @@ export async function POST(req: NextRequest) {
 
           const requestBody = {
             model: modelConfig.model,
-            messages: messages.map((m) => ({ role: m.role, content: m.content })),
+            messages: messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
             temperature: config.temperature ?? 0.8,
             max_tokens: maxOutputTokens,
             stream: true,

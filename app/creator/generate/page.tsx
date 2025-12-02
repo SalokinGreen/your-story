@@ -766,7 +766,11 @@ function BigAdventureCreatorPage() {
     ([, model]) => {
       const provider = (model as { provider?: string }).provider;
       if (extensionByokMode) {
-        return provider === "openrouter" || provider === "deepseek" || provider === "novelai";
+        return (
+          provider === "openrouter" ||
+          provider === "deepseek" ||
+          provider === "novelai"
+        );
       } else {
         return provider === "mistral" || provider === "deepinfra";
       }
@@ -850,11 +854,13 @@ function BigAdventureCreatorPage() {
     const quickStart = searchParams.get("quickStart");
     const genre = searchParams.get("genre");
     const prompt = searchParams.get("prompt");
+    const size = searchParams.get("size") || "standard";
 
     console.log("[Quick Start Effect] Params:", {
       quickStart,
       genre,
       prompt,
+      size,
       isQuickStart,
       quickStartReady,
     });
@@ -863,6 +869,15 @@ function BigAdventureCreatorPage() {
     if (quickStart === "true" && genre && !isQuickStart && !quickStartReady) {
       console.log("[Quick Start] Conditions met, initializing...");
       setIsQuickStart(true);
+
+      // Size presets with token counts (must match QuickStartGenres.tsx)
+      const sizeTokenMap: Record<string, number> = {
+        quick: 20000,
+        standard: 50000,
+        detailed: 100000,
+        epic: 200000,
+      };
+      const outputTokens = sizeTokenMap[size] || 50000;
 
       // Genre-specific style presets
       const genreStyleMap: Record<string, StylePreset> = {
@@ -938,20 +953,23 @@ function BigAdventureCreatorPage() {
           | "short"
           | "medium"
           | "long",
-        maxOutputTokens: 100000, // High output for comprehensive generation
+        maxOutputTokens: outputTokens,
         stageConfigs: {
-          core: { ...DEFAULT_STAGE_CONFIGS.core, maxOutputTokens: 100000 },
+          core: {
+            ...DEFAULT_STAGE_CONFIGS.core,
+            maxOutputTokens: outputTokens,
+          },
           mechanics: {
             ...DEFAULT_STAGE_CONFIGS.mechanics,
-            maxOutputTokens: 100000,
+            maxOutputTokens: outputTokens,
           },
           content: {
             ...DEFAULT_STAGE_CONFIGS.content,
-            maxOutputTokens: 100000,
+            maxOutputTokens: outputTokens,
           },
           advanced: {
             ...DEFAULT_STAGE_CONFIGS.advanced,
-            maxOutputTokens: 100000,
+            maxOutputTokens: outputTokens,
           },
         },
         contentIterations: { ...DEFAULT_CONTENT_ITERATIONS },
