@@ -1,5 +1,5 @@
 /**
- * Mythic GME Tool Definitions
+ * Advanced RPG Tools Tool Definitions
  *
  * Tool schemas for AI-driven Mythic Game Master Emulator operations.
  * Enables AI to manage story threads, NPCs, chaos factor, and scene tracking.
@@ -13,7 +13,7 @@ export const MYTHIC_TOOLS: ToolSchema[] = [
     function: {
       name: "add_thread",
       description:
-        "Add a new story thread to track in the Mythic GME system. Use when a new plotline, mystery, or goal emerges.",
+        "Add a new story thread to track in the Advanced RPG Tools system. Use when a new plotline, mystery, or goal emerges.",
       parameters: {
         type: "object",
         properties: {
@@ -38,7 +38,8 @@ export const MYTHIC_TOOLS: ToolSchema[] = [
         properties: {
           threadId: {
             type: "string",
-            description: "ID of the thread to close (from Mythic GME State)",
+            description:
+              "ID of the thread to close (from Advanced RPG Tools State)",
           },
         },
         required: ["threadId"],
@@ -90,7 +91,7 @@ export const MYTHIC_TOOLS: ToolSchema[] = [
     function: {
       name: "add_character",
       description:
-        "Add a new NPC to track in the Mythic GME system. Use when an important character is introduced.",
+        "Add a new NPC to track in the Advanced RPG Tools system. Use when an important character is introduced.",
       parameters: {
         type: "object",
         properties: {

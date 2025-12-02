@@ -1,5 +1,5 @@
 /**
- * Mythic GME Auto-Chaos System
+ * Advanced RPG Tools Auto-Chaos System
  *
  * Automatically adjusts chaos factor based on player performance in skill checks.
  * Chaos increases when players struggle, decreases when they succeed.

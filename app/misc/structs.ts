@@ -328,14 +328,14 @@ export interface StoryData {
     | "narrative"; // RPG dice system
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)
-  mythicState?: MythicState; // Mythic GME state (chaos factor, threads, characters)
+  mythicState?: MythicState; // Advanced RPG Tools state (chaos factor, threads, characters)
   customTables?: CustomTable[]; // Creator-defined random tables
   variables?: Variable[]; // Dynamic tracked variables (numbers, booleans, lists)
   starting_choices?: StartingChoice[]; // Optional custom starting choices from adventure
   loreEmbeddingsDirty?: boolean; // Flag indicating lore has changed and needs re-embedding
 }
 
-// Mythic GME state tracking
+// Advanced RPG Tools state tracking
 export interface MythicState {
   chaosFactor: number; // 1-9, default 5
   threads: MythicThread[]; // Active story threads

@@ -1,4 +1,4 @@
-# Mythic GME - Implementation Notes
+# Advanced RPG Tools - Implementation Notes
 
 ## Currently Implemented (Complete)
 
@@ -23,7 +23,7 @@
 
 ### Choice-Based Integration (NEW - ACTIVE)
 
-Mythic GME is now integrated directly into player choices. Adventure creators can add oracle checks to any choice:
+Advanced RPG Tools is now integrated directly into player choices. Adventure creators can add oracle checks to any choice:
 
 **`mythic_check`** - Ask the fate oracle a yes/no question
 
@@ -411,14 +411,14 @@ interface StoryData {
 
 ### Phase 3 (Polish)
 
-10. ⏳ Tutorial/guide for using Mythic GME
+10. ⏳ Tutorial/guide for using Advanced RPG Tools
 11. ⏳ Preset Mythic configurations (high chaos, low chaos, etc.)
 12. ⏳ Analytics on Fate Question outcomes
 13. ⏳ Thread/character relationship graph visualization
 
 ## Resources
 
-- Mythic GME 2nd Edition by Tana Pigeon
+- Advanced RPG Tools 2nd Edition by Tana Pigeon
 - Scene checks: Page 20-21
 - Chaos Factor: Page 28
 - Threads: Page 29-30

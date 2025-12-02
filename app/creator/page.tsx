@@ -1120,7 +1120,7 @@ function AdventureCreatorContent() {
       });
     }
 
-    // Apply Mythic GME settings
+    // Apply Advanced RPG Tools settings
     // mythicEnabled is derived from mythicState presence, not a separate field
     if (data.mythicState) {
       const ms = data.mythicState;
@@ -1338,7 +1338,7 @@ function AdventureCreatorContent() {
         setMomentum(template.momentum || 0);
         setMaxMomentum(template.maxMomentum || 5);
 
-        // Load Mythic GME state
+        // Load Advanced RPG Tools state
         if (template.mythicState) {
           setMythicEnabled(true);
           setMythicState(template.mythicState);
@@ -1614,7 +1614,7 @@ function AdventureCreatorContent() {
   const [relationshipPage, setRelationshipPage] = useState(1);
   const relationshipItemsPerPage = 10;
 
-  // Mythic GME
+  // Advanced RPG Tools
   const [mythicEnabled, setMythicEnabled] = useState(false);
   const [mythicState, setMythicState] = useState<MythicState>({
     chaosFactor: 5,
@@ -1757,7 +1757,7 @@ function AdventureCreatorContent() {
     { id: "variables", label: "Variables", icon: "Variable" },
     { id: "tables", label: "Custom Tables", icon: "Dices" },
     { id: "plot", label: "Plot Beats", icon: "Clapperboard" },
-    { id: "mythic", label: "Mythic GME", icon: "Sparkles" },
+    { id: "mythic", label: "Advanced RPG Tools", icon: "Sparkles" },
     { id: "upgrades", label: "Upgrade Settings", icon: "ArrowUpCircle" },
     { id: "preview", label: "Preview", icon: "Eye" },
   ];
@@ -4630,12 +4630,12 @@ ${description || ""}`;
                     </select>
                   </div>
                 </div>
-                {/* Mythic GME Section */}
+                {/* Advanced RPG Tools Section */}
                 {mythicEnabled && (
                   <div className="border-t border-blue-800/30 pt-4 mt-4">
                     <h4 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
                       <DynamicIcon name="Sparkles" className="w-4 h-4" />
-                      Mythic GME Options
+                      Advanced RPG Tools Options
                     </h4>
                     <div className="space-y-4">
                       <div>
@@ -4975,7 +4975,7 @@ ${description || ""}`;
                             </select>
                           </div>
                         </div>
-                        {/* Mythic GME Section in Edit */}
+                        {/* Advanced RPG Tools Section in Edit */}
                         {mythicEnabled && (
                           <div className="border-t border-blue-800/30 pt-4 mt-4">
                             <h4 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
@@ -4983,7 +4983,7 @@ ${description || ""}`;
                                 name="Sparkles"
                                 className="w-4 h-4"
                               />
-                              Mythic GME Options
+                              Advanced RPG Tools Options
                             </h4>
                             <div className="space-y-4">
                               <div>
@@ -10327,8 +10327,8 @@ ${description || ""}`;
             <div className="flex items-center justify-between p-4 rounded-lg bg-linear-to-r from-purple-500/10 to-transparent border-l-4 border-purple-500">
               <div>
                 <h3 className="text-xl font-bold text-purple-400 flex items-center gap-2">
-                  <span className="text-2xl">??</span>
-                  Mythic GME Settings
+                  <span className="text-2xl">✨</span>
+                  Advanced RPG Tools Settings
                 </h3>
                 <p className="text-sm text-gray-400 mt-1">
                   Optional oracle-driven storytelling with dynamic chaos
@@ -10399,7 +10399,7 @@ ${description || ""}`;
                 <div className="p-6 rounded-lg bg-linear-to-br from-blue-900/20 to-gray-900/50 border border-blue-500/20">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-lg font-bold text-blue-400 flex items-center gap-2">
-                      <span>??</span>
+                      <span>🧵</span>
                       Starting Story Threads
                       {mythicState.threads.length > 0 && (
                         <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-300">
@@ -10474,7 +10474,7 @@ ${description || ""}`;
                           >
                             {editingThreadId === thread.id ? (
                               <div className="flex gap-3">
-                                <span className="text-2xl">??</span>
+                                <span className="text-2xl">🧵</span>
                                 <input
                                   type="text"
                                   value={editThreadDescription}
@@ -10576,7 +10576,7 @@ ${description || ""}`;
                 <div className="p-6 rounded-lg bg-linear-to-br from-green-900/20 to-gray-900/50 border border-green-500/20">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-lg font-bold text-green-400 flex items-center gap-2">
-                      <span>??</span>
+                      <span>👤</span>
                       Starting NPCs
                       {mythicState.characters.length > 0 && (
                         <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-300">
@@ -10671,7 +10671,7 @@ ${description || ""}`;
                           >
                             {editingCharacterId === char.id ? (
                               <div className="flex gap-3">
-                                <span className="text-2xl">??</span>
+                                <span className="text-2xl">👤</span>
                                 <div className="flex-1 space-y-2">
                                   <input
                                     type="text"
@@ -10731,7 +10731,7 @@ ${description || ""}`;
                               </div>
                             ) : (
                               <div className="flex gap-3">
-                                <span className="text-2xl">??</span>
+                                <span className="text-2xl">👤</span>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-semibold text-gray-200">
                                     {char.name}
@@ -11827,7 +11827,7 @@ ${description || ""}`;
             disabled={currentStepIndex === 0}
             className="px-4 py-2.5 bg-blue-800/40 hover:bg-blue-700/50 disabled:opacity-50 disabled:cursor-not-allowed text-blue-200 text-sm font-medium rounded-lg transition-colors border border-blue-700/30"
           >
-            ? Previous
+            ← Previous
           </button>
 
           <div className="text-xs sm:text-sm text-blue-300/60 text-center">
@@ -11908,7 +11908,7 @@ ${description || ""}`;
               }}
               className="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
             >
-              Next ?
+              Next →
             </button>
           )}
         </div>

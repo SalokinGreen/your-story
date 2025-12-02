@@ -1,4 +1,4 @@
--- Mythic GME State Migration
+-- Advanced RPG Tools State Migration
 -- Adds mythic_state JSONB column to stories and adventures tables
 -- 
 -- mythic_state structure:
@@ -25,8 +25,8 @@ CREATE INDEX IF NOT EXISTS idx_adventures_mythic_chaos
 ON adventures ((mythic_state->>'chaosFactor'));
 
 -- Add comments for documentation
-COMMENT ON COLUMN stories.mythic_state IS 'Mythic GME state: chaos factor (1-9), story threads, NPCs, scene count';
-COMMENT ON COLUMN adventures.mythic_state IS 'Mythic GME state: chaos factor (1-9), story threads, NPCs, scene count';
+COMMENT ON COLUMN stories.mythic_state IS 'Advanced RPG Tools state: chaos factor (1-9), story threads, NPCs, scene count';
+COMMENT ON COLUMN adventures.mythic_state IS 'Advanced RPG Tools state: chaos factor (1-9), story threads, NPCs, scene count';
 
 -- Example usage:
 -- Update chaos factor: UPDATE stories SET mythic_state = jsonb_set(COALESCE(mythic_state, '{}'), '{chaosFactor}', '7') WHERE id = 'story-id';

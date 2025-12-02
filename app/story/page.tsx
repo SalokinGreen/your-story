@@ -2884,7 +2884,7 @@ function StoryPageContent() {
     //BuilddetailedRPG-stylechoicetextwithbrackets
     let choiceDetails: string[] = [];
 
-    // Process Mythic GME checks first (less important, shown at top)
+    // Process Advanced RPG Tools checks first (less important, shown at top)
     const mythicDetails: string[] = [];
     if (choice.mythic_check) {
       try {

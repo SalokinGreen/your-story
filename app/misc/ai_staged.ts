@@ -318,9 +318,9 @@ export function buildInfoMessage(
         }`
       : "";
 
-  // Build mythic GME section if enabled
+  // Build Advanced RPG Tools section if enabled
   const mythicSection = storyData.mythicState
-    ? `## Mythic GME
+    ? `## Advanced RPG Tools
 - Chaos Factor: ${storyData.mythicState.chaosFactor}/9 (${getChaosDescription(
         storyData.mythicState.chaosFactor
       )})
@@ -812,7 +812,7 @@ Relationship Guidelines:
 - Consider the NPC's personality: some warm up quickly, others are guarded and slow to trust
 - Relationship scale is typically 0-100; going from stranger (20-30) to close friend (70+) should take many interactions
 
-Mythic GME Guidelines (if enabled):
+Advanced RPG Tools Guidelines (if enabled):
 - ACTIVELY create threads and characters! Don't be conservative - the Mythic system thrives on a full list.
 - Use add_thread when new plotlines/mysteries/goals emerge - ANY loose end is a valid thread
   - Overheard rumors, unanswered questions, promised rewards, mysterious figures, unexplained events
@@ -1207,7 +1207,7 @@ Choice Design Guidelines:
    - No mythic_context_only flag needed (there's no skill check to contextualize)
    - Result directly affects narrative but doesn't test player ability
 
-MYTHIC GME ORACLE TABLES:
+Advanced RPG Tools ORACLE TABLES:
 The following oracle tables are available for creating choices that involve uncertainty, discovery, or world-building:
 Core Tables:
 - Fate Chart: Ask yes/no questions with likelihood modifiers (Impossible to Has To Be) adjusted by chaos factor
@@ -1466,7 +1466,7 @@ Example uses:
 ${
   storyData.mythicState
     ? `
-MYTHIC GME (for mythic_check):
+Advanced RPG Tools (for mythic_check):
 Use mythic_check for yes/no questions about the world that skill checks can't answer.
 Format: "question (likelihood)" where likelihood is one of:
 Impossible, No Way, Very Unlikely, Unlikely, 50/50, Somewhat Likely, Likely, Very Likely, Near Sure Thing, A Sure Thing, Has To Be

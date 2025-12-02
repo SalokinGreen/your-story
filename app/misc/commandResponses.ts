@@ -2809,7 +2809,7 @@ export function executeCommandWithResponse(
     };
   }
 
-  // === MYTHIC GME COMMANDS ===
+  // === Advanced RPG Tools COMMANDS ===
 
   // /add_thread: description
   const addThreadMatch = trimmed.match(/^\/add_thread:\s*(.+)$/i);
@@ -2870,7 +2870,7 @@ export function executeCommandWithResponse(
       return {
         command: trimmed,
         success: false,
-        message: "Mythic GME not enabled",
+        message: "Advanced RPG Tools not enabled",
         timestamp,
       };
     }
@@ -2908,7 +2908,7 @@ export function executeCommandWithResponse(
       return {
         command: trimmed,
         success: false,
-        message: "Mythic GME not enabled",
+        message: "Advanced RPG Tools not enabled",
         timestamp,
       };
     }
@@ -2955,7 +2955,7 @@ export function executeCommandWithResponse(
       return {
         command: trimmed,
         success: false,
-        message: "Mythic GME not enabled",
+        message: "Advanced RPG Tools not enabled",
         timestamp,
       };
     }
@@ -3010,7 +3010,7 @@ export function executeCommandWithResponse(
       return {
         command: trimmed,
         success: false,
-        message: "Mythic GME not enabled",
+        message: "Advanced RPG Tools not enabled",
         timestamp,
       };
     }
@@ -3113,7 +3113,7 @@ export function executeCommandWithResponse(
       return {
         command: trimmed,
         success: false,
-        message: "Mythic GME not enabled",
+        message: "Advanced RPG Tools not enabled",
         timestamp,
       };
     }
@@ -3172,7 +3172,7 @@ export function executeCommandWithResponse(
       return {
         command: trimmed,
         success: false,
-        message: "Mythic GME not enabled",
+        message: "Advanced RPG Tools not enabled",
         timestamp,
       };
     }
@@ -3215,7 +3215,7 @@ export function executeCommandWithResponse(
       return {
         command: trimmed,
         success: false,
-        message: "Mythic GME not enabled",
+        message: "Advanced RPG Tools not enabled",
         timestamp,
       };
     }
@@ -3264,7 +3264,7 @@ export function executeCommandWithResponse(
       return {
         command: trimmed,
         success: false,
-        message: "Mythic GME not enabled",
+        message: "Advanced RPG Tools not enabled",
         timestamp,
       };
     }

@@ -25,7 +25,7 @@ export function DraggableScroll({
   const startXRef = useRef(0);
   const scrollLeftRef = useRef(0);
   const hasMovedRef = useRef(false);
-  
+
   // Scroll indicator state
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -38,7 +38,7 @@ export function DraggableScroll({
 
     const { scrollLeft, scrollWidth, clientWidth } = container;
     const maxScroll = scrollWidth - clientWidth;
-    
+
     setCanScrollLeft(scrollLeft > 5);
     setCanScrollRight(scrollLeft < maxScroll - 5);
     setScrollProgress(maxScroll > 0 ? scrollLeft / maxScroll : 0);
@@ -150,7 +150,7 @@ export function DraggableScroll({
   const scrollBy = useCallback((direction: "left" | "right") => {
     const container = containerRef.current;
     if (!container) return;
-    
+
     const scrollAmount = container.clientWidth * 0.5;
     container.scrollBy({
       left: direction === "left" ? -scrollAmount : scrollAmount,
@@ -225,9 +225,9 @@ export function DraggableScroll({
         <div className="mt-2 w-full h-1 bg-blue-900/40 rounded-full overflow-hidden">
           <div
             className="h-full bg-purple-500/70 rounded-full transition-all duration-150"
-            style={{ 
+            style={{
               width: "20%",
-              marginLeft: `${scrollProgress * 80}%` 
+              marginLeft: `${scrollProgress * 80}%`,
             }}
           />
         </div>

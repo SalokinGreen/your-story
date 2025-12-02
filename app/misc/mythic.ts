@@ -1,5 +1,5 @@
 /**
- * Mythic GME (Game Master Emulator) System
+ * Advanced RPG Tools (Game Master Emulator) System
  * Based on the Mythic Game Master Emulator by Tana Pigeon
  *
  * This system provides:
@@ -511,7 +511,7 @@ export function generateEventMeaning(): {
 }
 
 /**
- * Complete Mythic GME state and utilities
+ * Complete Advanced RPG Tools state and utilities
  */
 export interface MythicState {
   chaosFactor: number;
@@ -521,7 +521,7 @@ export interface MythicState {
 }
 
 /**
- * Create a new Mythic GME state
+ * Create a new Advanced RPG Tools state
  */
 export function createMythicState(): MythicState {
   return {

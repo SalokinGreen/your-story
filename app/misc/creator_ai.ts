@@ -254,7 +254,7 @@ You can control how items in arrays are applied using the **_command** field:
     - cooldown: Turns until can be used again (0 = no cooldown)
     - stat: Optional associated stat
     - symbol: Emoji/icon
-- mythicState (Object with Mythic GME state - if provided, Mythic system will be enabled for this adventure)
+- mythicState (Object with Advanced RPG Tools state - if provided, Mythic system will be enabled for this adventure)
   - chaosFactor: Number 1-9 representing narrative chaos/unpredictability
   - sceneCount: Number >= 0 tracking scenes played
   - threads: Array of { id, description, status } - narrative threads
@@ -292,7 +292,7 @@ Notes:
 - Use the 'symbol' field to add an emoji or icon representing the item/stat/resource.
 - Be creative and thematic in your additions/modifications based on the story setting.
 - When creating stat/resource shop items, these are NEW stats/resources that players can unlock, not upgrades to existing ones.
-- Mythic GME is enabled by providing a mythicState object. If you want to enable Mythic, simply include mythicState with at least chaosFactor.
+- Advanced RPG Tools is enabled by providing a mythicState object. If you want to enable Mythic, simply include mythicState with at least chaosFactor.
 - Mythic chaos factor must be between 1-9, scene count must be >= 0.
 - Thread and character IDs are auto-generated if not provided, so you can omit them for new entries.
 - Starting choices allow players to choose how they begin the adventure. If startingChoices is empty/undefined, players see a default "Start Story" button.
@@ -502,10 +502,10 @@ Assistant:
 }
 \`\`\`"
 
-**Example 10 - Mythic GME:**
+**Example 10 - Advanced RPG Tools:**
 User: "Enable Mythic with chaos 5, add a thread about finding the ancient temple, and an NPC named Elara."
 Assistant:
-"I've enabled Mythic GME with your settings.
+"I've enabled Advanced RPG Tools with your settings.
 
 \`\`\`json
 {

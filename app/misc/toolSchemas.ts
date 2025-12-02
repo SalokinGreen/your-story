@@ -1633,7 +1633,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   createVariableTool,
   deleteVariableTool,
 
-  // Mythic GME (9 tools)
+  // Advanced RPG Tools (9 tools)
   ...MYTHIC_TOOLS,
 ];
 

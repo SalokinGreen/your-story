@@ -574,7 +574,7 @@ export const REGENERATE_SECTIONS: Record<
     stage: "advanced",
   },
   mythic: {
-    name: "Mythic GME",
+    name: "Advanced RPG Tools",
     description: "Solo play configuration",
     emoji: "🎲",
     stage: "advanced",
@@ -655,15 +655,18 @@ export interface GenerationHistoryEntry {
   config: BigAdventureConfig;
   result: BigAdventureResult;
   tokenCost: number;
+  thumbnailUrl?: string;
+  bannerUrl?: string;
 }
 
 export function saveGenerationToHistory(
   entry: Omit<GenerationHistoryEntry, "id">
-): void {
+): string {
   const history = loadGenerationHistory();
+  const id = `gen_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
   const newEntry: GenerationHistoryEntry = {
     ...entry,
-    id: `gen_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    id,
   };
 
   // Add to beginning, keep max entries
@@ -671,6 +674,25 @@ export function saveGenerationToHistory(
   if (history.length > MAX_HISTORY_ENTRIES) {
     history.pop();
   }
+
+  localStorage.setItem(GENERATION_HISTORY_KEY, JSON.stringify(history));
+  return id;
+}
+
+export function updateGenerationHistory(
+  id: string,
+  updates: Partial<Omit<GenerationHistoryEntry, "id">>
+): void {
+  const history = loadGenerationHistory();
+  const index = history.findIndex((h) => h.id === id);
+  if (index === -1) return;
+
+  history[index] = {
+    ...history[index],
+    ...updates,
+    // Update timestamp to show it was modified
+    timestamp: Date.now(),
+  };
 
   localStorage.setItem(GENERATION_HISTORY_KEY, JSON.stringify(history));
 }
@@ -881,7 +903,7 @@ export function getStageInfo(stage: GenerationStage): {
         "Upgrade shop (progression purchases)",
         "Character presets (pre-made builds)",
         "Custom random tables",
-        "Mythic GME integration",
+        "Advanced RPG Tools integration",
       ],
       instructionHint:
         "Shape character options, upgrade paths, or random event themes",
@@ -1235,7 +1257,7 @@ STAT VALUES FOR PRESETS:
 
   if (config.includeMythic) {
     advancedSections += `
-MYTHIC GME STATE:
+Advanced RPG Tools STATE:
 Initialize the Mythic Game Master Emulator for solo/GM-less play.
 - chaosFactor: 1-9 (5 is default, higher = more random events)
 - threads: Active narrative threads/plotlines
@@ -2200,7 +2222,7 @@ Write full, standalone content - not fragments!`,
       count: Math.round(counts.presets * durationMultiplier),
     },
     mythic: {
-      instruction: "Generate Mythic GME initial state for solo play.",
+      instruction: "Generate Advanced RPG Tools initial state for solo play.",
       schema: `{ "mythicState": { "chaosFactor": number (1-9), "sceneCount": 0, "threads": [{ "id": "thread_xxx", "description": "string", "status": "active" }], "characters": [{ "id": "char_xxx", "name": "string", "role": "string", "status": "active" }], "skillCheckHistory": [], "currentStreak": 0, "lastChaosAdjustment": 0 } }`,
     },
     customTables: {
@@ -2372,6 +2394,7 @@ export const EXTENDABLE_SECTIONS: RegenerateSection[] = [
   "relationships",
   "presets",
   "customTables",
+  "variables",
 ];
 
 /**

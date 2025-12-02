@@ -590,7 +590,7 @@ export function executeTools(
         continue;
       }
 
-      // === MYTHIC GME TOOL HANDLERS ===
+      // === Advanced RPG Tools TOOL HANDLERS ===
 
       // Add thread
       if (toolCall.function.name === "add_thread") {
@@ -648,7 +648,7 @@ export function executeTools(
       if (toolCall.function.name === "close_thread") {
         const threadId = args.threadId;
         if (!storyData.mythicState) {
-          const errorMsg = "Mythic GME not enabled";
+          const errorMsg = "Advanced RPG Tools not enabled";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
             toolName,
@@ -702,7 +702,7 @@ export function executeTools(
       if (toolCall.function.name === "reopen_thread") {
         const threadId = args.threadId;
         if (!storyData.mythicState) {
-          const errorMsg = "Mythic GME not enabled";
+          const errorMsg = "Advanced RPG Tools not enabled";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
             toolName,
@@ -774,7 +774,7 @@ export function executeTools(
         }
 
         if (!storyData.mythicState) {
-          const errorMsg = "Mythic GME not enabled";
+          const errorMsg = "Advanced RPG Tools not enabled";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
             toolName,
@@ -905,7 +905,7 @@ export function executeTools(
         const role = args.role?.trim();
 
         if (!storyData.mythicState) {
-          const errorMsg = "Mythic GME not enabled";
+          const errorMsg = "Advanced RPG Tools not enabled";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
             toolName,
@@ -984,7 +984,7 @@ export function executeTools(
         }
 
         if (!storyData.mythicState) {
-          const errorMsg = "Mythic GME not enabled";
+          const errorMsg = "Advanced RPG Tools not enabled";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
             toolName,

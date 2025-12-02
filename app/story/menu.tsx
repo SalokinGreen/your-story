@@ -5809,15 +5809,15 @@ export default function MenuPage({
                 <div className="mt-4 space-y-6">
                   <h4 className="text-lg font-bold text-white flex items-center gap-2">
                     <DynamicIcon name="Sparkles" className="w-6 h-6" />
-                    Mythic GME Settings
+                    Advanced RPG Tools Settings
                   </h4>
 
-                  {/* Enable/Disable Mythic GME */}
+                  {/* Enable/Disable Advanced RPG Tools */}
                   <div className="p-6 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
                     <div className="flex items-center justify-between">
                       <div>
                         <label className="block text-sm font-semibold text-blue-200 mb-1">
-                          Enable Mythic GME
+                          Enable Advanced RPG Tools
                         </label>
                         <p className="text-xs text-blue-200/60">
                           Use Mythic Game Master Emulator for dynamic story
