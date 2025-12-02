@@ -1347,8 +1347,10 @@ function BigAdventureCreatorPage() {
       return;
     }
 
-    const stagesToRun = getStagesToRun(config);
-    const tasks = getTotalGenerationTasks(config);
+    // Get model config to determine stages (low-output models skip content/advanced)
+    const modelConfig = getModelConfig(selectedModel);
+    const stagesToRun = getStagesToRun(config, modelConfig.maxOutputTokens);
+    const tasks = stagesToRun.length;
 
     // In resume mode, preserve existing progress
     const isResuming = resumeMode && completedStages.length > 0;
@@ -1515,7 +1517,10 @@ function BigAdventureCreatorPage() {
                     event.stage !== "advanced"
                   ) {
                     // Don't show preview for the last stage
-                    const stagesToRun = getStagesToRun(config);
+                    const stagesToRun = getStagesToRun(
+                      config,
+                      modelConfig.maxOutputTokens
+                    );
                     const isLastStage =
                       event.stage === stagesToRun[stagesToRun.length - 1];
 
@@ -3474,6 +3479,14 @@ ${result.description || ""}`;
                         </a>
                         .
                       </p>
+                      <div className="mt-3 p-2 bg-amber-950/50 rounded border border-amber-800/30">
+                        <p className="text-xs text-amber-400">
+                          ⚠️ <strong>Limited Output:</strong> NovelAI&apos;s low
+                          token limit means only Core &amp; Mechanics stages
+                          will run. Use the result editor to add more content,
+                          or switch to a different model for full generation.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

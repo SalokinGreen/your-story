@@ -561,8 +561,8 @@ export async function POST(req: NextRequest) {
         // Get model config
         const modelConfig = getModelConfig(model);
 
-        // All providers use BYOK - no token billing
-        const stages = getStagesToRun(config);
+        // Get stages to run - pass maxOutputTokens to skip content/advanced for low-output models (e.g., NovelAI)
+        const stages = getStagesToRun(config, modelConfig.maxOutputTokens);
 
         // Get API key (user-provided)
         const apiKey = getApiKey(
