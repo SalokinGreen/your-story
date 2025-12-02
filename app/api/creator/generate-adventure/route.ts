@@ -561,8 +561,8 @@ export async function POST(req: NextRequest) {
         // Get model config
         const modelConfig = getModelConfig(model);
 
-        // Get stages to run - pass maxOutputTokens to skip content/advanced for low-output models (e.g., NovelAI)
-        const stages = getStagesToRun(config, modelConfig.maxOutputTokens);
+        // Get stages to run
+        const stages = getStagesToRun(config);
 
         // Get API key (user-provided)
         const apiKey = getApiKey(
@@ -734,6 +734,7 @@ export async function POST(req: NextRequest) {
                   completionTokens: totalCompletionTokens,
                   totalTokens: totalPromptTokens + totalCompletionTokens,
                 },
+                tokenCost: 0, // BYOK mode - no token cost
                 isByok: true,
               },
             })}\n\n`

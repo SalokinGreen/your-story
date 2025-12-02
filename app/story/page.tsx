@@ -1868,7 +1868,9 @@ function StoryPageContent() {
 
     // Skip re-fetching if we've already loaded this story (prevents reload on tab focus)
     if (hasLoadedStoryRef.current === storyId && storyData) {
-      console.log("Story already loaded, skipping re-fetch (tab focus protection)");
+      console.log(
+        "Story already loaded, skipping re-fetch (tab focus protection)"
+      );
       return;
     }
 
@@ -1876,7 +1878,7 @@ function StoryPageContent() {
     function setupUIFromStory(loadedStoryData: StoryData) {
       // Mark this story as loaded to prevent re-fetching
       hasLoadedStoryRef.current = storyId;
-      
+
       // Migrate Mythic state to include new performance tracking fields
       if (loadedStoryData.mythicState) {
         import("@/app/misc/mythicChaos").then(({ migrateMythicState }) => {

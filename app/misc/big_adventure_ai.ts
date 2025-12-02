@@ -1863,18 +1863,11 @@ export function mergeBigAdventureResults(
  * @param config - The adventure configuration
  * @param maxOutputTokens - Optional max output tokens of the model. If below 4000, skips content and advanced stages.
  */
-export function getStagesToRun(
-  config: BigAdventureConfig,
-  maxOutputTokens?: number
-): GenerationStage[] {
+export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
   const stages: GenerationStage[] = [];
 
   // Check each stage's enabled status
   const stageConfigs = config.stageConfigs || DEFAULT_STAGE_CONFIGS;
-
-  // If model has very low output tokens (e.g., NovelAI with 1000), only run core and mechanics
-  const isLowOutputModel =
-    maxOutputTokens !== undefined && maxOutputTokens < 4000;
 
   if (stageConfigs.core?.enabled !== false) {
     stages.push("core");
@@ -1882,11 +1875,6 @@ export function getStagesToRun(
 
   if (stageConfigs.mechanics?.enabled !== false) {
     stages.push("mechanics");
-  }
-
-  // Skip content and advanced stages for low-output models
-  if (isLowOutputModel) {
-    return stages;
   }
 
   if (stageConfigs.content?.enabled !== false) {

@@ -107,7 +107,8 @@ function AutosaveRecoveryModal({
           </p>
           <p className="text-sm text-blue-200">
             <span className="text-blue-300/60">Completed:</span>{" "}
-            {autosave.completedStages.length} of 4 stages
+            {autosave.completedStages.length} of{" "}
+            {getStagesToRun(autosave.config).length} stages
             {autosave.completedStages.length > 0 && (
               <span className="text-green-400 ml-2">
                 (
@@ -1347,9 +1348,9 @@ function BigAdventureCreatorPage() {
       return;
     }
 
-    // Get model config to determine stages (low-output models skip content/advanced)
+    // Get model config and stages to run
     const modelConfig = getModelConfig(selectedModel);
-    const stagesToRun = getStagesToRun(config, modelConfig.maxOutputTokens);
+    const stagesToRun = getStagesToRun(config);
     const tasks = stagesToRun.length;
 
     // In resume mode, preserve existing progress
@@ -1517,10 +1518,7 @@ function BigAdventureCreatorPage() {
                     event.stage !== "advanced"
                   ) {
                     // Don't show preview for the last stage
-                    const stagesToRun = getStagesToRun(
-                      config,
-                      modelConfig.maxOutputTokens
-                    );
+                    const stagesToRun = getStagesToRun(config);
                     const isLastStage =
                       event.stage === stagesToRun[stagesToRun.length - 1];
 
