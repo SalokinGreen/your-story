@@ -315,12 +315,12 @@ function ConfigStep({
 // Stage Progress Component
 function StageProgress({
   stages,
-  currentStage,
+  activeStages,
   completedStages,
   failedStages,
 }: {
   stages: GenerationStage[];
-  currentStage: GenerationStage | null;
+  activeStages: GenerationStage[];
   completedStages: GenerationStage[];
   failedStages: GenerationStage[];
 }) {
@@ -330,7 +330,7 @@ function StageProgress({
         const info = getStageInfo(stage);
         const isComplete = completedStages.includes(stage);
         const isFailed = failedStages.includes(stage);
-        const isActive = currentStage === stage;
+        const isActive = activeStages.includes(stage);
 
         return (
           <div
@@ -378,10 +378,10 @@ function StageProgress({
 // Live Output Component
 function LiveOutput({
   content,
-  stage,
+  activeStages,
 }: {
   content: string;
-  stage: GenerationStage | null;
+  activeStages: GenerationStage[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -393,10 +393,18 @@ function LiveOutput({
 
   if (!content) return null;
 
+  // Show first active stage name, or count if multiple
+  const stageLabel =
+    activeStages.length === 0
+      ? ""
+      : activeStages.length === 1
+      ? `(${getStageInfo(activeStages[0]).name})`
+      : `(${activeStages.length} stages in parallel)`;
+
   return (
     <div className="mt-4">
       <div className="text-sm text-blue-300/60 mb-2">
-        Live Output {stage && `(${getStageInfo(stage).name})`}
+        Live Output {stageLabel}
       </div>
       <div
         ref={scrollRef}
@@ -404,6 +412,438 @@ function LiveOutput({
       >
         {content}
       </div>
+    </div>
+  );
+}
+
+// Content Browser Component - Shows generated content during generation
+function ContentBrowser({
+  partialResults,
+}: {
+  partialResults: Partial<BigAdventureResult>;
+}) {
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [selectedItemIndex, setSelectedItemIndex] = useState<number>(0);
+
+  const storyTemplate = partialResults.storyTemplate;
+
+  // Collect all available content sections
+  const sections: {
+    key: string;
+    label: string;
+    icon: string;
+    color: string;
+    items: { name: string; description?: string; symbol?: string }[];
+  }[] = [];
+
+  // Core Concept section (from core stage)
+  if (
+    partialResults.title ||
+    partialResults.description ||
+    storyTemplate?.premise ||
+    storyTemplate?.intro
+  ) {
+    const coreItems: { name: string; description?: string; symbol?: string }[] =
+      [];
+    if (partialResults.title) {
+      coreItems.push({
+        name: "Title",
+        description: partialResults.title,
+        symbol: "📖",
+      });
+    }
+    if (partialResults.shortDescription) {
+      coreItems.push({
+        name: "Short Description",
+        description: partialResults.shortDescription,
+        symbol: "📝",
+      });
+    }
+    if (partialResults.description) {
+      coreItems.push({
+        name: "Full Description",
+        description: partialResults.description,
+        symbol: "📄",
+      });
+    }
+    if (storyTemplate?.premise) {
+      coreItems.push({
+        name: "Premise",
+        description: storyTemplate.premise,
+        symbol: "🎯",
+      });
+    }
+    if (storyTemplate?.intro) {
+      coreItems.push({
+        name: "Introduction",
+        description: storyTemplate.intro,
+        symbol: "🎬",
+      });
+    }
+    if (storyTemplate?.player_name) {
+      coreItems.push({
+        name: "Default Player Name",
+        description: storyTemplate.player_name,
+        symbol: "👤",
+      });
+    }
+    if (storyTemplate?.player_summary) {
+      coreItems.push({
+        name: "Player Summary",
+        description: storyTemplate.player_summary,
+        symbol: "📋",
+      });
+    }
+    if (storyTemplate?.author_notes) {
+      coreItems.push({
+        name: "Author Notes",
+        description: storyTemplate.author_notes,
+        symbol: "✍️",
+      });
+    }
+    if (coreItems.length > 0) {
+      sections.push({
+        key: "core",
+        label: "Core Concept",
+        icon: "🎯",
+        color: "cyan",
+        items: coreItems,
+      });
+    }
+  }
+
+  if (storyTemplate?.lore && storyTemplate.lore.length > 0) {
+    sections.push({
+      key: "lore",
+      label: "Lore",
+      icon: "📜",
+      color: "purple",
+      items: storyTemplate.lore.map((l) => ({
+        name: l.title,
+        description: l.content,
+        symbol: l.secrtet ? "🔮" : "📖",
+      })),
+    });
+  }
+
+  if (storyTemplate?.achievements && storyTemplate.achievements.length > 0) {
+    sections.push({
+      key: "achievements",
+      label: "Achievements",
+      icon: "🏆",
+      color: "yellow",
+      items: storyTemplate.achievements.map((a) => ({
+        name: a.title,
+        description: a.description,
+        symbol: a.dateAchieved ? "✅" : "🔒",
+      })),
+    });
+  }
+
+  if (storyTemplate?.stats && storyTemplate.stats.length > 0) {
+    sections.push({
+      key: "stats",
+      label: "Stats",
+      icon: "📊",
+      color: "amber",
+      items: storyTemplate.stats.map((s) => ({
+        name: s.name,
+        description: s.description,
+        symbol: s.symbol,
+      })),
+    });
+  }
+
+  if (storyTemplate?.resources && storyTemplate.resources.length > 0) {
+    sections.push({
+      key: "resources",
+      label: "Resources",
+      icon: "💎",
+      color: "emerald",
+      items: storyTemplate.resources.map((r) => ({
+        name: r.name,
+        description: r.description,
+        symbol: r.symbol,
+      })),
+    });
+  }
+
+  if (storyTemplate?.abilities && storyTemplate.abilities.length > 0) {
+    sections.push({
+      key: "abilities",
+      label: "Abilities",
+      icon: "⚡",
+      color: "blue",
+      items: storyTemplate.abilities.map((a) => ({
+        name: a.name,
+        description: a.description,
+        symbol: a.symbol,
+      })),
+    });
+  }
+
+  if (storyTemplate?.inventory && storyTemplate.inventory.length > 0) {
+    sections.push({
+      key: "inventory",
+      label: "Items",
+      icon: "🎒",
+      color: "orange",
+      items: storyTemplate.inventory.map((i) => ({
+        name: i.name,
+        description: i.description,
+        symbol: i.symbol,
+      })),
+    });
+  }
+
+  if (storyTemplate?.quests && storyTemplate.quests.length > 0) {
+    sections.push({
+      key: "quests",
+      label: "Quests",
+      icon: "📋",
+      color: "green",
+      items: storyTemplate.quests.map((q) => ({
+        name: q.title,
+        description: q.description,
+        symbol: q.fulfilled ? "✅" : q.active ? "🔵" : "⬜",
+      })),
+    });
+  }
+
+  if (storyTemplate?.relationships && storyTemplate.relationships.length > 0) {
+    sections.push({
+      key: "relationships",
+      label: "NPCs",
+      icon: "👥",
+      color: "pink",
+      items: storyTemplate.relationships.map((r) => ({
+        name: r.name,
+        description: r.description,
+        symbol: r.value > 0 ? "💚" : r.value < 0 ? "💔" : "💛",
+      })),
+    });
+  }
+
+  if (storyTemplate?.plot_beats && storyTemplate.plot_beats.length > 0) {
+    sections.push({
+      key: "plotBeats",
+      label: "Plot Beats",
+      icon: "🎭",
+      color: "red",
+      items: storyTemplate.plot_beats.map((p, i) => ({
+        name: `Beat ${i + 1}: ${p.title}`,
+        description: p.content,
+        symbol: p.fulfilled ? "✅" : "⬜",
+      })),
+    });
+  }
+
+  if (sections.length === 0) return null;
+
+  const colorClasses: Record<
+    string,
+    { text: string; bg: string; border: string }
+  > = {
+    cyan: {
+      text: "text-cyan-400",
+      bg: "bg-cyan-900/30",
+      border: "border-cyan-500/50",
+    },
+    purple: {
+      text: "text-purple-400",
+      bg: "bg-purple-900/30",
+      border: "border-purple-500/50",
+    },
+    yellow: {
+      text: "text-yellow-400",
+      bg: "bg-yellow-900/30",
+      border: "border-yellow-500/50",
+    },
+    amber: {
+      text: "text-amber-400",
+      bg: "bg-amber-900/30",
+      border: "border-amber-500/50",
+    },
+    emerald: {
+      text: "text-emerald-400",
+      bg: "bg-emerald-900/30",
+      border: "border-emerald-500/50",
+    },
+    blue: {
+      text: "text-blue-400",
+      bg: "bg-blue-900/30",
+      border: "border-blue-500/50",
+    },
+    orange: {
+      text: "text-orange-400",
+      bg: "bg-orange-900/30",
+      border: "border-orange-500/50",
+    },
+    green: {
+      text: "text-green-400",
+      bg: "bg-green-900/30",
+      border: "border-green-500/50",
+    },
+    pink: {
+      text: "text-pink-400",
+      bg: "bg-pink-900/30",
+      border: "border-pink-500/50",
+    },
+    red: {
+      text: "text-red-400",
+      bg: "bg-red-900/30",
+      border: "border-red-500/50",
+    },
+  };
+
+  const currentSection = sections.find((s) => s.key === expandedSection);
+  const currentItem = currentSection?.items[selectedItemIndex];
+
+  return (
+    <div className="mt-6 bg-blue-950/30 rounded-xl border border-blue-700/30 overflow-hidden">
+      <div className="p-3 bg-blue-900/30 border-b border-blue-700/30">
+        <h4 className="text-sm font-medium text-blue-300 flex items-center gap-2">
+          <span>📚</span>
+          <span>Browse Generated Content</span>
+          <span className="text-xs text-blue-400/50 ml-auto">
+            {sections.reduce((sum, s) => sum + s.items.length, 0)} items
+          </span>
+        </h4>
+      </div>
+
+      {/* Section tabs */}
+      <div className="flex flex-wrap gap-2 p-3 border-b border-blue-800/30">
+        {sections.map((section) => {
+          const colors = colorClasses[section.color] || colorClasses.blue;
+          const isActive = expandedSection === section.key;
+          return (
+            <button
+              key={section.key}
+              onClick={() => {
+                setExpandedSection(isActive ? null : section.key);
+                setSelectedItemIndex(0);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                isActive
+                  ? `${colors.bg} ${colors.text} border ${colors.border}`
+                  : "bg-blue-900/30 text-blue-300/70 hover:bg-blue-800/40 border border-transparent"
+              }`}
+            >
+              <span>{section.icon}</span>
+              <span>{section.label}</span>
+              <span
+                className={`text-xs px-1.5 py-0.5 rounded ${
+                  isActive ? "bg-black/20" : "bg-blue-800/50"
+                }`}
+              >
+                {section.items.length}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Content viewer */}
+      {currentSection && (
+        <div className="p-4">
+          {/* Item navigation */}
+          <div className="flex items-center gap-3 mb-4">
+            <button
+              onClick={() =>
+                setSelectedItemIndex((prev) => Math.max(0, prev - 1))
+              }
+              disabled={selectedItemIndex === 0}
+              className="p-2 rounded-lg bg-blue-900/40 hover:bg-blue-800/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              ←
+            </button>
+            <div className="flex-1 text-center">
+              <span className="text-blue-300/60 text-sm">
+                {selectedItemIndex + 1} / {currentSection.items.length}
+              </span>
+            </div>
+            <button
+              onClick={() =>
+                setSelectedItemIndex((prev) =>
+                  Math.min(currentSection.items.length - 1, prev + 1)
+                )
+              }
+              disabled={selectedItemIndex === currentSection.items.length - 1}
+              className="p-2 rounded-lg bg-blue-900/40 hover:bg-blue-800/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              →
+            </button>
+          </div>
+
+          {/* Current item display */}
+          {currentItem && (
+            <div
+              className={`rounded-lg p-4 ${
+                colorClasses[currentSection.color]?.bg || "bg-blue-900/30"
+              } border ${
+                colorClasses[currentSection.color]?.border ||
+                "border-blue-500/30"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">{currentItem.symbol}</span>
+                <div className="flex-1 min-w-0">
+                  <h5
+                    className={`font-bold ${
+                      colorClasses[currentSection.color]?.text ||
+                      "text-blue-300"
+                    }`}
+                  >
+                    {currentItem.name}
+                  </h5>
+                  {currentItem.description && (
+                    <p className="text-sm text-blue-200/80 mt-2 whitespace-pre-wrap">
+                      {currentItem.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Quick item list */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {currentSection.items.map((item, idx) => (
+              <button
+                key={idx}
+                onClick={() => setSelectedItemIndex(idx)}
+                className={`px-2 py-1 rounded text-xs transition-all ${
+                  idx === selectedItemIndex
+                    ? `${
+                        colorClasses[currentSection.color]?.bg ||
+                        "bg-blue-900/50"
+                      } ${
+                        colorClasses[currentSection.color]?.text ||
+                        "text-blue-300"
+                      } border ${
+                        colorClasses[currentSection.color]?.border ||
+                        "border-blue-500/30"
+                      }`
+                    : "bg-blue-900/20 text-blue-300/60 hover:bg-blue-800/30 border border-transparent"
+                }`}
+                title={item.name}
+              >
+                {item.symbol}{" "}
+                {item.name.length > 20
+                  ? item.name.slice(0, 20) + "..."
+                  : item.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Collapsed state hint */}
+      {!expandedSection && (
+        <div className="p-4 text-center text-blue-300/50 text-sm">
+          Click a category above to browse your generated content
+        </div>
+      )}
     </div>
   );
 }
@@ -734,9 +1174,8 @@ function BigAdventureCreatorPage() {
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [stages, setStages] = useState<GenerationStage[]>([]);
-  const [currentStage, setCurrentStage] = useState<GenerationStage | null>(
-    null
-  );
+  // Active stages - supports multiple stages running in parallel
+  const [activeStages, setActiveStages] = useState<GenerationStage[]>([]);
   const [currentIteration, setCurrentIteration] = useState(0);
   const [totalTasks, setTotalTasks] = useState(0);
   const [completedTasks, setCompletedTasks] = useState(0);
@@ -895,17 +1334,17 @@ function BigAdventureCreatorPage() {
 
   // Finish current stage early (tell AI to wrap up)
   const finishStageEarly = useCallback(() => {
-    if (currentStage && isGenerating && abortControllerRef.current) {
+    if (activeStages.length > 0 && isGenerating && abortControllerRef.current) {
       finishEarlyRef.current = true;
-      addNotification(
-        `Finishing ${getStageInfo(currentStage).name} early...`,
-        "success"
-      );
+      const stageNames = activeStages
+        .map((s) => getStageInfo(s).name)
+        .join(", ");
+      addNotification(`Finishing ${stageNames} early...`, "success");
       // Abort the current request - the orchestrator will detect the finishEarly flag
       // and make a new request with finishEarly=true to wrap up the JSON
       abortControllerRef.current.abort();
     }
-  }, [currentStage, isGenerating, addNotification]);
+  }, [activeStages, isGenerating, addNotification]);
 
   // Handle quick start from home page genre buttons
   useEffect(() => {
@@ -1412,7 +1851,7 @@ function BigAdventureCreatorPage() {
     finishEarlyRef.current = false;
     // In resume mode, start from existing progress
     setCompletedTasks(isResuming ? skipStages.length : 0);
-    setCurrentStage(null);
+    setActiveStages([]);
     setCurrentIteration(0);
     // Don't reset completed stages in resume mode
     if (!isResuming) {
@@ -1432,31 +1871,40 @@ function BigAdventureCreatorPage() {
 
     abortControllerRef.current = new AbortController();
 
-    // Track live content for current stage
-    let currentStageLiveContent = "";
+    // Track live content per stage (for parallel mode)
+    const stageLiveContents = new Map<GenerationStage, string>();
 
     // Create callbacks for the orchestrator
     const callbacks: GenerationCallbacks = {
       onStageStart: (stage, stageInfo) => {
-        setCurrentStage(stage);
+        // Add to active stages (supports parallel)
+        setActiveStages((prev) => {
+          // Clear live content only if this is the first active stage
+          if (prev.length === 0) {
+            setLiveContent("");
+          }
+          return [...prev, stage];
+        });
         setCurrentIteration(1);
-        setLiveContent("");
-        currentStageLiveContent = "";
+        stageLiveContents.set(stage, "");
         console.log(`Starting stage: ${stageInfo.name}`);
       },
 
       onStageContent: (stage, content) => {
-        currentStageLiveContent += content;
-        setLiveContent(currentStageLiveContent);
+        const currentContent = stageLiveContents.get(stage) || "";
+        stageLiveContents.set(stage, currentContent + content);
+        // Show content from the most recently started stage
+        setLiveContent(stageLiveContents.get(stage) || "");
       },
 
       onStageContinuation: (stage, attempt, maxAttempts) => {
         console.log(`Stage ${stage} continuation: ${attempt}/${maxAttempts}`);
-        setLiveContent(
-          (prev) =>
-            prev +
-            `\n\n/* Continuing generation (${attempt}/${maxAttempts})... */\n`
-        );
+        const currentContent = stageLiveContents.get(stage) || "";
+        const newContent =
+          currentContent +
+          `\n\n/* Continuing generation (${attempt}/${maxAttempts})... */\n`;
+        stageLiveContents.set(stage, newContent);
+        setLiveContent(newContent);
       },
 
       onStageComplete: (stage, stageResult, promptTokens, completionTokens) => {
@@ -1466,7 +1914,13 @@ function BigAdventureCreatorPage() {
         });
         setCompletedStages((prev) => [...prev, stage]);
         setCompletedTasks((prev) => prev + 1);
-        setTokenCost((prev) => prev + promptTokens + completionTokens);
+        // Calculate actual coin cost from tokens
+        const coinCost = calculateTokenCost(
+          selectedModel,
+          promptTokens,
+          completionTokens
+        );
+        setTokenCost((prev) => prev + coinCost);
 
         if (stageResult) {
           setPartialResults((prev) => ({
@@ -1485,17 +1939,20 @@ function BigAdventureCreatorPage() {
           getParentStage(stage) !== "advanced"
         ) {
           const isLastStage = stage === stagesToRun[stagesToRun.length - 1];
+          const currentLiveContent = stageLiveContents.get(stage) || "";
           if (!isLastStage && stageResult) {
             setPreviewStageData({
               stage,
-              content: currentStageLiveContent,
+              content: currentLiveContent,
               partialResult: stageResult,
             });
             setShowStagePreview(true);
           }
         }
 
-        setCurrentStage(null);
+        // Remove from active stages
+        setActiveStages((prev) => prev.filter((s) => s !== stage));
+        stageLiveContents.delete(stage);
       },
 
       onStageError: (stage, error, canRetry) => {
@@ -1509,7 +1966,9 @@ function BigAdventureCreatorPage() {
             : `Stage ${getStageInfo(stage).name} failed: ${error}`,
           "warning"
         );
-        setCurrentStage(null);
+        // Remove from active stages
+        setActiveStages((prev) => prev.filter((s) => s !== stage));
+        stageLiveContents.delete(stage);
       },
 
       onStageWarning: (stage, message) => {
@@ -1542,7 +2001,7 @@ function BigAdventureCreatorPage() {
           "success"
         );
         setIsGenerating(false);
-        setCurrentStage(null);
+        setActiveStages([]);
         abortControllerRef.current = null;
       },
 
@@ -1557,7 +2016,7 @@ function BigAdventureCreatorPage() {
           addNotification(error || "Generation failed", "failure");
         }
         setIsGenerating(false);
-        setCurrentStage(null);
+        setActiveStages([]);
         abortControllerRef.current = null;
       },
 
@@ -3718,7 +4177,11 @@ ${result.description || ""}`;
                             parallelMode && !isNovelAISelected
                               ? "bg-purple-600"
                               : "bg-blue-900/40"
-                          } ${isNovelAISelected ? "opacity-50 cursor-not-allowed" : ""}`}
+                          } ${
+                            isNovelAISelected
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
+                          }`}
                         >
                           <span
                             className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
@@ -4106,9 +4569,14 @@ ${result.description || ""}`;
               </p>
               <div className="mt-4 text-sm text-blue-300/60">
                 Progress: {completedTasks} / {totalTasks} stages
-                {currentIteration > 1 && currentStage && (
+                {currentIteration > 1 && activeStages.length > 0 && (
                   <span className="ml-2 text-purple-400">
                     (Iteration {currentIteration})
+                  </span>
+                )}
+                {activeStages.length > 1 && (
+                  <span className="ml-2 text-green-400">
+                    ({activeStages.length} running in parallel)
                   </span>
                 )}
               </div>
@@ -4127,17 +4595,20 @@ ${result.description || ""}`;
 
             <StageProgress
               stages={stages}
-              currentStage={currentStage}
+              activeStages={activeStages}
               completedStages={completedStages}
               failedStages={failedStages}
             />
 
-            <LiveOutput content={liveContent} stage={currentStage} />
+            <LiveOutput content={liveContent} activeStages={activeStages} />
+
+            {/* Content Browser - browse generated content while waiting */}
+            <ContentBrowser partialResults={partialResults} />
 
             <div className="flex justify-center gap-4">
               <button
                 onClick={finishStageEarly}
-                disabled={!currentStage}
+                disabled={activeStages.length === 0}
                 className="px-6 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-800 disabled:text-amber-400 text-white rounded-lg transition-colors"
                 title="Tell AI to finish the current stage and move on"
               >

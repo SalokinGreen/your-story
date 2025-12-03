@@ -590,7 +590,8 @@ export async function POST(req: NextRequest) {
                   stage,
                   attempt: 1,
                   maxAttempts: 1,
-                  message: "Content too short to repair, using minimal fallback...",
+                  message:
+                    "Content too short to repair, using minimal fallback...",
                 })}\n\n`
               )
             );

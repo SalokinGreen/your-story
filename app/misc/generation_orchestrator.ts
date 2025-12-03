@@ -584,11 +584,7 @@ export async function generateAdventureSequential(
           );
         } else {
           // Log error but continue with other results
-          callbacks.onStageError(
-            stage,
-            result.error || "Unknown error",
-            false
-          );
+          callbacks.onStageError(stage, result.error || "Unknown error", false);
         }
       }
 
@@ -605,7 +601,8 @@ export async function generateAdventureSequential(
           config,
           completedStages,
           partialResults: mergedResults,
-          currentStage: parallelizableStagesToRun[parallelizableStagesToRun.length - 1],
+          currentStage:
+            parallelizableStagesToRun[parallelizableStagesToRun.length - 1],
         };
         saveAutosave(autosave);
         callbacks.onAutosave(autosave);
@@ -790,7 +787,8 @@ async function runSingleStageWithRetry(
           result: wrapUpResult.result,
           rawContent: wrapUpResult.rawContent,
           promptTokens: totalPromptTokens + wrapUpResult.promptTokens,
-          completionTokens: totalCompletionTokens + wrapUpResult.completionTokens,
+          completionTokens:
+            totalCompletionTokens + wrapUpResult.completionTokens,
         };
       } else {
         callbacks.onStageError(
@@ -847,7 +845,9 @@ async function runSingleStageWithRetry(
 
       callbacks.onError(
         `Stage "${getStageInfo(stage).name}" failed: ${errorMsg}. ` +
-          `Progress saved (${completedStages.length}/${completedStages.length + 1} stages completed). ` +
+          `Progress saved (${completedStages.length}/${
+            completedStages.length + 1
+          } stages completed). ` +
           `You can resume later.`
       );
 
