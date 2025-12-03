@@ -27,6 +27,19 @@ const TIMEOUT_THRESHOLD_MS = 280000; // 4 min 40 sec - slightly less than Vercel
 const HEARTBEAT_TIMEOUT_MS = 60000; // If no heartbeat for 60 seconds, assume timeout
 const MAX_CONTINUATIONS_PER_STAGE = 5; // Max times to continue a timed-out stage
 
+// Stages that must run sequentially (core and mechanics are required by later stages)
+const SEQUENTIAL_STAGES: GenerationStage[] = ["core", "mechanics"];
+
+// Stages that can run in parallel (only depend on core + mechanics, not each other)
+const PARALLELIZABLE_STAGES: GenerationStage[] = [
+  "content-lore",
+  "content-achievements",
+  "content-items",
+  "advanced-presets",
+  "advanced-tables",
+  "advanced-other",
+];
+
 export interface GenerationCallbacks {
   onStageStart: (
     stage: GenerationStage,
@@ -69,6 +82,8 @@ export interface GenerationOptions {
   existingResults?: Partial<BigAdventureResult>;
   abortSignal?: AbortSignal;
   finishEarlyRef?: React.RefObject<boolean | null>;
+  /** Enable parallel generation for stages 3-8 (not supported with NovelAI) */
+  parallelMode?: boolean;
 }
 
 interface StageResult {
@@ -454,6 +469,7 @@ async function generateSingleStageFinishEarly(
 
 /**
  * Orchestrate full adventure generation with sequential stage execution
+ * If parallelMode is enabled, stages 3-8 will run concurrently after stages 1-2 complete
  */
 export async function generateAdventureSequential(
   config: BigAdventureConfig,
@@ -475,58 +491,157 @@ export async function generateAdventureSequential(
 
   callbacks.onProgress(completedStages, stages.length);
 
-  for (const stage of stages) {
-    // Skip already completed stages
-    if (completedStages.includes(stage)) {
-      continue;
-    }
+  // Determine which stages need sequential vs parallel processing
+  const sequentialStagesToRun = stages.filter(
+    (s) => SEQUENTIAL_STAGES.includes(s) && !completedStages.includes(s)
+  );
+  const parallelizableStagesToRun = stages.filter(
+    (s) => PARALLELIZABLE_STAGES.includes(s) && !completedStages.includes(s)
+  );
 
-    // Check for abort
-    if (options.abortSignal?.aborted) {
-      callbacks.onError("Generation cancelled by user");
+  // Check if we should use parallel mode (not for NovelAI)
+  const useParallelMode =
+    options.parallelMode &&
+    !options.novelaiKey &&
+    parallelizableStagesToRun.length > 1;
+
+  // Phase 1: Run sequential stages (core, mechanics)
+  for (const stage of sequentialStagesToRun) {
+    const result = await runSingleStageWithRetry(
+      config,
+      stage,
+      stageResults,
+      completedStages,
+      options,
+      callbacks
+    );
+
+    if (!result.success) {
+      // Error already handled by runSingleStageWithRetry
       return;
     }
 
-    // Get merged previous results for context
+    stageResults.push(result.result);
+    completedStages.push(stage);
+    totalPromptTokens += result.promptTokens;
+    totalCompletionTokens += result.completionTokens;
+
+    callbacks.onStageComplete(
+      stage,
+      result.result,
+      result.promptTokens,
+      result.completionTokens
+    );
+    callbacks.onProgress(completedStages, stages.length);
+
+    // Save autosave
+    const mergedResults = mergeBigAdventureResults(
+      ...stageResults.filter((r) => r !== null)
+    );
+    const autosave: BigAdventureAutosave = {
+      id: options.sessionId,
+      timestamp: Date.now(),
+      config,
+      completedStages,
+      partialResults: mergedResults,
+      currentStage: stage,
+    };
+    saveAutosave(autosave);
+    callbacks.onAutosave(autosave);
+  }
+
+  // Phase 2: Run parallelizable stages
+  if (parallelizableStagesToRun.length > 0) {
+    // Get merged results from sequential stages for context
     const previousResults =
       stageResults.length > 0
         ? mergeBigAdventureResults(...stageResults.filter((r) => r !== null))
         : undefined;
 
-    let continuationCount = 0;
-    let stageCompleted = false;
-    let partialContent = ""; // Accumulated content for continuation
-
-    while (
-      !stageCompleted &&
-      continuationCount <= MAX_CONTINUATIONS_PER_STAGE
-    ) {
-      const isContinuation = continuationCount > 0;
-
-      if (isContinuation) {
-        callbacks.onStageContinuation(
-          stage,
-          continuationCount,
-          MAX_CONTINUATIONS_PER_STAGE
-        );
-      }
-
-      const result = await generateSingleStage(
+    if (useParallelMode) {
+      // Parallel execution
+      const parallelResults = await runStagesInParallel(
         config,
-        stage,
+        parallelizableStagesToRun,
         previousResults,
         options,
-        callbacks,
-        isContinuation ? partialContent : undefined
+        callbacks
       );
 
-      // Accumulate content regardless of success (for potential continuation)
-      if (result.rawContent) {
-        partialContent = result.rawContent;
+      // Process results
+      for (const { stage, result } of parallelResults) {
+        if (result.success && result.result) {
+          stageResults.push(result.result);
+          completedStages.push(stage);
+          totalPromptTokens += result.promptTokens;
+          totalCompletionTokens += result.completionTokens;
+
+          callbacks.onStageComplete(
+            stage,
+            result.result,
+            result.promptTokens,
+            result.completionTokens
+          );
+        } else {
+          // Log error but continue with other results
+          callbacks.onStageError(
+            stage,
+            result.error || "Unknown error",
+            false
+          );
+        }
       }
 
-      if (result.success && result.result) {
-        // Stage completed successfully
+      callbacks.onProgress(completedStages, stages.length);
+
+      // Save autosave after parallel phase
+      if (stageResults.length > 0) {
+        const mergedResults = mergeBigAdventureResults(
+          ...stageResults.filter((r) => r !== null)
+        );
+        const autosave: BigAdventureAutosave = {
+          id: options.sessionId,
+          timestamp: Date.now(),
+          config,
+          completedStages,
+          partialResults: mergedResults,
+          currentStage: parallelizableStagesToRun[parallelizableStagesToRun.length - 1],
+        };
+        saveAutosave(autosave);
+        callbacks.onAutosave(autosave);
+      }
+    } else {
+      // Sequential execution for remaining stages
+      for (const stage of parallelizableStagesToRun) {
+        // Check for abort
+        if (options.abortSignal?.aborted) {
+          callbacks.onError("Generation cancelled by user");
+          return;
+        }
+
+        // Get updated merged results
+        const currentPreviousResults =
+          stageResults.length > 0
+            ? mergeBigAdventureResults(
+                ...stageResults.filter((r) => r !== null)
+              )
+            : undefined;
+
+        const result = await runSingleStageWithRetry(
+          config,
+          stage,
+          stageResults,
+          completedStages,
+          options,
+          callbacks,
+          currentPreviousResults
+        );
+
+        if (!result.success) {
+          // Error already handled
+          return;
+        }
+
         stageResults.push(result.result);
         completedStages.push(stage);
         totalPromptTokens += result.promptTokens;
@@ -554,112 +669,11 @@ export async function generateAdventureSequential(
         };
         saveAutosave(autosave);
         callbacks.onAutosave(autosave);
-
-        stageCompleted = true;
-      } else if (result.finishedEarly && partialContent.length > 100) {
-        // User requested to finish early - make one final call to wrap up the JSON
-        callbacks.onStageWarning(
-          stage,
-          `Finishing early with ${partialContent.length} characters...`
-        );
-
-        // Accumulate tokens from partial generation
-        totalPromptTokens += result.promptTokens;
-        totalCompletionTokens += result.completionTokens;
-
-        // Make final wrap-up call - create a new abort controller for this
-        const wrapUpResult = await generateSingleStageFinishEarly(
-          config,
-          stage,
-          previousResults,
-          options,
-          callbacks,
-          partialContent
-        );
-
-        // Reset the finish early flag
-        if (options.finishEarlyRef) {
-          (options.finishEarlyRef as React.MutableRefObject<boolean>).current =
-            false;
-        }
-
-        if (wrapUpResult.success && wrapUpResult.result) {
-          stageResults.push(wrapUpResult.result);
-          completedStages.push(stage);
-          totalPromptTokens += wrapUpResult.promptTokens;
-          totalCompletionTokens += wrapUpResult.completionTokens;
-
-          callbacks.onStageComplete(
-            stage,
-            wrapUpResult.result,
-            wrapUpResult.promptTokens,
-            wrapUpResult.completionTokens
-          );
-          callbacks.onProgress(completedStages, stages.length);
-          stageCompleted = true;
-        } else {
-          // Wrap-up failed, treat as error
-          callbacks.onStageError(
-            stage,
-            wrapUpResult.error || "Failed to finish early",
-            false
-          );
-          callbacks.onError(
-            `Stage "${getStageInfo(stage).name}" failed to finish early. ` +
-              `Progress saved (${completedStages.length}/${stages.length} stages completed).`
-          );
-          return;
-        }
-      } else if (
-        result.timedOut &&
-        continuationCount < MAX_CONTINUATIONS_PER_STAGE &&
-        partialContent.length > 100
-      ) {
-        // Timeout with partial content - continue from where we left off
-        continuationCount++;
-        callbacks.onStageWarning(
-          stage,
-          `Connection timed out. Continuing from ${partialContent.length} characters... (${continuationCount}/${MAX_CONTINUATIONS_PER_STAGE})`
-        );
-        // Accumulate tokens from partial generation
-        totalPromptTokens += result.promptTokens;
-        totalCompletionTokens += result.completionTokens;
-      } else {
-        // Fatal error or max continuations exceeded or no content to continue from
-        const errorMsg =
-          result.timedOut && partialContent.length <= 100
-            ? "Stage timed out with insufficient content to continue"
-            : result.error || "Unknown error";
-        callbacks.onStageError(stage, errorMsg, false);
-
-        // Still save partial progress
-        if (stageResults.length > 0) {
-          const partialMerged = mergeBigAdventureResults(
-            ...stageResults.filter((r) => r !== null)
-          );
-          const autosave: BigAdventureAutosave = {
-            id: options.sessionId,
-            timestamp: Date.now(),
-            config,
-            completedStages,
-            partialResults: partialMerged,
-            currentStage: stage,
-          };
-          saveAutosave(autosave);
-          callbacks.onAutosave(autosave);
-        }
-
-        callbacks.onError(
-          `Stage "${getStageInfo(stage).name}" failed: ${errorMsg}. ` +
-            `Progress saved (${completedStages.length}/${stages.length} stages completed). ` +
-            `You can resume later.`
-        );
-        return;
       }
     }
   }
 
-  // All stages completed successfully
+  // All stages completed (or at least some succeeded)
   const finalResult = mergeBigAdventureResults(
     ...stageResults.filter((r) => r !== null)
   );
@@ -673,6 +687,322 @@ export async function generateAdventureSequential(
   callbacks.onComplete(finalResult, {
     prompt: totalPromptTokens,
     completion: totalCompletionTokens,
+  });
+}
+
+/**
+ * Run a single stage with retry/continuation logic
+ */
+async function runSingleStageWithRetry(
+  config: BigAdventureConfig,
+  stage: GenerationStage,
+  stageResults: (Partial<BigAdventureResult> | null)[],
+  completedStages: GenerationStage[],
+  options: GenerationOptions,
+  callbacks: GenerationCallbacks,
+  previousResultsOverride?: Partial<BigAdventureResult>
+): Promise<StageResult> {
+  // Check for abort
+  if (options.abortSignal?.aborted) {
+    callbacks.onError("Generation cancelled by user");
+    return {
+      success: false,
+      result: null,
+      rawContent: "",
+      promptTokens: 0,
+      completionTokens: 0,
+      error: "Cancelled",
+    };
+  }
+
+  // Get merged previous results for context
+  const previousResults =
+    previousResultsOverride ||
+    (stageResults.length > 0
+      ? mergeBigAdventureResults(...stageResults.filter((r) => r !== null))
+      : undefined);
+
+  let continuationCount = 0;
+  let partialContent = "";
+  let totalPromptTokens = 0;
+  let totalCompletionTokens = 0;
+
+  while (continuationCount <= MAX_CONTINUATIONS_PER_STAGE) {
+    const isContinuation = continuationCount > 0;
+
+    if (isContinuation) {
+      callbacks.onStageContinuation(
+        stage,
+        continuationCount,
+        MAX_CONTINUATIONS_PER_STAGE
+      );
+    }
+
+    const result = await generateSingleStage(
+      config,
+      stage,
+      previousResults,
+      options,
+      callbacks,
+      isContinuation ? partialContent : undefined
+    );
+
+    // Accumulate content regardless of success
+    if (result.rawContent) {
+      partialContent = result.rawContent;
+    }
+
+    if (result.success && result.result) {
+      return {
+        success: true,
+        result: result.result,
+        rawContent: partialContent,
+        promptTokens: totalPromptTokens + result.promptTokens,
+        completionTokens: totalCompletionTokens + result.completionTokens,
+      };
+    } else if (result.finishedEarly && partialContent.length > 100) {
+      // Handle finish early
+      callbacks.onStageWarning(
+        stage,
+        `Finishing early with ${partialContent.length} characters...`
+      );
+
+      totalPromptTokens += result.promptTokens;
+      totalCompletionTokens += result.completionTokens;
+
+      const wrapUpResult = await generateSingleStageFinishEarly(
+        config,
+        stage,
+        previousResults,
+        options,
+        callbacks,
+        partialContent
+      );
+
+      if (options.finishEarlyRef) {
+        (options.finishEarlyRef as React.MutableRefObject<boolean>).current =
+          false;
+      }
+
+      if (wrapUpResult.success && wrapUpResult.result) {
+        return {
+          success: true,
+          result: wrapUpResult.result,
+          rawContent: wrapUpResult.rawContent,
+          promptTokens: totalPromptTokens + wrapUpResult.promptTokens,
+          completionTokens: totalCompletionTokens + wrapUpResult.completionTokens,
+        };
+      } else {
+        callbacks.onStageError(
+          stage,
+          wrapUpResult.error || "Failed to finish early",
+          false
+        );
+        return {
+          success: false,
+          result: null,
+          rawContent: partialContent,
+          promptTokens: totalPromptTokens,
+          completionTokens: totalCompletionTokens,
+          error: wrapUpResult.error || "Failed to finish early",
+        };
+      }
+    } else if (
+      result.timedOut &&
+      continuationCount < MAX_CONTINUATIONS_PER_STAGE &&
+      partialContent.length > 100
+    ) {
+      // Continue from timeout
+      continuationCount++;
+      callbacks.onStageWarning(
+        stage,
+        `Connection timed out. Continuing from ${partialContent.length} characters... (${continuationCount}/${MAX_CONTINUATIONS_PER_STAGE})`
+      );
+      totalPromptTokens += result.promptTokens;
+      totalCompletionTokens += result.completionTokens;
+    } else {
+      // Fatal error
+      const errorMsg =
+        result.timedOut && partialContent.length <= 100
+          ? "Stage timed out with insufficient content to continue"
+          : result.error || "Unknown error";
+      callbacks.onStageError(stage, errorMsg, false);
+
+      // Save partial progress
+      if (stageResults.length > 0) {
+        const partialMerged = mergeBigAdventureResults(
+          ...stageResults.filter((r) => r !== null)
+        );
+        const autosave: BigAdventureAutosave = {
+          id: options.sessionId,
+          timestamp: Date.now(),
+          config,
+          completedStages,
+          partialResults: partialMerged,
+          currentStage: stage,
+        };
+        saveAutosave(autosave);
+        callbacks.onAutosave(autosave);
+      }
+
+      callbacks.onError(
+        `Stage "${getStageInfo(stage).name}" failed: ${errorMsg}. ` +
+          `Progress saved (${completedStages.length}/${completedStages.length + 1} stages completed). ` +
+          `You can resume later.`
+      );
+
+      return {
+        success: false,
+        result: null,
+        rawContent: partialContent,
+        promptTokens: totalPromptTokens,
+        completionTokens: totalCompletionTokens,
+        error: errorMsg,
+      };
+    }
+  }
+
+  // Should not reach here
+  return {
+    success: false,
+    result: null,
+    rawContent: partialContent,
+    promptTokens: totalPromptTokens,
+    completionTokens: totalCompletionTokens,
+    error: "Max continuations exceeded",
+  };
+}
+
+/**
+ * Run multiple stages in parallel using Promise.allSettled
+ */
+async function runStagesInParallel(
+  config: BigAdventureConfig,
+  stages: GenerationStage[],
+  previousResults: Partial<BigAdventureResult> | undefined,
+  options: GenerationOptions,
+  callbacks: GenerationCallbacks
+): Promise<{ stage: GenerationStage; result: StageResult }[]> {
+  // Notify about parallel execution
+  callbacks.onStageWarning(
+    stages[0],
+    `Starting parallel generation of ${stages.length} stages...`
+  );
+
+  // Create promises for each stage
+  const stagePromises = stages.map(async (stage) => {
+    // Check for abort before starting
+    if (options.abortSignal?.aborted) {
+      return {
+        stage,
+        result: {
+          success: false,
+          result: null,
+          rawContent: "",
+          promptTokens: 0,
+          completionTokens: 0,
+          error: "Cancelled",
+        } as StageResult,
+      };
+    }
+
+    // Generate the stage
+    let continuationCount = 0;
+    let partialContent = "";
+    let totalPromptTokens = 0;
+    let totalCompletionTokens = 0;
+
+    while (continuationCount <= MAX_CONTINUATIONS_PER_STAGE) {
+      const isContinuation = continuationCount > 0;
+
+      if (isContinuation) {
+        callbacks.onStageContinuation(
+          stage,
+          continuationCount,
+          MAX_CONTINUATIONS_PER_STAGE
+        );
+      }
+
+      const result = await generateSingleStage(
+        config,
+        stage,
+        previousResults,
+        options,
+        callbacks,
+        isContinuation ? partialContent : undefined
+      );
+
+      if (result.rawContent) {
+        partialContent = result.rawContent;
+      }
+
+      if (result.success && result.result) {
+        return {
+          stage,
+          result: {
+            success: true,
+            result: result.result,
+            rawContent: partialContent,
+            promptTokens: totalPromptTokens + result.promptTokens,
+            completionTokens: totalCompletionTokens + result.completionTokens,
+          } as StageResult,
+        };
+      } else if (
+        result.timedOut &&
+        continuationCount < MAX_CONTINUATIONS_PER_STAGE &&
+        partialContent.length > 100
+      ) {
+        continuationCount++;
+        totalPromptTokens += result.promptTokens;
+        totalCompletionTokens += result.completionTokens;
+      } else {
+        return {
+          stage,
+          result: {
+            success: false,
+            result: null,
+            rawContent: partialContent,
+            promptTokens: totalPromptTokens + result.promptTokens,
+            completionTokens: totalCompletionTokens + result.completionTokens,
+            error: result.error || "Unknown error",
+          } as StageResult,
+        };
+      }
+    }
+
+    return {
+      stage,
+      result: {
+        success: false,
+        result: null,
+        rawContent: partialContent,
+        promptTokens: totalPromptTokens,
+        completionTokens: totalCompletionTokens,
+        error: "Max continuations exceeded",
+      } as StageResult,
+    };
+  });
+
+  // Wait for all stages to complete (or fail)
+  const settledResults = await Promise.allSettled(stagePromises);
+
+  // Convert settled results to our format
+  return settledResults.map((settled, index) => {
+    if (settled.status === "fulfilled") {
+      return settled.value;
+    } else {
+      return {
+        stage: stages[index],
+        result: {
+          success: false,
+          result: null,
+          rawContent: "",
+          promptTokens: 0,
+          completionTokens: 0,
+          error: settled.reason?.message || "Promise rejected",
+        } as StageResult,
+      };
+    }
   });
 }
 

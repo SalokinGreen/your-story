@@ -1720,13 +1720,18 @@ The output must be valid JSON when combined with what came before.`;
 export function attemptJSONRepair(content: string): string {
   let jsonContent = content.trim();
 
-  // Remove markdown code blocks if present
+  // Remove markdown code blocks if present (at start/end)
   const jsonBlockMatch = jsonContent.match(
     /```(?:json)?\s*([\s\S]*?)(?:\s*```)?$/
   );
   if (jsonBlockMatch) {
     jsonContent = jsonBlockMatch[1].trim();
   }
+
+  // Remove ALL embedded markdown code block markers that may appear mid-JSON
+  // This handles cases where AI inserts ```json mid-response
+  jsonContent = jsonContent.replace(/```json\s*/gi, "");
+  jsonContent = jsonContent.replace(/```\s*/g, "");
 
   const startIndex = jsonContent.indexOf("{");
   if (startIndex === -1) return jsonContent;
@@ -1853,6 +1858,11 @@ export function parseBigAdventureStageOutput(
     if (jsonBlockMatch) {
       jsonContent = jsonBlockMatch[1].trim();
     }
+
+    // Remove ALL embedded markdown code block markers that may appear mid-JSON
+    // This handles cases where AI inserts ```json mid-response
+    jsonContent = jsonContent.replace(/```json\s*/gi, "");
+    jsonContent = jsonContent.replace(/```\s*/g, "");
 
     // Try to find JSON object boundaries
     const startIndex = jsonContent.indexOf("{");

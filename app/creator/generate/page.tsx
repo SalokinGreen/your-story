@@ -697,6 +697,20 @@ function BigAdventureCreatorPage() {
     (AI_MODELS as Record<string, { provider?: string }>)[selectedModel]
       ?.provider === "novelai";
 
+  // Parallel generation mode (run stages 3-8 concurrently)
+  const [parallelMode, setParallelMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("bigAdventureParallelMode");
+      return stored !== "false"; // Default to true
+    }
+    return true;
+  });
+
+  // Persist parallelMode to localStorage
+  useEffect(() => {
+    localStorage.setItem("bigAdventureParallelMode", parallelMode.toString());
+  }, [parallelMode]);
+
   // Filter models based on BYOK mode
   const filteredModels = Object.entries(AI_MODELS).filter(([, model]) => {
     const provider = (model as { provider?: string }).provider;
@@ -1552,7 +1566,7 @@ function BigAdventureCreatorPage() {
       },
     };
 
-    // Run the sequential generation
+    // Run the sequential generation (with optional parallel mode for stages 3-8)
     await generateAdventureSequential(
       config,
       {
@@ -1568,6 +1582,7 @@ function BigAdventureCreatorPage() {
             : undefined,
         abortSignal: abortControllerRef.current.signal,
         finishEarlyRef,
+        parallelMode: parallelMode && !isNovelAISelected, // Disable for NovelAI
       },
       callbacks
     );
@@ -1583,6 +1598,7 @@ function BigAdventureCreatorPage() {
     partialResults,
     apiKeys.openRouterKey,
     apiKeys.deepseekKey,
+    parallelMode,
   ]);
 
   // Auto-start generation when quick start is ready and user is authenticated
@@ -3671,6 +3687,42 @@ ${result.description || ""}`;
                           <span
                             className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
                               config.previewBetweenStages
+                                ? "translate-x-6"
+                                : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Parallel Generation Toggle */}
+                    <div className="bg-purple-900/20 rounded-lg p-4 border border-purple-700/30">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-white">
+                            Parallel Generation ⚡
+                          </h4>
+                          <p className="text-xs text-blue-300/50 mt-1">
+                            Run stages 3-8 simultaneously for faster generation
+                            {isNovelAISelected && (
+                              <span className="text-yellow-400 ml-1">
+                                (Not available with NovelAI)
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setParallelMode(!parallelMode)}
+                          disabled={isNovelAISelected}
+                          className={`relative w-12 h-6 rounded-full transition-colors ${
+                            parallelMode && !isNovelAISelected
+                              ? "bg-purple-600"
+                              : "bg-blue-900/40"
+                          } ${isNovelAISelected ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          <span
+                            className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                              parallelMode && !isNovelAISelected
                                 ? "translate-x-6"
                                 : "translate-x-0"
                             }`}

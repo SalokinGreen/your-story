@@ -522,7 +522,7 @@ export default function AIConfigTab() {
       {/* Current Preset Banner */}
       <div
         className={`${
-          byokMode && novelaiEnabled && hasKey("novelaiKey")
+          novelaiEnabled && hasKey("novelaiKey")
             ? "bg-linear-to-r from-green-600 to-teal-600"
             : byokMode
             ? "bg-linear-to-r from-purple-600 to-blue-600"
@@ -542,7 +542,7 @@ export default function AIConfigTab() {
                   💰 Coins
                 </span>
               )}
-              {byokMode && novelaiEnabled && hasKey("novelaiKey") && (
+              {novelaiEnabled && hasKey("novelaiKey") && (
                 <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
                   + NovelAI
                 </span>
@@ -576,9 +576,9 @@ export default function AIConfigTab() {
         <div className="flex flex-col gap-1 text-xs mt-2">
           <div>
             <span className="text-white/60">Story:</span>{" "}
-            {byokMode && novelaiEnabled && hasKey("novelaiKey") ? (
+            {novelaiEnabled && hasKey("novelaiKey") ? (
               <span className="text-green-200">
-                NovelAI GLM-4-6 (BYOK) - 8K context
+                NovelAI GLM-4-6 (BYOK) - 28K context
               </span>
             ) : (
               <>
