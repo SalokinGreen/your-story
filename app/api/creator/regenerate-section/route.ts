@@ -7,7 +7,11 @@
 
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getModelConfig } from "@/app/misc/ai_prices";
+import {
+  getModelConfig,
+  calculateTokenCost,
+  calculateCostFromEstimatedCost,
+} from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
 import {
   BigAdventureConfig,
@@ -18,6 +22,7 @@ import {
   parseRegenerateSectionOutput,
 } from "@/app/misc/big_adventure_ai";
 import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
+import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 
 // NovelAI API endpoint
 const NOVELAI_API_URL = "https://text.novelai.net/oa/v1/completions";
@@ -41,7 +46,7 @@ interface RequestBody {
 }
 
 function getApiKey(
-  provider: "deepseek" | "openrouter" | "novelai",
+  provider: "deepseek" | "openrouter" | "novelai" | "mistral" | "deepinfra",
   userProvidedOpenRouterKey?: string,
   userProvidedDeepseekKey?: string,
   novelaiKey?: string
@@ -50,6 +55,12 @@ function getApiKey(
     return userProvidedDeepseekKey || null;
   } else if (provider === "novelai") {
     return novelaiKey || null;
+  } else if (provider === "mistral") {
+    // Mistral uses server-side API key - users pay with coins
+    return process.env.MISTRAL_API_KEY || null;
+  } else if (provider === "deepinfra") {
+    // DeepInfra uses server-side API key - users pay with coins
+    return process.env.DEEPINFRA_API_KEY || null;
   } else {
     return userProvidedOpenRouterKey || null;
   }
@@ -266,34 +277,77 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // Get model config - all providers use BYOK
+        // Get model config
         const modelConfig = getModelConfig(model);
+        const isByok =
+          modelConfig.provider === "openrouter" ||
+          modelConfig.provider === "deepseek" ||
+          modelConfig.provider === "novelai";
+        const isCoinsProvider =
+          modelConfig.provider === "mistral" ||
+          modelConfig.provider === "deepinfra";
 
-        // Get API key (user-provided)
+        // Get API key
         const apiKey = getApiKey(
-          modelConfig.provider as "deepseek" | "openrouter" | "novelai",
+          modelConfig.provider as
+            | "deepseek"
+            | "openrouter"
+            | "novelai"
+            | "mistral"
+            | "deepinfra",
           openRouterKey,
           deepseekKey,
           novelaiKey
         );
 
         if (!apiKey) {
-          const providerName =
-            modelConfig.provider === "deepseek"
-              ? "DeepSeek"
-              : modelConfig.provider === "openrouter"
-              ? "OpenRouter"
-              : "NovelAI";
+          let errorMessage: string;
+
+          if (modelConfig.provider === "mistral") {
+            errorMessage =
+              "Mistral API is not configured on the server. Please contact support.";
+          } else if (modelConfig.provider === "deepinfra") {
+            errorMessage =
+              "DeepInfra API is not configured on the server. Please contact support.";
+          } else {
+            const providerName =
+              modelConfig.provider === "deepseek"
+                ? "DeepSeek"
+                : modelConfig.provider === "openrouter"
+                ? "OpenRouter"
+                : "NovelAI";
+            errorMessage = `${providerName} API key required. Please add your API key in Settings.`;
+          }
+
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "error",
-                error: `${providerName} API key required. Please add your API key in Settings.`,
+                error: errorMessage,
               })}\n\n`
             )
           );
           controller.close();
           return;
+        }
+
+        // Check token balance for Coins mode providers (Mistral/DeepInfra) before making request
+        if (isCoinsProvider) {
+          const balance = await getUserTokenBalance(user.id, supabase);
+          const estimatedCost = Math.max(1, modelConfig.cost || 1);
+          const currentBalance = balance?.total ?? 0;
+          if (currentBalance < estimatedCost) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "error",
+                  error: `Insufficient coins. You need at least ${estimatedCost} coins. Current balance: ${currentBalance}`,
+                })}\n\n`
+              )
+            );
+            controller.close();
+            return;
+          }
         }
 
         const sectionInfo = REGENERATE_SECTIONS[section];
@@ -320,6 +374,7 @@ export async function POST(req: NextRequest) {
         let fullContent = "";
         let promptTokens = 0;
         let completionTokens = 0;
+        let estimatedCostDollars: number | undefined;
 
         // Handle NovelAI separately (uses completions API, not chat)
         if (modelConfig.provider === "novelai") {
@@ -335,11 +390,17 @@ export async function POST(req: NextRequest) {
           promptTokens = result.promptTokens;
           completionTokens = result.completionTokens;
         } else {
-          // Standard OpenAI-compatible providers (OpenRouter, DeepSeek)
-          const endpoint =
-            modelConfig.provider === "deepseek"
-              ? "https://api.deepseek.com/chat/completions"
-              : "https://openrouter.ai/api/v1/chat/completions";
+          // Standard OpenAI-compatible providers (OpenRouter, DeepSeek, Mistral, DeepInfra)
+          let endpoint: string;
+          if (modelConfig.provider === "deepseek") {
+            endpoint = "https://api.deepseek.com/chat/completions";
+          } else if (modelConfig.provider === "mistral") {
+            endpoint = "https://api.mistral.ai/v1/chat/completions";
+          } else if (modelConfig.provider === "deepinfra") {
+            endpoint = "https://api.deepinfra.com/v1/openai/chat/completions";
+          } else {
+            endpoint = "https://openrouter.ai/api/v1/chat/completions";
+          }
 
           const headers: Record<string, string> = {
             "Content-Type": "application/json",
@@ -421,6 +482,10 @@ export async function POST(req: NextRequest) {
                 if (parsed.usage) {
                   promptTokens = parsed.usage.prompt_tokens || 0;
                   completionTokens = parsed.usage.completion_tokens || 0;
+                  // DeepInfra provides estimated_cost in dollars
+                  if (parsed.usage.estimated_cost !== undefined) {
+                    estimatedCostDollars = parsed.usage.estimated_cost;
+                  }
                 }
               } catch {
                 // Skip malformed JSON
@@ -436,7 +501,36 @@ export async function POST(req: NextRequest) {
           throw new Error("Failed to parse regenerated content");
         }
 
-        // All providers use BYOK - no token billing
+        // Deduct tokens for Coins mode providers (Mistral/DeepInfra)
+        let tokenCost = 0;
+        if (
+          isCoinsProvider &&
+          (promptTokens > 0 ||
+            completionTokens > 0 ||
+            estimatedCostDollars !== undefined)
+        ) {
+          if (
+            modelConfig.provider === "deepinfra" &&
+            estimatedCostDollars !== undefined
+          ) {
+            tokenCost = calculateCostFromEstimatedCost(estimatedCostDollars);
+          } else {
+            tokenCost = calculateTokenCost(
+              model,
+              promptTokens,
+              completionTokens
+            );
+          }
+          const deductResult = await deductTokens(user.id, tokenCost, supabase);
+          if (!deductResult.success) {
+            logger.warn("Failed to deduct tokens for regenerate section", {
+              userId: user.id,
+              provider: modelConfig.provider,
+              tokenCost,
+              error: deductResult.error,
+            });
+          }
+        }
 
         logger.action("Section regeneration complete", {
           userId: user.id,
@@ -445,6 +539,7 @@ export async function POST(req: NextRequest) {
           section,
           promptTokens,
           completionTokens,
+          tokenCost,
         });
 
         // Send final result
@@ -464,7 +559,8 @@ export async function POST(req: NextRequest) {
                   completionTokens,
                   totalTokens: promptTokens + completionTokens,
                 },
-                isByok: true,
+                tokenCost: tokenCost > 0 ? tokenCost : undefined,
+                isByok,
               },
             })}\n\n`
           )

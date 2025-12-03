@@ -25,7 +25,7 @@ import {
 // Configuration for timeout detection
 const TIMEOUT_THRESHOLD_MS = 280000; // 4 min 40 sec - slightly less than Vercel's 5 min limit
 const HEARTBEAT_TIMEOUT_MS = 60000; // If no heartbeat for 60 seconds, assume timeout
-const MAX_CONTINUATIONS_PER_STAGE = 5; // Max times to continue a timed-out stage
+const MAX_RETRY_ATTEMPTS = 1; // On timeout, get 1 retry that asks AI to finish JSON immediately
 
 // Stages that must run sequentially (core and mechanics are required by later stages)
 const SEQUENTIAL_STAGES: GenerationStage[] = ["core", "mechanics"];
@@ -679,7 +679,8 @@ export async function generateAdventureSequential(
 }
 
 /**
- * Run a single stage with retry/continuation logic
+ * Run a single stage with retry logic
+ * On timeout/failure: get 1 retry that asks AI to finish JSON immediately
  */
 async function runSingleStageWithRetry(
   config: BigAdventureConfig,
@@ -710,20 +711,16 @@ async function runSingleStageWithRetry(
       ? mergeBigAdventureResults(...stageResults.filter((r) => r !== null))
       : undefined);
 
-  let continuationCount = 0;
+  let retryCount = 0;
   let partialContent = "";
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
 
-  while (continuationCount <= MAX_CONTINUATIONS_PER_STAGE) {
-    const isContinuation = continuationCount > 0;
+  while (retryCount <= MAX_RETRY_ATTEMPTS) {
+    const isRetry = retryCount > 0;
 
-    if (isContinuation) {
-      callbacks.onStageContinuation(
-        stage,
-        continuationCount,
-        MAX_CONTINUATIONS_PER_STAGE
-      );
+    if (isRetry) {
+      callbacks.onStageContinuation(stage, retryCount, MAX_RETRY_ATTEMPTS);
     }
 
     const result = await generateSingleStage(
@@ -732,31 +729,30 @@ async function runSingleStageWithRetry(
       previousResults,
       options,
       callbacks,
-      isContinuation ? partialContent : undefined
+      undefined // Don't continue from partial - we'll use finish early instead
     );
 
     // Accumulate content regardless of success
     if (result.rawContent) {
       partialContent = result.rawContent;
     }
+    totalPromptTokens += result.promptTokens;
+    totalCompletionTokens += result.completionTokens;
 
     if (result.success && result.result) {
       return {
         success: true,
         result: result.result,
         rawContent: partialContent,
-        promptTokens: totalPromptTokens + result.promptTokens,
-        completionTokens: totalCompletionTokens + result.completionTokens,
+        promptTokens: totalPromptTokens,
+        completionTokens: totalCompletionTokens,
       };
     } else if (result.finishedEarly && partialContent.length > 100) {
-      // Handle finish early
+      // Handle user-triggered finish early
       callbacks.onStageWarning(
         stage,
         `Finishing early with ${partialContent.length} characters...`
       );
-
-      totalPromptTokens += result.promptTokens;
-      totalCompletionTokens += result.completionTokens;
 
       const wrapUpResult = await generateSingleStageFinishEarly(
         config,
@@ -797,23 +793,48 @@ async function runSingleStageWithRetry(
         };
       }
     } else if (
-      result.timedOut &&
-      continuationCount < MAX_CONTINUATIONS_PER_STAGE &&
+      (result.timedOut || result.error) &&
+      retryCount < MAX_RETRY_ATTEMPTS &&
       partialContent.length > 100
     ) {
-      // Continue from timeout
-      continuationCount++;
+      // On timeout or error with partial content: retry by asking AI to finish JSON immediately
+      retryCount++;
       callbacks.onStageWarning(
         stage,
-        `Connection timed out. Continuing from ${partialContent.length} characters... (${continuationCount}/${MAX_CONTINUATIONS_PER_STAGE})`
+        `Timeout/error with ${partialContent.length} chars. Retrying with finish-now request...`
       );
-      totalPromptTokens += result.promptTokens;
-      totalCompletionTokens += result.completionTokens;
-    } else {
-      // Fatal error
+
+      // Use finish early to wrap up what we have
+      const wrapUpResult = await generateSingleStageFinishEarly(
+        config,
+        stage,
+        previousResults,
+        options,
+        callbacks,
+        partialContent
+      );
+
+      totalPromptTokens += wrapUpResult.promptTokens;
+      totalCompletionTokens += wrapUpResult.completionTokens;
+
+      if (wrapUpResult.success && wrapUpResult.result) {
+        return {
+          success: true,
+          result: wrapUpResult.result,
+          rawContent: wrapUpResult.rawContent,
+          promptTokens: totalPromptTokens,
+          completionTokens: totalCompletionTokens,
+        };
+      }
+      // If wrap-up failed, continue to error handling below
+      partialContent = wrapUpResult.rawContent || partialContent;
+    }
+
+    // Fatal error - no more retries or insufficient content
+    if (retryCount >= MAX_RETRY_ATTEMPTS || partialContent.length <= 100) {
       const errorMsg =
         result.timedOut && partialContent.length <= 100
-          ? "Stage timed out with insufficient content to continue"
+          ? "Stage timed out with insufficient content to recover"
           : result.error || "Unknown error";
       callbacks.onStageError(stage, errorMsg, false);
 
@@ -901,21 +922,17 @@ async function runStagesInParallel(
       return result;
     }
 
-    // Generate the stage
-    let continuationCount = 0;
+    // Generate the stage with simple retry logic
+    let retryCount = 0;
     let partialContent = "";
     let totalPromptTokens = 0;
     let totalCompletionTokens = 0;
 
-    while (continuationCount <= MAX_CONTINUATIONS_PER_STAGE) {
-      const isContinuation = continuationCount > 0;
+    while (retryCount <= MAX_RETRY_ATTEMPTS) {
+      const isRetry = retryCount > 0;
 
-      if (isContinuation) {
-        callbacks.onStageContinuation(
-          stage,
-          continuationCount,
-          MAX_CONTINUATIONS_PER_STAGE
-        );
+      if (isRetry) {
+        callbacks.onStageContinuation(stage, retryCount, MAX_RETRY_ATTEMPTS);
       }
 
       const genResult = await generateSingleStage(
@@ -924,12 +941,14 @@ async function runStagesInParallel(
         previousResults,
         options,
         callbacks,
-        isContinuation ? partialContent : undefined
+        undefined // Don't continue from partial
       );
 
       if (genResult.rawContent) {
         partialContent = genResult.rawContent;
       }
+      totalPromptTokens += genResult.promptTokens;
+      totalCompletionTokens += genResult.completionTokens;
 
       if (genResult.success && genResult.result) {
         const stageResult = {
@@ -938,9 +957,8 @@ async function runStagesInParallel(
             success: true,
             result: genResult.result,
             rawContent: partialContent,
-            promptTokens: totalPromptTokens + genResult.promptTokens,
-            completionTokens:
-              totalCompletionTokens + genResult.completionTokens,
+            promptTokens: totalPromptTokens,
+            completionTokens: totalCompletionTokens,
           } as StageResult,
         };
         results.push(stageResult);
@@ -955,23 +973,65 @@ async function runStagesInParallel(
 
         return stageResult;
       } else if (
-        genResult.timedOut &&
-        continuationCount < MAX_CONTINUATIONS_PER_STAGE &&
+        (genResult.timedOut || genResult.error) &&
+        retryCount < MAX_RETRY_ATTEMPTS &&
         partialContent.length > 100
       ) {
-        continuationCount++;
-        totalPromptTokens += genResult.promptTokens;
-        totalCompletionTokens += genResult.completionTokens;
-      } else {
+        // On timeout/error with partial content: retry by asking AI to finish JSON immediately
+        retryCount++;
+        callbacks.onStageWarning(
+          stage,
+          `Timeout/error with ${partialContent.length} chars. Retrying with finish-now request...`
+        );
+
+        const wrapUpResult = await generateSingleStageFinishEarly(
+          config,
+          stage,
+          previousResults,
+          options,
+          callbacks,
+          partialContent
+        );
+
+        totalPromptTokens += wrapUpResult.promptTokens;
+        totalCompletionTokens += wrapUpResult.completionTokens;
+
+        if (wrapUpResult.success && wrapUpResult.result) {
+          const stageResult = {
+            stage,
+            result: {
+              success: true,
+              result: wrapUpResult.result,
+              rawContent: wrapUpResult.rawContent,
+              promptTokens: totalPromptTokens,
+              completionTokens: totalCompletionTokens,
+            } as StageResult,
+          };
+          results.push(stageResult);
+
+          callbacks.onStageComplete(
+            stage,
+            wrapUpResult.result,
+            stageResult.result.promptTokens,
+            stageResult.result.completionTokens
+          );
+
+          return stageResult;
+        }
+        // If wrap-up failed, continue to error handling
+        partialContent = wrapUpResult.rawContent || partialContent;
+      }
+
+      // Fatal error - no more retries or insufficient content
+      if (retryCount >= MAX_RETRY_ATTEMPTS || partialContent.length <= 100) {
         const stageResult = {
           stage,
           result: {
             success: false,
             result: null,
             rawContent: partialContent,
-            promptTokens: totalPromptTokens + genResult.promptTokens,
-            completionTokens:
-              totalCompletionTokens + genResult.completionTokens,
+            promptTokens: totalPromptTokens,
+            completionTokens: totalCompletionTokens,
             error: genResult.error || "Unknown error",
           } as StageResult,
         };
@@ -996,13 +1056,13 @@ async function runStagesInParallel(
         rawContent: partialContent,
         promptTokens: totalPromptTokens,
         completionTokens: totalCompletionTokens,
-        error: "Max continuations exceeded",
+        error: "Max retries exceeded",
       } as StageResult,
     };
     results.push(stageResult);
 
     // Immediately notify that this stage failed
-    callbacks.onStageError(stage, "Max continuations exceeded", false);
+    callbacks.onStageError(stage, "Max retries exceeded", false);
 
     return stageResult;
   });

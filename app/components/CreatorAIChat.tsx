@@ -1,12 +1,19 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ChatMessage } from "@/app/misc/ai";
 import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
-import { parseCreatorOutput } from "@/app/misc/creator_ai";
+import {
+  parseCreatorOutput,
+  buildCreatorMessages,
+} from "@/app/misc/creator_ai";
 import { DynamicIcon } from "./DynamicIcon";
-import { AI_MODELS } from "@/app/misc/ai_prices";
+import {
+  AI_MODELS,
+  getModelConfig,
+  calculateTokenCost,
+} from "@/app/misc/ai_prices";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 
 interface CreatorAIChatProps {
@@ -39,7 +46,7 @@ export default function CreatorAIChat({
   onApplyChanges,
 }: CreatorAIChatProps) {
   const chatKey = adventureId ? `creatorAiChat:${adventureId}` : null;
-  const { keys: apiKeys } = useAPIKeys();
+  const { keys: apiKeys, hasKey } = useAPIKeys();
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (typeof window !== "undefined" && chatKey) {
@@ -56,12 +63,34 @@ export default function CreatorAIChat({
   });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // BYOK/Coins mode toggle
+  const [byokMode, setByokMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("creatorAiByokMode");
+      return stored === "true";
+    }
+    return false;
+  });
+
   const [model, setModel] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("creatorAiModel") || "Deepseek Chat";
+      return (
+        localStorage.getItem("creatorAiModel") || "DeepInfra DeepSeek V3.2"
+      );
     }
-    return "Deepseek Chat";
+    return "DeepInfra DeepSeek V3.2";
   });
+
+  // Output size slider
+  const [maxOutputTokens, setMaxOutputTokens] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("creatorAiMaxOutput");
+      return stored ? parseInt(stored, 10) : 4000;
+    }
+    return 4000;
+  });
+
   const [novelaiKey, setNovelaiKey] = useState<string>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("novelaiKey") || "";
@@ -71,10 +100,61 @@ export default function CreatorAIChat({
   const [showKeyInput, setShowKeyInput] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Get model config
+  const modelConfig = useMemo(() => getModelConfig(model), [model]);
+
   // Check if NovelAI is selected
-  const isNovelAISelected =
-    (AI_MODELS as Record<string, { provider?: string }>)[model]?.provider ===
-    "novelai";
+  const isNovelAISelected = modelConfig.provider === "novelai";
+
+  // Filter models based on BYOK mode
+  const filteredModels = useMemo(() => {
+    return Object.entries(AI_MODELS).filter(([, m]) => {
+      const provider = (m as { provider?: string }).provider;
+      if (byokMode) {
+        // BYOK mode: show openrouter, deepseek, novelai
+        return (
+          provider === "openrouter" ||
+          provider === "deepseek" ||
+          provider === "novelai"
+        );
+      } else {
+        // Coins mode: show mistral, deepinfra
+        return provider === "mistral" || provider === "deepinfra";
+      }
+    });
+  }, [byokMode]);
+
+  // Check if user has any BYOK keys configured
+  const hasAnyBYOKKey =
+    hasKey("openRouterKey") || hasKey("deepseekKey") || novelaiKey.length > 0;
+
+  // Calculate estimated cost
+  const estimatedCost = useCallback(() => {
+    // Estimate input tokens from context (rough: 4 chars per token)
+    const contextStr =
+      JSON.stringify(currentStoryData) + JSON.stringify(adventureMetadata);
+    const estimatedInputTokens = Math.ceil(contextStr.length / 4) + 500; // Add buffer for system prompt
+
+    // Calculate dollar cost from token prices (per million tokens)
+    const dollarCost =
+      (modelConfig.inputPrice * estimatedInputTokens) / 1000000 +
+      (modelConfig.outputPrice * maxOutputTokens) / 1000000;
+
+    // Calculate coin cost
+    const coinCost = calculateTokenCost(
+      model,
+      estimatedInputTokens,
+      maxOutputTokens
+    );
+
+    return { coins: Math.max(1, coinCost), dollars: dollarCost };
+  }, [
+    currentStoryData,
+    adventureMetadata,
+    modelConfig,
+    maxOutputTokens,
+    model,
+  ]);
 
   // Save chat history to localStorage
   useEffect(() => {
@@ -83,12 +163,14 @@ export default function CreatorAIChat({
     }
   }, [messages, chatKey]);
 
-  // Save model selection to localStorage
+  // Save preferences to localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("creatorAiModel", model);
+      localStorage.setItem("creatorAiByokMode", byokMode.toString());
+      localStorage.setItem("creatorAiMaxOutput", maxOutputTokens.toString());
     }
-  }, [model]);
+  }, [model, byokMode, maxOutputTokens]);
 
   // Save NovelAI key to localStorage
   useEffect(() => {
@@ -96,6 +178,34 @@ export default function CreatorAIChat({
       localStorage.setItem("novelaiKey", novelaiKey);
     }
   }, [novelaiKey]);
+
+  // When switching modes, auto-select a compatible model
+  useEffect(() => {
+    const currentProvider = modelConfig.provider;
+    const isBYOKProvider =
+      currentProvider === "openrouter" ||
+      currentProvider === "deepseek" ||
+      currentProvider === "novelai";
+    const isCoinsProvider =
+      currentProvider === "mistral" || currentProvider === "deepinfra";
+
+    // If in BYOK mode but current model is coins-only, switch to default BYOK model
+    if (byokMode && isCoinsProvider) {
+      setModel("Deepseek Chat");
+    }
+    // If in Coins mode but current model is BYOK-only, switch to default coins model
+    if (!byokMode && isBYOKProvider) {
+      setModel("DeepInfra DeepSeek V3.2");
+    }
+  }, [byokMode, modelConfig.provider]);
+
+  // Clamp max output tokens when model changes
+  useEffect(() => {
+    const modelMax = modelConfig.maxOutputTokens || 8000;
+    if (maxOutputTokens > modelMax) {
+      setMaxOutputTokens(modelMax);
+    }
+  }, [model, modelConfig.maxOutputTokens, maxOutputTokens]);
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -119,28 +229,62 @@ export default function CreatorAIChat({
       return;
     }
 
+    // Validate BYOK keys for other providers
+    if (byokMode && !isNovelAISelected && !hasAnyBYOKKey) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Please add your API key in Settings (gear icon in header) to use BYOK mode.",
+        },
+      ]);
+      return;
+    }
+
     const userMsg: ChatMessage = { role: "user", content: input };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
     try {
-      // Prepare context (limit history to last 10 messages to save tokens)
+      // Build messages using the creator AI prompt builder
       const recentMessages = [...messages, userMsg].slice(-10);
-
-      const response = await authenticatedFetch("/api/creator/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: recentMessages,
-          currentStoryData: currentStoryData,
-          adventureMetadata: adventureMetadata,
-          model: model,
-          novelaiKey: isNovelAISelected ? novelaiKey : undefined,
-          openRouterKey: apiKeys.openRouterKey,
-          deepseekKey: apiKeys.deepseekKey,
-        }),
+      const aiMessages = buildCreatorMessages({
+        messages: recentMessages,
+        currentStoryData,
+        adventureMetadata,
       });
+
+      let response: Response;
+
+      if (isNovelAISelected) {
+        // NovelAI uses a separate endpoint
+        response = await authenticatedFetch("/api/novelai/generate-stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: aiMessages,
+            novelaiKey: novelaiKey,
+            maxTokens: Math.min(maxOutputTokens, 1000), // NovelAI has 1K limit
+            temperature: 0.7,
+          }),
+        });
+      } else {
+        // Use the generic /api/generate endpoint
+        response = await authenticatedFetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: aiMessages,
+            model: model,
+            maxTokens: maxOutputTokens,
+            temperature: 0.7,
+            openRouterKey: byokMode ? apiKeys.openRouterKey : undefined,
+            deepseekKey: byokMode ? apiKeys.deepseekKey : undefined,
+          }),
+        });
+      }
 
       if (!response.ok) {
         const errorData = await response
@@ -152,11 +296,42 @@ export default function CreatorAIChat({
         );
       }
 
-      const data = await response.json();
+      let content: string;
+      let meta: any;
+
+      if (isNovelAISelected) {
+        // NovelAI returns SSE stream, read as text
+        const text = await response.text();
+        // Parse SSE events to extract content
+        const lines = text.split("\n");
+        let fullContent = "";
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === "content" && data.content) {
+                fullContent += data.content;
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        }
+        content = fullContent;
+        meta = { isByok: true, modelName: model };
+      } else {
+        const data = await response.json();
+        content = data.content;
+        meta = {
+          ...data.meta,
+          isByok: byokMode,
+        };
+      }
+
       const assistantMsg: ChatMessage & { meta?: any } = {
         role: "assistant",
-        content: data.content,
-        meta: data.meta, // Include cost and usage info
+        content,
+        meta,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -166,7 +341,9 @@ export default function CreatorAIChat({
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, I encountered an error. Please try again.",
+          content: `Sorry, I encountered an error: ${
+            error instanceof Error ? error.message : "Please try again."
+          }`,
         },
       ]);
     } finally {
@@ -229,35 +406,75 @@ export default function CreatorAIChat({
               For your Adventures
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            {messages.length > 0 && (
+              <button
+                onClick={handleClearChat}
+                className="rounded-full p-2 text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                title="Clear chat history"
+              >
+                <DynamicIcon name="Trash2" className="w-5 h-5" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="rounded-full p-2 text-gray-400 hover:bg-gray-800 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+            >
+              <DynamicIcon name="X" className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* Settings Bar */}
+        <div className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/80 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* BYOK/Coins Toggle */}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-blue-950 rounded-lg border border-gray-200 dark:border-gray-700">
+              <span
+                className={`text-xs font-medium ${
+                  !byokMode ? "text-amber-500" : "text-gray-400"
+                }`}
+              >
+                🪙 Coins
+              </span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={byokMode}
+                  onChange={(e) => setByokMode(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-8 h-4 bg-amber-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-600" />
+              </label>
+              <span
+                className={`text-xs font-medium ${
+                  byokMode ? "text-green-500" : "text-gray-400"
+                }`}
+              >
+                🔑 BYOK
+              </span>
+            </div>
+
+            {/* Model Selection */}
+            <div className="flex items-center gap-1 flex-1 min-w-0">
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className={`bg-gray-100 dark:bg-blue-950 border-none text-xs rounded-md px-2 py-1 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer max-w-[150px] truncate ${
+                className={`flex-1 min-w-0 bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 text-xs rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer truncate ${
                   isNovelAISelected ? "ring-1 ring-green-500" : ""
                 }`}
                 title="Select AI model"
               >
-                <optgroup label="Recommended">
-                  <option value="Deepseek Chat">Deepseek Chat (Best)</option>
-                  <option value="Gemini 2.5 Flash">Gemini 2.5 Flash</option>
-                  <option value="Mistral Medium 3.1">Mistral Medium 3.1</option>
-                </optgroup>
-                <optgroup label="Advanced">
-                  <option value="Deepseek R1">DeepSeek R1 (Reasoning)</option>
-                  <option value="Grok 4 Fast">Grok 4 Fast (Creative)</option>
-                  <option value="GLM 4.6">GLM 4.6 (Long Context)</option>
-                </optgroup>
-                <optgroup label="Budget">
-                  <option value="Gemini 2.5 Flash Lite">
-                    Gemini Flash Lite
+                {filteredModels.map(([key, m]) => (
+                  <option key={key} value={key}>
+                    {m.name}{" "}
+                    {byokMode
+                      ? ""
+                      : m.cost > 0
+                      ? `(~${m.cost} coins)`
+                      : "(Free)"}
                   </option>
-                  <option value="Grok Code Fast 1">Grok Code Fast</option>
-                </optgroup>
-                <optgroup label="BYOK (Free)">
-                  <option value="NovelAI GLM-4-6">NovelAI (Your Key)</option>
-                </optgroup>
+                ))}
               </select>
               {isNovelAISelected && (
                 <button
@@ -277,49 +494,84 @@ export default function CreatorAIChat({
                 </button>
               )}
             </div>
-            {/* NovelAI Key Input Popup */}
-            {showKeyInput && isNovelAISelected && (
-              <div className="absolute top-16 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3 z-50 w-72">
-                <div className="flex items-center gap-2 mb-2">
-                  <DynamicIcon name="Key" className="w-4 h-4 text-purple-500" />
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    NovelAI API Key
-                  </span>
-                </div>
-                <input
-                  type="password"
-                  value={novelaiKey}
-                  onChange={(e) => setNovelaiKey(e.target.value)}
-                  placeholder="Enter your NovelAI key..."
-                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                />
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  Free to use with your own subscription. Key is stored locally.
-                </p>
-                <button
-                  onClick={() => setShowKeyInput(false)}
-                  className="mt-2 w-full px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded-md transition-colors"
-                >
-                  Done
-                </button>
-              </div>
-            )}
-            {messages.length > 0 && (
-              <button
-                onClick={handleClearChat}
-                className="rounded-full p-2 text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                title="Clear chat history"
-              >
-                <DynamicIcon name="Trash2" className="w-5 h-5" />
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="rounded-full p-2 text-gray-400 hover:bg-gray-800 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-            >
-              <DynamicIcon name="X" className="w-6 h-6" />
-            </button>
+
+            {/* Output Size */}
+            <div className="flex items-center gap-2 px-2 py-1 bg-white dark:bg-blue-950 rounded-lg border border-gray-200 dark:border-gray-700">
+              <DynamicIcon
+                name="FileText"
+                className="w-3.5 h-3.5 text-gray-500"
+              />
+              <input
+                type="range"
+                min={500}
+                max={Math.min(modelConfig.maxOutputTokens || 8000, 16000)}
+                step={500}
+                value={maxOutputTokens}
+                onChange={(e) =>
+                  setMaxOutputTokens(parseInt(e.target.value, 10))
+                }
+                className="w-16 h-1 accent-purple-500 cursor-pointer"
+                title={`Max output: ${maxOutputTokens} tokens`}
+              />
+              <span className="text-[10px] text-gray-500 dark:text-gray-400 w-8">
+                {maxOutputTokens >= 1000
+                  ? `${(maxOutputTokens / 1000).toFixed(1)}k`
+                  : maxOutputTokens}
+              </span>
+            </div>
+
+            {/* Estimated Cost */}
+            <div className="text-[10px] px-2 py-1 bg-white dark:bg-blue-950 rounded-lg border border-gray-200 dark:border-gray-700">
+              <span className="text-gray-500 dark:text-gray-400">Est: </span>
+              {byokMode ? (
+                <span className="font-medium text-green-600 dark:text-green-400">
+                  ~${estimatedCost().dollars.toFixed(4)}
+                </span>
+              ) : (
+                <span className="font-medium text-amber-600 dark:text-amber-400">
+                  ~{estimatedCost().coins} coins
+                </span>
+              )}
+            </div>
           </div>
+
+          {/* BYOK mode warning if no keys configured */}
+          {byokMode && !hasAnyBYOKKey && (
+            <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-lg">
+              <p className="text-xs text-red-600 dark:text-red-300">
+                ⚠️ No API keys configured. Add keys in Settings (gear icon in
+                header).
+              </p>
+            </div>
+          )}
+
+          {/* NovelAI Key Input Popup */}
+          {showKeyInput && isNovelAISelected && (
+            <div className="mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <DynamicIcon name="Key" className="w-4 h-4 text-purple-500" />
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  NovelAI API Key
+                </span>
+              </div>
+              <input
+                type="password"
+                value={novelaiKey}
+                onChange={(e) => setNovelaiKey(e.target.value)}
+                placeholder="Enter your NovelAI key..."
+                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+              />
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Free to use with your own subscription. Key is stored locally.
+              </p>
+              <button
+                onClick={() => setShowKeyInput(false)}
+                className="mt-2 w-full px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded-md transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Messages */}
@@ -469,6 +721,18 @@ function MessageItem({
   const { text, data } = parseCreatorOutput(message.content);
   const meta = message.meta;
 
+  // Calculate dollar cost from usage if available
+  const dollarCost = useMemo(() => {
+    if (!meta?.usage || !meta?.modelName) return null;
+    const modelConfig = getModelConfig(meta.modelName);
+    const inputTokens = meta.usage.promptTokens || 0;
+    const outputTokens = meta.usage.completionTokens || 0;
+    return (
+      (modelConfig.inputPrice * inputTokens) / 1000000 +
+      (modelConfig.outputPrice * outputTokens) / 1000000
+    );
+  }, [meta]);
+
   return (
     <div
       className={`flex ${
@@ -483,7 +747,7 @@ function MessageItem({
         }`}
       >
         <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
-        {!isUser && (meta?.cost !== undefined || meta?.isByok) && (
+        {!isUser && (meta?.tokenCost !== undefined || meta?.isByok) && (
           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50 flex items-center justify-between text-xs">
             <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
               <DynamicIcon name="Info" className="w-3 h-3" />
@@ -491,11 +755,12 @@ function MessageItem({
             </span>
             {meta?.isByok ? (
               <span className="font-semibold text-green-600 dark:text-green-400">
-                Free (BYOK)
+                {dollarCost !== null ? `~$${dollarCost.toFixed(4)}` : "Free"}{" "}
+                (BYOK)
               </span>
             ) : (
               <span className="font-semibold text-amber-600 dark:text-amber-400">
-                {meta.cost} {meta.cost === 1 ? "coin" : "coins"}
+                {meta.tokenCost} {meta.tokenCost === 1 ? "coin" : "coins"}
               </span>
             )}
           </div>

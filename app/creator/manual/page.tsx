@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/misc/AuthContext";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
@@ -626,6 +626,7 @@ function AdventureCreatorContent() {
   const [loading, setLoading] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [isLocal, setIsLocal] = useState(false); // Track if adventure is stored locally
+  const hasLoadedAdventureRef = useRef<string | null>(null); // Track loaded adventure ID to prevent re-fetching on tab focus
   const [selectedPreset, setSelectedPreset] = useState<string>("custom");
   const [presets, setPresets] = useState<Preset[]>([DEFAULT_PRESET]);
   const [showPresetForm, setShowPresetForm] = useState(false);
@@ -1224,6 +1225,14 @@ function AdventureCreatorContent() {
     if (!editAdventureId) return;
     if (!user) return; // Wait for auth to be ready
 
+    // Skip re-fetching if we've already loaded this adventure (prevents reload on tab focus)
+    if (hasLoadedAdventureRef.current === editAdventureId) {
+      console.log(
+        "Adventure already loaded, skipping re-fetch (tab focus protection)"
+      );
+      return;
+    }
+
     const loadAdventure = async () => {
       setLoading(true);
       try {
@@ -1422,6 +1431,9 @@ function AdventureCreatorContent() {
             "success"
           );
         }
+
+        // Mark this adventure as loaded to prevent re-fetching on tab focus
+        hasLoadedAdventureRef.current = editAdventureId;
       } catch (error) {
         console.error("Error loading adventure:", error);
         addNotification("Failed to load adventure", "failure");
