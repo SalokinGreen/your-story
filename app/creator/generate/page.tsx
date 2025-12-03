@@ -50,7 +50,12 @@ import {
   loadGenerationHistory,
   deleteHistoryEntry,
   clearGenerationHistory,
+  mergeBigAdventureResults,
 } from "@/app/misc/big_adventure_ai";
+import {
+  generateAdventureSequential,
+  GenerationCallbacks,
+} from "@/app/misc/generation_orchestrator";
 import {
   AI_MODELS,
   calculateTokenCost,
@@ -1326,7 +1331,7 @@ function BigAdventureCreatorPage() {
     []
   );
 
-  // Start generation
+  // Start generation using sequential orchestrator (handles Vercel timeout limits)
   const startGeneration = useCallback(async () => {
     if (!config.prompt.trim()) {
       addNotification("Please enter an adventure prompt", "warning");
@@ -1342,14 +1347,7 @@ function BigAdventureCreatorPage() {
       return;
     }
 
-    const token = await getAuthToken();
-    if (!token) {
-      addNotification("Please sign in to generate adventures", "warning");
-      return;
-    }
-
-    // Get model config and stages to run
-    const modelConfig = getModelConfig(selectedModel);
+    // Get stages to run
     const stagesToRun = getStagesToRun(config);
     const tasks = stagesToRun.length;
 
@@ -1362,7 +1360,7 @@ function BigAdventureCreatorPage() {
     setStages(stagesToRun);
     setTotalTasks(tasks);
     // In resume mode, start from existing progress
-    setCompletedTasks(isResuming ? completedStages.length : 0);
+    setCompletedTasks(isResuming ? skipStages.length : 0);
     setCurrentStage(null);
     setCurrentIteration(0);
     // Don't reset completed stages in resume mode
@@ -1377,239 +1375,154 @@ function BigAdventureCreatorPage() {
     // Clear resume mode now that we're generating
     setResumeMode(false);
 
-    // Initialize autosave
+    // Initialize session
     const currentSessionId = sessionId || generateSessionId();
     if (!sessionId) setSessionId(currentSessionId);
 
     abortControllerRef.current = new AbortController();
 
-    try {
-      const response = await fetch("/api/creator/generate-adventure", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          config,
-          model: selectedModel,
-          novelaiKey: isNovelAISelected ? novelaiKey : undefined,
-          openRouterKey: apiKeys.openRouterKey,
-          deepseekKey: apiKeys.deepseekKey,
-          // Pass skip stages and existing results for resume
-          skipStages: skipStages.length > 0 ? skipStages : undefined,
-          existingResults:
-            Object.keys(resumedPartialResults).length > 0
-              ? resumedPartialResults
-              : undefined,
-        }),
-        signal: abortControllerRef.current.signal,
-      });
+    // Track live content for current stage
+    let currentStageLiveContent = "";
 
-      if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status}`);
-      }
+    // Create callbacks for the orchestrator
+    const callbacks: GenerationCallbacks = {
+      onStageStart: (stage, stageInfo) => {
+        setCurrentStage(stage);
+        setCurrentIteration(1);
+        setLiveContent("");
+        currentStageLiveContent = "";
+        console.log(`Starting stage: ${stageInfo.name}`);
+      },
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("No response body");
-      }
+      onStageContent: (stage, content) => {
+        currentStageLiveContent += content;
+        setLiveContent(currentStageLiveContent);
+      },
 
-      const decoder = new TextDecoder();
-      let buffer = "";
-      // Initialize with existing results if resuming
-      let currentPartialResults: Partial<BigAdventureResult> = isResuming
-        ? { ...resumedPartialResults }
-        : {};
-      let currentCompletedStages: GenerationStage[] = isResuming
-        ? [...completedStages]
-        : [];
-      let currentLiveContent = "";
+      onStageContinuation: (stage, attempt, maxAttempts) => {
+        console.log(`Stage ${stage} continuation: ${attempt}/${maxAttempts}`);
+        setLiveContent(
+          (prev) =>
+            prev +
+            `\n\n/* Continuing generation (${attempt}/${maxAttempts})... */\n`
+        );
+      },
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      onStageComplete: (stage, stageResult, promptTokens, completionTokens) => {
+        console.log(`Stage ${stage} complete:`, { promptTokens, completionTokens });
+        setCompletedStages((prev) => [...prev, stage]);
+        setCompletedTasks((prev) => prev + 1);
+        setTokenCost((prev) => prev + promptTokens + completionTokens);
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
+        if (stageResult) {
+          setPartialResults((prev) => ({
+            ...prev,
+            ...stageResult,
+            storyTemplate: {
+              ...prev.storyTemplate,
+              ...stageResult.storyTemplate,
+            },
+          }));
+        }
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith("data:")) continue;
-
-          const data = trimmed.slice(5).trim();
-          if (data === "[DONE]") continue;
-
-          try {
-            const event = JSON.parse(data);
-
-            switch (event.type) {
-              case "start":
-                setStages(
-                  event.stages.map((s: { stage: GenerationStage }) => s.stage)
-                );
-                break;
-
-              case "stage_start":
-                setCurrentStage(event.stage);
-                setCurrentIteration(event.iteration || 1);
-                setLiveContent("");
-                currentLiveContent = "";
-                break;
-
-              case "stage_content":
-                currentLiveContent += event.content;
-                setLiveContent(currentLiveContent);
-                break;
-
-              case "stage_skipped":
-                // Stage was already completed (resume mode)
-                console.log(`Stage ${event.stage} skipped: ${event.message}`);
-                // Don't increment completedTasks - it was already counted
-                break;
-
-              case "stage_complete":
-                if (event.success) {
-                  currentCompletedStages = [
-                    ...currentCompletedStages,
-                    event.stage,
-                  ];
-                  setCompletedStages(currentCompletedStages);
-                  setCompletedTasks((prev) => prev + 1);
-
-                  // Merge partial results
-                  if (event.partialResult) {
-                    currentPartialResults = {
-                      ...currentPartialResults,
-                      ...event.partialResult,
-                      storyTemplate: {
-                        ...currentPartialResults.storyTemplate,
-                        ...event.partialResult?.storyTemplate,
-                      },
-                    };
-                    setPartialResults(currentPartialResults);
-                  }
-
-                  // Log if continuation was needed
-                  if (
-                    event.continuationAttempts &&
-                    event.continuationAttempts > 0
-                  ) {
-                    console.log(
-                      `Stage ${event.stage} required ${event.continuationAttempts} continuation(s)`
-                    );
-                  }
-
-                  // Save autosave after each stage completion
-                  const autosaveData: BigAdventureAutosave = {
-                    id: currentSessionId,
-                    timestamp: Date.now(),
-                    config,
-                    completedStages: currentCompletedStages,
-                    partialResults: currentPartialResults,
-                    currentStage: event.stage,
-                  };
-                  saveAutosave(autosaveData);
-
-                  // Preview mode: Show stage preview modal (stream continues in background)
-                  if (
-                    config.previewBetweenStages &&
-                    event.stage !== "advanced"
-                  ) {
-                    // Don't show preview for the last stage
-                    const stagesToRun = getStagesToRun(config);
-                    const isLastStage =
-                      event.stage === stagesToRun[stagesToRun.length - 1];
-
-                    if (!isLastStage) {
-                      setPreviewStageData({
-                        stage: event.stage,
-                        content: currentLiveContent,
-                        partialResult: event.partialResult || {},
-                      });
-                      setShowStagePreview(true);
-                    }
-                  }
-                } else {
-                  setFailedStages((prev) => [...prev, event.stage]);
-                }
-                setCurrentStage(null);
-                break;
-
-              case "stage_continuation":
-                // JSON was incomplete, continuing generation
-                console.log(
-                  `Stage ${event.stage} continuation attempt ${event.attempt}/${event.maxAttempts}`
-                );
-                // Optionally show a subtle indicator that continuation is happening
-                setLiveContent(
-                  (prev) =>
-                    prev +
-                    `\n\n/* Continuing generation (${event.attempt}/${event.maxAttempts})... */\n`
-                );
-                break;
-
-              case "stage_warning":
-                // Warning about incomplete content
-                console.warn(`Stage ${event.stage} warning: ${event.message}`);
-                addNotification(event.message, "warning");
-                break;
-
-              case "stage_error":
-                setFailedStages((prev) => [...prev, event.stage]);
-                setCurrentStage(null);
-                addNotification(
-                  `Stage ${event.stage} failed: ${event.error}`,
-                  "warning"
-                );
-                break;
-
-              case "done":
-                setResult(event.result);
-                setTokenCost(event.meta.tokenCost);
-                // Clear autosave on successful completion
-                clearAutosave();
-                // Save to history and track the ID
-                const historyId = saveGenerationToHistory({
-                  timestamp: Date.now(),
-                  title: event.result.title || "Untitled Adventure",
-                  config,
-                  result: event.result,
-                  tokenCost: event.meta.tokenCost,
-                });
-                setCurrentHistoryId(historyId);
-                setHistory(loadGenerationHistory());
-                addNotification(
-                  `Adventure generated! Cost: ${event.meta.tokenCost} coins`,
-                  "success"
-                );
-                break;
-
-              case "error":
-                throw new Error(event.error);
-            }
-          } catch {
-            // Skip malformed JSON
+        // Preview mode: Show stage preview modal
+        if (config.previewBetweenStages && stage !== "advanced") {
+          const isLastStage = stage === stagesToRun[stagesToRun.length - 1];
+          if (!isLastStage && stageResult) {
+            setPreviewStageData({
+              stage,
+              content: currentStageLiveContent,
+              partialResult: stageResult,
+            });
+            setShowStagePreview(true);
           }
         }
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      if (error instanceof Error && error.name === "AbortError") {
+
+        setCurrentStage(null);
+      },
+
+      onStageError: (stage, error, canRetry) => {
+        console.error(`Stage ${stage} error:`, error, { canRetry });
+        if (!canRetry) {
+          setFailedStages((prev) => [...prev, stage]);
+        }
         addNotification(
-          "Generation cancelled. Progress has been saved.",
+          canRetry ? error : `Stage ${getStageInfo(stage).name} failed: ${error}`,
           "warning"
         );
-      } else {
-        addNotification(errorMessage || "Generation failed", "failure");
-      }
-    } finally {
-      setIsGenerating(false);
-      setCurrentStage(null);
-      abortControllerRef.current = null;
-    }
+        setCurrentStage(null);
+      },
+
+      onStageWarning: (stage, message) => {
+        console.warn(`Stage ${stage} warning:`, message);
+        addNotification(message, "warning");
+      },
+
+      onProgress: (completed, total) => {
+        console.log(`Progress: ${completed.length}/${total} stages`);
+      },
+
+      onComplete: (finalResult, tokens) => {
+        setResult(finalResult);
+        // Clear autosave on successful completion
+        clearAutosave();
+        // Save to history
+        const historyId = saveGenerationToHistory({
+          timestamp: Date.now(),
+          title: finalResult.title || "Untitled Adventure",
+          config,
+          result: finalResult,
+          tokenCost: tokens.prompt + tokens.completion,
+        });
+        setCurrentHistoryId(historyId);
+        setHistory(loadGenerationHistory());
+        addNotification(
+          `Adventure generated! Total tokens: ${tokens.prompt + tokens.completion}`,
+          "success"
+        );
+        setIsGenerating(false);
+        setCurrentStage(null);
+        abortControllerRef.current = null;
+      },
+
+      onError: (error) => {
+        console.error("Generation error:", error);
+        if (error.includes("cancelled")) {
+          addNotification(
+            "Generation cancelled. Progress has been saved.",
+            "warning"
+          );
+        } else {
+          addNotification(error || "Generation failed", "failure");
+        }
+        setIsGenerating(false);
+        setCurrentStage(null);
+        abortControllerRef.current = null;
+      },
+
+      onAutosave: (autosave) => {
+        console.log("Autosave updated:", autosave.completedStages);
+      },
+    };
+
+    // Run the sequential generation
+    await generateAdventureSequential(
+      config,
+      {
+        model: selectedModel,
+        openRouterKey: apiKeys.openRouterKey,
+        deepseekKey: apiKeys.deepseekKey,
+        novelaiKey: isNovelAISelected ? novelaiKey : undefined,
+        sessionId: currentSessionId,
+        skipStages: skipStages.length > 0 ? skipStages : undefined,
+        existingResults:
+          Object.keys(resumedPartialResults).length > 0
+            ? resumedPartialResults
+            : undefined,
+        abortSignal: abortControllerRef.current.signal,
+      },
+      callbacks
+    );
   }, [
     config,
     selectedModel,

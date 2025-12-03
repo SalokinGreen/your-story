@@ -140,8 +140,12 @@ Resource System:
 - When a choice uses a resource (use_resource), it signifies that action requires or risks that resource.
 - Choose resources that thematically fit the action: use Stamina for running/escaping, Health for combat/dangerous situations, Mana for spellcasting, etc.
 - Resource requirements are based on DC:
-  * Required amount: DC ÷ ${rpgSystem.resources.requiredDivisor} (rounded down, minimum ${rpgSystem.resources.minRequired})
-  * If player has insufficient resource: dice roll receives -DC÷${rpgSystem.resources.penaltyDivisor} penalty (minimum -${rpgSystem.resources.minPenalty})
+  * Required amount: DC ÷ ${
+    rpgSystem.resources.requiredDivisor
+  } (rounded down, minimum ${rpgSystem.resources.minRequired})
+  * If player has insufficient resource: dice roll receives -DC÷${
+    rpgSystem.resources.penaltyDivisor
+  } penalty (minimum -${rpgSystem.resources.minPenalty})
 - YOU manage all resource gains and losses via tools (adjust_resource, set_resource) based on narrative outcomes.
 - Example: A player sprints to escape - on failure, YOU might deduct Stamina; on success, YOU decide if they're winded or energized.
 
