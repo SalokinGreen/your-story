@@ -1658,7 +1658,9 @@ export function buildBigAdventureMessages(
     if (template.stats && template.stats.length > 0) {
       elementsMessage += `STATS:\n`;
       template.stats.forEach((s) => {
-        elementsMessage += `- "${s.name}": ${s.description || "No description"}\n`;
+        elementsMessage += `- "${s.name}": ${
+          s.description || "No description"
+        }\n`;
       });
       elementsMessage += "\n";
     }
@@ -1666,7 +1668,9 @@ export function buildBigAdventureMessages(
     if (template.resources && template.resources.length > 0) {
       elementsMessage += `RESOURCES:\n`;
       template.resources.forEach((r) => {
-        elementsMessage += `- "${r.name}": ${r.description || "No description"}\n`;
+        elementsMessage += `- "${r.name}": ${
+          r.description || "No description"
+        }\n`;
       });
       elementsMessage += "\n";
     }
@@ -1674,7 +1678,9 @@ export function buildBigAdventureMessages(
     if (template.inventory && template.inventory.length > 0) {
       elementsMessage += `INVENTORY ITEMS:\n`;
       template.inventory.forEach((i) => {
-        elementsMessage += `- "${i.name}": ${i.description || "No description"} (${i.type})\n`;
+        elementsMessage += `- "${i.name}": ${
+          i.description || "No description"
+        } (${i.type})\n`;
       });
       elementsMessage += "\n";
     }
@@ -1682,7 +1688,9 @@ export function buildBigAdventureMessages(
     if (template.abilities && template.abilities.length > 0) {
       elementsMessage += `ABILITIES:\n`;
       template.abilities.forEach((a) => {
-        elementsMessage += `- "${a.name}": ${a.description || "No description"}\n`;
+        elementsMessage += `- "${a.name}": ${
+          a.description || "No description"
+        }\n`;
       });
       elementsMessage += "\n";
     }
@@ -1690,7 +1698,9 @@ export function buildBigAdventureMessages(
     if (template.achievements && template.achievements.length > 0) {
       elementsMessage += `ACHIEVEMENTS:\n`;
       template.achievements.forEach((a) => {
-        elementsMessage += `- "${a.title}": ${a.description || "No description"}\n`;
+        elementsMessage += `- "${a.title}": ${
+          a.description || "No description"
+        }\n`;
       });
       elementsMessage += "\n";
     }
@@ -1698,12 +1708,15 @@ export function buildBigAdventureMessages(
     if (template.relationships && template.relationships.length > 0) {
       elementsMessage += `RELATIONSHIPS:\n`;
       template.relationships.forEach((r) => {
-        elementsMessage += `- "${r.name}": ${r.description || "No description"}\n`;
+        elementsMessage += `- "${r.name}": ${
+          r.description || "No description"
+        }\n`;
       });
       elementsMessage += "\n";
     }
 
-    elementsMessage += "Assign an appropriate icon from the available list to each element above.";
+    elementsMessage +=
+      "Assign an appropriate icon from the available list to each element above.";
 
     messages.push({ role: "user", content: elementsMessage });
   }
@@ -2187,7 +2200,8 @@ export function mergeBigAdventureResults(
           merged.storyTemplate.achievements.map((achievement) => ({
             ...achievement,
             symbol:
-              assignments.achievements![achievement.title] || achievement.symbol,
+              assignments.achievements![achievement.title] ||
+              achievement.symbol,
           }));
       }
 
