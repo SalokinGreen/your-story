@@ -1409,7 +1409,10 @@ function BigAdventureCreatorPage() {
       },
 
       onStageComplete: (stage, stageResult, promptTokens, completionTokens) => {
-        console.log(`Stage ${stage} complete:`, { promptTokens, completionTokens });
+        console.log(`Stage ${stage} complete:`, {
+          promptTokens,
+          completionTokens,
+        });
         setCompletedStages((prev) => [...prev, stage]);
         setCompletedTasks((prev) => prev + 1);
         setTokenCost((prev) => prev + promptTokens + completionTokens);
@@ -1447,7 +1450,9 @@ function BigAdventureCreatorPage() {
           setFailedStages((prev) => [...prev, stage]);
         }
         addNotification(
-          canRetry ? error : `Stage ${getStageInfo(stage).name} failed: ${error}`,
+          canRetry
+            ? error
+            : `Stage ${getStageInfo(stage).name} failed: ${error}`,
           "warning"
         );
         setCurrentStage(null);
@@ -1477,7 +1482,9 @@ function BigAdventureCreatorPage() {
         setCurrentHistoryId(historyId);
         setHistory(loadGenerationHistory());
         addNotification(
-          `Adventure generated! Total tokens: ${tokens.prompt + tokens.completion}`,
+          `Adventure generated! Total tokens: ${
+            tokens.prompt + tokens.completion
+          }`,
           "success"
         );
         setIsGenerating(false);

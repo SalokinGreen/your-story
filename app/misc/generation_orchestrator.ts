@@ -27,19 +27,33 @@ const HEARTBEAT_TIMEOUT_MS = 60000; // If no heartbeat for 60 seconds, assume ti
 const MAX_RETRIES_PER_STAGE = 2;
 
 export interface GenerationCallbacks {
-  onStageStart: (stage: GenerationStage, stageInfo: ReturnType<typeof getStageInfo>) => void;
+  onStageStart: (
+    stage: GenerationStage,
+    stageInfo: ReturnType<typeof getStageInfo>
+  ) => void;
   onStageContent: (stage: GenerationStage, content: string) => void;
-  onStageContinuation: (stage: GenerationStage, attempt: number, maxAttempts: number) => void;
+  onStageContinuation: (
+    stage: GenerationStage,
+    attempt: number,
+    maxAttempts: number
+  ) => void;
   onStageComplete: (
     stage: GenerationStage,
     result: Partial<BigAdventureResult> | null,
     promptTokens: number,
     completionTokens: number
   ) => void;
-  onStageError: (stage: GenerationStage, error: string, canRetry: boolean) => void;
+  onStageError: (
+    stage: GenerationStage,
+    error: string,
+    canRetry: boolean
+  ) => void;
   onStageWarning: (stage: GenerationStage, message: string) => void;
   onProgress: (completedStages: GenerationStage[], totalStages: number) => void;
-  onComplete: (result: BigAdventureResult, totalTokens: { prompt: number; completion: number }) => void;
+  onComplete: (
+    result: BigAdventureResult,
+    totalTokens: { prompt: number; completion: number }
+  ) => void;
   onError: (error: string) => void;
   onAutosave: (autosave: BigAdventureAutosave) => void;
 }
@@ -195,7 +209,11 @@ async function generateSingleStage(
               break;
 
             case "stage_continuation":
-              callbacks.onStageContinuation(stage, event.attempt, event.maxAttempts);
+              callbacks.onStageContinuation(
+                stage,
+                event.attempt,
+                event.maxAttempts
+              );
               lastHeartbeat = Date.now();
               break;
 
@@ -218,7 +236,8 @@ async function generateSingleStage(
                 result: event.result,
                 rawContent: event.rawContent || fullContent,
                 promptTokens: event.meta?.usage?.promptTokens || promptTokens,
-                completionTokens: event.meta?.usage?.completionTokens || completionTokens,
+                completionTokens:
+                  event.meta?.usage?.completionTokens || completionTokens,
               };
 
             case "error":
@@ -278,7 +297,9 @@ export async function generateAdventureSequential(
   callbacks: GenerationCallbacks
 ): Promise<void> {
   const stages = getStagesToRun(config);
-  const completedStages: GenerationStage[] = options.skipStages ? [...options.skipStages] : [];
+  const completedStages: GenerationStage[] = options.skipStages
+    ? [...options.skipStages]
+    : [];
   const stageResults: (Partial<BigAdventureResult> | null)[] = [];
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
@@ -313,7 +334,12 @@ export async function generateAdventureSequential(
 
     while (!stageCompleted && retryCount <= MAX_RETRIES_PER_STAGE) {
       if (retryCount > 0) {
-        callbacks.onStageWarning(stage, `Retrying stage (attempt ${retryCount + 1}/${MAX_RETRIES_PER_STAGE + 1})...`);
+        callbacks.onStageWarning(
+          stage,
+          `Retrying stage (attempt ${retryCount + 1}/${
+            MAX_RETRIES_PER_STAGE + 1
+          })...`
+        );
       }
 
       const result = await generateSingleStage(
@@ -360,7 +386,9 @@ export async function generateAdventureSequential(
         retryCount++;
         callbacks.onStageError(
           stage,
-          `Stage timed out, retrying... (attempt ${retryCount + 1}/${MAX_RETRIES_PER_STAGE + 1})`,
+          `Stage timed out, retrying... (attempt ${retryCount + 1}/${
+            MAX_RETRIES_PER_STAGE + 1
+          })`,
           true
         );
       } else {
@@ -386,8 +414,8 @@ export async function generateAdventureSequential(
 
         callbacks.onError(
           `Stage "${getStageInfo(stage).name}" failed: ${result.error}. ` +
-          `Progress saved (${completedStages.length}/${stages.length} stages completed). ` +
-          `You can resume later.`
+            `Progress saved (${completedStages.length}/${stages.length} stages completed). ` +
+            `You can resume later.`
         );
         return;
       }
@@ -418,8 +446,22 @@ export async function generateSingleStageOnly(
   config: BigAdventureConfig,
   stage: GenerationStage,
   previousResults: Partial<BigAdventureResult> | undefined,
-  options: Omit<GenerationOptions, 'skipStages' | 'existingResults'>,
-  callbacks: Pick<GenerationCallbacks, 'onStageStart' | 'onStageContent' | 'onStageContinuation' | 'onStageComplete' | 'onStageError' | 'onStageWarning'>
+  options: Omit<GenerationOptions, "skipStages" | "existingResults">,
+  callbacks: Pick<
+    GenerationCallbacks,
+    | "onStageStart"
+    | "onStageContent"
+    | "onStageContinuation"
+    | "onStageComplete"
+    | "onStageError"
+    | "onStageWarning"
+  >
 ): Promise<StageResult> {
-  return generateSingleStage(config, stage, previousResults, options as GenerationOptions, callbacks as GenerationCallbacks);
+  return generateSingleStage(
+    config,
+    stage,
+    previousResults,
+    options as GenerationOptions,
+    callbacks as GenerationCallbacks
+  );
 }

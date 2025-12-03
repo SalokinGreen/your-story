@@ -25,10 +25,7 @@ import {
   buildContinuationPrompt,
 } from "@/app/misc/big_adventure_ai";
 import { getModelConfig } from "@/app/misc/ai_prices";
-import {
-  convertMessagesToPrompt,
-  NOVELAI_MODEL,
-} from "@/app/misc/novelai";
+import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -343,7 +340,10 @@ export async function POST(req: NextRequest) {
           try {
             controller.enqueue(
               encoder.encode(
-                `data: ${JSON.stringify({ type: "heartbeat", timestamp: Date.now() })}\n\n`
+                `data: ${JSON.stringify({
+                  type: "heartbeat",
+                  timestamp: Date.now(),
+                })}\n\n`
               )
             );
           } catch {
