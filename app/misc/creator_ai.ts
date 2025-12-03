@@ -687,10 +687,132 @@ export interface CreatorOutputData extends Partial<StoryData> {
   startingChoices?: StartingChoice[];
 }
 
+/**
+ * Attempt to repair incomplete/malformed JSON
+ * Handles missing code fences, truncated content, unclosed brackets, etc.
+ */
+function attemptJSONRepair(content: string): string {
+  let jsonContent = content.trim();
+
+  // Remove markdown code blocks if present (at start/end)
+  const jsonBlockMatch = jsonContent.match(
+    /```(?:json)?\s*([\s\S]*?)(?:\s*```)?$/
+  );
+  if (jsonBlockMatch) {
+    jsonContent = jsonBlockMatch[1].trim();
+  }
+
+  // Remove ALL embedded markdown code block markers that may appear mid-JSON
+  jsonContent = jsonContent.replace(/```json\s*/gi, "");
+  jsonContent = jsonContent.replace(/```\s*/g, "");
+
+  const startIndex = jsonContent.indexOf("{");
+  if (startIndex === -1) return jsonContent;
+
+  jsonContent = jsonContent.slice(startIndex);
+
+  // Track what needs closing
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+  let lastValidPosition = 0;
+
+  for (let i = 0; i < jsonContent.length; i++) {
+    const char = jsonContent[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"' && !escaped) {
+      inString = !inString;
+      if (!inString) {
+        const nextNonSpace = jsonContent.slice(i + 1).match(/^\s*([,}\]:])/);
+        if (nextNonSpace) {
+          lastValidPosition = i;
+        }
+      }
+      continue;
+    }
+
+    if (!inString) {
+      if (char === "{") {
+        stack.push("}");
+      } else if (char === "[") {
+        stack.push("]");
+      } else if (char === "}" || char === "]") {
+        if (stack.length > 0 && stack[stack.length - 1] === char) {
+          stack.pop();
+          lastValidPosition = i;
+        }
+      } else if (char === ",") {
+        lastValidPosition = i;
+      }
+    }
+  }
+
+  // If we're in an unterminated string or have unclosed brackets, truncate
+  if (inString || stack.length > 0) {
+    const truncated = jsonContent.slice(0, lastValidPosition + 1);
+
+    // Remove trailing partial elements
+    let cleaned = truncated.replace(/,\s*\{[^}]*$/, "");
+    cleaned = cleaned.replace(/,\s*\[[^\]]*$/, "");
+    cleaned = cleaned.replace(/,\s*"[^"]*"?\s*:?\s*(?:"[^"]*)?$/, "");
+    cleaned = cleaned.replace(/,\s*$/, "");
+
+    jsonContent = cleaned;
+
+    // Recount stack after truncation
+    stack.length = 0;
+    inString = false;
+    escaped = false;
+    for (let i = 0; i < jsonContent.length; i++) {
+      const char = jsonContent[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === "{") stack.push("}");
+        else if (char === "[") stack.push("]");
+        else if (char === "}" || char === "]") {
+          if (stack.length > 0) stack.pop();
+        }
+      }
+    }
+  }
+
+  // Remove trailing comma before closing bracket
+  jsonContent = jsonContent.replace(/,(\s*[}\]])/, "$1");
+
+  // Close remaining brackets/braces
+  while (stack.length > 0) {
+    jsonContent += stack.pop();
+  }
+
+  return jsonContent;
+}
+
 export function parseCreatorOutput(content: string): {
   text: string;
   data: CreatorOutputData | null;
 } {
+  // First try: look for fenced ```json blocks
   const jsonBlockRegex = /```json\s*([\s\S]*?)\s*```/;
   const match = content.match(jsonBlockRegex);
 
@@ -698,31 +820,63 @@ export function parseCreatorOutput(content: string): {
     const jsonString = match[1];
     try {
       const data = JSON.parse(jsonString);
-      // Remove the JSON block from the text to keep the chat clean
       const text = content.replace(jsonBlockRegex, "").trim();
       return { text, data };
     } catch (e) {
-      console.error("Failed to parse Creator AI JSON:", e);
-      console.error("JSON string was:", jsonString);
-
-      // Try to extract and fix common JSON errors
+      console.warn("Fenced JSON parse failed, attempting repair...");
       try {
-        // Remove any trailing commas before closing brackets/braces
-        let fixedJson = jsonString
-          .replace(/,(\s*[}\]])/g, "$1")
-          // Fix unescaped quotes in strings (basic attempt)
-          .replace(/title":/g, '"title":')
-          // Remove any leading/trailing whitespace
-          .trim();
-
-        const fixedData = JSON.parse(fixedJson);
+        const repairedJson = attemptJSONRepair(jsonString);
+        const data = JSON.parse(repairedJson);
         const text = content.replace(jsonBlockRegex, "").trim();
-        console.log("Successfully parsed JSON after cleanup");
-        return { text, data: fixedData };
-      } catch (fixError) {
-        console.error("Failed to parse even after cleanup:", fixError);
-        return { text: content, data: null };
+        console.log("JSON repair successful (fenced block)");
+        return { text, data };
+      } catch (repairError) {
+        console.error("Failed to repair fenced JSON:", repairError);
       }
+    }
+  }
+
+  // Second try: look for raw JSON (no code fence) - common with some models
+  // Find JSON object that starts with { and contains typical story data keys
+  const rawJsonMatch = content.match(
+    /(\{[\s\S]*(?:"inventory"|"stats"|"lore"|"achievements"|"resources"|"quests"|"relationships"|"variables"|"abilities"|"customTables")[\s\S]*\})/
+  );
+
+  if (rawJsonMatch) {
+    const rawJson = rawJsonMatch[1];
+    try {
+      const data = JSON.parse(rawJson);
+      // Remove the JSON from text, keeping any prose before/after
+      const text = content.replace(rawJson, "").trim();
+      console.log("Parsed raw JSON successfully (no code fence)");
+      return { text, data };
+    } catch (e) {
+      console.warn("Raw JSON parse failed, attempting repair...");
+      try {
+        const repairedJson = attemptJSONRepair(rawJson);
+        const data = JSON.parse(repairedJson);
+        const text = content.replace(rawJson, "").trim();
+        console.log("JSON repair successful (raw JSON)");
+        return { text, data };
+      } catch (repairError) {
+        console.error("Failed to repair raw JSON:", repairError);
+      }
+    }
+  }
+
+  // Third try: just look for any JSON object starting with {
+  const anyJsonStart = content.indexOf("{");
+  if (anyJsonStart !== -1) {
+    const potentialJson = content.slice(anyJsonStart);
+    try {
+      const repairedJson = attemptJSONRepair(potentialJson);
+      const data = JSON.parse(repairedJson);
+      const text = content.slice(0, anyJsonStart).trim();
+      console.log("Parsed JSON after aggressive repair");
+      return { text, data };
+    } catch (e) {
+      // Give up on JSON parsing
+      console.warn("All JSON parsing attempts failed");
     }
   }
 

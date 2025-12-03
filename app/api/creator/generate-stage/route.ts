@@ -400,7 +400,17 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Start heartbeat to keep connection alive
+        // Send immediate heartbeat before any async operations to prevent client timeout
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "heartbeat",
+              timestamp: Date.now(),
+            })}\n\n`
+          )
+        );
+
+        // Start heartbeat interval to keep connection alive
         heartbeatInterval = setInterval(() => {
           try {
             controller.enqueue(

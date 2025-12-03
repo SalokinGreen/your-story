@@ -48,6 +48,7 @@ import {
   getAbilityBonus,
 } from "../misc/abilitySystem";
 import { getRPGSystem, type RPGSystemType } from "../misc/rpgSystems";
+import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
 
 // Basic Settings Component
 interface BasicSettingsForm {
@@ -4294,7 +4295,9 @@ export default function MenuPage({
     | "agmt"
     | "story"
     | "tts"
+    | "ai"
   >("basic");
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -4587,6 +4590,15 @@ export default function MenuPage({
           <span>Explorer</span>
         </button>
       </div>
+
+      {/* AI Editor Button */}
+      <button
+        onClick={() => setShowAIAssistant(true)}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-purple-600/80 to-pink-600/80 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-xl transition-all border border-purple-500/30"
+      >
+        <DynamicIcon name="Wand2" className="w-5 h-5" />
+        <span>AI Editor</span>
+      </button>
 
       {/* Player Notes - Collapsible */}
       <div className="bg-[#0f1a2e] rounded-xl border border-blue-800/30 overflow-hidden">
@@ -5765,6 +5777,18 @@ export default function MenuPage({
         confirmButtonClass={confirmDialog.confirmButtonClass}
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
+
+      {/* AI Story Editor Modal */}
+      <StoryCreativeAssistant
+        isOpen={showAIAssistant}
+        onClose={() => setShowAIAssistant(false)}
+        storyData={storyData}
+        storyId={storyDbId || undefined}
+        onApplyChanges={(updates) => {
+          onUpdateStoryData(updates);
+          addNotification("Changes applied! Don't forget to save.", "success");
+        }}
       />
     </div>
   );

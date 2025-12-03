@@ -24,7 +24,7 @@ import {
 
 // Configuration for timeout detection
 const TIMEOUT_THRESHOLD_MS = 280000; // 4 min 40 sec - slightly less than Vercel's 5 min limit
-const HEARTBEAT_TIMEOUT_MS = 60000; // If no heartbeat for 60 seconds, assume timeout
+const HEARTBEAT_TIMEOUT_MS = 90000; // If no heartbeat for 90 seconds, assume timeout (increased for slow starts)
 const MAX_RETRY_ATTEMPTS = 1; // On timeout, get 1 retry that asks AI to finish JSON immediately
 
 // Stages that must run sequentially (core and mechanics are required by later stages)
@@ -186,8 +186,52 @@ async function generateSingleStage(
       return elapsed > TIMEOUT_THRESHOLD_MS || sinceLast > HEARTBEAT_TIMEOUT_MS;
     };
 
+    // Helper to race read() against a timeout check
+    // This prevents blocking indefinitely on slow streams
+    const readWithTimeoutCheck = async (): Promise<
+      | { done: boolean; value: Uint8Array | undefined; timedOut: false }
+      | { timedOut: true }
+    > => {
+      // Check every 5 seconds while waiting for data
+      const CHECK_INTERVAL_MS = 5000;
+
+      return new Promise((resolve) => {
+        let resolved = false;
+
+        // Start the actual read
+        reader.read().then(
+          ({ done, value }) => {
+            if (!resolved) {
+              resolved = true;
+              resolve({ done, value, timedOut: false });
+            }
+          },
+          () => {
+            // Read failed - treat as done
+            if (!resolved) {
+              resolved = true;
+              resolve({ done: true, value: undefined, timedOut: false });
+            }
+          }
+        );
+
+        // Periodically check for timeout while read is pending
+        const checkInterval = setInterval(() => {
+          if (resolved) {
+            clearInterval(checkInterval);
+            return;
+          }
+          if (checkTimeout()) {
+            resolved = true;
+            clearInterval(checkInterval);
+            resolve({ timedOut: true });
+          }
+        }, CHECK_INTERVAL_MS);
+      });
+    };
+
     while (true) {
-      // Check for timeout
+      // Check for timeout before reading
       if (checkTimeout()) {
         reader.cancel();
         return {
@@ -201,7 +245,23 @@ async function generateSingleStage(
         };
       }
 
-      const { done, value } = await reader.read();
+      const readResult = await readWithTimeoutCheck();
+
+      // Handle timeout during read
+      if (readResult.timedOut) {
+        reader.cancel();
+        return {
+          success: false,
+          result: null,
+          rawContent: fullContent,
+          promptTokens,
+          completionTokens,
+          error: "Request timed out",
+          timedOut: true,
+        };
+      }
+
+      const { done, value } = readResult;
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });

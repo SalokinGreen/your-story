@@ -75,6 +75,10 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **BYOK providers** (user provides API key): OpenRouter, DeepSeek, NovelAI
   - **Coins provider** (server-side key, user pays with coins): Mistral (mistral-small-2506, mistral-medium-2508, codestral-2508)
   - **APIKeysAvailable**: Interface with `coinsEnabled` flag for Mistral models
+- app/misc/story_creator_ai.ts: **Story Creative Assistant utilities**. Exports buildStoryCreatorMessages() and applyCreatorChangesToStoryData(). Converts between Adventure-style AI outputs and StoryData structures.
+  - **buildStoryCreatorMessages**: Builds prompts with story history (last 15 scene parts), recent memory context, and current game state. Returns messages array with Adventure-style output format.
+  - **applyCreatorChangesToStoryData**: Applies AI-suggested changes (stats, resources, inventory, abilities, achievements, lore) to StoryData. Uses mergeArrayWithCommands() for array modifications.
+  - **mergeArrayWithCommands**: Handles merge/replace/delete/add operations on array fields using `__merge`, `__command`, and `__id` markers.
 - app/misc/generation.ts: **Frontend generation orchestrator**. Exports generateStoryTurn() which handles the complete 3-stage generation flow:
   - Stage 1: Calls buildStoryPrompt(), streams story content via /api/generate-stream
   - Stage 2: Calls buildToolPrompt() in a loop, executes tools locally via executeTools(), supports multi-round tool calling
@@ -162,6 +166,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/components/TTSControls.tsx: Text-to-speech controls with voice selection, volume, play/pause/stop, and auto-generation support.
 - app/components/CustomVoiceManager.tsx: Manage custom Speechify voice IDs for TTS.
 - app/components/DiceVisualizer.tsx: Main dice animation component with 4-phase system (rolling→stopped→calculating→result). Supports all 8 RPG systems with visual feedback for advantage/disadvantage, explosions, stress dice, partial success, and Fate ladder outcomes. Click or keyboard (Enter/Space/Escape) to skip animation.
+- app/components/StoryCreativeAssistant.tsx: AI-powered story editing modal for in-game modifications. Features BYOK/Coins toggle, model selection, output size slider, cost estimation, chat history persistence. Uses story_creator_ai.ts to build prompts with recent story history (last 15 scene parts) and memory context, then applies AI-suggested changes to StoryData.
 
 ### Config
 
