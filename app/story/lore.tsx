@@ -18,7 +18,7 @@ export default function LorePage(storyData: StoryData) {
     const term = searchTerm.toLowerCase();
     return (
       loreItem.title.toLowerCase().includes(term) ||
-      loreItem.content.toLowerCase().includes(term) ||
+      (loreItem.content || "").toLowerCase().includes(term) ||
       (loreItem.relatedCharacters || []).some((char) =>
         char.toLowerCase().includes(term)
       ) ||
@@ -184,7 +184,7 @@ export default function LorePage(storyData: StoryData) {
                         {loreItem.title}
                       </h4>
                       <p className="text-xs text-blue-200/40 line-clamp-2">
-                        {loreItem.content.substring(0, 80)}...
+                        {(loreItem.content || "").substring(0, 80)}...
                       </p>
                     </div>
                   </button>
