@@ -1881,13 +1881,18 @@ function StoryPageContent() {
       hasLoadedStoryRef.current = storyId;
 
       // Migrate AGMT state to include new performance tracking fields
-      if (loadedStoryData.agmtState) {
-        import("@/app/misc/mythicChaos").then(({ migrateAGMTState }) => {
-          loadedStoryData.agmtState = migrateAGMTState(
-            loadedStoryData.agmtState!
-          );
-        });
-      }
+      // Also migrate "mythic" item grades to "agmt" for backward compatibility
+      import("@/app/misc/mythicChaos").then(
+        ({ migrateAGMTState, migrateItemGrades }) => {
+          if (loadedStoryData.agmtState) {
+            loadedStoryData.agmtState = migrateAGMTState(
+              loadedStoryData.agmtState!
+            );
+          }
+          // Migrate item grades from "mythic" to "agmt"
+          migrateItemGrades(loadedStoryData);
+        }
+      );
 
       //Initializequestarraysiftheydon'texist(forbackwardscompatibility)
       if (!loadedStoryData.quests) loadedStoryData.quests = [];
