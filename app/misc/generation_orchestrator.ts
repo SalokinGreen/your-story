@@ -40,6 +40,9 @@ const PARALLELIZABLE_STAGES: GenerationStage[] = [
   "advanced-other",
 ];
 
+// Stages that must run after all others (depend on full content)
+const POST_STAGES: GenerationStage[] = ["icons"];
+
 export interface GenerationCallbacks {
   onStageStart: (
     stage: GenerationStage,
@@ -658,6 +661,71 @@ export async function generateAdventureSequential(
         saveAutosave(autosave);
         callbacks.onAutosave(autosave);
       }
+    }
+  }
+
+  // Phase 3: Post-stages (icons) - run after all content is generated
+  const postStagesToRun = stages.filter(
+    (s) => POST_STAGES.includes(s) && !completedStages.includes(s)
+  );
+
+  for (const stage of postStagesToRun) {
+    // Check for abort
+    if (options.abortSignal?.aborted) {
+      callbacks.onError("Generation cancelled by user");
+      return;
+    }
+
+    // Get complete merged results for icon assignment context
+    const currentPreviousResults =
+      stageResults.length > 0
+        ? mergeBigAdventureResults(...stageResults.filter((r) => r !== null))
+        : undefined;
+
+    const result = await runSingleStageWithRetry(
+      config,
+      stage,
+      stageResults,
+      completedStages,
+      options,
+      callbacks,
+      currentPreviousResults
+    );
+
+    if (!result.success) {
+      // Icon stage is optional - don't fail the whole generation
+      console.warn(`Post-stage ${stage} failed, continuing without it`);
+      continue;
+    }
+
+    stageResults.push(result.result);
+    completedStages.push(stage);
+    totalPromptTokens += result.promptTokens;
+    totalCompletionTokens += result.completionTokens;
+
+    callbacks.onStageComplete(
+      stage,
+      result.result,
+      result.promptTokens,
+      result.completionTokens
+    );
+    callbacks.onProgress(completedStages, stages.length);
+
+    // Save autosave
+    if (stageResults.length > 0) {
+      const mergedResults = mergeBigAdventureResults(
+        ...stageResults.filter((r) => r !== null)
+      );
+      const autosave: BigAdventureAutosave = {
+        id: options.sessionId,
+        timestamp: Date.now(),
+        config,
+        completedStages,
+        partialResults: mergedResults,
+        currentStage: stage,
+      };
+      saveAutosave(autosave);
+      callbacks.onAutosave(autosave);
     }
   }
 
