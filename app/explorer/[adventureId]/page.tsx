@@ -460,7 +460,9 @@ export default function AdventureDetailPage() {
             {isAuthor && (
               <>
                 <button
-                  onClick={() => router.push(`/creator?edit=${adventureId}`)}
+                  onClick={() =>
+                    router.push(`/creator/manual?edit=${adventureId}`)
+                  }
                   className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                   title="Edit"
                 >

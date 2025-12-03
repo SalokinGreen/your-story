@@ -4,7 +4,7 @@
  * Generates complete adventures in stages:
  * - Stage 1: Core concept (title, premise, intro, player summary, author notes)
  * - Stage 2: Mechanics (stats, resources, abilities, variables)
- * - Stage 3: Content (inventory, lore, relationships, achievements, quests, plot beats)
+ * - Stage 3: Content (inventory, lore, relationships, achievements, quests)
  * - Stage 4: Advanced (presets, agmt, custom tables, upgrades, starting choices)
  */
 
@@ -807,7 +807,7 @@ const COMPLEXITY_COUNTS: Record<
   },
 };
 
-// Duration affects plot beats and content depth
+// Duration affects content depth
 const DURATION_MULTIPLIERS: Record<"short" | "medium" | "long", number> = {
   short: 0.7,
   medium: 1.0,
@@ -909,14 +909,10 @@ export function getStageInfo(stage: GenerationStage): {
     },
     "content-achievements": {
       name: "Goals & Milestones",
-      description: "Achievements, quests, and plot beats",
+      description: "Achievements and quests",
       detailedDescription:
-        "Defines what the player can accomplish: achievements to unlock, quests to complete, and story milestones to reach.",
-      generates: [
-        "Achievements with rewards",
-        "Main and side quests",
-        "Plot beats (story milestones)",
-      ],
+        "Defines what the player can accomplish: achievements to unlock and quests to complete.",
+      generates: ["Achievements with rewards", "Main and side quests"],
       instructionHint:
         "Shape quest objectives, achievement triggers, or story pacing",
       number: 4,

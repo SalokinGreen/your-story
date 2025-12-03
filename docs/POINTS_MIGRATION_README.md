@@ -19,6 +19,7 @@ The migration adds two new fields to the `storyData` JSONB column:
 ## Point Spending
 
 Players can spend points in the Upgrades shop:
+
 - **Stat Increase**: 10 points to increase any stat by 1 (max 100)
 - **Resource Max Increase**: 15 points to increase any resource maximum by 10
 - **Add Item**: 20 points to add a custom item to inventory
@@ -33,6 +34,7 @@ Players can spend points in the Upgrades shop:
 ## Verification
 
 After running the migration, the script will output a count of:
+
 - Stories with points fields
 - Adventures with points fields
 
@@ -68,10 +70,10 @@ export interface StoryData {
 }
 
 export const UPGRADE_COSTS = {
-    STAT_INCREASE: 10,
-    RESOURCE_MAX_INCREASE: 15,
-    ADD_ITEM: 20,
-    CHAPTER_REWARD: 50,
+  STAT_INCREASE: 10,
+  RESOURCE_MAX_INCREASE: 15,
+  ADD_ITEM: 20,
+  CHAPTER_REWARD: 50,
 } as const;
 ```
 

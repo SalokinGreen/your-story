@@ -697,7 +697,7 @@ You have access to various tools (functions) to modify game state. Use them to:
 - Track quests and achievements
 - Manage relationships
 - Add memory entries for important story developments
-- Update lore and plot beats
+- Update lore entries
 - Manage conditions/afflictions (injuries, poison, exhaustion, curses, etc.)
 
 ⚠️ EXACT NAME MATCHING REQUIREMENT:

@@ -9,21 +9,24 @@ This document explains all game mechanics in Your Story: stats, resources, items
 **Purpose**: Metacurrency that gives players agency to influence dice rolls and guarantee success on critical moments.
 
 **Structure**:
+
 ```typescript
 interface StoryData {
-  momentum: number;      // Current momentum (0-maxMomentum)
-  maxMomentum: number;   // Maximum momentum (typically 5)
+  momentum: number; // Current momentum (0-maxMomentum)
+  maxMomentum: number; // Maximum momentum (typically 5)
   // ...
 }
 ```
 
 **Earning Momentum**:
+
 - **Critical Success**: Roll 100 → Earn 2 momentum
 - **Strong Success**: Beat DC by 20+ → Earn 1 momentum
 - **AI Rewards**: `/modify_momentum: +1` for exceptional roleplay or clever solutions
 - **Story Milestones**: AI can grant momentum for reaching key plot points
 
 **Spending Momentum**:
+
 - **Reroll (1⚡)**: Roll again and take the better result
   - Works with advantage/disadvantage
   - Select before making your choice
@@ -34,18 +37,21 @@ interface StoryData {
   - Use for critical story moments
 
 **Rules**:
+
 - Momentum is capped at maxMomentum (default: 5)
 - Momentum persists across the entire story
 - Cannot earn momentum when using Guarantee
 - AI can rarely deduct momentum (`/modify_momentum: -1`) for narrative-breaking choices
 
 **UI Display**:
+
 - Shown on story page as dots (⚡⚡⚡○○)
 - Buttons appear when a choice has a skill check
 - Button text shows cost and effect
 - Stats page shows detailed momentum info
 
 **Examples**:
+
 ```typescript
 // Scenario 1: Normal success with strong roll
 Roll: 45, Stealth: 60, DC: 85
@@ -70,22 +76,25 @@ Result: Automatic success, no roll needed
 **Purpose**: Character attributes that define capabilities.
 
 **Structure**:
+
 ```typescript
 interface Stat {
-  name: string;          // e.g., "Strength", "Stealth"
-  value: number;         // 0-100 (percentage)
-  description: string;   // What the stat represents
-  symbol: string;        // Display icon (e.g., "💪")
+  name: string; // e.g., "Strength", "Stealth"
+  value: number; // 0-100 (percentage)
+  description: string; // What the stat represents
+  symbol: string; // Display icon (e.g., "💪")
   custom_symbol_url?: string;
 }
 ```
 
 **Usage**:
+
 - Used in skill checks: `Roll + Stat Value >= DC`
 - Modified by AI commands: `/modify_stat: Strength(+5)`
 - Displayed in stats page
 
 **Examples**:
+
 - Strength: 65% → Good at physical tasks
 - Stealth: 30% → Poor at sneaking
 - Charisma: 80% → Excellent at persuasion
@@ -95,11 +104,12 @@ interface Stat {
 **Purpose**: Consumable values that can be spent and replenished.
 
 **Structure**:
+
 ```typescript
 interface Resource {
-  name: string;          // e.g., "Health", "Stamina"
-  value: number;         // Current amount
-  maxValue: number;      // Maximum amount
+  name: string; // e.g., "Health", "Stamina"
+  value: number; // Current amount
+  maxValue: number; // Maximum amount
   description: string;
   symbol: string;
   custom_symbol_url?: string;
@@ -107,12 +117,14 @@ interface Resource {
 ```
 
 **Usage**:
+
 - **resource_used**: Consumes 10% of maxValue (minimum 1)
 - **risked_resource**: Lost 20% of maxValue on failure
 - Modified by AI: `/modify_resource: Health(-10)`
 - Clamped: 0 ≤ value ≤ maxValue
 
 **Examples**:
+
 ```typescript
 {
   name: "Health",
@@ -130,14 +142,15 @@ interface Resource {
 **Purpose**: Equipment that provides advantages or can be consumed.
 
 **Structure**:
+
 ```typescript
 interface InventoryItem {
-  name: string;          // e.g., "Healing Potion"
-  quantity: number;      // How many you have
+  name: string; // e.g., "Healing Potion"
+  quantity: number; // How many you have
   description: string;
-  type: 'normal' | 'consumable' | 'story' | 'misc';  // Strict type union
-  stat: string;          // Related stat (if any)
-  resource: string;      // Related resource (if any)
+  type: "normal" | "consumable" | "story" | "misc"; // Strict type union
+  stat: string; // Related stat (if any)
+  resource: string; // Related resource (if any)
   symbol: string;
   custom_symbol_url?: string;
 }
@@ -158,6 +171,7 @@ interface InventoryItem {
 4. **Consumption**: consumable items used immediately; normal items break on failure; story/misc never lost
 
 **Example Flow**:
+
 ```typescript
 Choice: "Climb the wall <use_item: Rope; item_loss: false>"
 
@@ -177,11 +191,12 @@ Disadvantage → Use 62 (worse)
 **Purpose**: Milestones that recognize player accomplishments.
 
 **Structure**:
+
 ```typescript
 interface Achievement {
   title: string;
-  description: string;   // User-facing description (can be vague)
-  ai_hint?: string;      // Optional precise hint for AI on when to trigger
+  description: string; // User-facing description (can be vague)
+  ai_hint?: string; // Optional precise hint for AI on when to trigger
   dateAchieved: Date | null;
   points: number;
   symbol: string;
@@ -190,11 +205,13 @@ interface Achievement {
 ```
 
 **Two-Description System**:
+
 - **description**: Shown to players (can be mysterious to encourage discovery)
 - **ai_hint**: Precise triggering conditions for AI (optional, used in AI prompts)
 - Example: description: "???" vs ai_hint: "Trigger when player defeats the red dragon"
 
 **Unlocking**:
+
 - AI issues command: `/trigger_achievement: Dragon Slayer`
 - Shows toast: "🏆 Achievement Unlocked: Dragon Slayer"
 - Prevents duplicates
@@ -205,13 +222,14 @@ interface Achievement {
 **Purpose**: Dynamic world-building content that can be revealed/hidden based on story events.
 
 **Structure**:
+
 ```typescript
 interface StoryLore {
   title: string;
-  content: string;       // Supports Markdown
+  content: string; // Supports Markdown
   thumbnailUrl?: string;
-  secrtet?: boolean;     // Hidden until discovered
-  on: boolean;           // Currently visible to player and AI
+  secrtet?: boolean; // Hidden until discovered
+  on: boolean; // Currently visible to player and AI
   on_triggers: string[]; // Words that enable this lore
   off_triggers: string[]; // Words that disable this lore
   var_on_triggers: string[]; // Variable names that enable this lore
@@ -220,6 +238,7 @@ interface StoryLore {
 ```
 
 **Dynamic Visibility**:
+
 - Lore entries can be turned on/off based on story events
 - **Trigger Words**: When AI response contains trigger word, lore is enabled
 - **Variable Triggers**: When specific boolean variables become true, lore is enabled/disabled
@@ -227,6 +246,7 @@ interface StoryLore {
 - Useful for revealing backstory, hints, or changing world state
 
 **Example**:
+
 ```typescript
 {
   title: "Ancient Map",
@@ -253,6 +273,7 @@ let dice_roll = Math.floor(Math.random() * 100) + 1;
 **Formula**: `Roll + Stat Value >= DC`
 
 **Example**:
+
 ```typescript
 // Choice with DC 75
 Stealth stat: 45
@@ -278,6 +299,7 @@ const dc_passed = dice_roll === 100 || total >= dc;
 ### Advantage/Disadvantage
 
 **Advantage** (Roll twice, take **lower**):
+
 - Item is present
 - Lower number = better chance to succeed
 
@@ -288,6 +310,7 @@ Advantage → Use 45
 ```
 
 **Disadvantage** (Roll twice, take **higher**):
+
 - Required item is missing
 - Higher number = worse chance to succeed
 
@@ -317,13 +340,13 @@ Choices can include optional metadata that triggers mechanics:
 
 ```typescript
 interface Choice {
-  text: string;              // Display text
-  skill_used?: string;       // Stat name for check
-  skill_dc?: number;         // Difficulty modifier
-  item_used?: string;        // Required/helpful item
-  item_loss?: boolean;       // Consume item?
-  resource_used?: string;    // Resource to spend
-  risked_resource?: string;  // Resource at risk on failure
+  text: string; // Display text
+  skill_used?: string; // Stat name for check
+  skill_dc?: number; // Difficulty modifier
+  item_used?: string; // Required/helpful item
+  item_loss?: boolean; // Consume item?
+  resource_used?: string; // Resource to spend
+  risked_resource?: string; // Resource at risk on failure
 }
 ```
 
@@ -334,6 +357,7 @@ interface Choice {
 ```
 
 **Parsed to**:
+
 ```typescript
 {
   text: "Sneak past the guards",
@@ -366,15 +390,18 @@ The AI can modify game state using commands in the `<commands>` block.
 ### /add_item: name | description | type | quantity
 
 **Add New Items**:
+
 ```
 /add_item: Health Potion | Restores vitality | consumable | 3
 ```
+
 - Adds 3 Health Potions to inventory with description and type
 - Type must be one of: normal, consumable, story, misc
 - Creates new item or adds to existing quantity
 - Notification: "Added 3 Health Potion to inventory"
 
 **Item Types**:
+
 - **normal**: Advantage on use, breaks on failure
 - **consumable**: Advantage on use, consumed immediately
 - **story**: Advantage on use, never breaks/consumed
@@ -383,17 +410,21 @@ The AI can modify game state using commands in the `<commands>` block.
 ### /modify_item: name(amount)
 
 **Add Items**:
+
 ```
 /modify_item: Healing Potion(+3)
 ```
+
 - Adds 3 Healing Potions to inventory
 - Creates new item if doesn't exist
 - Notification: "Added 3 Healing Potion"
 
 **Remove Items**:
+
 ```
 /modify_item: Rope(-1)
 ```
+
 - Removes 1 Rope
 - Deletes item if quantity reaches 0
 - Notification: "Removed 1 Rope from inventory"
@@ -401,34 +432,42 @@ The AI can modify game state using commands in the `<commands>` block.
 ### /modify_stat: name(amount)
 
 **Increase Stat**:
+
 ```
 /modify_stat: Strength(+10)
 ```
+
 - Increases Strength by 10
 - Clamped: 0 ≤ value ≤ 100
 - Notification: "Strength: 45 → 55" (green)
 
 **Decrease Stat**:
+
 ```
 /modify_stat: Charisma(-5)
 ```
+
 - Decreases Charisma by 5
 - Notification: "Charisma: 70 → 65" (yellow)
 
 ### /modify_resource: name(amount)
 
 **Restore Resource**:
+
 ```
 /modify_resource: Health(+25)
 ```
+
 - Increases Health by 25
 - Clamped: 0 ≤ value ≤ maxValue
 - Notification: "Health: 50 → 75/100" (green)
 
 **Drain Resource**:
+
 ```
 /modify_resource: Stamina(-15)
 ```
+
 - Decreases Stamina by 15
 - Notification: "Stamina: 80 → 65/100" (yellow)
 
@@ -437,6 +476,7 @@ The AI can modify game state using commands in the `<commands>` block.
 ```
 /trigger_achievement: First Blood
 ```
+
 - Unlocks existing achievement from adventure's achievement list
 - Ignores duplicates
 - Notification: "🏆 Achievement Unlocked: First Blood" (green)
@@ -447,23 +487,28 @@ The AI can modify game state using commands in the `<commands>` block.
 ### /modify_momentum: amount
 
 **Award Momentum**:
+
 ```
 /modify_momentum: +1
 ```
+
 - Increases momentum by 1
 - Clamped: 0 ≤ value ≤ maxMomentum
 - Notification: "⚡ Momentum: 3 → 4/5" (green)
 - Use for: Exceptional roleplay, clever solutions, story milestones
 
 **Deduct Momentum** (rare):
+
 ```
 /modify_momentum: -1
 ```
+
 - Decreases momentum by 1
 - Notification: "⚡ Momentum: 4 → 3/5" (yellow)
 - Use sparingly for: Extremely reckless or narrative-breaking choices
 
 **Guidelines**:
+
 - Reward momentum to encourage creative play
 - Don't over-reward (1 momentum per milestone is sufficient)
 - Avoid deducting momentum unless absolutely necessary
@@ -474,6 +519,7 @@ The AI can modify game state using commands in the `<commands>` block.
 ### Standard Choices
 
 Players select from AI-generated choices with metadata:
+
 ```
 - Sneak past the guard <use_skill: Stealth (DC 75); use_item: Cloak>
 ```
@@ -481,6 +527,7 @@ Players select from AI-generated choices with metadata:
 ### Custom Input
 
 Players can submit free-form text instead of selecting a choice:
+
 - Toggle "Add Custom Input" button in story UI
 - Enter any text action or dialogue
 - AI responds to custom input without predefined mechanics
@@ -489,6 +536,7 @@ Players can submit free-form text instead of selecting a choice:
 ### Retry System
 
 Players can retry the last AI response:
+
 - "Retry" button appears after AI generates response
 - Removes last AI output and regenerates with same context
 - Useful if AI response doesn't match expectations
@@ -501,6 +549,7 @@ When a skill check fails, additional penalties apply:
 ### 1. Risked Resource Loss
 
 If `risked_resource` is specified:
+
 - Lose 20% of maxValue (double normal usage)
 - Minimum: 1 point
 - Notification: "Lost 20 Health from failure! (55/100 remaining)"
@@ -513,6 +562,7 @@ resource.value = Math.max(0, resource.value - loss);
 ### 2. Item Loss on Failure
 
 If `item_loss: true`:
+
 - Item is consumed
 - Quantity decremented or removed
 - Notification: "Lost Rope from failure!"
@@ -535,6 +585,7 @@ resource.value = Math.max(0, resource.value - usage);
 ```
 
 **Example**:
+
 ```
 Health: 100 max → Uses 10 per action
 Stamina: 50 max → Uses 5 per action
@@ -550,6 +601,7 @@ const loss = Math.max(1, Math.floor(resource.maxValue * 0.2));
 ```
 
 **Example**: Health (100 max)
+
 - Normal use: -10
 - Failed risk: -20 (double penalty)
 
@@ -557,14 +609,15 @@ const loss = Math.max(1, Math.floor(resource.maxValue * 0.2));
 
 All game actions trigger notifications:
 
-| Type | Color | Usage |
-|------|-------|-------|
-| **success** | Green | Check passed, stat increased, resource restored, achievement |
-| **failure** | Red | Check failed, penalties applied |
-| **warning** | Yellow | Item lost, resource drained, risk notification |
-| **info** | Blue | Item used, resource used, general info |
+| Type        | Color  | Usage                                                        |
+| ----------- | ------ | ------------------------------------------------------------ |
+| **success** | Green  | Check passed, stat increased, resource restored, achievement |
+| **failure** | Red    | Check failed, penalties applied                              |
+| **warning** | Yellow | Item lost, resource drained, risk notification               |
+| **info**    | Blue   | Item used, resource used, general info                       |
 
 **Examples**:
+
 - ✓ Check Passed! (Stealth: 45 ≤ 75) - success
 - ✗ Check Failed! (Strength: 82 > 70) - failure
 - Lost 20 Health from failure! - failure
@@ -576,6 +629,7 @@ All game actions trigger notifications:
 ### Memory System
 
 Key events are stored in `storyData.memory`:
+
 - AI adds entries in `<memory>` block
 - Included in future prompts for continuity
 - Prevents repetition and maintains coherence
@@ -583,6 +637,7 @@ Key events are stored in `storyData.memory`:
 ### Chapter System
 
 Stories are divided into chapters:
+
 - AI can end chapters with `!!! END CHAPTER !!!`
 - Sets `endChapter: true` on ScenePart
 - Can trigger chapter summary (future)
@@ -590,6 +645,7 @@ Stories are divided into chapters:
 ### Story Endings
 
 AI can end the story with markers:
+
 - `!!! END STORY !!!` → `endStory: true`
 - `!!! GAME OVER !!!` → `gameOver: true`
 - Displays ending screen (future)
@@ -601,11 +657,13 @@ AI can end the story with markers:
 Players earn upgrade points from story progression:
 
 **Chapter Completion**: 50 points
+
 - AI ends chapter with `!!! END CHAPTER !!!` marker
 - Points awarded once per chapter (tracked in `earnedPointsFromChapters[]`)
 - Larger reward for completing major story milestones
 
 **Achievement Unlocks**: Variable points
+
 - Future enhancement: achievements can specify custom point values
 - Use `/add_achievement: title` to unlock achievements
 
@@ -614,16 +672,19 @@ Players earn upgrade points from story progression:
 Players access the **Upgrades** tab to spend points:
 
 **Stat Increase** (10 points):
+
 - Increase any stat by +1
 - Maximum stat value: 100
 - Example: Raise Stealth from 55 to 56
 
 **Resource Max Increase** (15 points):
+
 - Increase any resource maximum by +10
 - Current value adjusts proportionally
 - Example: Health max from 100 to 110
 
 **Add Custom Item** (20 points):
+
 - Create a custom item for inventory
 - Player defines name, description, symbol
 - Can be used for advantage in future choices
@@ -631,6 +692,7 @@ Players access the **Upgrades** tab to spend points:
 ### Point Balance
 
 Current points displayed in:
+
 - **Stats Page**: Prominent card at top showing balance and earning info
 - **Upgrades Page**: Header shows current points and purchase costs
 
@@ -645,6 +707,7 @@ Current points displayed in:
 ### Integration with AI
 
 The AI is aware of the points system:
+
 - Sees current point balance in context
 - Times chapter endings for satisfying milestones
 - Triggers achievements to reward progression
@@ -653,16 +716,17 @@ The AI is aware of the points system:
 
 ```typescript
 export const UPGRADE_COSTS = {
-    STAT_INCREASE: 10,
-    RESOURCE_MAX_INCREASE: 15,
-    ADD_ITEM: 20,
-    CHAPTER_REWARD: 50,
+  STAT_INCREASE: 10,
+  RESOURCE_MAX_INCREASE: 15,
+  ADD_ITEM: 20,
+  CHAPTER_REWARD: 50,
 } as const;
 ```
 
 ## Complete Example
 
 ### Choice Definition
+
 ```
 - Sneak past the dragon using your cloak of shadows <use_skill: Stealth (DC 60); use_item: Shadow Cloak; item_loss: false; risk_resource: Health>
 ```
@@ -670,6 +734,7 @@ export const UPGRADE_COSTS = {
 ### Scenario 1: Normal Success
 
 **Setup**:
+
 - Stealth: 55
 - Health: 85/100
 - Momentum: 3/5
@@ -695,6 +760,7 @@ export const UPGRADE_COSTS = {
 ### Scenario 2: Using Reroll to Succeed
 
 **Setup**:
+
 - Stealth: 55
 - Momentum: 3/5
 - DC: 120 (hard check)
@@ -716,6 +782,7 @@ export const UPGRADE_COSTS = {
 ### Scenario 3: Guaranteed Success on Critical Moment
 
 **Setup**:
+
 - Momentum: 4/5
 - DC: 150 (very hard - escaping collapsing cave)
 
@@ -732,6 +799,7 @@ export const UPGRADE_COSTS = {
 ### Scenario 4: Critical Success
 
 **Setup**:
+
 - Stealth: 55
 - Momentum: 4/5 (near max)
 - DC: 100
@@ -750,6 +818,7 @@ export const UPGRADE_COSTS = {
 ### Scenario 5: Failure with Penalties
 
 **Setup**:
+
 - Stealth: 55
 - Health: 85/100
 - Momentum: 2/5
@@ -773,6 +842,7 @@ export const UPGRADE_COSTS = {
 ### For Story Creators
 
 1. **Set Reasonable DCs** (assuming average stat of 50):
+
    - DC 20-40: Trivial (auto-succeed with any roll)
    - DC 50-70: Very Easy (succeed on 1-20)
    - DC 80-100: Easy (succeed on 30-50)
@@ -781,11 +851,13 @@ export const UPGRADE_COSTS = {
    - DC 160+: Very Hard (requires high stats or momentum)
 
 2. **Balance Resources**:
+
    - Don't risk resources on easy checks
    - Use items for critical moments
    - Consider failure states
 
 3. **Meaningful Choices**:
+
    - Each choice should feel distinct
    - Failures should be interesting, not punishing
    - Successes should feel rewarding
@@ -811,4 +883,4 @@ export const UPGRADE_COSTS = {
 
 ---
 
-*Last updated: November 15, 2025*
+_Last updated: November 15, 2025_

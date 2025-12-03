@@ -1524,7 +1524,7 @@ export default function LibraryPage() {
                       >
                         <button
                           onClick={() =>
-                            router.push(`/creator?edit=${adventure.id}`)
+                            router.push(`/creator/manual?edit=${adventure.id}`)
                           }
                           className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-sm rounded-lg transition-colors"
                         >
@@ -1614,7 +1614,7 @@ export default function LibraryPage() {
                       >
                         <button
                           onClick={() =>
-                            router.push(`/creator?edit=${adventure.id}`)
+                            router.push(`/creator/manual?edit=${adventure.id}`)
                           }
                           className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-sm rounded-lg transition-colors"
                         >

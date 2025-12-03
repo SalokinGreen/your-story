@@ -337,8 +337,8 @@ export default function CreatorAIChat({
                   How can I help you create?
                 </h3>
                 <p className="text-sm mb-4">
-                  I can design items, write plot beats, balance stats, or create
-                  entire scenarios from scratch.
+                  I can design items, write lore entries, balance stats, or
+                  create entire scenarios from scratch.
                 </p>
 
                 {/* AI Commands Info Box */}
@@ -370,11 +370,11 @@ export default function CreatorAIChat({
                   </button>
                   <button
                     onClick={() =>
-                      setInput("Write a plot beat about a dragon attack")
+                      setInput("Write a lore entry about the ancient kingdom")
                     }
                     className="px-4 py-2 rounded-lg bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-500 transition-colors text-left shadow-xs"
                   >
-                    "Write a plot beat about..."
+                    "Write a lore entry about..."
                   </button>
                   <button
                     onClick={() =>

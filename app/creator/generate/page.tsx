@@ -1376,13 +1376,23 @@ function BigAdventureCreatorPage() {
       // Genre-specific RPG system recommendations
       const genreRpgMap: Record<string, RPGSystemType> = {
         fantasy: "1d20", // Classic D&D-style for fantasy
-        "sci-fi": "yze", // Year Zero Engine for gritty sci-fi
+        "sci-fi": "pbta", // PbtA for sci-fi narrative drama
         horror: "percentile", // Percentile for horror (Call of Cthulhu style)
-        mystery: "3d6", // 3d6 bell curve for mystery (predictable outcomes)
-        romance: "narrative", // Narrative for romance (story-focused)
-        western: "explosive", // Explosive dice for western action
+        mystery: "pbta", // PbtA for mystery narrative tension
+        romance: "fate", // Fate for romance (aspects fit emotional connections)
+        western: "pbta", // PbtA for western drama and hard choices
         comedy: "fate", // Fate for comedy (aspects and stunts fit humor)
-        superheroes: "explosive", // Explosive dice for superhero action
+        superheroes: "fate", // Fate for superhero aspects and dramatic action
+        "dark fantasy": "pbta", // PbtA for grim choices and consequences
+        historical: "pbta", // PbtA for historical drama
+        pirates: "fate", // Fate for swashbuckling adventure aspects
+        survival: "pbta", // PbtA for hard survival choices
+        "urban fantasy": "pbta", // PbtA for modern supernatural drama
+        steampunk: "fate", // Fate for inventive gadget aspects
+        drama: "fate", // Fate for character-driven emotional aspects
+        thriller: "pbta", // PbtA for tense action sequences
+        "post-apocalyptic": "pbta", // PbtA for harsh survival choices
+        noir: "pbta", // PbtA for hard-boiled detective drama
       };
 
       // Genre-specific complexity (some genres benefit from more depth)
@@ -1398,6 +1408,16 @@ function BigAdventureCreatorPage() {
         western: "moderate",
         comedy: "simple", // Comedy works best with lighter mechanics
         superheroes: "moderate", // Balance of action and character development
+        "dark fantasy": "complex", // Deep lore and world-building
+        historical: "complex", // Historical accuracy needs detail
+        pirates: "moderate",
+        survival: "moderate",
+        "urban fantasy": "moderate",
+        steampunk: "complex", // Inventions and world-building
+        drama: "simple", // Focus on characters over mechanics
+        thriller: "moderate",
+        "post-apocalyptic": "complex", // World-building and factions
+        noir: "moderate",
       };
 
       // Genre-specific duration
@@ -1410,6 +1430,16 @@ function BigAdventureCreatorPage() {
         western: "medium",
         comedy: "short", // Comedy is best in shorter, punchy adventures
         superheroes: "medium", // Room for origin stories and villain arcs
+        "dark fantasy": "long",
+        historical: "long",
+        pirates: "medium",
+        survival: "medium",
+        "urban fantasy": "medium",
+        steampunk: "medium",
+        drama: "short",
+        thriller: "medium",
+        "post-apocalyptic": "long",
+        noir: "medium",
       };
 
       // Build the prompt
@@ -2703,7 +2733,7 @@ ${result.description || ""}`;
       addNotification("Adventure saved successfully!", "success");
 
       // Navigate to the creator to edit the adventure
-      router.push(`/creator?edit=${savedAdventure.id}`);
+      router.push(`/creator/manual?edit=${savedAdventure.id}`);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);

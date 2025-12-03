@@ -19,6 +19,7 @@ This guide will help you set up the Supabase backend for Your Story application.
 4. Click **Run** to execute the SQL
 
 This will create:
+
 - `adventures` table - Stores user-created adventures
 - `comments` table - Stores comments and ratings for adventures
 - `stories` table - Stores individual user playthroughs
@@ -51,6 +52,7 @@ This will add momentum fields to all existing stories and adventure templates wi
 ## Step 4: Test the Setup
 
 You can test by:
+
 1. Creating a new adventure through the creator UI
 2. Posting a comment on an adventure
 3. Checking the **Table Editor** to see the data
@@ -81,16 +83,19 @@ The following API endpoints are available:
 All tables use Row Level Security (RLS) policies:
 
 ### Adventures
+
 - Anyone can view published adventures
 - Users can only create/edit/delete their own adventures
 - Authors must match the authenticated user
 
 ### Comments
+
 - Anyone can view comments
 - Authenticated users can create comments
 - Users can only edit/delete their own comments
 
 ### Story Instances
+
 - Users can only view/create/edit/delete their own story instances
 - Story data is stored as JSONB and includes:
   - All game state (scenes, chapters, choices)
@@ -101,6 +106,7 @@ All tables use Row Level Security (RLS) policies:
 ## Automatic Features
 
 The database includes automatic features:
+
 - `updated_at` timestamps are automatically maintained
 - Adventure ratings are automatically calculated from comment ratings
 - Triggers handle cascading deletes for related records
@@ -114,6 +120,7 @@ If you want to migrate the sample adventures from `app/misc/sample_adventures.ts
 3. Mark them as `is_published = true` and optionally `is_featured = true`
 
 Example SQL for one adventure:
+
 ```sql
 INSERT INTO public.adventures (
   title, description, short_description, author_id, author_name,
@@ -140,15 +147,18 @@ INSERT INTO public.adventures (
 ## Troubleshooting
 
 ### Can't insert data
+
 - Check that RLS policies are enabled and correct
 - Verify you're authenticated when making requests
 - Check browser console for error messages
 
 ### Queries are slow
+
 - Verify indexes are created (check `database-schema.sql`)
 - Check query performance in Supabase **SQL Editor** using `EXPLAIN ANALYZE`
 
 ### Rating not updating
+
 - Check that the trigger `update_rating_on_comment` exists
 - Verify comments have valid ratings (1-5)
 
