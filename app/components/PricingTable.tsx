@@ -74,7 +74,7 @@ export default function PricingTable({
       </div>
 
       {/* Pricing Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto px-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto px-4 items-stretch">
         {tiers.map((tier) => {
           const colors = tierColors[tier.id];
           const isCurrentTier = tier.id === currentTier;
@@ -84,7 +84,7 @@ export default function PricingTable({
           return (
             <div
               key={tier.id}
-              className={`relative bg-blue-950/50 rounded-xl border overflow-hidden transition-all ${
+              className={`relative bg-blue-950/50 rounded-xl border overflow-hidden transition-all flex flex-col ${
                 colors.border
               } ${
                 isHighlighted || isPopular ? `shadow-lg ${colors.glow}` : ""
@@ -121,11 +121,11 @@ export default function PricingTable({
                     <span className="text-white/60 text-sm">/month</span>
                   )}
                 </div>
-                <p className="text-white/60 text-sm mt-1">{tier.description}</p>
+                <p className="text-white/60 text-sm mt-1 min-h-10">{tier.description}</p>
               </div>
 
               {/* Content */}
-              <div className="p-4">
+              <div className="p-4 flex flex-col flex-1">
                 {/* Coins Highlight */}
                 <div className="bg-blue-900/30 rounded-lg p-3 mb-4 text-center">
                   <div className="flex items-center justify-center gap-2 text-yellow-400 mb-1">
@@ -138,7 +138,7 @@ export default function PricingTable({
                 </div>
 
                 {/* Features */}
-                <ul className="space-y-2 mb-4">
+                <ul className="space-y-2 mb-4 flex-1">
                   {tier.features.map((feature, i) => (
                     <li
                       key={i}
