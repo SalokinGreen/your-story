@@ -345,11 +345,7 @@ export async function generateStoryTurn(
     // ========================================
     let embeddingContext: EmbeddingContext | undefined;
 
-    if (
-      options.enableEmbeddings &&
-      options.storyId &&
-      (storyData.lore.length > 30 || storyData.memory.length > 50)
-    ) {
+    if (options.enableEmbeddings && options.storyId) {
       logger.action("Stage 0: Retrieving embedding context");
 
       try {

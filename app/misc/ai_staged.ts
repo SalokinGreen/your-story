@@ -149,13 +149,9 @@ export function buildInfoMessage(
     return l.alwaysOn === true;
   });
 
-  // If we have embedding context AND threshold is met, use embedding-based selection
+  // If we have embedding context, use embedding-based selection
   let activeLore: StoryLore[];
-  if (
-    embeddingContext &&
-    embeddingContext.loreTitles.length > 0 &&
-    storyData.lore.length > 30
-  ) {
+  if (embeddingContext && embeddingContext.loreTitles.length > 0) {
     // Get lore entries matching embedding-retrieved titles
     const embeddingLoreTitles = new Set(
       embeddingContext.loreTitles.map((t) => t.toLowerCase())
@@ -206,14 +202,10 @@ export function buildInfoMessage(
         .join("\n----\n")}`
     : "";
 
-  // Build memory section - use embeddings if available for large memory sets
+  // Build memory section - use embeddings if available
   let memorySection: string;
-  if (
-    embeddingContext &&
-    embeddingContext.memories.length > 0 &&
-    storyData.memory.length > 50
-  ) {
-    // Use embedding-retrieved memories for large memory sets
+  if (embeddingContext && embeddingContext.memories.length > 0) {
+    // Use embedding-retrieved memories
     memorySection = `## Memory\n${embeddingContext.memories
       .map((m) => `- ${m}`)
       .join("\n")}`;

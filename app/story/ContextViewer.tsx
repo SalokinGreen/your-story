@@ -165,12 +165,11 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       const simulatedLoreTitles = activeLore.slice(0, 8).map((l) => l.title);
       const simulatedMemories = storyData.memory.slice(-15); // Most recent 15
 
-      if (storyData.lore.length > 30 || storyData.memory.length > 50) {
-        simulatedEmbeddingContext = {
-          loreTitles: simulatedLoreTitles,
-          memories: simulatedMemories,
-        };
-      }
+      // Always use embedding context when enabled
+      simulatedEmbeddingContext = {
+        loreTitles: simulatedLoreTitles,
+        memories: simulatedMemories,
+      };
     }
 
     switch (activeStage) {
@@ -596,18 +595,10 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                           : "balanced"}
                         )
                       </p>
-                      {embeddingStats.totalLore > 30 ||
-                      embeddingStats.totalMemory > 50 ? (
-                        <p className="mt-1 italic text-purple-600 dark:text-purple-400">
-                          Context below shows simulated selection. Live uses
-                          semantic search.
-                        </p>
-                      ) : (
-                        <p className="mt-1 italic text-purple-600 dark:text-purple-400">
-                          Thresholds not met (&gt;30 lore or &gt;50 memories).
-                          Using full context.
-                        </p>
-                      )}
+                      <p className="mt-1 italic text-purple-600 dark:text-purple-400">
+                        Context below shows simulated selection. Live uses
+                        semantic search.
+                      </p>
                     </>
                   ) : (
                     <>

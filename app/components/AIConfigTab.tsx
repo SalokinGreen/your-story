@@ -1321,8 +1321,8 @@ export default function AIConfigTab() {
             <DynamicIcon name="Info" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             <span>
               When enabled, uses Mistral embeddings to semantically search lore
-              and memories. Activates automatically for stories with 30+ lore
-              entries or 50+ memories. Cost: ~0.5 coins per 100 turns.
+              and memories for more relevant context. Cost: ~0.5 coins per 100
+              turns.
             </span>
           </p>
         </div>
