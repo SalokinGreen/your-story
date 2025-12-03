@@ -398,7 +398,7 @@ export function executeCommandWithResponse(
 
   // /add_item: item name | description | type | quantity | grade (optional)
   const addItemMatch = trimmed.match(
-    /^\/add_item:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(normal|consumable|story|misc)\s*\|\s*(\d+)(?:\s*\|\s*(common|uncommon|rare|epic|legendary|mythic))?$/i
+    /^\/add_item:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(normal|consumable|story|misc)\s*\|\s*(\d+)(?:\s*\|\s*(common|uncommon|rare|epic|legendary|agmt))?$/i
   );
   if (addItemMatch) {
     const itemName = addItemMatch[1].trim();
@@ -415,7 +415,7 @@ export function executeCommandWithResponse(
       | "rare"
       | "epic"
       | "legendary"
-      | "mythic";
+      | "agmt";
 
     // Get max durability based on grade
     const gradeMaxDurability: Record<string, number> = {
@@ -424,7 +424,7 @@ export function executeCommandWithResponse(
       rare: 8,
       epic: 12,
       legendary: 20,
-      mythic: Infinity,
+      agmt: Infinity,
     };
     const maxDurability = gradeMaxDurability[grade] || 3;
 
@@ -470,7 +470,7 @@ export function executeCommandWithResponse(
       command: trimmed,
       success: true,
       message: `Added ${quantity} ${gradeLabel} ${itemName} to inventory${
-        grade !== "mythic" ? ` (${maxDurability} durability)` : " (unbreakable)"
+        grade !== "agmt" ? ` (${maxDurability} durability)` : " (unbreakable)"
       }`,
       timestamp,
     };
@@ -688,12 +688,12 @@ export function executeCommandWithResponse(
       };
     }
 
-    // Can't repair mythic items (they have infinite durability)
-    if (item.grade === "mythic") {
+    // Can't repair agmt items (they have infinite durability)
+    if (item.grade === "agmt") {
       return {
         command: trimmed,
         success: "partial" as const,
-        message: `${item.name} is a Mythic item with infinite durability - no repair needed`,
+        message: `${item.name} is a AGMT item with infinite durability - no repair needed`,
         timestamp,
       };
     }
@@ -705,7 +705,7 @@ export function executeCommandWithResponse(
       rare: 8,
       epic: 12,
       legendary: 20,
-      mythic: Infinity,
+      agmt: Infinity,
     };
     const maxDurability =
       item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
@@ -770,12 +770,12 @@ export function executeCommandWithResponse(
       };
     }
 
-    // Can't damage mythic items
-    if (item.grade === "mythic") {
+    // Can't damage agmt items
+    if (item.grade === "agmt") {
       return {
         command: trimmed,
         success: "partial" as const,
-        message: `${item.name} is a Mythic item and cannot be damaged`,
+        message: `${item.name} is a AGMT item and cannot be damaged`,
         timestamp,
       };
     }
@@ -787,7 +787,7 @@ export function executeCommandWithResponse(
       rare: 8,
       epic: 12,
       legendary: 20,
-      mythic: Infinity,
+      agmt: Infinity,
     };
     const maxDurability =
       item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
@@ -840,7 +840,7 @@ export function executeCommandWithResponse(
 
   // /upgrade_item: item name | new_grade
   const upgradeItemMatch = trimmed.match(
-    /^\/upgrade_item:\s*(.+?)\s*\|\s*(uncommon|rare|epic|legendary|mythic)$/i
+    /^\/upgrade_item:\s*(.+?)\s*\|\s*(uncommon|rare|epic|legendary|agmt)$/i
   );
   if (upgradeItemMatch) {
     const itemName = upgradeItemMatch[1].trim();
@@ -849,7 +849,7 @@ export function executeCommandWithResponse(
       | "rare"
       | "epic"
       | "legendary"
-      | "mythic";
+      | "agmt";
 
     const matchResult = findItemMatch(itemName, storyData.inventory);
     const item = matchResult?.item;
@@ -869,7 +869,7 @@ export function executeCommandWithResponse(
       "rare",
       "epic",
       "legendary",
-      "mythic",
+      "agmt",
     ];
     const currentGradeIndex = gradeOrder.indexOf(item.grade || "common");
     const newGradeIndex = gradeOrder.indexOf(newGrade);
@@ -892,7 +892,7 @@ export function executeCommandWithResponse(
       rare: 8,
       epic: 12,
       legendary: 20,
-      mythic: Infinity,
+      agmt: Infinity,
     };
     const oldMaxDurability =
       item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
@@ -903,7 +903,7 @@ export function executeCommandWithResponse(
     const durabilityRatio =
       oldMaxDurability > 0 ? currentDurability / oldMaxDurability : 1;
     const newDurability =
-      newGrade === "mythic"
+      newGrade === "agmt"
         ? Infinity
         : Math.ceil(newMaxDurability * durabilityRatio);
 
@@ -931,7 +931,7 @@ export function executeCommandWithResponse(
       command: trimmed,
       success: true,
       message: `Upgraded ${item.name} to ${newGradeLabel}!${
-        newGrade !== "mythic"
+        newGrade !== "agmt"
           ? ` Max durability: ${newMaxDurability}`
           : " (now unbreakable)"
       }${fuzzyNote}`,
@@ -959,11 +959,11 @@ export function executeCommandWithResponse(
       };
     }
 
-    if (item.grade === "mythic") {
+    if (item.grade === "agmt") {
       return {
         command: trimmed,
         success: "partial" as const,
-        message: `${item.name} is a Mythic item with infinite durability`,
+        message: `${item.name} is a AGMT item with infinite durability`,
         timestamp,
       };
     }
@@ -974,7 +974,7 @@ export function executeCommandWithResponse(
       rare: 8,
       epic: 12,
       legendary: 20,
-      mythic: Infinity,
+      agmt: Infinity,
     };
     const maxDurability =
       item.maxDurability ?? gradeMaxDurability[item.grade || "common"] ?? 3;
@@ -2816,8 +2816,8 @@ export function executeCommandWithResponse(
   if (addThreadMatch) {
     const description = addThreadMatch[1].trim();
 
-    if (!storyData.mythicState) {
-      storyData.mythicState = {
+    if (!storyData.agmtState) {
+      storyData.agmtState = {
         chaosFactor: 5,
         threads: [],
         characters: [],
@@ -2829,7 +2829,7 @@ export function executeCommandWithResponse(
     }
 
     // Check for duplicate
-    const exists = storyData.mythicState.threads.some(
+    const exists = storyData.agmtState.threads.some(
       (t) => t.description.toLowerCase() === description.toLowerCase()
     );
     if (exists) {
@@ -2841,7 +2841,7 @@ export function executeCommandWithResponse(
       };
     }
 
-    storyData.mythicState.threads.push({
+    storyData.agmtState.threads.push({
       id: crypto.randomUUID(),
       description,
       status: "active",
@@ -2866,7 +2866,7 @@ export function executeCommandWithResponse(
     const oldDesc = updateThreadMatch[1].trim();
     const newDesc = updateThreadMatch[2].trim();
 
-    if (!storyData.mythicState) {
+    if (!storyData.agmtState) {
       return {
         command: trimmed,
         success: false,
@@ -2875,7 +2875,7 @@ export function executeCommandWithResponse(
       };
     }
 
-    const thread = storyData.mythicState.threads.find(
+    const thread = storyData.agmtState.threads.find(
       (t) => t.description.toLowerCase() === oldDesc.toLowerCase()
     );
     if (!thread) {
@@ -2904,7 +2904,7 @@ export function executeCommandWithResponse(
   if (resolveThreadMatch) {
     const description = resolveThreadMatch[1].trim();
 
-    if (!storyData.mythicState) {
+    if (!storyData.agmtState) {
       return {
         command: trimmed,
         success: false,
@@ -2913,7 +2913,7 @@ export function executeCommandWithResponse(
       };
     }
 
-    const thread = storyData.mythicState.threads.find(
+    const thread = storyData.agmtState.threads.find(
       (t) => t.description.toLowerCase() === description.toLowerCase()
     );
     if (!thread) {
@@ -2951,7 +2951,7 @@ export function executeCommandWithResponse(
   if (closeThreadMatch) {
     const threadId = closeThreadMatch[1].trim();
 
-    if (!storyData.mythicState) {
+    if (!storyData.agmtState) {
       return {
         command: trimmed,
         success: false,
@@ -2961,9 +2961,9 @@ export function executeCommandWithResponse(
     }
 
     // Try to find by ID first, then by description
-    let thread = storyData.mythicState.threads.find((t) => t.id === threadId);
+    let thread = storyData.agmtState.threads.find((t) => t.id === threadId);
     if (!thread) {
-      thread = storyData.mythicState.threads.find(
+      thread = storyData.agmtState.threads.find(
         (t) => t.description.toLowerCase() === threadId.toLowerCase()
       );
     }
@@ -3006,7 +3006,7 @@ export function executeCommandWithResponse(
   if (reopenThreadMatch) {
     const description = reopenThreadMatch[1].trim();
 
-    if (!storyData.mythicState) {
+    if (!storyData.agmtState) {
       return {
         command: trimmed,
         success: false,
@@ -3015,7 +3015,7 @@ export function executeCommandWithResponse(
       };
     }
 
-    const thread = storyData.mythicState.threads.find(
+    const thread = storyData.agmtState.threads.find(
       (t) => t.description.toLowerCase() === description.toLowerCase()
     );
     if (!thread) {
@@ -3056,8 +3056,8 @@ export function executeCommandWithResponse(
     const name = addCharacterMatch[1].trim();
     const role = addCharacterMatch[2].trim();
 
-    if (!storyData.mythicState) {
-      storyData.mythicState = {
+    if (!storyData.agmtState) {
+      storyData.agmtState = {
         chaosFactor: 5,
         threads: [],
         characters: [],
@@ -3069,7 +3069,7 @@ export function executeCommandWithResponse(
     }
 
     // Check for duplicate
-    const exists = storyData.mythicState.characters.some(
+    const exists = storyData.agmtState.characters.some(
       (c) => c.name.toLowerCase() === name.toLowerCase()
     );
     if (exists) {
@@ -3081,7 +3081,7 @@ export function executeCommandWithResponse(
       };
     }
 
-    storyData.mythicState.characters.push({
+    storyData.agmtState.characters.push({
       id: crypto.randomUUID(),
       name,
       role,
@@ -3109,7 +3109,7 @@ export function executeCommandWithResponse(
     const newName = updateCharacterMatch[2].trim();
     const newRole = updateCharacterMatch[3].trim();
 
-    if (!storyData.mythicState) {
+    if (!storyData.agmtState) {
       return {
         command: trimmed,
         success: false,
@@ -3118,7 +3118,7 @@ export function executeCommandWithResponse(
       };
     }
 
-    const character = storyData.mythicState.characters.find(
+    const character = storyData.agmtState.characters.find(
       (c) => c.name.toLowerCase() === oldName.toLowerCase()
     );
     if (!character) {
@@ -3168,7 +3168,7 @@ export function executeCommandWithResponse(
   if (removeCharacterMatch) {
     const name = removeCharacterMatch[1].trim();
 
-    if (!storyData.mythicState) {
+    if (!storyData.agmtState) {
       return {
         command: trimmed,
         success: false,
@@ -3177,7 +3177,7 @@ export function executeCommandWithResponse(
       };
     }
 
-    const characterIndex = storyData.mythicState.characters.findIndex(
+    const characterIndex = storyData.agmtState.characters.findIndex(
       (c) => c.name.toLowerCase() === name.toLowerCase()
     );
     if (characterIndex === -1) {
@@ -3189,10 +3189,7 @@ export function executeCommandWithResponse(
       };
     }
 
-    const removed = storyData.mythicState.characters.splice(
-      characterIndex,
-      1
-    )[0];
+    const removed = storyData.agmtState.characters.splice(characterIndex, 1)[0];
 
     logger.action("Character removed via command response", {
       name: removed.name,
@@ -3211,7 +3208,7 @@ export function executeCommandWithResponse(
   if (adjustChaosMatch) {
     const delta = parseInt(adjustChaosMatch[1], 10);
 
-    if (!storyData.mythicState) {
+    if (!storyData.agmtState) {
       return {
         command: trimmed,
         success: false,
@@ -3220,22 +3217,22 @@ export function executeCommandWithResponse(
       };
     }
 
-    const oldValue = storyData.mythicState.chaosFactor;
-    storyData.mythicState.chaosFactor = Math.max(
+    const oldValue = storyData.agmtState.chaosFactor;
+    storyData.agmtState.chaosFactor = Math.max(
       1,
       Math.min(9, oldValue + delta)
     );
 
     logger.action("Chaos factor adjusted via command response", {
       oldValue,
-      newValue: storyData.mythicState.chaosFactor,
+      newValue: storyData.agmtState.chaosFactor,
       delta,
     });
 
     return {
       command: trimmed,
       success: true,
-      message: `Chaos factor: ${oldValue} → ${storyData.mythicState.chaosFactor}`,
+      message: `Chaos factor: ${oldValue} → ${storyData.agmtState.chaosFactor}`,
       timestamp,
     };
   }
@@ -3260,7 +3257,7 @@ export function executeCommandWithResponse(
       };
     }
 
-    if (!storyData.mythicState) {
+    if (!storyData.agmtState) {
       return {
         command: trimmed,
         success: false,
@@ -3270,11 +3267,11 @@ export function executeCommandWithResponse(
     }
 
     // Find character by name or ID
-    let character = storyData.mythicState.characters.find(
+    let character = storyData.agmtState.characters.find(
       (c) => c.name.toLowerCase() === name.toLowerCase()
     );
     if (!character) {
-      character = storyData.mythicState.characters.find((c) => c.id === name);
+      character = storyData.agmtState.characters.find((c) => c.id === name);
     }
 
     if (!character) {
@@ -3310,8 +3307,8 @@ export function executeCommandWithResponse(
   if (incrementSceneMatch) {
     const newValue = parseInt(incrementSceneMatch[2], 10);
 
-    if (!storyData.mythicState) {
-      storyData.mythicState = {
+    if (!storyData.agmtState) {
+      storyData.agmtState = {
         chaosFactor: 5,
         threads: [],
         characters: [],
@@ -3322,8 +3319,8 @@ export function executeCommandWithResponse(
       };
     }
 
-    const oldValue = storyData.mythicState.sceneCount || 0;
-    storyData.mythicState.sceneCount = newValue;
+    const oldValue = storyData.agmtState.sceneCount || 0;
+    storyData.agmtState.sceneCount = newValue;
 
     logger.action("Scene count updated via command response", {
       oldValue,
@@ -3341,8 +3338,8 @@ export function executeCommandWithResponse(
   // Simple /increment_scene command
   const simpleIncrementSceneMatch = trimmed.match(/^\/increment_scene$/i);
   if (simpleIncrementSceneMatch) {
-    if (!storyData.mythicState) {
-      storyData.mythicState = {
+    if (!storyData.agmtState) {
+      storyData.agmtState = {
         chaosFactor: 5,
         threads: [],
         characters: [],
@@ -3353,18 +3350,18 @@ export function executeCommandWithResponse(
       };
     }
 
-    const oldValue = storyData.mythicState.sceneCount || 0;
-    storyData.mythicState.sceneCount = oldValue + 1;
+    const oldValue = storyData.agmtState.sceneCount || 0;
+    storyData.agmtState.sceneCount = oldValue + 1;
 
     logger.action("Scene count incremented via command response", {
       oldValue,
-      newValue: storyData.mythicState.sceneCount,
+      newValue: storyData.agmtState.sceneCount,
     });
 
     return {
       command: trimmed,
       success: true,
-      message: `Scene count: ${oldValue} → ${storyData.mythicState.sceneCount}`,
+      message: `Scene count: ${oldValue} → ${storyData.agmtState.sceneCount}`,
       timestamp,
     };
   }

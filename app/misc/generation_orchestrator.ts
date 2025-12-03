@@ -9,6 +9,7 @@
  * - Progress tracking and autosave
  */
 
+import React from "react";
 import { getAuthToken } from "@/app/misc/getAuthToken";
 import {
   BigAdventureConfig,
@@ -67,6 +68,7 @@ export interface GenerationOptions {
   skipStages?: GenerationStage[];
   existingResults?: Partial<BigAdventureResult>;
   abortSignal?: AbortSignal;
+  finishEarlyRef?: React.RefObject<boolean | null>;
 }
 
 interface StageResult {
@@ -77,6 +79,7 @@ interface StageResult {
   completionTokens: number;
   error?: string;
   timedOut?: boolean;
+  finishedEarly?: boolean;
 }
 
 /**
@@ -125,6 +128,7 @@ async function generateSingleStage(
         deepseekKey: options.deepseekKey,
         novelaiKey: options.novelaiKey,
         continueFrom: continueFrom || undefined,
+        finishEarly: options.finishEarlyRef?.current || false,
       }),
       signal: options.abortSignal,
     });
@@ -269,13 +273,16 @@ async function generateSingleStage(
     };
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
+      // Check if this was a "finish early" abort (ref was set before abort)
+      const wasFinishEarly = options.finishEarlyRef?.current === true;
       return {
         success: false,
         result: null,
         rawContent: fullContent,
         promptTokens,
         completionTokens,
-        error: "Generation cancelled",
+        error: wasFinishEarly ? "Finishing early..." : "Generation cancelled",
+        finishedEarly: wasFinishEarly,
       };
     }
 
@@ -287,6 +294,160 @@ async function generateSingleStage(
       completionTokens,
       error: error instanceof Error ? error.message : String(error),
       timedOut: error instanceof Error && error.message.includes("timeout"),
+    };
+  }
+}
+
+/**
+ * Generate a single stage with finishEarly flag set to wrap up the JSON
+ * This is called after an abort when the user clicked "Finish Early"
+ */
+async function generateSingleStageFinishEarly(
+  config: BigAdventureConfig,
+  stage: GenerationStage,
+  previousResults: Partial<BigAdventureResult> | undefined,
+  options: GenerationOptions,
+  callbacks: GenerationCallbacks,
+  partialContent: string
+): Promise<StageResult> {
+  const token = await getAuthToken();
+  if (!token) {
+    return {
+      success: false,
+      result: null,
+      rawContent: partialContent,
+      promptTokens: 0,
+      completionTokens: 0,
+      error: "Not authenticated",
+    };
+  }
+
+  try {
+    // Make a request with finishEarly=true to wrap up the JSON
+    // Note: We don't use the abortSignal here since we want this to complete
+    const response = await fetch("/api/creator/generate-stage", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        config,
+        stage,
+        previousResults,
+        model: options.model,
+        openRouterKey: options.openRouterKey,
+        deepseekKey: options.deepseekKey,
+        novelaiKey: options.novelaiKey,
+        continueFrom: partialContent,
+        finishEarly: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return {
+        success: false,
+        result: null,
+        rawContent: partialContent,
+        promptTokens: 0,
+        completionTokens: 0,
+        error: `HTTP ${response.status}: ${errorText}`,
+      };
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      return {
+        success: false,
+        result: null,
+        rawContent: partialContent,
+        promptTokens: 0,
+        completionTokens: 0,
+        error: "No response body",
+      };
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let fullContent = partialContent;
+    let promptTokens = 0;
+    let completionTokens = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data:")) continue;
+
+        const data = trimmed.slice(5).trim();
+        if (data === "[DONE]") continue;
+
+        try {
+          const event = JSON.parse(data);
+
+          switch (event.type) {
+            case "stage_content":
+              fullContent += event.content;
+              callbacks.onStageContent(stage, event.content);
+              break;
+
+            case "stage_complete":
+              promptTokens = event.promptTokens || 0;
+              completionTokens = event.completionTokens || 0;
+              if (event.rawContent) {
+                fullContent = event.rawContent;
+              }
+              break;
+
+            case "done":
+              return {
+                success: event.result !== null,
+                result: event.result,
+                rawContent: event.rawContent || fullContent,
+                promptTokens: event.meta?.usage?.promptTokens || promptTokens,
+                completionTokens:
+                  event.meta?.usage?.completionTokens || completionTokens,
+              };
+
+            case "error":
+              return {
+                success: false,
+                result: null,
+                rawContent: fullContent,
+                promptTokens,
+                completionTokens,
+                error: event.error,
+              };
+          }
+        } catch {
+          // Skip malformed JSON
+        }
+      }
+    }
+
+    return {
+      success: false,
+      result: null,
+      rawContent: fullContent,
+      promptTokens,
+      completionTokens,
+      error: "Stream ended without completion",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      result: null,
+      rawContent: partialContent,
+      promptTokens: 0,
+      completionTokens: 0,
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }
@@ -395,6 +556,60 @@ export async function generateAdventureSequential(
         callbacks.onAutosave(autosave);
 
         stageCompleted = true;
+      } else if (result.finishedEarly && partialContent.length > 100) {
+        // User requested to finish early - make one final call to wrap up the JSON
+        callbacks.onStageWarning(
+          stage,
+          `Finishing early with ${partialContent.length} characters...`
+        );
+
+        // Accumulate tokens from partial generation
+        totalPromptTokens += result.promptTokens;
+        totalCompletionTokens += result.completionTokens;
+
+        // Make final wrap-up call - create a new abort controller for this
+        const wrapUpResult = await generateSingleStageFinishEarly(
+          config,
+          stage,
+          previousResults,
+          options,
+          callbacks,
+          partialContent
+        );
+
+        // Reset the finish early flag
+        if (options.finishEarlyRef) {
+          (options.finishEarlyRef as React.MutableRefObject<boolean>).current =
+            false;
+        }
+
+        if (wrapUpResult.success && wrapUpResult.result) {
+          stageResults.push(wrapUpResult.result);
+          completedStages.push(stage);
+          totalPromptTokens += wrapUpResult.promptTokens;
+          totalCompletionTokens += wrapUpResult.completionTokens;
+
+          callbacks.onStageComplete(
+            stage,
+            wrapUpResult.result,
+            wrapUpResult.promptTokens,
+            wrapUpResult.completionTokens
+          );
+          callbacks.onProgress(completedStages, stages.length);
+          stageCompleted = true;
+        } else {
+          // Wrap-up failed, treat as error
+          callbacks.onStageError(
+            stage,
+            wrapUpResult.error || "Failed to finish early",
+            false
+          );
+          callbacks.onError(
+            `Stage "${getStageInfo(stage).name}" failed to finish early. ` +
+              `Progress saved (${completedStages.length}/${stages.length} stages completed).`
+          );
+          return;
+        }
       } else if (
         result.timedOut &&
         continuationCount < MAX_CONTINUATIONS_PER_STAGE &&

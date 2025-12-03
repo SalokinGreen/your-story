@@ -1,6 +1,6 @@
 /**
  * Advanced RPG Tools (Game Master Emulator) System
- * Based on the Mythic Game Master Emulator by Tana Pigeon
+ * Based on the AGMT Game Master Emulator by Tana Pigeon
  *
  * This system provides:
  * - Fate questions (yes/no with varying likelihoods)
@@ -24,7 +24,7 @@ export type Likelihood =
   | "A Sure Thing"
   | "Has To Be";
 
-// Mythic Fate Chart (Chaos Factor rows, Likelihood columns)
+// AGMT Fate Chart (Chaos Factor rows, Likelihood columns)
 // Returns: [Exceptional No, No, Yes, Exceptional Yes] thresholds
 const FATE_CHART: Record<
   number,
@@ -181,7 +181,7 @@ export function askFate(
   // Validate likelihood exists in chart
   if (!FATE_CHART[chaosFactor] || !FATE_CHART[chaosFactor][likelihood]) {
     console.error(
-      `Invalid Mythic parameters: chaosFactor=${chaosFactor}, likelihood="${likelihood}"`
+      `Invalid AGMT parameters: chaosFactor=${chaosFactor}, likelihood="${likelihood}"`
     );
     // Default to 50/50 if invalid
     likelihood = "50/50";
@@ -513,7 +513,7 @@ export function generateEventMeaning(): {
 /**
  * Complete Advanced RPG Tools state and utilities
  */
-export interface MythicState {
+export interface AGMTState {
   chaosFactor: number;
   threads: string[];
   npcs: string[];
@@ -523,7 +523,7 @@ export interface MythicState {
 /**
  * Create a new Advanced RPG Tools state
  */
-export function createMythicState(): MythicState {
+export function createAGMTState(): AGMTState {
   return {
     chaosFactor: 5,
     threads: [],
@@ -535,7 +535,7 @@ export function createMythicState(): MythicState {
 /**
  * Complete scene setup and random event check
  */
-export function setupScene(state: MythicState): {
+export function setupScene(state: AGMTState): {
   sceneType: SceneType;
   sceneRoll: number;
   randomEvent: boolean;
@@ -5658,7 +5658,7 @@ const ELEMENT_TABLES: Record<ElementCategory, string[]> = {
 };
 
 /**
- * List of all available mythic table names for validation
+ * List of all available agmt table names for validation
  */
 export const MYTHIC_TABLE_NAMES = Object.keys(
   ELEMENT_TABLES

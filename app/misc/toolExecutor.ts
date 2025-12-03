@@ -8,8 +8,8 @@
 import {
   StoryData,
   CommandResponse,
-  MythicThread,
-  MythicCharacter,
+  AGMTThread,
+  AGMTCharacter,
   Condition,
   Variable,
   NumberVariable,
@@ -619,14 +619,14 @@ export function executeTools(
           continue;
         }
 
-        const newThread: MythicThread = {
+        const newThread: AGMTThread = {
           id: crypto.randomUUID(),
           description,
           status: "active",
           createdAt: Date.now(),
         };
 
-        storyData.mythicState = storyData.mythicState || {
+        storyData.agmtState = storyData.agmtState || {
           chaosFactor: 5,
           threads: [],
           characters: [],
@@ -636,7 +636,7 @@ export function executeTools(
           lastChaosAdjustment: -999,
         };
 
-        storyData.mythicState.threads.push(newThread);
+        storyData.agmtState.threads.push(newThread);
 
         logger.action("Thread added via tool", {
           toolCallId: toolId,
@@ -655,7 +655,7 @@ export function executeTools(
       // Close thread
       if (toolCall.function.name === "close_thread") {
         const threadId = args.threadId;
-        if (!storyData.mythicState) {
+        if (!storyData.agmtState) {
           const errorMsg = "Advanced RPG Tools not enabled";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
@@ -671,7 +671,7 @@ export function executeTools(
           continue;
         }
 
-        const thread = storyData.mythicState.threads.find(
+        const thread = storyData.agmtState.threads.find(
           (t) => t.id === threadId
         );
         if (!thread) {
@@ -709,7 +709,7 @@ export function executeTools(
       // Reopen thread
       if (toolCall.function.name === "reopen_thread") {
         const threadId = args.threadId;
-        if (!storyData.mythicState) {
+        if (!storyData.agmtState) {
           const errorMsg = "Advanced RPG Tools not enabled";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
@@ -725,7 +725,7 @@ export function executeTools(
           continue;
         }
 
-        const thread = storyData.mythicState.threads.find(
+        const thread = storyData.agmtState.threads.find(
           (t) => t.id === threadId
         );
         if (!thread) {
@@ -781,7 +781,7 @@ export function executeTools(
           continue;
         }
 
-        if (!storyData.mythicState) {
+        if (!storyData.agmtState) {
           const errorMsg = "Advanced RPG Tools not enabled";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
@@ -797,7 +797,7 @@ export function executeTools(
           continue;
         }
 
-        const thread = storyData.mythicState.threads.find(
+        const thread = storyData.agmtState.threads.find(
           (t) => t.id === threadId
         );
         if (!thread) {
@@ -871,7 +871,7 @@ export function executeTools(
           continue;
         }
 
-        const newCharacter: MythicCharacter = {
+        const newCharacter: AGMTCharacter = {
           id: crypto.randomUUID(),
           name,
           role,
@@ -879,7 +879,7 @@ export function executeTools(
           createdAt: Date.now(),
         };
 
-        storyData.mythicState = storyData.mythicState || {
+        storyData.agmtState = storyData.agmtState || {
           chaosFactor: 5,
           threads: [],
           characters: [],
@@ -889,7 +889,7 @@ export function executeTools(
           lastChaosAdjustment: -999,
         };
 
-        storyData.mythicState.characters.push(newCharacter);
+        storyData.agmtState.characters.push(newCharacter);
 
         logger.action("Character added via tool", {
           toolCallId: toolId,
@@ -912,7 +912,7 @@ export function executeTools(
         const name = args.name?.trim();
         const role = args.role?.trim();
 
-        if (!storyData.mythicState) {
+        if (!storyData.agmtState) {
           const errorMsg = "Advanced RPG Tools not enabled";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
@@ -928,7 +928,7 @@ export function executeTools(
           continue;
         }
 
-        const character = storyData.mythicState.characters.find(
+        const character = storyData.agmtState.characters.find(
           (c) => c.id === characterId
         );
         if (!character) {
@@ -991,7 +991,7 @@ export function executeTools(
           continue;
         }
 
-        if (!storyData.mythicState) {
+        if (!storyData.agmtState) {
           const errorMsg = "Advanced RPG Tools not enabled";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
@@ -1007,7 +1007,7 @@ export function executeTools(
           continue;
         }
 
-        const character = storyData.mythicState.characters.find(
+        const character = storyData.agmtState.characters.find(
           (c) => c.id === characterId
         );
         if (!character) {
@@ -1047,7 +1047,7 @@ export function executeTools(
 
       // Increment scene
       if (toolCall.function.name === "increment_scene") {
-        storyData.mythicState = storyData.mythicState || {
+        storyData.agmtState = storyData.agmtState || {
           chaosFactor: 5,
           threads: [],
           characters: [],
@@ -1057,17 +1057,17 @@ export function executeTools(
           lastChaosAdjustment: -999,
         };
 
-        const oldCount = storyData.mythicState.sceneCount;
-        const oldChaos = storyData.mythicState.chaosFactor;
+        const oldCount = storyData.agmtState.sceneCount;
+        const oldChaos = storyData.agmtState.chaosFactor;
 
         // Increment scene
-        storyData.mythicState.sceneCount++;
+        storyData.agmtState.sceneCount++;
 
         // Auto-adjust chaos based on performance
-        const adjustedState = applyChaosAdjustment(storyData.mythicState);
+        const adjustedState = applyChaosAdjustment(storyData.agmtState);
         const newChaos = adjustedState.chaosFactor;
 
-        storyData.mythicState = adjustedState;
+        storyData.agmtState = adjustedState;
 
         // Build response message
         let message = `✓ Scene count: ${oldCount} → ${oldCount + 1}`;

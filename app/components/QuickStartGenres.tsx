@@ -10,7 +10,7 @@ const genres = [
     name: "Fantasy",
     icon: "Sword",
     color: "from-purple-500 to-indigo-600",
-    description: "Epic quests, magic, mythical creatures, and heroic journeys",
+    description: "Epic quests, magic, agmtal creatures, and heroic journeys",
   },
   {
     name: "Sci-Fi",
@@ -64,46 +64,45 @@ const genres = [
 ];
 
 // Size presets with token counts and time estimates
-// Cost calculation: DeepInfra DeepSeek V3.2 pricing
-// Input: $0.21/M tokens, Output: $0.32/M tokens
-// Assumes ~4K input tokens per stage, 4 stages, output = tokens value
-// Formula: ((4000 * 4) * 0.21 + tokens * 0.32) / 1000000 * 100 (cents per coin)
+// Cost calculation: Mistral Large 3.0 pricing via server (Coins mode)
+// With 8 substages, estimates are higher than the old 4-stage model
+// Time accounts for network latency, continuations, and processing
 const sizePresets = [
   {
     name: "Quick",
     value: "quick",
     tokens: 20000,
-    timeMin: 4,
-    timeMax: 6,
+    timeMin: 6,
+    timeMax: 10,
     description: "Basic adventure, fewer details",
-    estimatedCoins: 8, // ~$0.007
+    estimatedCoins: 15, // 8 stages × ~2K tokens each
   },
   {
     name: "Standard",
     value: "standard",
     tokens: 50000,
-    timeMin: 8,
-    timeMax: 12,
+    timeMin: 12,
+    timeMax: 20,
     description: "Well-rounded adventure",
-    estimatedCoins: 18, // ~$0.017
+    estimatedCoins: 35, // 8 stages × ~5K tokens each
   },
   {
     name: "Detailed",
     value: "detailed",
     tokens: 100000,
-    timeMin: 18,
-    timeMax: 25,
+    timeMin: 25,
+    timeMax: 40,
     description: "Rich lore and content",
-    estimatedCoins: 35, // ~$0.033
+    estimatedCoins: 65, // 8 stages × ~10K tokens each
   },
   {
     name: "Epic",
     value: "epic",
     tokens: 200000,
-    timeMin: 35,
-    timeMax: 50,
+    timeMin: 45,
+    timeMax: 70,
     description: "Maximum depth and detail",
-    estimatedCoins: 68, // ~$0.065
+    estimatedCoins: 120, // 8 stages × ~20K tokens each
   },
 ];
 
@@ -117,7 +116,7 @@ export default function QuickStartGenres() {
     null
   );
   const [customPrompt, setCustomPrompt] = useState("");
-  const [sizeIndex, setSizeIndex] = useState(1); // Default to "Standard"
+  const [sizeIndex, setSizeIndex] = useState(0); // Default to "Quick" (smallest)
 
   const selectedSize = sizePresets[sizeIndex];
 
@@ -260,6 +259,20 @@ export default function QuickStartGenres() {
                     for your genre.
                   </p>
                 </div>
+              </div>
+            </div>
+
+            {/* Keep Tab Open Warning */}
+            <div className="bg-amber-900/20 border border-amber-500/30 rounded-lg p-3 mb-4">
+              <div className="flex items-start gap-2">
+                <StaticIcon
+                  name="AlertTriangle"
+                  className="w-4 h-4 text-amber-400 mt-0.5 shrink-0"
+                />
+                <p className="text-xs text-amber-200/80">
+                  Keep this tab open and visible during generation. Switching
+                  tabs or minimizing may interrupt the connection.
+                </p>
               </div>
             </div>
 

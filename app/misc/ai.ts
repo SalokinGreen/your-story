@@ -737,25 +737,21 @@ export function outputToScenePart(text: string): ScenePart {
         choice.item_loss = lossMatch[1].toLowerCase() === "true";
       }
 
-      // Parse mythic_check: question (likelihood)
-      const mythicCheckMatch = metadata.match(
-        /mythic_check:\s*([^;]+?)(?:;|$)/i
-      );
-      if (mythicCheckMatch) {
-        const mythicCheck = mythicCheckMatch[1].trim();
-        if (mythicCheck.toLowerCase() !== "none") {
-          choice.mythic_check = mythicCheck;
+      // Parse agmt_check: question (likelihood)
+      const agmtCheckMatch = metadata.match(/agmt_check:\s*([^;]+?)(?:;|$)/i);
+      if (agmtCheckMatch) {
+        const agmtCheck = agmtCheckMatch[1].trim();
+        if (agmtCheck.toLowerCase() !== "none") {
+          choice.agmt_check = agmtCheck;
         }
       }
 
-      // Parse mythic_table: category
-      const mythicTableMatch = metadata.match(
-        /mythic_table:\s*([^;]+?)(?:;|$)/i
-      );
-      if (mythicTableMatch) {
-        const mythicTable = mythicTableMatch[1].trim();
-        if (mythicTable.toLowerCase() !== "none") {
-          choice.mythic_table = mythicTable;
+      // Parse agmt_table: category
+      const agmtTableMatch = metadata.match(/agmt_table:\s*([^;]+?)(?:;|$)/i);
+      if (agmtTableMatch) {
+        const agmtTable = agmtTableMatch[1].trim();
+        if (agmtTable.toLowerCase() !== "none") {
+          choice.agmt_table = agmtTable;
         }
       }
 

@@ -12,6 +12,7 @@ import {
   RPGSystemType,
   ComplexityLevel,
   GenerationStage,
+  LegacyStage,
   StageConfig,
   ContentIterationConfig,
   BigAdventureAutosave,
@@ -30,6 +31,7 @@ import {
   canExtendSection,
   EXTENDABLE_SECTIONS,
   getStageInfo,
+  getParentStage,
   getStagesToRun,
   estimateBigAdventureCost,
   getTotalGenerationTasks,
@@ -218,19 +220,34 @@ function IterationSlider({
   );
 }
 
-// Stage Toggle Component
+// Stage Toggle Component (uses legacy stages for UI)
 function StageToggle({
   stage,
   enabled,
   onToggle,
   disabled = false,
 }: {
-  stage: GenerationStage;
+  stage: LegacyStage;
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
   disabled?: boolean;
 }) {
-  const info = getStageInfo(stage);
+  // Map legacy stage to first substage for getStageInfo
+  const substage: GenerationStage =
+    stage === "content"
+      ? "content-lore"
+      : stage === "advanced"
+      ? "advanced-presets"
+      : stage;
+  const info = getStageInfo(substage);
+
+  // Custom names for legacy stages in UI
+  const legacyNames: Record<LegacyStage, string> = {
+    core: "Core Concept",
+    mechanics: "Mechanics",
+    content: "Content",
+    advanced: "Advanced",
+  };
 
   return (
     <label
@@ -246,7 +263,9 @@ function StageToggle({
         className="w-4 h-4 rounded bg-blue-900/50 border-blue-700/50 text-purple-500 focus:ring-purple-500"
       />
       <div className="flex-1">
-        <span className="text-sm font-medium text-white">{info.name}</span>
+        <span className="text-sm font-medium text-white">
+          {legacyNames[stage]}
+        </span>
         <p className="text-xs text-blue-300/50">{info.description}</p>
       </div>
     </label>
@@ -614,7 +633,7 @@ function BigAdventureCreatorPage() {
     rpgSystem: "1d20",
     complexity: "moderate",
     nsfw: false,
-    includeMythic: true,
+    includeAGMT: true,
     includeUpgradeShop: true,
     includeCustomTables: true,
     includePresets: true,
@@ -857,6 +876,23 @@ function BigAdventureCreatorPage() {
   // Abort controller for cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Signal to finish the current stage early
+  const finishEarlyRef = useRef<boolean>(false);
+
+  // Finish current stage early (tell AI to wrap up)
+  const finishStageEarly = useCallback(() => {
+    if (currentStage && isGenerating && abortControllerRef.current) {
+      finishEarlyRef.current = true;
+      addNotification(
+        `Finishing ${getStageInfo(currentStage).name} early...`,
+        "success"
+      );
+      // Abort the current request - the orchestrator will detect the finishEarly flag
+      // and make a new request with finishEarly=true to wrap up the JSON
+      abortControllerRef.current.abort();
+    }
+  }, [currentStage, isGenerating, addNotification]);
+
   // Handle quick start from home page genre buttons
   useEffect(() => {
     const quickStart = searchParams.get("quickStart");
@@ -952,7 +988,7 @@ function BigAdventureCreatorPage() {
         complexity: (genreComplexityMap[genre] ||
           "moderate") as ComplexityLevel,
         nsfw: false,
-        includeMythic: true,
+        includeAGMT: true,
         includeUpgradeShop: true,
         includeCustomTables: true,
         includePresets: true,
@@ -1291,7 +1327,7 @@ function BigAdventureCreatorPage() {
 
   // Update stage config
   const updateStageConfig = useCallback(
-    (stage: GenerationStage, updates: Partial<StageConfig>) => {
+    (stage: LegacyStage, updates: Partial<StageConfig>) => {
       setConfig((prev) => {
         const currentStageConfigs = prev.stageConfigs || {
           ...DEFAULT_STAGE_CONFIGS,
@@ -1359,6 +1395,7 @@ function BigAdventureCreatorPage() {
     setIsGenerating(true);
     setStages(stagesToRun);
     setTotalTasks(tasks);
+    finishEarlyRef.current = false;
     // In resume mode, start from existing progress
     setCompletedTasks(isResuming ? skipStages.length : 0);
     setCurrentStage(null);
@@ -1428,8 +1465,11 @@ function BigAdventureCreatorPage() {
           }));
         }
 
-        // Preview mode: Show stage preview modal
-        if (config.previewBetweenStages && stage !== "advanced") {
+        // Preview mode: Show stage preview modal (not for advanced substages)
+        if (
+          config.previewBetweenStages &&
+          getParentStage(stage) !== "advanced"
+        ) {
           const isLastStage = stage === stagesToRun[stagesToRun.length - 1];
           if (!isLastStage && stageResult) {
             setPreviewStageData({
@@ -1527,6 +1567,7 @@ function BigAdventureCreatorPage() {
             ? resumedPartialResults
             : undefined,
         abortSignal: abortControllerRef.current.signal,
+        finishEarlyRef,
       },
       callbacks
     );
@@ -3188,9 +3229,9 @@ ${result.description || ""}`;
                   <label className="flex items-start gap-3 p-4 bg-blue-900/30 rounded-lg cursor-pointer hover:bg-blue-900/50 transition-colors border border-blue-700/30">
                     <input
                       type="checkbox"
-                      checked={config.includeMythic}
+                      checked={config.includeAGMT}
                       onChange={(e) =>
-                        updateConfig({ includeMythic: e.target.checked })
+                        updateConfig({ includeAGMT: e.target.checked })
                       }
                       className="w-5 h-5 mt-0.5 rounded bg-blue-900/50 border-blue-700/50 text-purple-500 focus:ring-purple-500"
                     />
@@ -3753,20 +3794,27 @@ ${result.description || ""}`;
                             "mechanics",
                             "content",
                             "advanced",
-                          ] as GenerationStage[]
+                          ] as LegacyStage[]
                         ).map((stage) => {
                           const stageValue = Math.min(
                             config.stageConfigs?.[stage]?.maxOutputTokens ??
                               config.maxOutputTokens,
                             getModelMaxTokens()
                           );
+                          // Map legacy stage to first substage for getStageInfo
+                          const substage: GenerationStage =
+                            stage === "content"
+                              ? "content-lore"
+                              : stage === "advanced"
+                              ? "advanced-presets"
+                              : stage;
                           return (
                             <div
                               key={stage}
                               className="flex items-center gap-4"
                             >
                               <span className="text-sm text-blue-200 w-24">
-                                {getStageInfo(stage).name}
+                                {getStageInfo(substage).name.split(" ")[0]}
                               </span>
                               <input
                                 type="range"
@@ -3806,14 +3854,27 @@ ${result.description || ""}`;
                             "mechanics",
                             "content",
                             "advanced",
-                          ] as GenerationStage[]
+                          ] as LegacyStage[]
                         ).map((stage) => {
-                          const info = getStageInfo(stage);
+                          // Map legacy stage to first substage for getStageInfo
+                          const substage: GenerationStage =
+                            stage === "content"
+                              ? "content-lore"
+                              : stage === "advanced"
+                              ? "advanced-presets"
+                              : stage;
+                          const info = getStageInfo(substage);
+                          const legacyNames: Record<LegacyStage, string> = {
+                            core: "Core Concept",
+                            mechanics: "Mechanics",
+                            content: "Content",
+                            advanced: "Advanced",
+                          };
                           return (
                             <div key={stage} className="space-y-2">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-purple-200">
-                                  {info.emoji} {info.name}
+                                  {info.emoji} {legacyNames[stage]}
                                 </span>
                                 {!config.stageConfigs?.[stage]?.enabled && (
                                   <span className="text-xs text-blue-400/50">
@@ -4022,6 +4083,14 @@ ${result.description || ""}`;
             <LiveOutput content={liveContent} stage={currentStage} />
 
             <div className="flex justify-center gap-4">
+              <button
+                onClick={finishStageEarly}
+                disabled={!currentStage}
+                className="px-6 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-800 disabled:text-amber-400 text-white rounded-lg transition-colors"
+                title="Tell AI to finish the current stage and move on"
+              >
+                Finish Stage Early
+              </button>
               <button
                 onClick={cancelGeneration}
                 className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"

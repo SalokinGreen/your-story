@@ -5,7 +5,7 @@
  * - Stage 1: Core concept (title, premise, intro, player summary, author notes)
  * - Stage 2: Mechanics (stats, resources, abilities, variables)
  * - Stage 3: Content (inventory, lore, relationships, achievements, quests, plot beats)
- * - Stage 4: Advanced (presets, mythic, custom tables, upgrades, starting choices)
+ * - Stage 4: Advanced (presets, agmt, custom tables, upgrades, starting choices)
  */
 
 import { StoryData, StartingChoice } from "@/app/misc/structs";
@@ -24,7 +24,27 @@ export type RPGSystemType =
 
 export type ComplexityLevel = "simple" | "moderate" | "complex";
 
-export type GenerationStage = "core" | "mechanics" | "content" | "advanced";
+// Generation stages - content and advanced are split into substages to avoid timeout
+export type GenerationStage =
+  | "core"
+  | "mechanics"
+  | "content-lore"
+  | "content-achievements"
+  | "content-items"
+  | "advanced-presets"
+  | "advanced-tables"
+  | "advanced-other";
+
+// Legacy stage type for backward compatibility and UI grouping
+export type LegacyStage = "core" | "mechanics" | "content" | "advanced";
+
+// Map substage to its parent legacy stage
+export function getParentStage(stage: GenerationStage): LegacyStage {
+  if (stage === "core") return "core";
+  if (stage === "mechanics") return "mechanics";
+  if (stage.startsWith("content-")) return "content";
+  return "advanced";
+}
 
 // Per-stage configuration
 export interface StageConfig {
@@ -34,8 +54,8 @@ export interface StageConfig {
   customInstructions?: string; // Optional custom instructions for this stage
 }
 
-// Default stage configurations
-export const DEFAULT_STAGE_CONFIGS: Record<GenerationStage, StageConfig> = {
+// Default stage configurations for UI (uses legacy 4 stages)
+export const DEFAULT_STAGE_CONFIGS: Record<LegacyStage, StageConfig> = {
   core: {
     enabled: true,
     iterations: 1,
@@ -51,7 +71,7 @@ export const DEFAULT_STAGE_CONFIGS: Record<GenerationStage, StageConfig> = {
   content: {
     enabled: true,
     iterations: 1,
-    maxOutputTokens: 6000,
+    maxOutputTokens: 4000,
     customInstructions: "",
   },
   advanced: {
@@ -61,6 +81,15 @@ export const DEFAULT_STAGE_CONFIGS: Record<GenerationStage, StageConfig> = {
     customInstructions: "",
   },
 };
+
+// Get config for a substage from legacy config
+export function getSubstageConfig(
+  stage: GenerationStage,
+  stageConfigs: Record<LegacyStage, StageConfig> | undefined
+): StageConfig {
+  const legacyStage = getParentStage(stage);
+  return stageConfigs?.[legacyStage] || DEFAULT_STAGE_CONFIGS[legacyStage];
+}
 
 // Iteration-specific sub-stages for content stage
 export type ContentSubStage =
@@ -95,7 +124,7 @@ export interface BigAdventureConfig {
   rpgSystem: RPGSystemType;
   complexity: ComplexityLevel;
   nsfw: boolean;
-  includeMythic: boolean;
+  includeAGMT: boolean;
   includeUpgradeShop: boolean;
   includeCustomTables: boolean;
   includePresets: boolean;
@@ -103,8 +132,8 @@ export interface BigAdventureConfig {
   targetDuration: "short" | "medium" | "long";
   maxOutputTokens: number; // Global fallback output max per stage
 
-  // Per-stage configuration (Phase 1)
-  stageConfigs?: Record<GenerationStage, StageConfig>;
+  // Per-stage configuration (Phase 1) - uses legacy 4 stages for UI
+  stageConfigs?: Record<LegacyStage, StageConfig>;
   contentIterations?: ContentIterationConfig;
 
   // Preview mode (Phase 2) - pause after each stage for review
@@ -480,19 +509,19 @@ export type RegenerateSection =
   | "plotBeats" // Regenerate plot beats
   | "relationships" // Regenerate relationships
   | "presets" // Regenerate character presets
-  | "mythic" // Regenerate mythic state
+  | "agmt" // Regenerate agmt state
   | "customTables" // Regenerate custom tables
   | "upgradeShop" // Regenerate upgrade shop
   | "startingChoices"; // Regenerate starting choices
 
-// Section metadata for UI
+// Section metadata for UI (uses LegacyStage for grouping)
 export const REGENERATE_SECTIONS: Record<
   RegenerateSection,
   {
     name: string;
     description: string;
     emoji: string;
-    stage: GenerationStage;
+    stage: LegacyStage;
   }
 > = {
   title: {
@@ -573,7 +602,7 @@ export const REGENERATE_SECTIONS: Record<
     emoji: "🎭",
     stage: "advanced",
   },
-  mythic: {
+  agmt: {
     name: "Advanced RPG Tools",
     description: "Solo play configuration",
     emoji: "🎲",
@@ -875,40 +904,96 @@ export function getStageInfo(stage: GenerationStage): {
       number: 2,
       emoji: "⚙️",
     },
-    content: {
-      name: "Story Content",
-      description: "NPCs, lore, quests, and world-building",
+    "content-lore": {
+      name: "Lore & World",
+      description: "World-building and lore entries",
       detailedDescription:
-        "Populates your world with content: characters to meet, history to discover, items to find, goals to achieve, and story milestones. This is the meat of your adventure.",
+        "Creates the world's history, factions, NPCs, and locations. Rich lore entries that bring the setting to life.",
       generates: [
-        "Lore entries (world history, factions, locations)",
-        "Relationships (NPCs with attitudes)",
-        "Inventory items (equipment, consumables)",
-        "Achievements (goals with rewards)",
-        "Quests (main & side objectives)",
-        "Plot beats (story milestones)",
+        "Key NPCs and characters",
+        "Locations and landmarks",
+        "Factions and organizations",
+        "History and past events",
+        "World lore and customs",
       ],
       instructionHint:
-        "Focus on NPC depth, faction politics, item variety, or story pacing",
+        "Focus on NPC depth, faction politics, location atmosphere, or historical events",
       number: 3,
       emoji: "📚",
     },
-    advanced: {
-      name: "Advanced Features",
-      description: "Character creation, upgrades, and randomization",
+    "content-achievements": {
+      name: "Goals & Milestones",
+      description: "Achievements, quests, and plot beats",
       detailedDescription:
-        "Adds depth through optional systems: character creation choices, progression unlocks, random event tables, and GM emulation tools for unpredictable storytelling.",
+        "Defines what the player can accomplish: achievements to unlock, quests to complete, and story milestones to reach.",
       generates: [
-        "Starting choices (character creation options)",
-        "Upgrade shop (progression purchases)",
-        "Character presets (pre-made builds)",
-        "Custom random tables",
-        "Advanced RPG Tools integration",
+        "Achievements with rewards",
+        "Main and side quests",
+        "Plot beats (story milestones)",
       ],
       instructionHint:
-        "Shape character options, upgrade paths, or random event themes",
+        "Shape quest objectives, achievement triggers, or story pacing",
       number: 4,
-      emoji: "✨",
+      emoji: "🏆",
+    },
+    "content-items": {
+      name: "Items & NPCs",
+      description: "Inventory and relationships",
+      detailedDescription:
+        "Creates the player's starting equipment and NPC relationships that can change over time.",
+      generates: [
+        "Starting inventory items",
+        "NPC relationships with attitudes",
+      ],
+      instructionHint:
+        "Focus on item variety, equipment balance, or NPC dynamics",
+      number: 5,
+      emoji: "🎒",
+    },
+    "advanced-presets": {
+      name: "Character Presets",
+      description: "Pre-made character builds",
+      detailedDescription:
+        "Creates alternative character builds players can choose from, each with unique stats, abilities, and starting equipment.",
+      generates: [
+        "Character presets/classes",
+        "Unique stat distributions",
+        "Preset-specific abilities",
+      ],
+      instructionHint:
+        "Shape class archetypes, playstyle variety, or build uniqueness",
+      number: 6,
+      emoji: "🎭",
+    },
+    "advanced-tables": {
+      name: "Random Tables",
+      description: "Custom tables and AGMT integration",
+      detailedDescription:
+        "Adds randomization through custom tables and AGMT GM emulator tools for solo play.",
+      generates: [
+        "Custom random event tables",
+        "AGMT oracle configuration",
+        "Random encounter tables",
+      ],
+      instructionHint:
+        "Focus on event variety, oracle themes, or encounter balance",
+      number: 7,
+      emoji: "🎲",
+    },
+    "advanced-other": {
+      name: "Upgrades & Choices",
+      description: "Progression shop and starting options",
+      detailedDescription:
+        "Creates the upgrade shop for character progression and starting choices for adventure customization.",
+      generates: [
+        "Upgrade shop items",
+        "Starting choice options",
+        "Progression unlocks",
+      ],
+      instructionHint:
+        "Shape upgrade paths, starting variations, or progression balance",
+      number: 8,
+      emoji: "🛒",
     },
   };
   return stages[stage];
@@ -931,9 +1016,8 @@ function buildSystemPrompt(
       ? STYLE_PRESETS[config.stylePreset]?.promptModifier
       : "";
 
-  // Get custom instructions for this stage
-  const stageConfig =
-    config.stageConfigs?.[stage] || DEFAULT_STAGE_CONFIGS[stage];
+  // Get custom instructions for this stage (use parent stage config for substages)
+  const stageConfig = getSubstageConfig(stage, config.stageConfigs);
   const customInstructions = stageConfig.customInstructions?.trim() || "";
 
   const basePrompt = `You are an expert Game Designer creating a complete text adventure game.
@@ -1050,57 +1134,20 @@ OUTPUT JSON SCHEMA:
 Remember: Output ONLY the JSON object, nothing else.`;
   }
 
-  if (stage === "content") {
-    // Get content iteration multipliers (default to 1x if not set)
+  // CONTENT SUBSTAGES
+  if (stage === "content-lore") {
     const contentIterations =
       config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
-
-    // Apply both duration multiplier AND content iterations for each category
-    const plotBeatCount = Math.round(
-      counts.plotBeats * durationMultiplier * contentIterations.plotBeats
-    );
     const loreCount = Math.round(
       counts.lore * durationMultiplier * contentIterations.lore
     );
-    const achievementCount = Math.round(
-      counts.achievements * durationMultiplier * contentIterations.achievements
-    );
-    const questCount = Math.round(
-      counts.quests * durationMultiplier * contentIterations.quests
-    );
-    const relationshipCount = Math.round(
-      counts.relationships *
-        durationMultiplier *
-        contentIterations.relationships
-    );
-    const inventoryCount = Math.round(3 * contentIterations.inventory); // Base 3 items times multiplier
 
     return `${basePrompt}
 
-STAGE 3: STORY CONTENT
-Generate inventory, lore, relationships, achievements, quests, and plot beats.
+STAGE 3A: LORE & WORLD-BUILDING
+Generate detailed lore entries that bring the world to life.
 
-TARGET COUNTS:
-- Starting Inventory: ${inventoryCount}-${inventoryCount + 2} items
-- Lore Entries: ${loreCount}
-- Relationships: ${relationshipCount}
-- Achievements: ${achievementCount}
-- Quests: ${questCount}
-- Plot Beats: ${plotBeatCount}
-
-ITEM TYPES:
-- "normal": Gives advantage on skill checks, breaks on critical failure
-- "consumable": Gives advantage, consumed after use
-- "story": Gives advantage, never breaks/consumed (quest items)
-- "misc": Prevents disadvantage, never breaks/consumed
-
-ITEM GRADES (rarity):
-- "common" (+0 bonus, 8 durability)
-- "uncommon" (+1, 13 dur)
-- "rare" (+2, 20 dur)
-- "epic" (+3, 30 dur)
-- "legendary" (+4, 50 dur)
-- "mythic" (+5, infinite dur)
+TARGET COUNT: ${loreCount} lore entries
 
 LORE ENTRY GUIDELINES:
 Create DETAILED, RICH lore entries. Each entry should be 2-4 paragraphs with specific names, dates, and vivid descriptions.
@@ -1110,76 +1157,80 @@ REQUIRED LORE CATEGORIES (distribute entries across all):
 1. KEY NPCs (at least 3-4 entries):
    - Important characters the player will meet or hear about
    - Include their appearance, personality, motivations, secrets, and relationship to the main plot
-   - Example: "Lord Varen Blackwood" - detailed backstory, current goals, secret vulnerabilities
 
 2. LOCATIONS (at least 3-4 entries):
    - Major places in the world (cities, dungeons, landmarks)
    - Describe atmosphere, notable features, dangers, and history
-   - Include what the player might find there and who controls it
 
 3. FACTIONS & ORGANIZATIONS (at least 2-3 entries):
    - Groups with power and influence in the world
    - Their goals, methods, leaders, symbols, and relationship to other factions
-   - How they might help or hinder the player
 
 4. HISTORY & PAST EVENTS (at least 2-3 entries):
    - Important historical events that shaped the current world
    - Ancient wars, fallen kingdoms, legendary heroes, catastrophes
-   - How these events affect the present situation
 
 5. UPCOMING THREATS & EVENTS (at least 2-3 entries):
    - Looming dangers or prophecies about the future
-   - Secret plots being hatched, approaching deadlines, gathering storms
    - Set these as secret=true with beats_trigger for dramatic reveals
 
 6. WORLD LORE (remaining entries):
    - Magic systems, religions, customs, creatures, artifacts
-   - Cultural details, legends, mysteries to uncover
-   - Anything that adds depth and flavor to the world
-
-LORE CONTENT QUALITY:
-- Be SPECIFIC: Use proper nouns, exact numbers, vivid descriptions
-- Be DETAILED: 2-4 paragraphs per entry, not just 1-2 sentences
-- Be INTERCONNECTED: Reference other lore entries, NPCs, and locations
-- Include HOOKS: Details that hint at quests, secrets, or opportunities
 
 LORE TRIGGERS (make lore dynamic):
-- on_triggers: words/phrases that reveal this lore when mentioned in the story
-  IMPORTANT: Triggers use WORD BOUNDARIES - "gun" won't match "guns" or "gunfire"
-  Include variations: ["gun", "guns", "pistol", "pistols", "firearm", "firearms"]
-  Include nicknames: ["Naomy", "Nao", "Lady Blackwood"]
-  Be thorough - list all forms and aliases a player might use
-- off_triggers: words/phrases that hide this lore (rare, use sparingly)
-- beats_trigger: plot beat indices (0-based) that reveal this lore (great for secrets)
-- var_on_triggers: boolean variable names that reveal when true
-- secrtet: true for hidden lore the AI knows but player hasn't discovered yet
-- alwaysOn: true for fundamental world facts player should always have access to
+- on_triggers: words/phrases that reveal this lore when mentioned
+  IMPORTANT: Include variations for word boundaries ["gun", "guns", "pistol", "pistols"]
+- beats_trigger: plot beat indices (0-based) that reveal this lore
+- secrtet: true for hidden lore the AI knows but player hasn't discovered
+- alwaysOn: true for fundamental world facts
 
-CRITICAL: EVERY lore entry MUST have on_triggers with 3-5 variations OR set alwaysOn=true. Empty on_triggers arrays are NOT allowed!
-
-RELATIONSHIP VALUES: -100 (mortal enemy) to +100 (devoted ally)
+CRITICAL: EVERY lore entry MUST have on_triggers with 3-5 variations OR set alwaysOn=true!
 
 OUTPUT JSON SCHEMA:
 {
-  "inventory": [
-    { "name": "string", "quantity": number, "description": "string", "type": "normal|consumable|story|misc", "grade": "common|uncommon|rare|epic|legendary|mythic", "symbol": "emoji" }
-  ],
   "lore": [
     {
-      "title": "Lord Varen Blackwood",
-      "content": "string (2-4 DETAILED paragraphs with specific names, descriptions, history, motivations, and connections to other lore)",
+      "title": "string",
+      "content": "string (2-4 DETAILED paragraphs)",
       "secrtet": false,
       "on": false,
       "alwaysOn": false,
-      "on_triggers": ["Varen", "Blackwood", "Lord Blackwood", "the lord", "Lord Varen"],
+      "on_triggers": ["trigger1", "trigger2", "trigger3"],
       "off_triggers": [],
       "beats_trigger": [],
       "var_on_triggers": []
     }
-  ],
-  "relationships": [
-    { "name": "string", "value": number, "description": "string", "symbol": "emoji" }
-  ],
+  ]
+}
+
+Remember: Output ONLY the JSON object, nothing else.`;
+  }
+
+  if (stage === "content-achievements") {
+    const contentIterations =
+      config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
+    const plotBeatCount = Math.round(
+      counts.plotBeats * durationMultiplier * contentIterations.plotBeats
+    );
+    const achievementCount = Math.round(
+      counts.achievements * durationMultiplier * contentIterations.achievements
+    );
+    const questCount = Math.round(
+      counts.quests * durationMultiplier * contentIterations.quests
+    );
+
+    return `${basePrompt}
+
+STAGE 3B: GOALS & MILESTONES
+Generate achievements, quests, and plot beats.
+
+TARGET COUNTS:
+- Achievements: ${achievementCount}
+- Quests: ${questCount}
+- Plot Beats: ${plotBeatCount}
+
+OUTPUT JSON SCHEMA:
+{
   "achievements": [
     { "title": "string", "description": "string (player-facing)", "ai_hint": "string (precise trigger conditions for AI)", "points": number, "symbol": "emoji", "dateAchieved": null }
   ],
@@ -1194,76 +1245,130 @@ OUTPUT JSON SCHEMA:
 Remember: Output ONLY the JSON object, nothing else.`;
   }
 
-  // Stage: advanced
-  const presetCount = config.includePresets
-    ? Math.round(counts.presets * durationMultiplier)
-    : 0;
-  const tableCount = config.includeCustomTables
-    ? Math.round(counts.customTables * durationMultiplier)
-    : 0;
-  const shopItemCount = config.includeUpgradeShop
-    ? Math.round(counts.shopItems * durationMultiplier)
-    : 0;
+  if (stage === "content-items") {
+    const contentIterations =
+      config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
+    const inventoryCount = Math.round(3 * contentIterations.inventory);
+    const relationshipCount = Math.round(
+      counts.relationships *
+        durationMultiplier *
+        contentIterations.relationships
+    );
 
-  let advancedSections = "";
-  const schemaFields: string[] = [];
+    return `${basePrompt}
 
-  if (config.includePresets && presetCount > 0) {
-    advancedSections += `
-CHARACTER PRESETS (${presetCount}):
-Different character builds/classes players can choose. Each has unique stats, resources, inventory, and abilities.
-Presets should offer meaningfully different playstyles.
+STAGE 3C: ITEMS & RELATIONSHIPS
+Generate starting inventory and NPC relationships.
 
-IMPORTANT: Each preset MUST include abilities. Use the abilities generated in the mechanics stage as a base:
-- Give each preset a subset of the available abilities that fits their playstyle
-- You may also create 1-2 unique abilities per preset for specialization
-- Adjust ability grades to reflect each preset's proficiency
+TARGET COUNTS:
+- Starting Inventory: ${inventoryCount}-${inventoryCount + 2} items
+- Relationships: ${relationshipCount}
+
+ITEM TYPES:
+- "normal": Gives advantage on skill checks, breaks on critical failure
+- "consumable": Gives advantage, consumed after use
+- "story": Gives advantage, never breaks/consumed (quest items)
+- "misc": Prevents disadvantage, never breaks/consumed
+
+ITEM GRADES (rarity):
+- "common" (+0 bonus, 8 durability)
+- "uncommon" (+1, 13 dur)
+- "rare" (+2, 20 dur)
+- "epic" (+3, 30 dur)
+- "legendary" (+4, 50 dur)
+- "agmt" (+5, infinite dur)
+
+RELATIONSHIP VALUES: -100 (mortal enemy) to +100 (devoted ally)
+
+OUTPUT JSON SCHEMA:
+{
+  "inventory": [
+    { "name": "string", "quantity": number, "description": "string", "type": "normal|consumable|story|misc", "grade": "common|uncommon|rare|epic|legendary|agmt", "symbol": "emoji" }
+  ],
+  "relationships": [
+    { "name": "string", "value": number, "description": "string", "symbol": "emoji" }
+  ]
+}
+
+Remember: Output ONLY the JSON object, nothing else.`;
+  }
+
+  // ADVANCED SUBSTAGES
+  if (stage === "advanced-presets") {
+    const presetCount = config.includePresets
+      ? Math.round(counts.presets * durationMultiplier)
+      : 0;
+
+    if (!config.includePresets || presetCount === 0) {
+      return `${basePrompt}
+
+STAGE 4A: CHARACTER PRESETS
+Character presets are not enabled for this adventure.
+
+OUTPUT JSON SCHEMA:
+{}
+
+Output an empty JSON object.`;
+    }
+
+    return `${basePrompt}
+
+STAGE 4A: CHARACTER PRESETS
+Generate ${presetCount} different character builds/classes.
+
+Each preset offers a meaningfully different playstyle with unique stats, resources, inventory, and abilities.
+
+IMPORTANT: Each preset MUST include abilities. Use abilities from the mechanics stage as a base.
 
 CRITICAL - PRESET INTROS:
-The "intro" field is a COMPLETE REPLACEMENT for the default intro, NOT an addition to it.
-Each preset intro must be a FULL, STANDALONE opening narrative (3-5 paragraphs) that:
-- Sets the scene and atmosphere
-- Establishes this specific character's situation and perspective
-- Creates immersion and hooks the player
-- Is as detailed and polished as the main adventure intro
-Do NOT write short intros expecting them to be appended - they replace the intro entirely!
-
-PRESET PLAYER SUMMARY:
-The "playerSummary" is also a COMPLETE REPLACEMENT (2-3 paragraphs) describing this specific character's background, personality, skills, and history.
+The "intro" field is a COMPLETE REPLACEMENT for the default intro (3-5 paragraphs).
+The "playerSummary" is also a COMPLETE REPLACEMENT (2-3 paragraphs).
 
 STAT VALUES FOR PRESETS:
 - Range: 1-100 where 50 is human average
 - Player characters typically have 40-70 in most stats
-- One or two standout stats can be 70-85
-- Weaknesses can be 25-40
-`;
-    schemaFields.push(`"presets": [
+- One or two standout stats can be 70-85, weaknesses 25-40
+
+OUTPUT JSON SCHEMA:
+{
+  "presets": [
     {
       "id": "preset-xxx",
       "name": "string",
-      "description": "string (1-2 sentence hook for selection screen)",
+      "description": "string (1-2 sentence hook)",
       "icon": "emoji",
       "playerName": "string",
-      "playerSummary": "string (2-3 paragraphs - COMPLETE character background, NOT a fragment)",
-      "intro": "string (3-5 paragraphs - COMPLETE opening narrative, NOT a fragment. This REPLACES the default intro entirely!)",
+      "playerSummary": "string (2-3 paragraphs)",
+      "intro": "string (3-5 paragraphs - COMPLETE opening narrative)",
       "stats": [{ "name": "string", "value": number, "description": "string", "symbol": "emoji" }],
       "resources": [{ "name": "string", "value": number, "maxValue": number, "description": "string", "symbol": "emoji" }],
       "inventory": [{ "name": "string", "quantity": number, "description": "string", "type": "string", "grade": "string", "symbol": "emoji" }],
       "abilities": [{ "name": "string", "description": "string", "grade": "string", "cost": [], "cooldown": number, "currentCooldown": 0, "symbol": "emoji" }],
       "authorNotes": "string"
     }
-  ]`);
+  ]
+}
+
+Remember: Output ONLY the JSON object, nothing else.`;
   }
 
-  if (config.includeMythic) {
-    advancedSections += `
+  if (stage === "advanced-tables") {
+    const tableCount = config.includeCustomTables
+      ? Math.round(counts.customTables * durationMultiplier)
+      : 0;
+
+    const schemaFields: string[] = [];
+    let instructions = "";
+
+    if (config.includeAGMT) {
+      instructions += `
 Advanced RPG Tools STATE:
-Initialize the Mythic Game Master Emulator for solo/GM-less play.
-- chaosFactor: 1-9 (5 is default, higher = more random events)
+Initialize the AGMT Game Master Emulator for solo/GM-less play.
+- chaosFactor: 1-9 (5 is default)
 - threads: Active narrative threads/plotlines
 - characters: Important NPCs
 `;
-    schemaFields.push(`"mythicState": {
+      schemaFields.push(`"agmtState": {
     "chaosFactor": number,
     "sceneCount": 0,
     "threads": [{ "id": "thread_xxx", "description": "string", "status": "active" }],
@@ -1272,17 +1377,15 @@ Initialize the Mythic Game Master Emulator for solo/GM-less play.
     "currentStreak": 0,
     "lastChaosAdjustment": 0
   }`);
-  }
+    }
 
-  if (config.includeCustomTables && tableCount > 0) {
-    advancedSections += `
+    if (config.includeCustomTables && tableCount > 0) {
+      instructions += `
 CUSTOM RANDOM TABLES (${tableCount}):
-Create thematic random tables for encounters, weather, events, loot, etc.
-Each table MUST have 20-50 entries for proper variety and randomness.
-Each entry has a weight (1-10, higher = more likely). Vary weights for interesting distributions.
-Examples: random encounters (30+ entries), weather effects (20+), loot tables (40+), NPC reactions (25+).
+Each table MUST have 20-50 entries for proper variety.
+Each entry has a weight (1-10, higher = more likely).
 `;
-    schemaFields.push(`"customTables": [
+      schemaFields.push(`"customTables": [
     {
       "id": "table_xxx",
       "name": "string",
@@ -1290,17 +1393,49 @@ Examples: random encounters (30+ entries), weather effects (20+), loot tables (4
       "entries": [{ "text": "string", "weight": number }]
     }
   ]`);
+    }
+
+    if (schemaFields.length === 0) {
+      return `${basePrompt}
+
+STAGE 4B: RANDOM TABLES & MYTHIC
+No tables or AGMT features are enabled.
+
+OUTPUT JSON SCHEMA:
+{}
+
+Output an empty JSON object.`;
+    }
+
+    return `${basePrompt}
+
+STAGE 4B: RANDOM TABLES & MYTHIC
+${instructions}
+
+OUTPUT JSON SCHEMA:
+{
+  ${schemaFields.join(",\n  ")}
+}
+
+Remember: Output ONLY the JSON object, nothing else.`;
   }
 
-  if (config.includeUpgradeShop && shopItemCount > 0) {
-    advancedSections += `
-UPGRADE SHOP (${shopItemCount} total items across all shops):
-Configure the progression/upgrade system where players spend points.
-Create interesting unlockables: new stats, resources, items, and abilities.
+  if (stage === "advanced-other") {
+    const shopItemCount = config.includeUpgradeShop
+      ? Math.round(counts.shopItems * durationMultiplier)
+      : 0;
 
-STAT VALUES: Range 1-100 where 50 is human average. Shop stats typically start at 30-50.
+    const schemaFields: string[] = [];
+    let instructions = "";
+
+    if (config.includeUpgradeShop && shopItemCount > 0) {
+      instructions += `
+UPGRADE SHOP (${shopItemCount} total items):
+Configure the progression/upgrade system where players spend points.
+
+STAT VALUES: Range 1-100 where 50 is human average.
 `;
-    schemaFields.push(`"upgradeSettings": {
+      schemaFields.push(`"upgradeSettings": {
     "enabled": true,
     "allowStatUpgrade": true,
     "allowResourceUpgrade": true,
@@ -1319,15 +1454,14 @@ STAT VALUES: Range 1-100 where 50 is human average. Shop stats typically start a
     "itemShop": [{ "name": "string", "description": "string", "type": "string", "symbol": "emoji", "quantity": number, "cost": number, "grade": "string" }],
     "abilityShop": [{ "name": "string", "description": "string", "symbol": "emoji", "grade": "string", "cost": number, "abilityCost": [], "cooldown": number }]
   }`);
-  }
+    }
 
-  if (config.includeStartingChoices) {
-    advancedSections += `
+    if (config.includeStartingChoices) {
+      instructions += `
 STARTING CHOICES (2-4):
-Custom starting choices instead of a simple "Start Story" button.
-Each choice can have different narrative paths, skill checks, or requirements.
+Custom starting choices instead of "Start Story".
 `;
-    schemaFields.push(`"startingChoices": [
+      schemaFields.push(`"startingChoices": [
     {
       "text": "string",
       "intro_override": "string (optional alternate intro)",
@@ -1337,26 +1471,24 @@ Each choice can have different narrative paths, skill checks, or requirements.
       "item_used": "string (optional)"
     }
   ]`);
-  }
+    }
 
-  // If no advanced features selected, just return empty object
-  if (schemaFields.length === 0) {
-    return `${basePrompt}
+    if (schemaFields.length === 0) {
+      return `${basePrompt}
 
-STAGE 4: ADVANCED FEATURES
-No advanced features were selected for this adventure.
+STAGE 4C: UPGRADES & STARTING CHOICES
+No upgrade shop or starting choices are enabled.
 
 OUTPUT JSON SCHEMA:
 {}
 
 Output an empty JSON object.`;
-  }
+    }
 
-  return `${basePrompt}
+    return `${basePrompt}
 
-STAGE 4: ADVANCED FEATURES
-Generate advanced configuration for the adventure.
-${advancedSections}
+STAGE 4C: UPGRADES & STARTING CHOICES
+${instructions}
 
 OUTPUT JSON SCHEMA:
 {
@@ -1364,6 +1496,15 @@ OUTPUT JSON SCHEMA:
 }
 
 Remember: Output ONLY the JSON object, nothing else.`;
+  }
+
+  // Fallback - should never reach here
+  return `${basePrompt}
+
+Unknown stage: ${stage}
+
+OUTPUT JSON SCHEMA:
+{}`;
 }
 
 /**
@@ -1395,8 +1536,8 @@ export function buildBigAdventureMessages(
       previousResults.storyTemplate?.stats &&
       previousResults.storyTemplate.stats.length > 0
     ) {
-      // For advanced stage, include full stat details for preset creation
-      if (stage === "advanced") {
+      // For advanced-presets stage, include full stat details for preset creation
+      if (stage === "advanced-presets") {
         contextMessage += `\nStats (use these for presets, adjust values per build):\n`;
         previousResults.storyTemplate.stats.forEach((s) => {
           contextMessage += `- ${s.name} (${s.symbol || "📊"}): ${
@@ -1413,8 +1554,8 @@ export function buildBigAdventureMessages(
       previousResults.storyTemplate?.resources &&
       previousResults.storyTemplate.resources.length > 0
     ) {
-      // For advanced stage, include full resource details for preset creation
-      if (stage === "advanced") {
+      // For advanced-presets stage, include full resource details for preset creation
+      if (stage === "advanced-presets") {
         contextMessage += `\nResources (use these for presets, adjust values per build):\n`;
         previousResults.storyTemplate.resources.forEach((r) => {
           contextMessage += `- ${r.name} (${r.symbol || "📦"}): ${
@@ -1765,12 +1906,18 @@ export function parseBigAdventureStageOutput(
       };
     }
 
-    if (stage === "content") {
+    // Content substages
+    if (stage === "content-lore") {
       return {
         storyTemplate: {
-          inventory: parsed.inventory,
           lore: parsed.lore,
-          relationships: parsed.relationships,
+        },
+      };
+    }
+
+    if (stage === "content-achievements") {
+      return {
+        storyTemplate: {
           achievements: parsed.achievements,
           quests: parsed.quests,
           plot_beats: parsed.plot_beats,
@@ -1778,12 +1925,36 @@ export function parseBigAdventureStageOutput(
       };
     }
 
-    if (stage === "advanced") {
+    if (stage === "content-items") {
+      return {
+        storyTemplate: {
+          inventory: parsed.inventory,
+          relationships: parsed.relationships,
+        },
+      };
+    }
+
+    // Advanced substages
+    if (stage === "advanced-presets") {
       return {
         storyTemplate: {
           presets: parsed.presets,
-          mythicState: parsed.mythicState,
+        },
+      };
+    }
+
+    if (stage === "advanced-tables") {
+      return {
+        storyTemplate: {
+          agmtState: parsed.agmtState,
           customTables: parsed.customTables,
+        },
+      };
+    }
+
+    if (stage === "advanced-other") {
+      return {
+        storyTemplate: {
           upgradeSettings: parsed.upgradeSettings,
         },
         startingChoices: parsed.startingChoices,
@@ -1877,21 +2048,29 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
     stages.push("mechanics");
   }
 
-  if (stageConfigs.content?.enabled !== false) {
-    stages.push("content");
+  // Content substages - all enabled if content stage is enabled
+  const contentEnabled = stageConfigs.content?.enabled !== false;
+
+  if (contentEnabled) {
+    stages.push("content-lore");
+    stages.push("content-achievements");
+    stages.push("content-items");
   }
 
-  // Only add advanced stage if any advanced features are enabled AND stage is enabled
+  // Advanced substages - only if specific features are enabled AND advanced stage is enabled
   const advancedEnabled = stageConfigs.advanced?.enabled !== false;
-  const hasAdvancedFeatures =
-    config.includeMythic ||
-    config.includeUpgradeShop ||
-    config.includeCustomTables ||
-    config.includePresets ||
-    config.includeStartingChoices;
 
-  if (advancedEnabled && hasAdvancedFeatures) {
-    stages.push("advanced");
+  if (advancedEnabled && config.includePresets) {
+    stages.push("advanced-presets");
+  }
+  if (advancedEnabled && (config.includeAGMT || config.includeCustomTables)) {
+    stages.push("advanced-tables");
+  }
+  if (
+    advancedEnabled &&
+    (config.includeUpgradeShop || config.includeStartingChoices)
+  ) {
+    stages.push("advanced-other");
   }
 
   return stages;
@@ -1929,32 +2108,38 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
   const inputEstimates: Record<GenerationStage, number> = {
     core: 2000,
     mechanics: 3000,
-    content: 4000,
-    advanced: 5000,
+    "content-lore": 3500,
+    "content-achievements": 3000,
+    "content-items": 2500,
+    "advanced-presets": 4000,
+    "advanced-tables": 3000,
+    "advanced-other": 3000,
   };
 
   let totalInput = 0;
   let totalOutput = 0;
 
   for (const stage of stages) {
-    const stageConfig = stageConfigs[stage] || DEFAULT_STAGE_CONFIGS[stage];
+    const stageConfig = getSubstageConfig(stage, stageConfigs);
     const baseInput = inputEstimates[stage];
     let outputForStage = stageConfig.maxOutputTokens || config.maxOutputTokens;
 
-    if (stage === "content") {
-      // Calculate content multiplier to estimate additional output needed
-      // Higher iterations = more content = needs more output tokens
-      const avgContentMultiplier =
-        (contentIterations.lore +
-          contentIterations.achievements +
-          contentIterations.plotBeats +
-          contentIterations.relationships +
+    if (stage === "content-lore") {
+      // Scale lore output by iteration multiplier
+      const outputMultiplier = Math.min(2, contentIterations.lore);
+      outputForStage = Math.round(outputForStage * outputMultiplier);
+    } else if (stage === "content-achievements") {
+      const avgMultiplier =
+        (contentIterations.achievements +
           contentIterations.quests +
-          contentIterations.inventory) /
-        6; // Average of all multipliers
-
-      // Scale output estimate by average multiplier (capped at 2x since it's one response)
-      const outputMultiplier = Math.min(2, avgContentMultiplier);
+          contentIterations.plotBeats) /
+        3;
+      const outputMultiplier = Math.min(2, avgMultiplier);
+      outputForStage = Math.round(outputForStage * outputMultiplier);
+    } else if (stage === "content-items") {
+      const avgMultiplier =
+        (contentIterations.inventory + contentIterations.relationships) / 2;
+      const outputMultiplier = Math.min(2, avgMultiplier);
       outputForStage = Math.round(outputForStage * outputMultiplier);
     }
 
@@ -2155,7 +2340,7 @@ EXISTING CONTENT SUMMARY:`;
     },
     inventory: {
       instruction:
-        "Generate 3-5 starting items. Types: normal, consumable, story, misc. Grades: common, uncommon, rare, epic, legendary, mythic.",
+        "Generate 3-5 starting items. Types: normal, consumable, story, misc. Grades: common, uncommon, rare, epic, legendary, agmt.",
       schema: `{ "inventory": [{ "name": "string", "quantity": number, "description": "string", "type": "string", "grade": "string", "symbol": "emoji" }] }`,
     },
     lore: {
@@ -2223,9 +2408,9 @@ Write full, standalone content - not fragments!`,
       schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string (2-3 paragraphs)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "stats": [...], "resources": [...], "inventory": [...], "abilities": [...], "authorNotes": "string" }] }`,
       count: Math.round(counts.presets * durationMultiplier),
     },
-    mythic: {
+    agmt: {
       instruction: "Generate Advanced RPG Tools initial state for solo play.",
-      schema: `{ "mythicState": { "chaosFactor": number (1-9), "sceneCount": 0, "threads": [{ "id": "thread_xxx", "description": "string", "status": "active" }], "characters": [{ "id": "char_xxx", "name": "string", "role": "string", "status": "active" }], "skillCheckHistory": [], "currentStreak": 0, "lastChaosAdjustment": 0 } }`,
+      schema: `{ "agmtState": { "chaosFactor": number (1-9), "sceneCount": 0, "threads": [{ "id": "thread_xxx", "description": "string", "status": "active" }], "characters": [{ "id": "char_xxx", "name": "string", "role": "string", "status": "active" }], "skillCheckHistory": [], "currentStreak": 0, "lastChaosAdjustment": 0 } }`,
     },
     customTables: {
       instruction: `Generate ${Math.round(
@@ -2364,8 +2549,8 @@ export function parseRegenerateSectionOutput(
         return { storyTemplate: { relationships: parsed.relationships } };
       case "presets":
         return { storyTemplate: { presets: parsed.presets } };
-      case "mythic":
-        return { storyTemplate: { mythicState: parsed.mythicState } };
+      case "agmt":
+        return { storyTemplate: { agmtState: parsed.agmtState } };
       case "customTables":
         return { storyTemplate: { customTables: parsed.customTables } };
       case "upgradeShop":
@@ -2582,7 +2767,7 @@ ${existingItemsPreview || "(none)"}`;
     },
     inventory: {
       instruction: `Generate NEW inventory items that complement the existing ones. Mix item types. Generate as many as possible.`,
-      schema: `{ "inventory": [{ "name": "string", "description": "string", "type": "normal|consumable|story|misc", "grade": "common|uncommon|rare|epic|mythic", "stat": "string (optional)", "symbol": "emoji", "durability": number, "maxDurability": number }] }`,
+      schema: `{ "inventory": [{ "name": "string", "description": "string", "type": "normal|consumable|story|misc", "grade": "common|uncommon|rare|epic|agmt", "stat": "string (optional)", "symbol": "emoji", "durability": number, "maxDurability": number }] }`,
     },
     lore: {
       instruction: `Generate NEW DETAILED lore entries that expand the world. Generate as many as the output budget allows.
@@ -2630,7 +2815,7 @@ Each preset's "playerSummary" is a COMPLETE REPLACEMENT (2-3 paragraphs) for the
 Write full, standalone content - not fragments!`,
       schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string (2-3 paragraphs)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "stats": [...], "resources": [...], "inventory": [...], "abilities": [...], "authorNotes": "string" }] }`,
     },
-    mythic: {
+    agmt: {
       instruction: "",
       schema: "",
     },

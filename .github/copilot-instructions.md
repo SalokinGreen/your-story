@@ -296,7 +296,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - consumable: Advantage on use, consumed immediately
   - story: Advantage on use, never breaks/consumed (quest items)
   - misc: Prevents disadvantage, never breaks/consumed
-- **Item Grades**: common (+0), uncommon (+1), rare (+2), epic (+3), mythic (+5 and infinite durability)
+- **Item Grades**: common (+0), uncommon (+1), rare (+2), epic (+3), agmt (+5 and infinite durability)
 - **Ability System**:
   - Abilities are skills, spells, or techniques with resource/variable costs
   - AbilityGrade: "novice" (+0), "apprentice" (+1), "adept" (+2), "expert" (+3), "master" (+4), "legendary" (+5)

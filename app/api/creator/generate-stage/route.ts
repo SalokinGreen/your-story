@@ -17,7 +17,7 @@ import {
   BigAdventureConfig,
   BigAdventureResult,
   GenerationStage,
-  DEFAULT_STAGE_CONFIGS,
+  getSubstageConfig,
   getStageInfo,
   buildBigAdventureMessages,
   parseBigAdventureStageOutput,
@@ -51,6 +51,8 @@ interface RequestBody {
   novelaiKey?: string;
   // For continuation after timeout - the partial content generated so far
   continueFrom?: string;
+  // Signal to wrap up the current stage early
+  finishEarly?: boolean;
 }
 
 function getApiKey(
@@ -400,6 +402,7 @@ export async function POST(req: NextRequest) {
           deepseekKey,
           novelaiKey,
           continueFrom,
+          finishEarly,
         } = body;
 
         if (!config || !config.prompt) {
@@ -473,8 +476,7 @@ export async function POST(req: NextRequest) {
         }
 
         const stageInfo = getStageInfo(stage);
-        const stageConfig =
-          config.stageConfigs?.[stage] || DEFAULT_STAGE_CONFIGS[stage];
+        const stageConfig = getSubstageConfig(stage, config.stageConfigs);
         const maxOutputTokens =
           stageConfig.maxOutputTokens || config.maxOutputTokens;
         const temperature = config.temperature ?? 0.8;
@@ -508,8 +510,53 @@ export async function POST(req: NextRequest) {
         let totalCompletionTokens = 0;
         let continuationAttempts = 0;
 
-        // If continuing from partial content, start from there instead of fresh
-        if (continueFrom && continueFrom.trim()) {
+        // Handle "Finish Early" request - wrap up with minimal content
+        if (finishEarly && continueFrom && continueFrom.trim()) {
+          fullContent = continueFrom;
+
+          // Build a "wrap up" prompt to close the JSON cleanly
+          const wrapUpPrompt = `IMPORTANT: The user has requested to finish this stage early. Please complete the JSON output NOW with minimal additional content. Close all open arrays and objects properly. Do NOT add more items - just close the structure cleanly. Output ONLY the remaining JSON to close the structure, nothing else.`;
+
+          const wrapUpMessages = [
+            ...messages.map((m) => ({ role: m.role, content: m.content })),
+            { role: "assistant", content: fullContent },
+            { role: "user", content: wrapUpPrompt },
+          ];
+
+          logger.info(
+            `Stage ${stage} finishing early from ${fullContent.length} chars`
+          );
+
+          // Notify client we're wrapping up
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "stage_continuation",
+                stage,
+                attempt: 1,
+                maxAttempts: 1,
+                message: "Finishing stage early, closing JSON...",
+              })}\n\n`
+            )
+          );
+
+          // Request wrap-up with low token count
+          const wrapUpResult = await streamAIResponse(
+            wrapUpMessages,
+            modelConfig,
+            apiKey,
+            500, // Just enough tokens to close the JSON
+            0.1, // Very low temperature for consistent closing
+            controller,
+            encoder,
+            stage,
+            heartbeatInterval
+          );
+
+          fullContent += wrapUpResult.content;
+          totalPromptTokens += wrapUpResult.promptTokens;
+          totalCompletionTokens += wrapUpResult.completionTokens;
+        } else if (continueFrom && continueFrom.trim()) {
           fullContent = continueFrom;
 
           // Check if the existing content is incomplete
@@ -570,79 +617,82 @@ export async function POST(req: NextRequest) {
           totalCompletionTokens += initialResult.completionTokens;
         }
 
-        // Check if JSON is incomplete and attempt continuation
-        let incompleteCheck = detectIncompleteJSON(fullContent);
+        // Skip normal continuation loop if we already finished early
+        if (!finishEarly) {
+          // Check if JSON is incomplete and attempt continuation
+          let incompleteCheck = detectIncompleteJSON(fullContent);
 
-        while (
-          incompleteCheck.isIncomplete &&
-          continuationAttempts < MAX_CONTINUATIONS
-        ) {
-          continuationAttempts++;
+          while (
+            incompleteCheck.isIncomplete &&
+            continuationAttempts < MAX_CONTINUATIONS
+          ) {
+            continuationAttempts++;
 
-          // Notify about continuation
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "stage_continuation",
-                stage,
-                attempt: continuationAttempts,
-                maxAttempts: MAX_CONTINUATIONS,
-                message: `JSON incomplete, continuing generation (attempt ${continuationAttempts}/${MAX_CONTINUATIONS})...`,
-              })}\n\n`
-            )
-          );
+            // Notify about continuation
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "stage_continuation",
+                  stage,
+                  attempt: continuationAttempts,
+                  maxAttempts: MAX_CONTINUATIONS,
+                  message: `JSON incomplete, continuing generation (attempt ${continuationAttempts}/${MAX_CONTINUATIONS})...`,
+                })}\n\n`
+              )
+            );
 
-          logger.info(
-            `Stage ${stage} JSON incomplete, attempting continuation ${continuationAttempts}/${MAX_CONTINUATIONS}`
-          );
+            logger.info(
+              `Stage ${stage} JSON incomplete, attempting continuation ${continuationAttempts}/${MAX_CONTINUATIONS}`
+            );
 
-          // Build continuation prompt
-          const continuationPrompt = buildContinuationPrompt(
-            incompleteCheck.truncatedContent,
-            stage
-          );
+            // Build continuation prompt
+            const continuationPrompt = buildContinuationPrompt(
+              incompleteCheck.truncatedContent,
+              stage
+            );
 
-          // Create continuation messages
-          const continuationMessages = [
-            ...messages.map((m) => ({ role: m.role, content: m.content })),
-            { role: "assistant", content: fullContent },
-            { role: "user", content: continuationPrompt },
-          ];
+            // Create continuation messages
+            const continuationMessages = [
+              ...messages.map((m) => ({ role: m.role, content: m.content })),
+              { role: "assistant", content: fullContent },
+              { role: "user", content: continuationPrompt },
+            ];
 
-          // Request continuation
-          const continuationResult = await streamAIResponse(
-            continuationMessages,
-            modelConfig,
-            apiKey,
-            Math.min(maxOutputTokens, 4000),
-            0.3, // Lower temperature for more consistent continuation
-            controller,
-            encoder,
-            stage,
-            heartbeatInterval
-          );
+            // Request continuation
+            const continuationResult = await streamAIResponse(
+              continuationMessages,
+              modelConfig,
+              apiKey,
+              Math.min(maxOutputTokens, 4000),
+              0.3, // Lower temperature for more consistent continuation
+              controller,
+              encoder,
+              stage,
+              heartbeatInterval
+            );
 
-          fullContent += continuationResult.content;
-          totalPromptTokens += continuationResult.promptTokens;
-          totalCompletionTokens += continuationResult.completionTokens;
+            fullContent += continuationResult.content;
+            totalPromptTokens += continuationResult.promptTokens;
+            totalCompletionTokens += continuationResult.completionTokens;
 
-          // Check again
-          incompleteCheck = detectIncompleteJSON(fullContent);
-        }
+            // Check again
+            incompleteCheck = detectIncompleteJSON(fullContent);
+          }
 
-        if (incompleteCheck.isIncomplete) {
-          logger.warn(
-            `Stage ${stage} still incomplete after ${MAX_CONTINUATIONS} continuation attempts`
-          );
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "stage_warning",
-                stage,
-                message: `Stage ${stage} content may be incomplete. JSON repair will be attempted.`,
-              })}\n\n`
-            )
-          );
+          if (incompleteCheck.isIncomplete) {
+            logger.warn(
+              `Stage ${stage} still incomplete after ${MAX_CONTINUATIONS} continuation attempts`
+            );
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "stage_warning",
+                  stage,
+                  message: `Stage ${stage} content may be incomplete. JSON repair will be attempted.`,
+                })}\n\n`
+              )
+            );
+          }
         }
 
         // Parse the stage output

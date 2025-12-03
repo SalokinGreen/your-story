@@ -10,9 +10,9 @@ import {
   PlotBeat,
   Quest,
   Relationship,
-  MythicState,
-  MythicThread,
-  MythicCharacter,
+  AGMTState,
+  AGMTThread,
+  AGMTCharacter,
   CustomTable,
   Variable,
   NumberVariable,
@@ -1682,7 +1682,7 @@ function InventoryEditor({
                   <div>
                     <label className="block text-xs text-blue-200/60 mb-1">
                       Durability{" "}
-                      {editInventoryItem.grade === "mythic"
+                      {editInventoryItem.grade === "agmt"
                         ? "(∞)"
                         : `(max ${getMaxDurability(
                             (editInventoryItem.grade as ItemGrade) || "common"
@@ -1691,7 +1691,7 @@ function InventoryEditor({
                     <input
                       type="number"
                       value={
-                        editInventoryItem.grade === "mythic"
+                        editInventoryItem.grade === "agmt"
                           ? "∞"
                           : editInventoryItem.durability ??
                             getMaxDurability(
@@ -1713,7 +1713,7 @@ function InventoryEditor({
                           ),
                         })
                       }
-                      disabled={editInventoryItem.grade === "mythic"}
+                      disabled={editInventoryItem.grade === "agmt"}
                       placeholder="Durability"
                       className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white disabled:opacity-50"
                     />
@@ -1812,7 +1812,7 @@ function InventoryEditor({
                     <span className="text-xs text-blue-200/40">
                       Durability:
                     </span>
-                    {item.grade === "mythic" ? (
+                    {item.grade === "agmt" ? (
                       <span className="text-xs text-yellow-400">∞</span>
                     ) : (
                       <>
@@ -4701,7 +4701,7 @@ export default function MenuPage({
     | "tables"
     | "threads"
     | "characters"
-    | "mythic"
+    | "agmt"
     | "story"
     | "tts"
   >("basic");
@@ -5304,8 +5304,8 @@ export default function MenuPage({
                 { id: "variables", label: "Variables", icon: "Variable" },
                 { id: "tables", label: "Tables", icon: "Dices" },
                 { id: "relationships", label: "Relationships", icon: "Users" },
-                { id: "mythic", label: "Mythic", icon: "Sparkles" },
-                ...(storyData.mythicState
+                { id: "agmt", label: "AGMT", icon: "Sparkles" },
+                ...(storyData.agmtState
                   ? [
                       { id: "threads", label: "Threads", icon: "ListTodo" },
                       { id: "characters", label: "NPCs", icon: "Users" },
@@ -5429,7 +5429,7 @@ export default function MenuPage({
                 </div>
               )}
 
-              {activeTab === "threads" && storyData.mythicState && (
+              {activeTab === "threads" && storyData.agmtState && (
                 <div className="mt-4 space-y-6">
                   <div className="flex items-center justify-between">
                     <h4 className="text-lg font-bold text-white flex items-center gap-2">
@@ -5438,17 +5438,17 @@ export default function MenuPage({
                     </h4>
                     <button
                       onClick={() => {
-                        const newThread: MythicThread = {
+                        const newThread: AGMTThread = {
                           id: crypto.randomUUID(),
                           description: "",
                           status: "active",
                           createdAt: Date.now(),
                         };
                         onUpdateStoryData({
-                          mythicState: {
-                            ...storyData.mythicState!,
+                          agmtState: {
+                            ...storyData.agmtState!,
                             threads: [
-                              ...storyData.mythicState!.threads,
+                              ...storyData.agmtState!.threads,
                               newThread,
                             ],
                           },
@@ -5465,13 +5465,13 @@ export default function MenuPage({
                     <h5 className="text-sm font-semibold text-blue-200">
                       Active Threads (
                       {
-                        storyData.mythicState.threads.filter(
+                        storyData.agmtState.threads.filter(
                           (t) => t.status === "active"
                         ).length
                       }
                       )
                     </h5>
-                    {storyData.mythicState.threads
+                    {storyData.agmtState.threads
                       .filter((t) => t.status === "active")
                       .map((thread) => (
                         <div
@@ -5482,9 +5482,9 @@ export default function MenuPage({
                             value={thread.description}
                             onChange={(e) => {
                               onUpdateStoryData({
-                                mythicState: {
-                                  ...storyData.mythicState!,
-                                  threads: storyData.mythicState!.threads.map(
+                                agmtState: {
+                                  ...storyData.agmtState!,
+                                  threads: storyData.agmtState!.threads.map(
                                     (t) =>
                                       t.id === thread.id
                                         ? { ...t, description: e.target.value }
@@ -5506,15 +5506,14 @@ export default function MenuPage({
                               <button
                                 onClick={() => {
                                   onUpdateStoryData({
-                                    mythicState: {
-                                      ...storyData.mythicState!,
-                                      threads:
-                                        storyData.mythicState!.threads.map(
-                                          (t) =>
-                                            t.id === thread.id
-                                              ? { ...t, status: "closed" }
-                                              : t
-                                        ),
+                                    agmtState: {
+                                      ...storyData.agmtState!,
+                                      threads: storyData.agmtState!.threads.map(
+                                        (t) =>
+                                          t.id === thread.id
+                                            ? { ...t, status: "closed" }
+                                            : t
+                                      ),
                                     },
                                   });
                                   addNotification("Thread resolved", "success");
@@ -5533,10 +5532,10 @@ export default function MenuPage({
                                     icon: "Trash2",
                                     onConfirm: () => {
                                       onUpdateStoryData({
-                                        mythicState: {
-                                          ...storyData.mythicState!,
+                                        agmtState: {
+                                          ...storyData.agmtState!,
                                           threads:
-                                            storyData.mythicState!.threads.filter(
+                                            storyData.agmtState!.threads.filter(
                                               (t) => t.id !== thread.id
                                             ),
                                         },
@@ -5560,7 +5559,7 @@ export default function MenuPage({
                           </div>
                         </div>
                       ))}
-                    {storyData.mythicState.threads.filter(
+                    {storyData.agmtState.threads.filter(
                       (t) => t.status === "active"
                     ).length === 0 && (
                       <p className="text-sm text-blue-200/60 italic">
@@ -5573,14 +5572,14 @@ export default function MenuPage({
                     <summary className="px-4 py-3 cursor-pointer font-semibold text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
                       Closed Threads (
                       {
-                        storyData.mythicState.threads.filter(
+                        storyData.agmtState.threads.filter(
                           (t) => t.status === "closed"
                         ).length
                       }
                       )
                     </summary>
                     <div className="px-4 pb-4 space-y-3">
-                      {storyData.mythicState.threads
+                      {storyData.agmtState.threads
                         .filter((t) => t.status === "closed")
                         .map((thread) => (
                           <div
@@ -5594,15 +5593,14 @@ export default function MenuPage({
                               <button
                                 onClick={() => {
                                   onUpdateStoryData({
-                                    mythicState: {
-                                      ...storyData.mythicState!,
-                                      threads:
-                                        storyData.mythicState!.threads.map(
-                                          (t) =>
-                                            t.id === thread.id
-                                              ? { ...t, status: "active" }
-                                              : t
-                                        ),
+                                    agmtState: {
+                                      ...storyData.agmtState!,
+                                      threads: storyData.agmtState!.threads.map(
+                                        (t) =>
+                                          t.id === thread.id
+                                            ? { ...t, status: "active" }
+                                            : t
+                                      ),
                                     },
                                   });
                                   addNotification("Thread reopened", "success");
@@ -5614,10 +5612,10 @@ export default function MenuPage({
                               <button
                                 onClick={() => {
                                   onUpdateStoryData({
-                                    mythicState: {
-                                      ...storyData.mythicState!,
+                                    agmtState: {
+                                      ...storyData.agmtState!,
                                       threads:
-                                        storyData.mythicState!.threads.filter(
+                                        storyData.agmtState!.threads.filter(
                                           (t) => t.id !== thread.id
                                         ),
                                     },
@@ -5631,7 +5629,7 @@ export default function MenuPage({
                             </div>
                           </div>
                         ))}
-                      {storyData.mythicState.threads.filter(
+                      {storyData.agmtState.threads.filter(
                         (t) => t.status === "closed"
                       ).length === 0 && (
                         <p className="text-sm text-blue-200/60 italic py-2">
@@ -5643,7 +5641,7 @@ export default function MenuPage({
                 </div>
               )}
 
-              {activeTab === "characters" && storyData.mythicState && (
+              {activeTab === "characters" && storyData.agmtState && (
                 <div className="mt-4 space-y-6">
                   <div className="flex items-center justify-between">
                     <h4 className="text-lg font-bold text-white flex items-center gap-2">
@@ -5652,7 +5650,7 @@ export default function MenuPage({
                     </h4>
                     <button
                       onClick={() => {
-                        const newChar: MythicCharacter = {
+                        const newChar: AGMTCharacter = {
                           id: crypto.randomUUID(),
                           name: "",
                           role: "",
@@ -5660,10 +5658,10 @@ export default function MenuPage({
                           createdAt: Date.now(),
                         };
                         onUpdateStoryData({
-                          mythicState: {
-                            ...storyData.mythicState!,
+                          agmtState: {
+                            ...storyData.agmtState!,
                             characters: [
-                              ...storyData.mythicState!.characters,
+                              ...storyData.agmtState!.characters,
                               newChar,
                             ],
                           },
@@ -5677,7 +5675,7 @@ export default function MenuPage({
                   </div>
 
                   <div className="grid gap-3">
-                    {storyData.mythicState.characters.map((char) => (
+                    {storyData.agmtState.characters.map((char) => (
                       <div
                         key={char.id}
                         className={`p-4 rounded-lg border space-y-3 ${
@@ -5694,10 +5692,10 @@ export default function MenuPage({
                             value={char.name}
                             onChange={(e) => {
                               onUpdateStoryData({
-                                mythicState: {
-                                  ...storyData.mythicState!,
+                                agmtState: {
+                                  ...storyData.agmtState!,
                                   characters:
-                                    storyData.mythicState!.characters.map((c) =>
+                                    storyData.agmtState!.characters.map((c) =>
                                       c.id === char.id
                                         ? { ...c, name: e.target.value }
                                         : c
@@ -5712,10 +5710,10 @@ export default function MenuPage({
                             value={char.status}
                             onChange={(e) => {
                               onUpdateStoryData({
-                                mythicState: {
-                                  ...storyData.mythicState!,
+                                agmtState: {
+                                  ...storyData.agmtState!,
                                   characters:
-                                    storyData.mythicState!.characters.map((c) =>
+                                    storyData.agmtState!.characters.map((c) =>
                                       c.id === char.id
                                         ? {
                                             ...c,
@@ -5737,14 +5735,14 @@ export default function MenuPage({
                           value={char.role}
                           onChange={(e) => {
                             onUpdateStoryData({
-                              mythicState: {
-                                ...storyData.mythicState!,
-                                characters:
-                                  storyData.mythicState!.characters.map((c) =>
+                              agmtState: {
+                                ...storyData.agmtState!,
+                                characters: storyData.agmtState!.characters.map(
+                                  (c) =>
                                     c.id === char.id
                                       ? { ...c, role: e.target.value }
                                       : c
-                                  ),
+                                ),
                               },
                             });
                           }}
@@ -5768,10 +5766,10 @@ export default function MenuPage({
                                 icon: "Trash2",
                                 onConfirm: () => {
                                   onUpdateStoryData({
-                                    mythicState: {
-                                      ...storyData.mythicState!,
+                                    agmtState: {
+                                      ...storyData.agmtState!,
                                       characters:
-                                        storyData.mythicState!.characters.filter(
+                                        storyData.agmtState!.characters.filter(
                                           (c) => c.id !== char.id
                                         ),
                                     },
@@ -5794,7 +5792,7 @@ export default function MenuPage({
                         </div>
                       </div>
                     ))}
-                    {storyData.mythicState.characters.length === 0 && (
+                    {storyData.agmtState.characters.length === 0 && (
                       <p className="text-sm text-blue-200/60 italic">
                         No NPCs added yet. Click "New NPC" to add one.
                       </p>
@@ -5803,7 +5801,7 @@ export default function MenuPage({
                 </div>
               )}
 
-              {activeTab === "mythic" && (
+              {activeTab === "agmt" && (
                 <div className="mt-4 space-y-6">
                   <h4 className="text-lg font-bold text-white flex items-center gap-2">
                     <DynamicIcon name="Sparkles" className="w-6 h-6" />
@@ -5818,19 +5816,19 @@ export default function MenuPage({
                           Enable Advanced RPG Tools
                         </label>
                         <p className="text-xs text-blue-200/60">
-                          Use Mythic Game Master Emulator for dynamic story
+                          Use AGMT Game Master Emulator for dynamic story
                           generation
                         </p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={!!storyData.mythicState}
+                          checked={!!storyData.agmtState}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              // Enable Mythic with default state
+                              // Enable AGMT with default state
                               onUpdateStoryData({
-                                mythicState: {
+                                agmtState: {
                                   chaosFactor: 5,
                                   threads: [],
                                   characters: [],
@@ -5841,9 +5839,9 @@ export default function MenuPage({
                                 },
                               });
                             } else {
-                              // Disable Mythic
+                              // Disable AGMT
                               onUpdateStoryData({
-                                mythicState: undefined,
+                                agmtState: undefined,
                               });
                             }
                           }}
@@ -5854,22 +5852,22 @@ export default function MenuPage({
                     </div>
                   </div>
 
-                  {storyData.mythicState && (
+                  {storyData.agmtState && (
                     <>
                       {/* Chaos Factor */}
                       <div className="p-6 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
                         <label className="block text-sm font-semibold text-blue-200 mb-3">
-                          Chaos Factor: {storyData.mythicState.chaosFactor}
+                          Chaos Factor: {storyData.agmtState.chaosFactor}
                         </label>
                         <input
                           type="range"
                           min="1"
                           max="9"
-                          value={storyData.mythicState.chaosFactor}
+                          value={storyData.agmtState.chaosFactor}
                           onChange={(e) => {
                             onUpdateStoryData({
-                              mythicState: {
-                                ...storyData.mythicState!,
+                              agmtState: {
+                                ...storyData.agmtState!,
                                 chaosFactor: parseInt(e.target.value),
                               },
                             });
@@ -5877,15 +5875,15 @@ export default function MenuPage({
                           className="w-full h-3 bg-blue-900/30 rounded-lg appearance-none cursor-pointer"
                         />
                         <p className="text-sm text-blue-200/60 mt-2">
-                          {storyData.mythicState.chaosFactor <= 3 &&
+                          {storyData.agmtState.chaosFactor <= 3 &&
                             "Very Ordered - Things go as expected"}
-                          {storyData.mythicState.chaosFactor > 3 &&
-                            storyData.mythicState.chaosFactor <= 5 &&
+                          {storyData.agmtState.chaosFactor > 3 &&
+                            storyData.agmtState.chaosFactor <= 5 &&
                             "Normal - Standard chaos level"}
-                          {storyData.mythicState.chaosFactor > 5 &&
-                            storyData.mythicState.chaosFactor <= 7 &&
+                          {storyData.agmtState.chaosFactor > 5 &&
+                            storyData.agmtState.chaosFactor <= 7 &&
                             "Chaotic - Unexpected twists likely"}
-                          {storyData.mythicState.chaosFactor > 7 &&
+                          {storyData.agmtState.chaosFactor > 7 &&
                             "Extreme Chaos - Anything can happen!"}
                         </p>
                       </div>
@@ -5893,17 +5891,17 @@ export default function MenuPage({
                       {/* Scene Count */}
                       <div className="p-6 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
                         <label className="block text-sm font-semibold text-blue-200 mb-3">
-                          Scene Count: {storyData.mythicState.sceneCount}
+                          Scene Count: {storyData.agmtState.sceneCount}
                         </label>
                         <div className="flex gap-2">
                           <button
                             onClick={() => {
                               onUpdateStoryData({
-                                mythicState: {
-                                  ...storyData.mythicState!,
+                                agmtState: {
+                                  ...storyData.agmtState!,
                                   sceneCount: Math.max(
                                     0,
-                                    storyData.mythicState!.sceneCount - 1
+                                    storyData.agmtState!.sceneCount - 1
                                   ),
                                 },
                               });
@@ -5915,10 +5913,10 @@ export default function MenuPage({
                           <button
                             onClick={() => {
                               onUpdateStoryData({
-                                mythicState: {
-                                  ...storyData.mythicState!,
+                                agmtState: {
+                                  ...storyData.agmtState!,
                                   sceneCount:
-                                    storyData.mythicState!.sceneCount + 1,
+                                    storyData.agmtState!.sceneCount + 1,
                                 },
                               });
                             }}
@@ -5929,8 +5927,8 @@ export default function MenuPage({
                           <button
                             onClick={() => {
                               onUpdateStoryData({
-                                mythicState: {
-                                  ...storyData.mythicState!,
+                                agmtState: {
+                                  ...storyData.agmtState!,
                                   sceneCount: 0,
                                 },
                               });
@@ -5943,7 +5941,7 @@ export default function MenuPage({
                       </div>
 
                       {/* Performance Tracking */}
-                      {storyData.mythicState && (
+                      {storyData.agmtState && (
                         <div className="p-6 bg-gradient to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 rounded-lg border-2 border-gray-300 dark:border-gray-700">
                           <h4 className="text-sm font-semibold text-blue-200 mb-4 flex items-center gap-2">
                             <DynamicIcon
@@ -5961,31 +5959,30 @@ export default function MenuPage({
                               </span>
                               <span
                                 className={`text-sm font-bold ${
-                                  storyData.mythicState.currentStreak > 0
+                                  storyData.agmtState.currentStreak > 0
                                     ? "text-green-400"
-                                    : storyData.mythicState.currentStreak < 0
+                                    : storyData.agmtState.currentStreak < 0
                                     ? "text-red-400"
                                     : "text-gray-400"
                                 }`}
                               >
-                                {storyData.mythicState.currentStreak > 0 && "+"}
-                                {storyData.mythicState.currentStreak || 0}
-                                {Math.abs(
-                                  storyData.mythicState.currentStreak
-                                ) >= 3 && " ??"}
+                                {storyData.agmtState.currentStreak > 0 && "+"}
+                                {storyData.agmtState.currentStreak || 0}
+                                {Math.abs(storyData.agmtState.currentStreak) >=
+                                  3 && " ??"}
                               </span>
                             </div>
                             <div className="h-2 bg-blue-900/30 rounded-full overflow-hidden">
                               <div
                                 className={`h-full transition-all ${
-                                  storyData.mythicState.currentStreak > 0
+                                  storyData.agmtState.currentStreak > 0
                                     ? "bg-green-500"
                                     : "bg-red-500"
                                 }`}
                                 style={{
                                   width: `${Math.min(
                                     Math.abs(
-                                      storyData.mythicState.currentStreak
+                                      storyData.agmtState.currentStreak
                                     ) * 20,
                                     100
                                   )}%`,
@@ -5995,16 +5992,15 @@ export default function MenuPage({
                           </div>
 
                           {/* Recent Performance */}
-                          {storyData.mythicState.skillCheckHistory.length >
-                            0 && (
+                          {storyData.agmtState.skillCheckHistory.length > 0 && (
                             <div>
                               <span className="text-xs text-blue-200/60 block mb-2">
                                 Last{" "}
-                                {storyData.mythicState.skillCheckHistory.length}{" "}
+                                {storyData.agmtState.skillCheckHistory.length}{" "}
                                 Checks
                               </span>
                               <div className="flex gap-1 flex-wrap">
-                                {storyData.mythicState.skillCheckHistory
+                                {storyData.agmtState.skillCheckHistory
                                   .slice(-10)
                                   .map((check, i) => (
                                     <div
@@ -6025,7 +6021,7 @@ export default function MenuPage({
                               <div className="flex justify-between mt-2 text-xs">
                                 <span className="text-green-400">
                                   {
-                                    storyData.mythicState.skillCheckHistory.filter(
+                                    storyData.agmtState.skillCheckHistory.filter(
                                       (c) => c.success
                                     ).length
                                   }{" "}
@@ -6033,7 +6029,7 @@ export default function MenuPage({
                                 </span>
                                 <span className="text-red-400">
                                   {
-                                    storyData.mythicState.skillCheckHistory.filter(
+                                    storyData.agmtState.skillCheckHistory.filter(
                                       (c) => !c.success
                                     ).length
                                   }{" "}
@@ -6045,14 +6041,14 @@ export default function MenuPage({
 
                           {/* Next Adjustment Info */}
                           <div className="mt-4 pt-4 border-t border-blue-700/40 text-xs text-blue-300/50">
-                            {storyData.mythicState.sceneCount -
-                              storyData.mythicState.lastChaosAdjustment <
+                            {storyData.agmtState.sceneCount -
+                              storyData.agmtState.lastChaosAdjustment <
                             2 ? (
                               <span className="flex items-center gap-1">
                                 <DynamicIcon name="Clock" className="w-3 h-3" />
                                 Chaos stabilizing (adjusted recently)
                               </span>
-                            ) : storyData.mythicState.skillCheckHistory.length <
+                            ) : storyData.agmtState.skillCheckHistory.length <
                               5 ? (
                               <span className="flex items-center gap-1">
                                 <DynamicIcon
@@ -6060,7 +6056,7 @@ export default function MenuPage({
                                   className="w-3 h-3"
                                 />
                                 Building performance history (
-                                {storyData.mythicState.skillCheckHistory.length}
+                                {storyData.agmtState.skillCheckHistory.length}
                                 /5 checks)
                               </span>
                             ) : (
@@ -6078,7 +6074,7 @@ export default function MenuPage({
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
                           <div className="text-2xl font-bold text-purple-600">
                             {
-                              storyData.mythicState.threads.filter(
+                              storyData.agmtState.threads.filter(
                                 (t) => t.status === "active"
                               ).length
                             }
@@ -6090,7 +6086,7 @@ export default function MenuPage({
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
                           <div className="text-2xl font-bold text-purple-600">
                             {
-                              storyData.mythicState.characters.filter(
+                              storyData.agmtState.characters.filter(
                                 (c) => c.status === "active"
                               ).length
                             }
@@ -6102,7 +6098,7 @@ export default function MenuPage({
                         <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
                           <div className="text-2xl font-bold text-blue-200/60">
                             {
-                              storyData.mythicState.threads.filter(
+                              storyData.agmtState.threads.filter(
                                 (t) => t.status === "closed"
                               ).length
                             }
@@ -6113,7 +6109,7 @@ export default function MenuPage({
                         </div>
                         <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
                           <div className="text-2xl font-bold text-blue-200/60">
-                            {storyData.mythicState.characters.length}
+                            {storyData.agmtState.characters.length}
                           </div>
                           <div className="text-sm text-blue-200/60">
                             Total NPCs

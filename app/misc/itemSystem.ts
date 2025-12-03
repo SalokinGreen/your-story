@@ -16,7 +16,7 @@ export const GRADE_ORDER: ItemGrade[] = [
   "rare",
   "epic",
   "legendary",
-  "mythic",
+  "agmt",
 ];
 
 // Grade configuration
@@ -36,7 +36,7 @@ export interface SystemBonuses {
   rare: number;
   epic: number;
   legendary: number;
-  mythic: number;
+  agmt: number;
 }
 
 // Grade configurations
@@ -81,13 +81,13 @@ export const GRADE_CONFIG: Record<ItemGrade, GradeConfig> = {
     borderColor: "border-orange-500",
     label: "Legendary",
   },
-  mythic: {
+  agmt: {
     maxDurability: Infinity,
     color: "yellow",
     textColor: "text-yellow-300",
     bgColor: "bg-yellow-900/30",
     borderColor: "border-yellow-500",
-    label: "Mythic",
+    label: "AGMT",
   },
 };
 
@@ -100,7 +100,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     rare: 2,
     epic: 3,
     legendary: 4,
-    mythic: 5,
+    agmt: 5,
   },
   // 1d20: Linear, +1 = 5% improvement
   "1d20": {
@@ -109,7 +109,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     rare: 2,
     epic: 4,
     legendary: 5,
-    mythic: 6,
+    agmt: 6,
   },
   // 1d100: +5 per tier makes sense
   "1d100": {
@@ -118,7 +118,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     rare: 10,
     epic: 15,
     legendary: 20,
-    mythic: 25,
+    agmt: 25,
   },
   // Percentile: Same as 1d100
   percentile: {
@@ -127,7 +127,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     rare: 10,
     epic: 15,
     legendary: 20,
-    mythic: 25,
+    agmt: 25,
   },
   // PbtA: 2d6 system, +1 is HUGE (shifts entire tier)
   pbta: {
@@ -136,7 +136,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     rare: 1,
     epic: 2,
     legendary: 2,
-    mythic: 3,
+    agmt: 3,
   },
   // Fate: Ladder system, +1 shifts one step
   fate: {
@@ -145,7 +145,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     rare: 1,
     epic: 2,
     legendary: 2,
-    mythic: 3,
+    agmt: 3,
   },
   // YZE: Dice pool system, bonus = extra dice
   yze: {
@@ -154,7 +154,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     rare: 2,
     epic: 3,
     legendary: 4,
-    mythic: 5,
+    agmt: 5,
   },
   // Explosive: Die size steps (d4→d6→d8→d10→d12→d20)
   explosive: {
@@ -163,7 +163,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     rare: 1,
     epic: 2, // +2 die steps
     legendary: 2,
-    mythic: 3,
+    agmt: 3,
   },
   // Narrative: Simple bonuses
   narrative: {
@@ -172,7 +172,7 @@ export const SYSTEM_BONUSES: Record<string, SystemBonuses> = {
     rare: 1,
     epic: 2,
     legendary: 2,
-    mythic: 3,
+    agmt: 3,
   },
 };
 
@@ -211,8 +211,8 @@ export function applyDurabilityLoss(
   item: InventoryItem,
   failed: boolean
 ): { newDurability: number; broken: boolean; durabilityLost: number } {
-  // Mythic items never lose durability
-  if (item.grade === "mythic") {
+  // AGMT items never lose durability
+  if (item.grade === "agmt") {
     return {
       newDurability: item.durability ?? Infinity,
       broken: false,
@@ -276,7 +276,7 @@ export function repairItem(
   item: InventoryItem,
   amount: number
 ): { newDurability: number; amountRepaired: number } {
-  if (item.grade === "mythic") {
+  if (item.grade === "agmt") {
     return { newDurability: Infinity, amountRepaired: 0 };
   }
 
@@ -296,7 +296,7 @@ export function damageItem(
   item: InventoryItem,
   amount: number
 ): { newDurability: number; broken: boolean; amountDamaged: number } {
-  if (item.grade === "mythic") {
+  if (item.grade === "agmt") {
     return { newDurability: Infinity, broken: false, amountDamaged: 0 };
   }
 
@@ -326,7 +326,7 @@ export function upgradeItemGrade(
     "rare",
     "epic",
     "legendary",
-    "mythic",
+    "agmt",
   ];
   const currentIndex = gradeOrder.indexOf(item.grade || "common");
   const newIndex = gradeOrder.indexOf(newGrade);
@@ -347,7 +347,7 @@ export function upgradeItemGrade(
     message: `${
       item.name
     } upgraded to ${newGrade}! Max durability increased to ${
-      newGrade === "mythic" ? "∞" : newMaxDurability
+      newGrade === "agmt" ? "∞" : newMaxDurability
     }.`,
   };
 }
@@ -363,7 +363,7 @@ export function getDurabilityDisplay(item: InventoryItem): {
   isCritical: boolean;
   displayText: string;
 } {
-  if (item.grade === "mythic") {
+  if (item.grade === "agmt") {
     return {
       current: Infinity,
       max: Infinity,
@@ -393,14 +393,14 @@ export function getDurabilityDisplay(item: InventoryItem): {
  * Get all grades in order
  */
 export function getGradeOrder(): ItemGrade[] {
-  return ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
+  return ["common", "uncommon", "rare", "epic", "legendary", "agmt"];
 }
 
 /**
  * Check if a string is a valid grade
  */
 export function isValidGrade(grade: string): grade is ItemGrade {
-  return ["common", "uncommon", "rare", "epic", "legendary", "mythic"].includes(
+  return ["common", "uncommon", "rare", "epic", "legendary", "agmt"].includes(
     grade
   );
 }

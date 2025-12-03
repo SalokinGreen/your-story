@@ -25,48 +25,48 @@
 
 Advanced RPG Tools is now integrated directly into player choices. Adventure creators can add oracle checks to any choice:
 
-**`mythic_check`** - Ask the fate oracle a yes/no question
+**`agmt_check`** - Ask the fate oracle a yes/no question
 
 - Format: `"question (likelihood)"` or just `"question"` (defaults to 50/50)
 - Example: `"Is the door locked? (Likely)"`
 - Likelihood options: Impossible, No Way, Very Unlikely, Unlikely, 50/50, Somewhat Likely, Likely, Very Likely, Near Sure Thing, A Sure Thing, Has To Be
-- Uses `StoryData.mythicState.chaosFactor` (default 5) for random event detection
+- Uses `StoryData.agmtState.chaosFactor` (default 5) for random event detection
 - Output appears in user choice text:
   ```
-  [Mythic Question: Is the door locked?]
-  [Mythic Answer: Yes - RANDOM EVENT TRIGGERED!]
+  [AGMT Question: Is the door locked?]
+  [AGMT Answer: Yes - RANDOM EVENT TRIGGERED!]
   >Try to open the door
   ```
 
-**`mythic_table`** - Roll on a Mythic element table
+**`agmt_table`** - Roll on a AGMT element table
 
 - Format: Element category name (e.g., `"character_descriptors"`, `"locations"`, `"sounds"`)
 - 40+ available categories (full list below)
 - Output in choice text:
   ```
-  [Mythic Character Descriptors Table: Mysterious]
-  [Mythic Sounds Table: Creaking]
+  [AGMT Character Descriptors Table: Mysterious]
+  [AGMT Sounds Table: Creaking]
   >Investigate the noise
   ```
 
-**Example Choice with Mythic:**
+**Example Choice with AGMT:**
 
 ```typescript
 {
   text: "Sneak past the guard",
   skill_used: "Stealth",
   skill_dc: 60,
-  mythic_check: "Is the guard asleep? (Likely)",
-  mythic_table: "sounds"
+  agmt_check: "Is the guard asleep? (Likely)",
+  agmt_table: "sounds"
 }
 ```
 
 **Full Choice Output:**
 
 ```
-[Mythic Question: Is the guard asleep?]
-[Mythic Answer: Yes]
-[Mythic Sounds Table: Creaking]
+[AGMT Question: Is the guard asleep?]
+[AGMT Answer: Yes]
+[AGMT Sounds Table: Creaking]
 [Stealth: success]
 >Sneak past the guard
 ```
@@ -76,20 +76,20 @@ The AI receives this full context and interprets the oracle results narratively.
 **Available Element Tables:**
 adventure_tone, alien_species, animal_actions, army, cavern, character_actions_combat, character_actions_general, character_appearance, character_background, character_conversations, character_descriptors, character_identity, character_motivations, character_personality, character_skills, character_traits_flaws, characters, city, civilization, creature_abilities, creature_descriptors, cryptic_message, curses, domicile, dungeon, dungeon_traps, forest, gods, legends, locations, magic_item, mutation, names, noble_house, objects, plot_twists, powers, scavenging_results, smells, sounds, spell_effects, starship, terrain, undead, visions_dreams
 
-### Mythic State (StoryData.mythicState)
+### AGMT State (StoryData.agmtState)
 
 ```typescript
-interface MythicState {
+interface AGMTState {
   chaosFactor: number; // 1-9, default 5
-  threads: MythicThread[]; // Active story threads
-  characters: MythicCharacter[]; // Known NPCs
+  threads: AGMTThread[]; // Active story threads
+  characters: AGMTCharacter[]; // Known NPCs
   sceneCount: number; // Number of scenes played
 }
 ```
 
 Currently:
 
-- `chaosFactor` is read by choice-based `mythic_check` for fate questions
+- `chaosFactor` is read by choice-based `agmt_check` for fate questions
 - `threads` and `characters` arrays exist but no management tools yet
 - `sceneCount` not yet incremented automatically
 
@@ -97,7 +97,7 @@ Currently:
 
 ### 1. Scene Alteration System (Page 20-21)
 
-**Current Issue**: We have `check_scene` but it's not using the proper Mythic rules.
+**Current Issue**: We have `check_scene` but it's not using the proper AGMT rules.
 
 **Proper Implementation**:
 
@@ -203,7 +203,7 @@ export interface StoryThread {
 **Implementation**:
 
 ```typescript
-export interface MythicCharacter {
+export interface AGMTCharacter {
   id: string;
   name: string;
   role: string;
@@ -221,13 +221,13 @@ export interface MythicCharacter {
 
 ### 5. State Tracking
 
-**Complete Mythic State**:
+**Complete AGMT State**:
 
 ```typescript
-export interface MythicState {
+export interface AGMTState {
   chaosFactor: number; // 1-9, default 5
   threads: StoryThread[]; // Active plot threads
-  characters: MythicCharacter[]; // Known NPCs
+  characters: AGMTCharacter[]; // Known NPCs
   sceneCount: number; // Scenes played
 }
 ```
@@ -291,7 +291,7 @@ When unsure how an NPC acts, roll on behavior tables.
 
 ## Current Technical Limitation
 
-**Issue**: Mythic tool results happen after story generation in the same turn, but ARE sent to AI in the next turn.
+**Issue**: AGMT tool results happen after story generation in the same turn, but ARE sent to AI in the next turn.
 
 **Current Flow**:
 
@@ -353,13 +353,13 @@ When unsure how an NPC acts, roll on behavior tables.
 
 ## Integration with Story System
 
-### Where to Store Mythic State
+### Where to Store AGMT State
 
 ```typescript
 // Add to StoryData interface
 interface StoryData {
   // ... existing fields ...
-  mythicState?: {
+  agmtState?: {
     chaosFactor: number;
     threads: Array<{ id: string; description: string; status: string }>;
     characters: Array<{
@@ -373,7 +373,7 @@ interface StoryData {
 }
 ```
 
-### When to Use Mythic Tools
+### When to Use AGMT Tools
 
 **AI Should Use**:
 
@@ -397,7 +397,7 @@ interface StoryData {
 ### Phase 1 (Next Steps)
 
 1. ✅ Fix scene check to use proper d10 mechanics
-2. ⏳ Add Mythic state to StoryData
+2. ⏳ Add AGMT state to StoryData
 3. ⏳ Implement chaos management tools
 4. ⏳ Implement thread management tools
 5. ⏳ Implement character list tools
@@ -407,12 +407,12 @@ interface StoryData {
 6. ⏳ Pre-generation tool phase (solve technical limitation)
 7. ⏳ Detail/descriptor check tools
 8. ⏳ Pacing move tools
-9. ⏳ UI to view Mythic state (chaos factor, threads, characters)
+9. ⏳ UI to view AGMT state (chaos factor, threads, characters)
 
 ### Phase 3 (Polish)
 
 10. ⏳ Tutorial/guide for using Advanced RPG Tools
-11. ⏳ Preset Mythic configurations (high chaos, low chaos, etc.)
+11. ⏳ Preset AGMT configurations (high chaos, low chaos, etc.)
 12. ⏳ Analytics on Fate Question outcomes
 13. ⏳ Thread/character relationship graph visualization
 

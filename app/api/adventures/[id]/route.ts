@@ -224,8 +224,8 @@ export async function PATCH(
     if (body.nsfw !== undefined) updateData.nsfw = body.nsfw;
     if (body.storyTemplate !== undefined) {
       updateData.story_template = body.storyTemplate;
-      // Extract mythic_state from storyTemplate if present
-      updateData.mythic_state = body.storyTemplate?.mythicState || null;
+      // Extract agmt_state from storyTemplate if present
+      updateData.agmt_state = body.storyTemplate?.agmtState || null;
     }
     if (body.selectedPreset !== undefined)
       updateData.selected_preset = body.selectedPreset;

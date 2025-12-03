@@ -92,9 +92,9 @@ export function buildInfoMessage(
           const typeLabel = i.type ? ` [${i.type}]` : "";
           const gradeLabel = i.grade ? ` (${i.grade})` : "";
           const durabilityInfo =
-            i.type !== "consumable" && i.grade !== "mythic"
+            i.type !== "consumable" && i.grade !== "agmt"
               ? ` [dur: ${i.durability ?? "?"}/${i.maxDurability ?? "?"}]`
-              : i.grade === "mythic"
+              : i.grade === "agmt"
               ? " [dur: ∞]"
               : "";
           const desc = i.description ? ` - ${i.description}` : "";
@@ -319,30 +319,29 @@ export function buildInfoMessage(
       : "";
 
   // Build Advanced RPG Tools section if enabled
-  const mythicSection = storyData.mythicState
+  const agmtSection = storyData.agmtState
     ? `## Advanced RPG Tools
-- Chaos Factor: ${storyData.mythicState.chaosFactor}/9 (${getChaosDescription(
-        storyData.mythicState.chaosFactor
+- Chaos Factor: ${storyData.agmtState.chaosFactor}/9 (${getChaosDescription(
+        storyData.agmtState.chaosFactor
       )})
-- Scene Count: ${storyData.mythicState.sceneCount}
+- Scene Count: ${storyData.agmtState.sceneCount}
 - Active Threads: ${
-        storyData.mythicState.threads.filter((t) => t.status === "active")
-          .length
-      }/${storyData.mythicState.threads.length}
+        storyData.agmtState.threads.filter((t) => t.status === "active").length
+      }/${storyData.agmtState.threads.length}
 - Active NPCs: ${
-        storyData.mythicState.characters.filter((c) => c.status === "active")
+        storyData.agmtState.characters.filter((c) => c.status === "active")
           .length
-      }/${storyData.mythicState.characters.length}
+      }/${storyData.agmtState.characters.length}
 
 ### Threads
 ${
-  storyData.mythicState.threads
+  storyData.agmtState.threads
     .filter((t) => t.status === "active")
     .map((t) => `- [Active] ${t.description} (ID: ${t.id})`)
     .join("\n") || "(none)"
 }
 ${
-  storyData.mythicState.threads
+  storyData.agmtState.threads
     .filter((t) => t.status === "closed")
     .map((t) => `- [Closed] ${t.description} (ID: ${t.id})`)
     .join("\n") || ""
@@ -350,7 +349,7 @@ ${
 
 ### NPCs
 ${
-  storyData.mythicState.characters
+  storyData.agmtState.characters
     .map((c) => `- ${c.name} (${c.role}) [${c.status}] (ID: ${c.id})`)
     .join("\n") || "(none)"
 }`
@@ -416,7 +415,7 @@ ${
     conditionsSection,
     questsSection,
     variablesSection,
-    mythicSection,
+    agmtSection,
     customTablesSection,
     storyData.author_notes
       ? `## Author Notes\n${cleanString(storyData.author_notes)}`
@@ -824,7 +823,7 @@ Relationship Guidelines:
 - Relationship scale is typically 0-100; going from stranger (20-30) to close friend (70+) should take many interactions
 
 Advanced RPG Tools Guidelines (if enabled):
-- ACTIVELY create threads and characters! Don't be conservative - the Mythic system thrives on a full list.
+- ACTIVELY create threads and characters! Don't be conservative - the AGMT system thrives on a full list.
 - Use add_thread when new plotlines/mysteries/goals emerge - ANY loose end is a valid thread
   - Overheard rumors, unanswered questions, promised rewards, mysterious figures, unexplained events
   - "Who killed the merchant?", "Find the source of the corruption", "The stranger's warning"
@@ -1139,7 +1138,7 @@ Choice Design Guidelines:
   - Changed circumstances (guards are now alerted)
   - Different approaches (failed climbing → try picking the lock instead)
 - This prevents frustrating "roll until you win" loops and keeps the story moving forward${
-    storyData.mythicState
+    storyData.agmtState
       ? `
 
 ⚠️ MYTHIC QUESTIONS vs SKILL CHECKS - STRICT HIERARCHY:
@@ -1148,7 +1147,7 @@ Choice Design Guidelines:
    - If a choice has skill_used parameter, the skill check result determines whether the player succeeds
    - Success = player accomplishes the action
    - Failure = player fails at the action
-   - DO NOT ask Mythic questions that duplicate or "second guess" the skill check outcome
+   - DO NOT ask AGMT questions that duplicate or "second guess" the skill check outcome
 
 2. MYTHIC QUESTIONS are for situations where SKILL CHECKS DON'T ANSWER THE QUESTION:
    
@@ -1160,48 +1159,48 @@ Choice Design Guidelines:
    - Opportunities: "Is there another way? (50/50)" [offers alternatives]
    - Random events: Use Event Meaning for unexpected developments
    
-   ✅ GOOD COMBINATIONS (skill + mythic asking DIFFERENT questions):
-   "Search the ruins [Perception DC 12] [mythic: Is anything valuable here? (Unlikely) (context)]"
+   ✅ GOOD COMBINATIONS (skill + agmt asking DIFFERENT questions):
+   "Search the ruins [Perception DC 12] [agmt: Is anything valuable here? (Unlikely) (context)]"
    → Perception check = Can you find what's there (player ability)
-   → Mythic = What's actually there to find (world state)
-   → Set mythic_context_only: true
+   → AGMT = What's actually there to find (world state)
+   → Set agmt_context_only: true
    
-   "Convince the guard [Diplomacy DC 15] [mythic: Is the guard corrupt? (50/50) (context)]"
+   "Convince the guard [Diplomacy DC 15] [agmt: Is the guard corrupt? (50/50) (context)]"
    → Diplomacy = Your persuasion skill (player ability)
-   → Mythic = Guard's moral flexibility (NPC trait)
-   → Set mythic_context_only: true
+   → AGMT = Guard's moral flexibility (NPC trait)
+   → Set agmt_context_only: true
    
-   "Sneak past patrols [Stealth DC 18] [mythic: Are guards alert? (Likely) (context)]"
+   "Sneak past patrols [Stealth DC 18] [agmt: Are guards alert? (Likely) (context)]"
    → Stealth = Your sneaking ability (player ability)
-   → Mythic = Environmental difficulty (world state)
-   → Set mythic_context_only: true
+   → AGMT = Environmental difficulty (world state)
+   → Set agmt_context_only: true
    
    ❌ BAD USE CASES (redundant with skill check - NEVER DO THIS):
-   "Climb the wall [Athletics DC 14] [mythic: Can you reach the top? (Somewhat Likely)]"
-   ❌ WRONG: Both determine if you climb successfully - Mythic duplicates skill check
+   "Climb the wall [Athletics DC 14] [agmt: Can you reach the top? (Somewhat Likely)]"
+   ❌ WRONG: Both determine if you climb successfully - AGMT duplicates skill check
    
-   "Persuade the king [Diplomacy DC 18] [mythic: Does the king agree? (Likely)]"
-   ❌ WRONG: Diplomacy already answers if you persuade him - Mythic overrides skill check
+   "Persuade the king [Diplomacy DC 18] [agmt: Does the king agree? (Likely)]"
+   ❌ WRONG: Diplomacy already answers if you persuade him - AGMT overrides skill check
    
-   "Decode the runes [Intelligence DC 16] [mythic: Can you understand it? (50/50)]"
-   ❌ WRONG: Intelligence determines comprehension - Mythic second-guesses the result
+   "Decode the runes [Intelligence DC 16] [agmt: Can you understand it? (50/50)]"
+   ❌ WRONG: Intelligence determines comprehension - AGMT second-guesses the result
 
 3. WHEN COMBINING BOTH:
-   - ALWAYS set mythic_context_only: true when using mythic_check with skill_used
+   - ALWAYS set agmt_context_only: true when using agmt_check with skill_used
    - Skill check determines if PLAYER ACTION succeeds (primary outcome)
-   - Mythic determines WORLD RESPONSE or CONTEXT (narrative color)
+   - AGMT determines WORLD RESPONSE or CONTEXT (narrative color)
    - Skill result takes absolute priority for success/failure
-   - Mythic adds complications, opportunities, or environmental factors
+   - AGMT adds complications, opportunities, or environmental factors
    
    Example outcomes:
-   - Skill Success + Mythic Yes = Clean success with favorable circumstances
-   - Skill Success + Mythic No = Success despite unfavorable circumstances
-   - Skill Failure + Mythic Yes = Failure with mitigating factors or silver lining
-   - Skill Failure + Mythic No = Complete failure with additional complications
+   - Skill Success + AGMT Yes = Clean success with favorable circumstances
+   - Skill Success + AGMT No = Success despite unfavorable circumstances
+   - Skill Failure + AGMT Yes = Failure with mitigating factors or silver lining
+   - Skill Failure + AGMT No = Complete failure with additional complications
 
 4. STANDALONE MYTHIC (no skill check):
    - Use for pure world-building, NPC reactions, environmental queries
-   - No mythic_context_only flag needed (there's no skill check to contextualize)
+   - No agmt_context_only flag needed (there's no skill check to contextualize)
    - Result directly affects narrative but doesn't test player ability
 
 Advanced RPG Tools ORACLE TABLES:
@@ -1287,9 +1286,9 @@ export function buildActionAnalysisPrompt({
 }): { messages: ChatMessage[] } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
-  // Build unified table list - custom tables first, then mythic tables
+  // Build unified table list - custom tables first, then agmt tables
   const customTableNames = storyData.customTables?.map((t) => t.name) || [];
-  const mythicTableNames = storyData.mythicState
+  const agmtTableNames = storyData.agmtState
     ? [
         "adventure_tone",
         "alien_species",
@@ -1338,8 +1337,7 @@ export function buildActionAnalysisPrompt({
         "visions_dreams",
       ]
     : [];
-  const hasAnyTables =
-    customTableNames.length > 0 || mythicTableNames.length > 0;
+  const hasAnyTables = customTableNames.length > 0 || agmtTableNames.length > 0;
 
   const systemPrompt = `You analyze player actions for an interactive RPG game and determine what game mechanics apply.
 
@@ -1351,7 +1349,7 @@ RESPOND WITH VALID JSON ONLY - no markdown, no explanation, just the JSON object
   "item_used": "exact item name from inventory, or null",
   "ability_used": "exact ability name from abilities list, or null",
   "resource_used": "exact resource name from the list below, or null",
-  "mythic_check": "yes/no question (likelihood)" or null,
+  "agmt_check": "yes/no question (likelihood)" or null,
   "table": "table name" or null,
   "is_plain_action": true/false (true if this is just dialogue/narration with no mechanics)
 }
@@ -1381,9 +1379,9 @@ ${
         .map((i) => {
           const gradeLabel = i.grade ? `(${i.grade})` : "";
           const durInfo =
-            i.type !== "consumable" && i.grade !== "mythic"
+            i.type !== "consumable" && i.grade !== "agmt"
               ? ` dur:${i.durability ?? "?"}/${i.maxDurability ?? "?"}`
-              : i.grade === "mythic"
+              : i.grade === "agmt"
               ? " dur:∞"
               : "";
           return `• ${i.name} ${gradeLabel}[${i.type}]${durInfo} x${i.quantity}`;
@@ -1447,11 +1445,7 @@ ${
     ? `Custom Tables: ${customTableNames.join(", ")}`
     : ""
 }
-${
-  mythicTableNames.length > 0
-    ? `Mythic Tables: ${mythicTableNames.join(", ")}`
-    : ""
-}
+${agmtTableNames.length > 0 ? `AGMT Tables: ${agmtTableNames.join(", ")}` : ""}
 
 Example uses:
 - Player searches a room → table: "scavenging_results" or "objects"
@@ -1461,18 +1455,18 @@ Example uses:
     : ""
 }
 ${
-  storyData.mythicState
+  storyData.agmtState
     ? `
-Advanced RPG Tools (for mythic_check):
-Use mythic_check for yes/no questions about the world that skill checks can't answer.
+Advanced RPG Tools (for agmt_check):
+Use agmt_check for yes/no questions about the world that skill checks can't answer.
 Format: "question (likelihood)" where likelihood is one of:
 Impossible, No Way, Very Unlikely, Unlikely, 50/50, Somewhat Likely, Likely, Very Likely, Near Sure Thing, A Sure Thing, Has To Be
 
-Current Chaos Factor: ${storyData.mythicState.chaosFactor}/9
+Current Chaos Factor: ${storyData.agmtState.chaosFactor}/9
 
 Good uses: "Is the door locked? (50/50)", "Is someone watching? (Likely)", "Are there guards nearby? (Somewhat Likely)"
-Bad uses: Don't use mythic_check to determine success of skill-based actions - that's what skill_used is for.
-If skill_used is set, only use mythic_check for CONTEXT questions that don't override the skill result.`
+Bad uses: Don't use agmt_check to determine success of skill-based actions - that's what skill_used is for.
+If skill_used is set, only use agmt_check for CONTEXT questions that don't override the skill result.`
     : ""
 }
 

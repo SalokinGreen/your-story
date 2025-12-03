@@ -140,7 +140,7 @@ const addItemTool: ToolSchema = {
   function: {
     name: "add_item",
     description:
-      "Add an item to player's inventory. Item types: normal (has durability, breaks when depleted), consumable (one-use, consumed immediately), story (quest item, tracks durability but never breaks), misc (prevents disadvantage, tracks durability). Grades: common (3 dur), uncommon (5 dur, +bonus), rare (8 dur, +bonus), epic (12 dur, +bonus), legendary (20 dur, +bonus), mythic (infinite dur, +max bonus)",
+      "Add an item to player's inventory. Item types: normal (has durability, breaks when depleted), consumable (one-use, consumed immediately), story (quest item, tracks durability but never breaks), misc (prevents disadvantage, tracks durability). Grades: common (3 dur), uncommon (5 dur, +bonus), rare (8 dur, +bonus), epic (12 dur, +bonus), legendary (20 dur, +bonus), agmt (infinite dur, +max bonus)",
     parameters: {
       type: "object",
       properties: {
@@ -160,9 +160,9 @@ const addItemTool: ToolSchema = {
         },
         grade: {
           type: "string",
-          enum: ["common", "uncommon", "rare", "epic", "legendary", "mythic"],
+          enum: ["common", "uncommon", "rare", "epic", "legendary", "agmt"],
           description:
-            "Item grade/rarity. Affects durability and bonus: common (3 dur, +0), uncommon (5 dur, small bonus), rare (8 dur, medium bonus), epic (12 dur, good bonus), legendary (20 dur, great bonus), mythic (infinite dur, max bonus). Default: common",
+            "Item grade/rarity. Affects durability and bonus: common (3 dur, +0), uncommon (5 dur, small bonus), rare (8 dur, medium bonus), epic (12 dur, good bonus), legendary (20 dur, great bonus), agmt (infinite dur, max bonus). Default: common",
         },
         quantity: {
           type: "number",
@@ -222,7 +222,7 @@ const modifyItemTool: ToolSchema = {
         },
         grade: {
           type: "string",
-          enum: ["common", "uncommon", "rare", "epic", "legendary", "mythic"],
+          enum: ["common", "uncommon", "rare", "epic", "legendary", "agmt"],
           description:
             "New item grade (optional) - upgrading increases max durability",
         },
@@ -321,7 +321,7 @@ const upgradeItemTool: ToolSchema = {
         },
         newGrade: {
           type: "string",
-          enum: ["uncommon", "rare", "epic", "legendary", "mythic"],
+          enum: ["uncommon", "rare", "epic", "legendary", "agmt"],
           description:
             "The new grade to upgrade to (must be higher than current grade)",
         },

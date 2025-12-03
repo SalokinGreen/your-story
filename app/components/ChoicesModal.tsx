@@ -173,7 +173,7 @@ export default function ChoicesModal({
           skill_dc: result.analysis.skill_dc || undefined,
           item_used: result.analysis.item_used || undefined,
           resource_used: result.analysis.resource_used || undefined,
-          mythic_check: result.analysis.mythic_check || undefined,
+          agmt_check: result.analysis.agmt_check || undefined,
           table: result.analysis.table || undefined,
           stt_input: isStt || undefined,
         };
@@ -275,19 +275,19 @@ export default function ChoicesModal({
       );
     }
 
-    // Mythic check
-    if (choice.mythic_check) {
+    // AGMT check
+    if (choice.agmt_check) {
       details.push(
-        <div key="mythic" className="flex items-center gap-2 text-purple-400">
+        <div key="agmt" className="flex items-center gap-2 text-purple-400">
           <DynamicIcon name="Sparkles" className="w-4 h-4" />
           <span className="text-sm">Fate Check</span>
         </div>
       );
     }
 
-    // Unified table field (or legacy mythic_table/custom_table)
+    // Unified table field (or legacy agmt_table/custom_table)
     const tableToShow =
-      choice.table || choice.mythic_table || choice.custom_table;
+      choice.table || choice.agmt_table || choice.custom_table;
     if (tableToShow) {
       details.push(
         <div key="table" className="flex items-center gap-2 text-indigo-400">

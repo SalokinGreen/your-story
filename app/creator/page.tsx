@@ -19,9 +19,9 @@ import {
   UpgradeSettings,
   DEFAULT_UPGRADE_SETTINGS,
   Adventure,
-  MythicState,
-  MythicThread,
-  MythicCharacter,
+  AGMTState,
+  AGMTThread,
+  AGMTCharacter,
   CustomTable,
   StartingChoice,
   Variable,
@@ -87,7 +87,7 @@ type CreatorStep =
   | "achievements"
   | "quests"
   | "plot"
-  | "mythic"
+  | "agmt"
   | "variables"
   | "tables"
   | "upgrades"
@@ -104,7 +104,7 @@ function getAbilityGradeConfig(grade: string | undefined) {
   return ABILITY_GRADE_CONFIG[key] || ABILITY_GRADE_CONFIG.novice;
 }
 
-// Helper functions for Mythic UI
+// Helper functions for AGMT UI
 function getChaosColor(chaos: number): string {
   if (chaos <= 3) return "text-blue-400";
   if (chaos <= 5) return "text-yellow-400";
@@ -918,20 +918,20 @@ function AdventureCreatorContent() {
       }
     }
 
-    // Check Mythic deletions
-    if (data.mythicState) {
-      const ms = data.mythicState;
+    // Check AGMT deletions
+    if (data.agmtState) {
+      const ms = data.agmtState;
       if (ms.threads) {
         ms.threads.forEach((t: any) => {
           if (t._command === "delete") {
-            deletions.push(`Mythic Thread: ${t.description}`);
+            deletions.push(`AGMT Thread: ${t.description}`);
           }
         });
       }
       if (ms.characters) {
         ms.characters.forEach((c: any) => {
           if (c._command === "delete") {
-            deletions.push(`Mythic Character: ${c.name}`);
+            deletions.push(`AGMT Character: ${c.name}`);
           }
         });
       }
@@ -1121,16 +1121,16 @@ function AdventureCreatorContent() {
     }
 
     // Apply Advanced RPG Tools settings
-    // mythicEnabled is derived from mythicState presence, not a separate field
-    if (data.mythicState) {
-      const ms = data.mythicState;
+    // agmtEnabled is derived from agmtState presence, not a separate field
+    if (data.agmtState) {
+      const ms = data.agmtState;
 
-      // If mythicState is provided, enable Mythic
-      if (!mythicEnabled) {
-        setMythicEnabled(true);
+      // If agmtState is provided, enable AGMT
+      if (!agmtEnabled) {
+        setAGMTEnabled(true);
       }
 
-      const newState = { ...mythicState };
+      const newState = { ...agmtState };
 
       // Chaos factor validation (1-9)
       if (ms.chaosFactor !== undefined) {
@@ -1147,9 +1147,9 @@ function AdventureCreatorContent() {
       if (ms.threads) {
         const threadChanges = ms.threads as any[];
         newState.threads = applyItemChanges(
-          mythicState.threads,
+          agmtState.threads,
           threadChanges,
-          "mythic thread",
+          "agmt thread",
           "id"
         ).map((thread: any) => {
           // Auto-generate ID for new threads without one
@@ -1166,9 +1166,9 @@ function AdventureCreatorContent() {
       if (ms.characters) {
         const charChanges = ms.characters as any[];
         newState.characters = applyItemChanges(
-          mythicState.characters,
+          agmtState.characters,
           charChanges,
-          "mythic character",
+          "agmt character",
           "id"
         ).map((char: any) => {
           // Auto-generate ID for new characters without one
@@ -1181,7 +1181,7 @@ function AdventureCreatorContent() {
         });
       }
 
-      setMythicState(newState);
+      setAGMTState(newState);
     }
 
     // Apply custom tables
@@ -1339,12 +1339,12 @@ function AdventureCreatorContent() {
         setMaxMomentum(template.maxMomentum || 5);
 
         // Load Advanced RPG Tools state
-        if (template.mythicState) {
-          setMythicEnabled(true);
-          setMythicState(template.mythicState);
+        if (template.agmtState) {
+          setAGMTEnabled(true);
+          setAGMTState(template.agmtState);
         } else {
-          setMythicEnabled(false);
-          setMythicState({
+          setAGMTEnabled(false);
+          setAGMTState({
             chaosFactor: 5,
             threads: [],
             characters: [],
@@ -1411,9 +1411,9 @@ function AdventureCreatorContent() {
             if (Array.isArray(saved.variables)) setVariables(saved.variables);
             if (saved.upgradeSettings)
               setUpgradeSettings(saved.upgradeSettings);
-            if (saved.mythicEnabled !== undefined)
-              setMythicEnabled(saved.mythicEnabled);
-            if (saved.mythicState) setMythicState(saved.mythicState);
+            if (saved.agmtEnabled !== undefined)
+              setAGMTEnabled(saved.agmtEnabled);
+            if (saved.agmtState) setAGMTState(saved.agmtState);
             if (Array.isArray(saved.startingChoices))
               setStartingChoices(saved.startingChoices);
 
@@ -1615,8 +1615,8 @@ function AdventureCreatorContent() {
   const relationshipItemsPerPage = 10;
 
   // Advanced RPG Tools
-  const [mythicEnabled, setMythicEnabled] = useState(false);
-  const [mythicState, setMythicState] = useState<MythicState>({
+  const [agmtEnabled, setAGMTEnabled] = useState(false);
+  const [agmtState, setAGMTState] = useState<AGMTState>({
     chaosFactor: 5,
     threads: [],
     characters: [],
@@ -1684,9 +1684,9 @@ function AdventureCreatorContent() {
     resource_used: "",
     item_used: "",
     item_loss: false,
-    mythic_check: "",
-    mythic_context_only: false,
-    mythic_table: "",
+    agmt_check: "",
+    agmt_context_only: false,
+    agmt_table: "",
     custom_table: "",
   });
   const [editingStartingChoiceIndex, setEditingStartingChoiceIndex] = useState<
@@ -1757,7 +1757,7 @@ function AdventureCreatorContent() {
     { id: "variables", label: "Variables", icon: "Variable" },
     { id: "tables", label: "Custom Tables", icon: "Dices" },
     { id: "plot", label: "Plot Beats", icon: "Clapperboard" },
-    { id: "mythic", label: "Advanced RPG Tools", icon: "Sparkles" },
+    { id: "agmt", label: "Advanced RPG Tools", icon: "Sparkles" },
     { id: "upgrades", label: "Upgrade Settings", icon: "ArrowUpCircle" },
     { id: "preview", label: "Preview", icon: "Eye" },
   ];
@@ -1816,9 +1816,8 @@ function AdventureCreatorContent() {
         setCustomTables(saved.customTables);
       if (Array.isArray(saved.variables)) setVariables(saved.variables);
       if (saved.upgradeSettings) setUpgradeSettings(saved.upgradeSettings);
-      if (saved.mythicEnabled !== undefined)
-        setMythicEnabled(saved.mythicEnabled);
-      if (saved.mythicState) setMythicState(saved.mythicState);
+      if (saved.agmtEnabled !== undefined) setAGMTEnabled(saved.agmtEnabled);
+      if (saved.agmtState) setAGMTState(saved.agmtState);
       if (Array.isArray(saved.startingChoices))
         setStartingChoices(saved.startingChoices);
 
@@ -1891,8 +1890,8 @@ function AdventureCreatorContent() {
       customTables,
       variables,
       upgradeSettings,
-      mythicEnabled,
-      mythicState,
+      agmtEnabled,
+      agmtState,
       startingChoices,
       currentStep,
       updatedAt: Date.now(),
@@ -1939,8 +1938,8 @@ function AdventureCreatorContent() {
     quests,
     customTables,
     variables,
-    mythicEnabled,
-    mythicState,
+    agmtEnabled,
+    agmtState,
     upgradeSettings,
     startingChoices,
     currentStep,
@@ -2957,7 +2956,7 @@ ${description || ""}`;
       presets: presets,
       upgradeSettings: upgradeSettings,
       rpgSystem: rpgSystem,
-      mythicState: mythicEnabled ? mythicState : undefined,
+      agmtState: agmtEnabled ? agmtState : undefined,
     };
 
     // Save complete adventure using localAdventureManager
@@ -3049,8 +3048,8 @@ ${description || ""}`;
       setSelectedPreset("custom");
       setPresets([DEFAULT_PRESET]);
       setUpgradeSettings(DEFAULT_UPGRADE_SETTINGS);
-      setMythicEnabled(false);
-      setMythicState({
+      setAGMTEnabled(false);
+      setAGMTState({
         chaosFactor: 5,
         threads: [],
         characters: [],
@@ -3124,7 +3123,7 @@ ${description || ""}`;
         presets: presets,
         upgradeSettings: upgradeSettings,
         rpgSystem: rpgSystem,
-        mythicState: mythicEnabled ? mythicState : undefined,
+        agmtState: agmtEnabled ? agmtState : undefined,
       };
 
       // Get auth token
@@ -3262,7 +3261,7 @@ ${description || ""}`;
       presets: presets,
       upgradeSettings: upgradeSettings,
       rpgSystem: rpgSystem,
-      mythicState: mythicEnabled ? mythicState : undefined,
+      agmtState: agmtEnabled ? agmtState : undefined,
     };
 
     // If editing a local adventure, save to IndexedDB instead of database
@@ -4631,7 +4630,7 @@ ${description || ""}`;
                   </div>
                 </div>
                 {/* Advanced RPG Tools Section */}
-                {mythicEnabled && (
+                {agmtEnabled && (
                   <div className="border-t border-blue-800/30 pt-4 mt-4">
                     <h4 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
                       <DynamicIcon name="Sparkles" className="w-4 h-4" />
@@ -4644,11 +4643,11 @@ ${description || ""}`;
                         </label>
                         <input
                           type="text"
-                          value={newStartingChoice.mythic_check || ""}
+                          value={newStartingChoice.agmt_check || ""}
                           onChange={(e) =>
                             setNewStartingChoice({
                               ...newStartingChoice,
-                              mythic_check: e.target.value || undefined,
+                              agmt_check: e.target.value || undefined,
                             })
                           }
                           placeholder="e.g., Is the door locked? (Likely)"
@@ -4661,42 +4660,42 @@ ${description || ""}`;
                           Impossible, Impossible
                         </p>
                       </div>
-                      {newStartingChoice.mythic_check &&
+                      {newStartingChoice.agmt_check &&
                         newStartingChoice.skill_used && (
                           <label className="flex items-center gap-2 text-sm text-blue-300">
                             <input
                               type="checkbox"
                               checked={
-                                newStartingChoice.mythic_context_only || false
+                                newStartingChoice.agmt_context_only || false
                               }
                               onChange={(e) =>
                                 setNewStartingChoice({
                                   ...newStartingChoice,
-                                  mythic_context_only: e.target.checked,
+                                  agmt_context_only: e.target.checked,
                                 })
                               }
                               className="w-4 h-4 rounded"
                             />
-                            Mythic provides context only (doesn&apos;t override
+                            AGMT provides context only (doesn&apos;t override
                             skill check)
                           </label>
                         )}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-semibold text-blue-200 mb-1">
-                            Mythic Table Roll (optional)
+                            AGMT Table Roll (optional)
                           </label>
                           <select
-                            value={newStartingChoice.mythic_table || ""}
+                            value={newStartingChoice.agmt_table || ""}
                             onChange={(e) =>
                               setNewStartingChoice({
                                 ...newStartingChoice,
-                                mythic_table: e.target.value || undefined,
+                                agmt_table: e.target.value || undefined,
                               })
                             }
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                           >
-                            <option value="">No Mythic table</option>
+                            <option value="">No AGMT table</option>
                             <option value="action">Action</option>
                             <option value="subject">Subject</option>
                             <option value="action_subject">
@@ -4771,13 +4770,13 @@ ${description || ""}`;
                     item_loss: newStartingChoice.item_used
                       ? newStartingChoice.item_loss
                       : undefined,
-                    mythic_check: newStartingChoice.mythic_check || undefined,
-                    mythic_context_only:
-                      newStartingChoice.mythic_check &&
+                    agmt_check: newStartingChoice.agmt_check || undefined,
+                    agmt_context_only:
+                      newStartingChoice.agmt_check &&
                       newStartingChoice.skill_used
-                        ? newStartingChoice.mythic_context_only
+                        ? newStartingChoice.agmt_context_only
                         : undefined,
-                    mythic_table: newStartingChoice.mythic_table || undefined,
+                    agmt_table: newStartingChoice.agmt_table || undefined,
                     custom_table: newStartingChoice.custom_table || undefined,
                   };
                   setStartingChoices([...startingChoices, choice]);
@@ -4789,9 +4788,9 @@ ${description || ""}`;
                     resource_used: "",
                     item_used: "",
                     item_loss: false,
-                    mythic_check: "",
-                    mythic_context_only: false,
-                    mythic_table: "",
+                    agmt_check: "",
+                    agmt_context_only: false,
+                    agmt_table: "",
                     custom_table: "",
                   });
                   addNotification("Starting choice added!", "success");
@@ -4976,7 +4975,7 @@ ${description || ""}`;
                           </div>
                         </div>
                         {/* Advanced RPG Tools Section in Edit */}
-                        {mythicEnabled && (
+                        {agmtEnabled && (
                           <div className="border-t border-blue-800/30 pt-4 mt-4">
                             <h4 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
                               <DynamicIcon
@@ -4992,56 +4991,53 @@ ${description || ""}`;
                                 </label>
                                 <input
                                   type="text"
-                                  value={editStartingChoice.mythic_check || ""}
+                                  value={editStartingChoice.agmt_check || ""}
                                   onChange={(e) =>
                                     setEditStartingChoice({
                                       ...editStartingChoice,
-                                      mythic_check: e.target.value || undefined,
+                                      agmt_check: e.target.value || undefined,
                                     })
                                   }
                                   placeholder="e.g., Is the door locked? (Likely)"
                                   className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                 />
                               </div>
-                              {editStartingChoice.mythic_check &&
+                              {editStartingChoice.agmt_check &&
                                 editStartingChoice.skill_used && (
                                   <label className="flex items-center gap-2 text-sm text-blue-300">
                                     <input
                                       type="checkbox"
                                       checked={
-                                        editStartingChoice.mythic_context_only ||
+                                        editStartingChoice.agmt_context_only ||
                                         false
                                       }
                                       onChange={(e) =>
                                         setEditStartingChoice({
                                           ...editStartingChoice,
-                                          mythic_context_only: e.target.checked,
+                                          agmt_context_only: e.target.checked,
                                         })
                                       }
                                       className="w-4 h-4 rounded"
                                     />
-                                    Mythic provides context only
+                                    AGMT provides context only
                                   </label>
                                 )}
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                   <label className="block text-sm font-semibold text-blue-200 mb-1">
-                                    Mythic Table Roll
+                                    AGMT Table Roll
                                   </label>
                                   <select
-                                    value={
-                                      editStartingChoice.mythic_table || ""
-                                    }
+                                    value={editStartingChoice.agmt_table || ""}
                                     onChange={(e) =>
                                       setEditStartingChoice({
                                         ...editStartingChoice,
-                                        mythic_table:
-                                          e.target.value || undefined,
+                                        agmt_table: e.target.value || undefined,
                                       })
                                     }
                                     className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                   >
-                                    <option value="">No Mythic table</option>
+                                    <option value="">No AGMT table</option>
                                     <option value="action">Action</option>
                                     <option value="subject">Subject</option>
                                     <option value="action_subject">
@@ -5129,15 +5125,15 @@ ${description || ""}`;
                                 item_loss: editStartingChoice.item_used
                                   ? editStartingChoice.item_loss
                                   : undefined,
-                                mythic_check:
-                                  editStartingChoice.mythic_check || undefined,
-                                mythic_context_only:
-                                  editStartingChoice.mythic_check &&
+                                agmt_check:
+                                  editStartingChoice.agmt_check || undefined,
+                                agmt_context_only:
+                                  editStartingChoice.agmt_check &&
                                   editStartingChoice.skill_used
-                                    ? editStartingChoice.mythic_context_only
+                                    ? editStartingChoice.agmt_context_only
                                     : undefined,
-                                mythic_table:
-                                  editStartingChoice.mythic_table || undefined,
+                                agmt_table:
+                                  editStartingChoice.agmt_table || undefined,
                                 custom_table:
                                   editStartingChoice.custom_table || undefined,
                               };
@@ -5220,22 +5216,22 @@ ${description || ""}`;
                                 Uses: {choice.resource_used}
                               </span>
                             )}
-                            {choice.mythic_check && (
+                            {choice.agmt_check && (
                               <span className="px-2 py-0.5 bg-pink-900/30 text-pink-200 rounded text-xs">
                                 <DynamicIcon
                                   name="Sparkles"
                                   className="w-3 h-3 inline mr-1"
                                 />
-                                Fate: {choice.mythic_check}
+                                Fate: {choice.agmt_check}
                               </span>
                             )}
-                            {choice.mythic_table && (
+                            {choice.agmt_table && (
                               <span className="px-2 py-0.5 bg-violet-900/30 text-violet-200 rounded text-xs">
                                 <DynamicIcon
                                   name="TableProperties"
                                   className="w-3 h-3 inline mr-1"
                                 />
-                                Mythic: {choice.mythic_table}
+                                AGMT: {choice.agmt_table}
                               </span>
                             )}
                             {choice.custom_table && (
@@ -6087,7 +6083,7 @@ ${description || ""}`;
                         <div>
                           <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Durability{" "}
-                            {editInventoryItem.grade === "mythic"
+                            {editInventoryItem.grade === "agmt"
                               ? "(∞)"
                               : `(max ${getMaxDurability(
                                   (editInventoryItem.grade as ItemGrade) ||
@@ -6101,7 +6097,7 @@ ${description || ""}`;
                               (editInventoryItem.grade as ItemGrade) || "common"
                             )}
                             value={
-                              editInventoryItem.grade === "mythic"
+                              editInventoryItem.grade === "agmt"
                                 ? ""
                                 : editInventoryItem.durability ??
                                   getMaxDurability(
@@ -6124,9 +6120,9 @@ ${description || ""}`;
                                 ),
                               })
                             }
-                            disabled={editInventoryItem.grade === "mythic"}
+                            disabled={editInventoryItem.grade === "agmt"}
                             placeholder={
-                              editInventoryItem.grade === "mythic"
+                              editInventoryItem.grade === "agmt"
                                 ? "∞"
                                 : "Durability"
                             }
@@ -6231,7 +6227,7 @@ ${description || ""}`;
                             <span className="text-xs text-blue-200/40">
                               Durability:
                             </span>
-                            {item.grade === "mythic" ? (
+                            {item.grade === "agmt" ? (
                               <span className="text-xs text-yellow-400">∞</span>
                             ) : (
                               <>
@@ -10320,7 +10316,7 @@ ${description || ""}`;
           />
         );
 
-      case "mythic":
+      case "agmt":
         return (
           <div className="space-y-6">
             {/* Header Card */}
@@ -10337,15 +10333,15 @@ ${description || ""}`;
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={mythicEnabled}
-                  onChange={(e) => setMythicEnabled(e.target.checked)}
+                  checked={agmtEnabled}
+                  onChange={(e) => setAGMTEnabled(e.target.checked)}
                   className="sr-only peer"
                 />
                 <div className="w-14 h-7 bg-gray-700 peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
               </label>
             </div>
 
-            {mythicEnabled && (
+            {agmtEnabled && (
               <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
                 {/* Chaos Factor - Enhanced Visual Slider */}
                 <div className="p-6 rounded-lg bg-linear-to-br from-gray-800/50 to-gray-900/50 border border-gray-700">
@@ -10357,10 +10353,10 @@ ${description || ""}`;
                       type="range"
                       min="1"
                       max="9"
-                      value={mythicState.chaosFactor}
+                      value={agmtState.chaosFactor}
                       onChange={(e) =>
-                        setMythicState({
-                          ...mythicState,
+                        setAGMTState({
+                          ...agmtState,
                           chaosFactor: parseInt(e.target.value),
                         })
                       }
@@ -10370,10 +10366,10 @@ ${description || ""}`;
                       <div className="text-center">
                         <span
                           className={`text-3xl font-bold ${getChaosColor(
-                            mythicState.chaosFactor
+                            agmtState.chaosFactor
                           )}`}
                         >
-                          {mythicState.chaosFactor}
+                          {agmtState.chaosFactor}
                         </span>
                         <span className="text-xs text-gray-400 block mt-1">
                           / 9
@@ -10382,13 +10378,13 @@ ${description || ""}`;
                       <div className="text-right flex-1 ml-4">
                         <p
                           className={`text-sm font-semibold ${getChaosColor(
-                            mythicState.chaosFactor
+                            agmtState.chaosFactor
                           )}`}
                         >
-                          {getChaosLabel(mythicState.chaosFactor)}
+                          {getChaosLabel(agmtState.chaosFactor)}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          {getChaosDescription(mythicState.chaosFactor)}
+                          {getChaosDescription(agmtState.chaosFactor)}
                         </p>
                       </div>
                     </div>
@@ -10401,9 +10397,9 @@ ${description || ""}`;
                     <h4 className="text-lg font-bold text-blue-400 flex items-center gap-2">
                       <span>🧵</span>
                       Starting Story Threads
-                      {mythicState.threads.length > 0 && (
+                      {agmtState.threads.length > 0 && (
                         <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-300">
-                          {mythicState.threads.length}
+                          {agmtState.threads.length}
                         </span>
                       )}
                     </h4>
@@ -10416,10 +10412,10 @@ ${description || ""}`;
                         onChange={(e) => setNewThread(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && newThread.trim()) {
-                            setMythicState({
-                              ...mythicState,
+                            setAGMTState({
+                              ...agmtState,
                               threads: [
-                                ...mythicState.threads,
+                                ...agmtState.threads,
                                 {
                                   id: crypto.randomUUID(),
                                   description: newThread.trim(),
@@ -10437,10 +10433,10 @@ ${description || ""}`;
                       <button
                         onClick={() => {
                           if (newThread.trim()) {
-                            setMythicState({
-                              ...mythicState,
+                            setAGMTState({
+                              ...agmtState,
                               threads: [
-                                ...mythicState.threads,
+                                ...agmtState.threads,
                                 {
                                   id: crypto.randomUUID(),
                                   description: newThread.trim(),
@@ -10458,7 +10454,7 @@ ${description || ""}`;
                         + Add
                       </button>
                     </div>
-                    {mythicState.threads.length === 0 ? (
+                    {agmtState.threads.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         <p className="text-sm">No threads yet</p>
                         <p className="text-xs mt-1">
@@ -10467,7 +10463,7 @@ ${description || ""}`;
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {mythicState.threads.map((thread) => (
+                        {agmtState.threads.map((thread) => (
                           <div
                             key={thread.id}
                             className="group p-4 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-blue-500/50 transition-all duration-200"
@@ -10485,9 +10481,9 @@ ${description || ""}`;
                                 />
                                 <button
                                   onClick={() => {
-                                    setMythicState({
-                                      ...mythicState,
-                                      threads: mythicState.threads.map((t) =>
+                                    setAGMTState({
+                                      ...agmtState,
+                                      threads: agmtState.threads.map((t) =>
                                         t.id === thread.id
                                           ? {
                                               ...t,
@@ -10548,9 +10544,9 @@ ${description || ""}`;
                                   </button>
                                   <button
                                     onClick={() =>
-                                      setMythicState({
-                                        ...mythicState,
-                                        threads: mythicState.threads.filter(
+                                      setAGMTState({
+                                        ...agmtState,
+                                        threads: agmtState.threads.filter(
                                           (t) => t.id !== thread.id
                                         ),
                                       })
@@ -10578,9 +10574,9 @@ ${description || ""}`;
                     <h4 className="text-lg font-bold text-green-400 flex items-center gap-2">
                       <span>👤</span>
                       Starting NPCs
-                      {mythicState.characters.length > 0 && (
+                      {agmtState.characters.length > 0 && (
                         <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-300">
-                          {mythicState.characters.length}
+                          {agmtState.characters.length}
                         </span>
                       )}
                     </h4>
@@ -10604,10 +10600,10 @@ ${description || ""}`;
                             newCharacterName.trim() &&
                             newCharacterRole.trim()
                           ) {
-                            setMythicState({
-                              ...mythicState,
+                            setAGMTState({
+                              ...agmtState,
                               characters: [
-                                ...mythicState.characters,
+                                ...agmtState.characters,
                                 {
                                   id: crypto.randomUUID(),
                                   name: newCharacterName.trim(),
@@ -10630,10 +10626,10 @@ ${description || ""}`;
                             newCharacterName.trim() &&
                             newCharacterRole.trim()
                           ) {
-                            setMythicState({
-                              ...mythicState,
+                            setAGMTState({
+                              ...agmtState,
                               characters: [
-                                ...mythicState.characters,
+                                ...agmtState.characters,
                                 {
                                   id: crypto.randomUUID(),
                                   name: newCharacterName.trim(),
@@ -10655,7 +10651,7 @@ ${description || ""}`;
                         + Add
                       </button>
                     </div>
-                    {mythicState.characters.length === 0 ? (
+                    {agmtState.characters.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         <p className="text-sm">No characters yet</p>
                         <p className="text-xs mt-1">
@@ -10664,7 +10660,7 @@ ${description || ""}`;
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {mythicState.characters.map((char) => (
+                        {agmtState.characters.map((char) => (
                           <div
                             key={char.id}
                             className="group p-4 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-green-500/50 transition-all duration-200"
@@ -10694,9 +10690,9 @@ ${description || ""}`;
                                 </div>
                                 <button
                                   onClick={() => {
-                                    setMythicState({
-                                      ...mythicState,
-                                      characters: mythicState.characters.map(
+                                    setAGMTState({
+                                      ...agmtState,
+                                      characters: agmtState.characters.map(
                                         (c) =>
                                           c.id === char.id
                                             ? {
@@ -10771,12 +10767,11 @@ ${description || ""}`;
                                   </button>
                                   <button
                                     onClick={() =>
-                                      setMythicState({
-                                        ...mythicState,
-                                        characters:
-                                          mythicState.characters.filter(
-                                            (c) => c.id !== char.id
-                                          ),
+                                      setAGMTState({
+                                        ...agmtState,
+                                        characters: agmtState.characters.filter(
+                                          (c) => c.id !== char.id
+                                        ),
                                       })
                                     }
                                     className="text-red-400 hover:text-red-300"
@@ -12053,7 +12048,7 @@ ${description || ""}`;
           quests,
           presets,
           upgradeSettings,
-          mythicState: mythicEnabled ? mythicState : undefined,
+          agmtState: agmtEnabled ? agmtState : undefined,
           customTables,
         }}
         adventureMetadata={{

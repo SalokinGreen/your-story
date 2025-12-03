@@ -267,18 +267,16 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
         }
       }
 
-      // Parse mythic_check: question (likelihood)
-      const mythicCheckMatch = metadata.match(
-        /mythic_check:\s*([^;]+?)(?:;|$)/i
-      );
-      if (mythicCheckMatch) {
-        const mythicCheck = mythicCheckMatch[1].trim();
-        if (mythicCheck.toLowerCase() !== "none") {
-          choice.mythic_check = mythicCheck;
+      // Parse agmt_check: question (likelihood)
+      const agmtCheckMatch = metadata.match(/agmt_check:\s*([^;]+?)(?:;|$)/i);
+      if (agmtCheckMatch) {
+        const agmtCheck = agmtCheckMatch[1].trim();
+        if (agmtCheck.toLowerCase() !== "none") {
+          choice.agmt_check = agmtCheck;
         }
       }
 
-      // Parse unified table: field (replaces both mythic_table and custom_table)
+      // Parse unified table: field (replaces both agmt_table and custom_table)
       const tableMatch = metadata.match(/table:\s*([^;]+?)(?:;|$)/i);
       if (tableMatch) {
         const tableName = tableMatch[1].trim();
@@ -287,14 +285,12 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
         }
       }
 
-      // Legacy support: Parse mythic_table: category (migrate to unified table field)
-      const mythicTableMatch = metadata.match(
-        /mythic_table:\s*([^;]+?)(?:;|$)/i
-      );
-      if (mythicTableMatch && !choice.table) {
-        const mythicTable = mythicTableMatch[1].trim();
-        if (mythicTable.toLowerCase() !== "none") {
-          choice.table = mythicTable;
+      // Legacy support: Parse agmt_table: category (migrate to unified table field)
+      const agmtTableMatch = metadata.match(/agmt_table:\s*([^;]+?)(?:;|$)/i);
+      if (agmtTableMatch && !choice.table) {
+        const agmtTable = agmtTableMatch[1].trim();
+        if (agmtTable.toLowerCase() !== "none") {
+          choice.table = agmtTable;
         }
       }
 
@@ -1024,7 +1020,7 @@ export async function analyzeAction(
       item_used: null,
       ability_used: null,
       resource_used: null,
-      mythic_check: null,
+      agmt_check: null,
       table: null,
       is_plain_action: true,
     };
@@ -1123,15 +1119,15 @@ export async function analyzeAction(
     }
   }
 
-  // Handle legacy mythic_table/custom_table fields - migrate to unified table field
-  if (analysis.mythic_table && !analysis.table) {
-    analysis.table = analysis.mythic_table;
+  // Handle legacy agmt_table/custom_table fields - migrate to unified table field
+  if (analysis.agmt_table && !analysis.table) {
+    analysis.table = analysis.agmt_table;
   }
   if (analysis.custom_table && !analysis.table) {
     analysis.table = analysis.custom_table;
   }
 
-  // Validate unified table field - check both custom tables AND mythic element tables
+  // Validate unified table field - check both custom tables AND agmt element tables
   if (analysis.table) {
     const tableName = analysis.table;
 
@@ -1145,8 +1141,8 @@ export async function analyzeAction(
       }
     }
 
-    // If not found in custom tables, check if it's a valid mythic table
-    const mythicTableNames = [
+    // If not found in custom tables, check if it's a valid agmt table
+    const agmtTableNames = [
       "adventure_tone",
       "alien_species",
       "animal_actions",
@@ -1194,16 +1190,16 @@ export async function analyzeAction(
       "visions_dreams",
     ];
 
-    const isMythicTable = mythicTableNames.some(
+    const isAGMTTable = agmtTableNames.some(
       (name) => name.toLowerCase() === tableName.toLowerCase()
     );
     const isCustomTable = storyData.customTables?.some(
       (t) => t.name.toLowerCase() === tableName.toLowerCase()
     );
 
-    if (!isMythicTable && !isCustomTable) {
+    if (!isAGMTTable && !isCustomTable) {
       validationWarnings.push(
-        `Table "${tableName}" not found in custom or mythic tables, removing`
+        `Table "${tableName}" not found in custom or agmt tables, removing`
       );
       analysis.table = null;
     }
@@ -1214,7 +1210,7 @@ export async function analyzeAction(
     !analysis.skill_used &&
     !analysis.item_used &&
     !analysis.resource_used &&
-    !analysis.mythic_check &&
+    !analysis.agmt_check &&
     !analysis.table
   ) {
     analysis.is_plain_action = true;
@@ -1254,7 +1250,7 @@ export function analysisToChoice(
     skill_dc: analysis.skill_dc || undefined,
     item_used: analysis.item_used || undefined,
     resource_used: analysis.resource_used || undefined,
-    mythic_check: analysis.mythic_check || undefined,
+    agmt_check: analysis.agmt_check || undefined,
     table: analysis.table || undefined,
   };
 }

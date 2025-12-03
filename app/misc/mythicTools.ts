@@ -1,7 +1,7 @@
 /**
  * Advanced RPG Tools Tool Definitions
  *
- * Tool schemas for AI-driven Mythic Game Master Emulator operations.
+ * Tool schemas for AI-driven AGMT Game Master Emulator operations.
  * Enables AI to manage story threads, NPCs, chaos factor, and scene tracking.
  */
 

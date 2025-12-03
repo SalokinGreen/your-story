@@ -139,7 +139,7 @@ export default function Story({
             item_used: result.analysis.item_used || undefined,
             ability_used: result.analysis.ability_used || undefined,
             resource_used: result.analysis.resource_used || undefined,
-            mythic_check: result.analysis.mythic_check || undefined,
+            agmt_check: result.analysis.agmt_check || undefined,
             table: result.analysis.table || undefined,
             stt_input: true,
           };

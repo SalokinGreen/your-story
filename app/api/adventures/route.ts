@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
           is_published: isPublished || false,
           is_featured: false,
           story_template: storyTemplate,
-          mythic_state: storyTemplate?.mythicState || null,
+          agmt_state: storyTemplate?.agmtState || null,
           selected_preset: selectedPreset || null,
           presets: presets || null,
           starting_choices: startingChoices || null,

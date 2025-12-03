@@ -19,7 +19,7 @@ import {
   getStagesToRun,
   getStageInfo,
   BigAdventureResult,
-  DEFAULT_STAGE_CONFIGS,
+  getSubstageConfig,
   detectIncompleteJSON,
   buildContinuationPrompt,
 } from "@/app/misc/big_adventure_ai";
@@ -345,8 +345,7 @@ async function generateStage(
   const MAX_CONTINUATIONS = modelConfig.provider === "novelai" ? 50 : 5;
 
   // Get stage-specific max output tokens
-  const stageConfig =
-    config.stageConfigs?.[stage] || DEFAULT_STAGE_CONFIGS[stage];
+  const stageConfig = getSubstageConfig(stage, config.stageConfigs);
   const maxOutputTokens = stageConfig.maxOutputTokens || config.maxOutputTokens;
 
   // Send stage start event

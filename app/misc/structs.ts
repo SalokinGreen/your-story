@@ -32,7 +32,7 @@ export type ItemGrade =
   | "rare"
   | "epic"
   | "legendary"
-  | "mythic";
+  | "agmt";
 
 export interface InventoryItem {
   name: string;
@@ -150,12 +150,12 @@ export interface Choice {
   skill_dc?: number;
   resource_used?: string;
   condition_applies?: string; // Name of condition that applies penalty to this roll (AI chooses most relevant)
-  mythic_check?: string; // Format: "question (likelihood)" e.g., "Is the door locked? (Likely)"
-  mythic_context_only?: boolean; // When true with skill_used, mythic provides context only and doesn't override skill check result
-  table?: string; // Unified table field - checks both custom tables AND mythic element tables
+  agmt_check?: string; // Format: "question (likelihood)" e.g., "Is the door locked? (Likely)"
+  agmt_context_only?: boolean; // When true with skill_used, agmt provides context only and doesn't override skill check result
+  table?: string; // Unified table field - checks both custom tables AND agmt element tables
   intro_override?: string; // Optional: For starting choices, use this text instead of AI generation
   // Legacy fields for backward compatibility (deprecated - use 'table' instead)
-  mythic_table?: string;
+  agmt_table?: string;
   custom_table?: string;
   stt_input?: boolean; // True if text was input via speech-to-text (may contain transcription errors)
 }
@@ -329,7 +329,7 @@ export interface StoryData {
     | "narrative"; // RPG dice system
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)
-  mythicState?: MythicState; // Advanced RPG Tools state (chaos factor, threads, characters)
+  agmtState?: AGMTState; // Advanced RPG Tools state (chaos factor, threads, characters)
   customTables?: CustomTable[]; // Creator-defined random tables
   variables?: Variable[]; // Dynamic tracked variables (numbers, booleans, lists)
   starting_choices?: StartingChoice[]; // Optional custom starting choices from adventure
@@ -337,10 +337,10 @@ export interface StoryData {
 }
 
 // Advanced RPG Tools state tracking
-export interface MythicState {
+export interface AGMTState {
   chaosFactor: number; // 1-9, default 5
-  threads: MythicThread[]; // Active story threads
-  characters: MythicCharacter[]; // Known NPCs
+  threads: AGMTThread[]; // Active story threads
+  characters: AGMTCharacter[]; // Known NPCs
   sceneCount: number; // Number of scenes played
   skillCheckHistory: SkillCheckResult[]; // Recent skill check results
   currentStreak: number; // Positive = success streak, negative = failure streak
@@ -356,14 +356,14 @@ export interface SkillCheckResult {
   timestamp: number;
 }
 
-export interface MythicThread {
+export interface AGMTThread {
   id: string;
   description: string;
   status: "active" | "closed";
   createdAt: number;
 }
 
-export interface MythicCharacter {
+export interface AGMTCharacter {
   id: string;
   name: string;
   role: string;
@@ -476,11 +476,11 @@ export interface StartingChoice {
   item_used?: string; // Optional: requires/uses an item
   item_loss?: boolean; // Whether the item is consumed when used
   ability_used?: string; // Optional: uses an ability (applies bonus, deducts cost)
-  mythic_check?: string; // Optional: Mythic yes/no question
-  mythic_context_only?: boolean; // When true with skill_used, mythic provides context only
-  table?: string; // Unified table field - checks both custom tables AND mythic element tables
+  agmt_check?: string; // Optional: AGMT yes/no question
+  agmt_context_only?: boolean; // When true with skill_used, agmt provides context only
+  table?: string; // Unified table field - checks both custom tables AND agmt element tables
   // Legacy fields for backward compatibility (deprecated - use 'table' instead)
-  mythic_table?: string;
+  agmt_table?: string;
   custom_table?: string;
 }
 
@@ -562,10 +562,10 @@ export interface ActionAnalysis {
   item_used: string | null; // Item name if using an item
   ability_used: string | null; // Ability name if using an ability
   resource_used: string | null; // Resource name if using a resource
-  mythic_check: string | null; // Mythic yes/no question with likelihood
-  table: string | null; // Unified table field - checks both custom tables AND mythic element tables
+  agmt_check: string | null; // AGMT yes/no question with likelihood
+  table: string | null; // Unified table field - checks both custom tables AND agmt element tables
   // Legacy fields for backward compatibility (deprecated - use 'table' instead)
-  mythic_table?: string | null;
+  agmt_table?: string | null;
   custom_table?: string | null;
   is_plain_action: boolean; // True if no mechanics, just narration
 }

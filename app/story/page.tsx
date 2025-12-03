@@ -1880,11 +1880,11 @@ function StoryPageContent() {
       // Mark this story as loaded to prevent re-fetching
       hasLoadedStoryRef.current = storyId;
 
-      // Migrate Mythic state to include new performance tracking fields
-      if (loadedStoryData.mythicState) {
-        import("@/app/misc/mythicChaos").then(({ migrateMythicState }) => {
-          loadedStoryData.mythicState = migrateMythicState(
-            loadedStoryData.mythicState!
+      // Migrate AGMT state to include new performance tracking fields
+      if (loadedStoryData.agmtState) {
+        import("@/app/misc/mythicChaos").then(({ migrateAGMTState }) => {
+          loadedStoryData.agmtState = migrateAGMTState(
+            loadedStoryData.agmtState!
           );
         });
       }
@@ -2226,10 +2226,10 @@ function StoryPageContent() {
           skill_used: sc.skill_used,
           skill_dc: sc.skill_dc,
           resource_used: sc.resource_used,
-          mythic_check: sc.mythic_check,
-          mythic_context_only: sc.mythic_context_only,
+          agmt_check: sc.agmt_check,
+          agmt_context_only: sc.agmt_context_only,
           // Use unified table field, with fallback to legacy fields
-          table: sc.table || sc.mythic_table || sc.custom_table,
+          table: sc.table || sc.agmt_table || sc.custom_table,
           // Include intro_override so it can be used when this choice is selected
           intro_override: sc.intro_override,
         }))
@@ -2901,11 +2901,11 @@ function StoryPageContent() {
     let choiceDetails: string[] = [];
 
     // Process Advanced RPG Tools checks first (less important, shown at top)
-    const mythicDetails: string[] = [];
-    if (choice.mythic_check) {
+    const agmtDetails: string[] = [];
+    if (choice.agmt_check) {
       try {
         // Parse format: "question (likelihood)" or just "question"
-        const match = choice.mythic_check.match(
+        const match = choice.agmt_check.match(
           /^(.+?)(?:\s*\(\s*([^)]+)\s*\))?$/
         );
         if (match) {
@@ -2928,50 +2928,50 @@ function StoryPageContent() {
           ];
           if (!validLikelihoods.includes(likelihood)) {
             console.warn(
-              `Invalid Mythic likelihood "${likelihood}", defaulting to 50/50`
+              `Invalid AGMT likelihood "${likelihood}", defaulting to 50/50`
             );
             likelihood = "50/50";
           }
 
-          const chaosFactor = storyData.mythicState?.chaosFactor || 5;
+          const chaosFactor = storyData.agmtState?.chaosFactor || 5;
 
           const result = askFate(likelihood, chaosFactor);
 
-          let mythicLine = `[Mythic Question: ${question}]`;
-          let answerLine = `[Mythic Answer: ${result.answer}`;
+          let agmtLine = `[AGMT Question: ${question}]`;
+          let answerLine = `[AGMT Answer: ${result.answer}`;
           if (result.randomEvent) {
             answerLine += " - RANDOM EVENT TRIGGERED!";
           }
           answerLine += `]`;
 
-          mythicDetails.push(mythicLine);
-          mythicDetails.push(answerLine);
+          agmtDetails.push(agmtLine);
+          agmtDetails.push(answerLine);
 
-          // Add context flag if skill check exists or mythic_context_only is set
-          if (choice.skill_used || choice.mythic_context_only) {
-            mythicDetails.push(
-              `[Note: Mythic is context only - skill check determines success/failure]`
+          // Add context flag if skill check exists or agmt_context_only is set
+          if (choice.skill_used || choice.agmt_context_only) {
+            agmtDetails.push(
+              `[Note: AGMT is context only - skill check determines success/failure]`
             );
           }
 
-          logger.action("Mythic fate check from choice", {
+          logger.action("AGMT fate check from choice", {
             question,
             likelihood,
             answer: result.answer,
             roll: result.roll,
             randomEvent: result.randomEvent,
-            contextOnly: !!(choice.skill_used || choice.mythic_context_only),
+            contextOnly: !!(choice.skill_used || choice.agmt_context_only),
           });
         }
       } catch (error) {
-        console.error("Error processing mythic_check:", error);
+        console.error("Error processing agmt_check:", error);
       }
     }
 
-    // Process unified table field (checks both custom tables and mythic tables)
-    // Also handle legacy mythic_table and custom_table fields for backward compatibility
+    // Process unified table field (checks both custom tables and agmt tables)
+    // Also handle legacy agmt_table and custom_table fields for backward compatibility
     const tableToRoll =
-      choice.table || choice.mythic_table || choice.custom_table;
+      choice.table || choice.agmt_table || choice.custom_table;
     if (tableToRoll) {
       try {
         // First, check if it's a custom table
@@ -2996,7 +2996,7 @@ function StoryPageContent() {
             }
           }
           if (result) {
-            mythicDetails.push(`[${customTable.name}: ${result.text}]`);
+            agmtDetails.push(`[${customTable.name}: ${result.text}]`);
             logger.action("Custom table roll from choice", {
               table: customTable.name,
               result: result.text,
@@ -3004,14 +3004,14 @@ function StoryPageContent() {
             });
           }
         } else {
-          // Try as mythic element table
+          // Try as agmt element table
           const result = generateElement(tableToRoll as ElementCategory);
           const tableName = tableToRoll
             .replace(/_/g, " ")
             .replace(/\b\w/g, (l) => l.toUpperCase());
-          mythicDetails.push(`[${tableName} Table: ${result.element}]`);
+          agmtDetails.push(`[${tableName} Table: ${result.element}]`);
 
-          logger.action("Mythic table roll from choice", {
+          logger.action("AGMT table roll from choice", {
             table: tableToRoll,
             result: result.element,
           });
@@ -3931,21 +3931,21 @@ function StoryPageContent() {
             passed: dc_passed,
           });
 
-          // Track skill check for Mythic chaos adjustment
-          if (storyData.mythicState && choice.skill_used) {
+          // Track skill check for AGMT chaos adjustment
+          if (storyData.agmtState && choice.skill_used) {
             const { addSkillCheckResult } = await import(
               "@/app/misc/mythicChaos"
             );
             const skillResult = {
-              sceneNumber: storyData.mythicState.sceneCount,
+              sceneNumber: storyData.agmtState.sceneCount,
               success: dc_passed,
               skill: choice.skill_used,
               difficulty: dc,
               margin: total - dc,
               timestamp: Date.now(),
             };
-            storyData.mythicState = addSkillCheckResult(
-              storyData.mythicState,
+            storyData.agmtState = addSkillCheckResult(
+              storyData.agmtState,
               skillResult
             );
           }
@@ -4239,7 +4239,7 @@ function StoryPageContent() {
           `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; Durability ${itemDurabilityBefore}/${itemMaxDurability} → ${itemDurabilityAfter}/${itemMaxDurability}]`
         );
       } else if (itemMaxDurability === Infinity || itemMaxDurability === -1) {
-        // Mythic items have infinite durability
+        // AGMT items have infinite durability
         choiceDetails.push(
           `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; Durability ∞]`
         );
@@ -4278,9 +4278,9 @@ function StoryPageContent() {
       );
     }
 
-    // Add mythic details at the beginning (less important info first)
-    if (mythicDetails.length > 0) {
-      choiceDetails = [...mythicDetails, ...choiceDetails];
+    // Add agmt details at the beginning (less important info first)
+    if (agmtDetails.length > 0) {
+      choiceDetails = [...agmtDetails, ...choiceDetails];
     }
 
     // Process table rolls using unified table field
@@ -4308,7 +4308,7 @@ function StoryPageContent() {
             addNotification(`Table "${table.name}" is empty`, "warning");
           }
         }
-        // If not a custom table, the mythic table was already handled earlier
+        // If not a custom table, the agmt table was already handled earlier
       } catch (error) {
         console.error("Error processing table roll:", error);
       }

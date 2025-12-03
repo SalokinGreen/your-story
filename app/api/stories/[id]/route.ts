@@ -135,8 +135,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const updates: any = {};
     if (storyData !== undefined) {
       updates.story_data = storyData;
-      // Extract mythic_state from storyData if present
-      updates.mythic_state = storyData?.mythicState || null;
+      // Extract agmt_state from storyData if present
+      updates.agmt_state = storyData?.agmtState || null;
       // If storyData has nsfw flag, sync it to the column
       if (storyData.nsfw !== undefined) {
         updates.nsfw = storyData.nsfw;

@@ -154,7 +154,7 @@ You can control how items in arrays are applied using the **_command** field:
   - description: Item description
   - type: "normal" (advantage, breaks on fail), "consumable" (advantage, consumed on use), "story" (advantage, never breaks/consumed), "misc" (prevents disadvantage, never breaks/consumed)
   - symbol: Emoji/icon representing the item
-  - grade: Item quality tier - "common" (dur 8, +0 bonus), "uncommon" (dur 13, +1), "rare" (dur 20, +2), "epic" (dur 30, +3), "legendary" (dur 50, +4), "mythic" (infinite dur, +5)
+  - grade: Item quality tier - "common" (dur 8, +0 bonus), "uncommon" (dur 13, +1), "rare" (dur 20, +2), "epic" (dur 30, +3), "legendary" (dur 50, +4), "agmt" (infinite dur, +5)
   - durability: Current durability points (auto-set from grade if omitted)
   - maxDurability: Maximum durability (auto-set from grade if omitted)
 - abilities (Array of { name, description, grade, cost, cooldown, currentCooldown, stat, symbol })
@@ -244,7 +244,7 @@ You can control how items in arrays are applied using the **_command** field:
     - symbol: Emoji/icon representing the item
     - quantity: How many of this item to grant
     - cost: Progression points required to purchase
-    - grade: Optional item grade - "common", "uncommon", "rare", "epic", "legendary", "mythic" (default: "common")
+    - grade: Optional item grade - "common", "uncommon", "rare", "epic", "legendary", "agmt" (default: "common")
   - abilityShop: Array of { name, description, grade, cost, abilityCost, cooldown, stat, symbol } - abilities players can unlock
     - name: Ability name
     - description: What the ability does
@@ -254,7 +254,7 @@ You can control how items in arrays are applied using the **_command** field:
     - cooldown: Turns until can be used again (0 = no cooldown)
     - stat: Optional associated stat
     - symbol: Emoji/icon
-- mythicState (Object with Advanced RPG Tools state - if provided, Mythic system will be enabled for this adventure)
+- agmtState (Object with Advanced RPG Tools state - if provided, AGMT system will be enabled for this adventure)
   - chaosFactor: Number 1-9 representing narrative chaos/unpredictability
   - sceneCount: Number >= 0 tracking scenes played
   - threads: Array of { id, description, status } - narrative threads
@@ -273,7 +273,7 @@ You can control how items in arrays are applied using the **_command** field:
   - entries: Array of { text, weight } - possible results when rolling on the table
     - text: The result text that will be shown/used
     - weight: Probability weight (higher numbers = more likely to be selected). Default is 1.
-- startingChoices (Array of { text, intro_override, skill_used, skill_dc, resource_used, item_used, item_loss, ability_used, mythic_check, mythic_context_only, mythic_table, custom_table }) - Custom starting choices instead of default "Start Story" button
+- startingChoices (Array of { text, intro_override, skill_used, skill_dc, resource_used, item_used, item_loss, ability_used, agmt_check, agmt_context_only, agmt_table, custom_table }) - Custom starting choices instead of default "Start Story" button
   - text: The choice text displayed to player (required)
   - intro_override: Optional alternate intro text for this path (if empty, uses main intro)
   - skill_used: Optional skill name for skill check on this choice
@@ -282,9 +282,9 @@ You can control how items in arrays are applied using the **_command** field:
   - item_used: Optional item name that this choice requires
   - item_loss: Boolean - whether the item is consumed when used (default false)
   - ability_used: Optional ability name to use on this choice (will check/deduct costs and apply cooldown)
-  - mythic_check: Optional Mythic fate check question in format "Question (Likelihood)" e.g., "Is the guard asleep? (Likely)"
-  - mythic_context_only: Boolean - when true with skill_used, mythic provides context only (doesn't override skill check result)
-  - mythic_table: Optional Mythic table to roll on (e.g., "action", "subject", "character_descriptors", "locations", "plot_twists")
+  - agmt_check: Optional AGMT fate check question in format "Question (Likelihood)" e.g., "Is the guard asleep? (Likely)"
+  - agmt_context_only: Boolean - when true with skill_used, agmt provides context only (doesn't override skill check result)
+  - agmt_table: Optional AGMT table to roll on (e.g., "action", "subject", "character_descriptors", "locations", "plot_twists")
   - custom_table: Optional custom table name to roll on
 
 Notes:
@@ -292,8 +292,8 @@ Notes:
 - Use the 'symbol' field to add an emoji or icon representing the item/stat/resource.
 - Be creative and thematic in your additions/modifications based on the story setting.
 - When creating stat/resource shop items, these are NEW stats/resources that players can unlock, not upgrades to existing ones.
-- Advanced RPG Tools is enabled by providing a mythicState object. If you want to enable Mythic, simply include mythicState with at least chaosFactor.
-- Mythic chaos factor must be between 1-9, scene count must be >= 0.
+- Advanced RPG Tools is enabled by providing a agmtState object. If you want to enable AGMT, simply include agmtState with at least chaosFactor.
+- AGMT chaos factor must be between 1-9, scene count must be >= 0.
 - Thread and character IDs are auto-generated if not provided, so you can omit them for new entries.
 - Starting choices allow players to choose how they begin the adventure. If startingChoices is empty/undefined, players see a default "Start Story" button.
 - **Variables are essential for tracking custom game state** - use them for counters (gold, time), flags (is_night, is_wanted), and lists (known_spells). Boolean variables can trigger lore visibility.
@@ -503,13 +503,13 @@ Assistant:
 \`\`\`"
 
 **Example 10 - Advanced RPG Tools:**
-User: "Enable Mythic with chaos 5, add a thread about finding the ancient temple, and an NPC named Elara."
+User: "Enable AGMT with chaos 5, add a thread about finding the ancient temple, and an NPC named Elara."
 Assistant:
 "I've enabled Advanced RPG Tools with your settings.
 
 \`\`\`json
 {
-  "mythicState": {
+  "agmtState": {
     "chaosFactor": 5,
     "sceneCount": 0,
     "threads": [
@@ -529,14 +529,14 @@ Assistant:
 }
 \`\`\`"
 
-**Example 11 - Managing Mythic Threads:**
+**Example 11 - Managing AGMT Threads:**
 User: "Close the temple thread and add a new thread about the dragon awakening."
 Assistant:
-"I've updated the Mythic threads.
+"I've updated the AGMT threads.
 
 \`\`\`json
 {
-  "mythicState": {
+  "agmtState": {
     "threads": [
       {
         "description": "Find and explore the ancient temple before it collapses",
@@ -631,18 +631,18 @@ Assistant:
 }
 \`\`\`"
 
-**Example 15 - Starting Choices with Mythic:**
+**Example 15 - Starting Choices with AGMT:**
 User: "Add a starting choice that asks fate if there's a secret passage, and rolls on the locations table."
 Assistant:
-"I've added a Mythic-powered starting choice.
+"I've added a AGMT-powered starting choice.
 
 \`\`\`json
 {
   "startingChoices": [
     {
       "text": "Search for a hidden entrance",
-      "mythic_check": "Is there a secret passage? (Unlikely)",
-      "mythic_table": "locations"
+      "agmt_check": "Is there a secret passage? (Unlikely)",
+      "agmt_table": "locations"
     }
   ]
 }

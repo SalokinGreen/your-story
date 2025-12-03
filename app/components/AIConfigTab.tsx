@@ -822,6 +822,349 @@ export default function AIConfigTab() {
         </p>
       </div>
 
+      {/* Custom Model Config (only for custom preset) */}
+      {currentPreset === "custom" && (
+        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
+          <button
+            onClick={() => setShowModelConfig(!showModelConfig)}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+              <DynamicIcon name="Settings" className="w-4 h-4" />
+              Configure Custom Models
+            </h4>
+            <DynamicIcon
+              name={showModelConfig ? "ChevronUp" : "ChevronDown"}
+              className="w-4 h-4 text-gray-500"
+            />
+          </button>
+
+          {showModelConfig && (
+            <div className="space-y-4 pt-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Choose models for each generation stage
+              </p>
+
+              {/* Story Model */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Story Narration Model
+                </label>
+                <select
+                  value={storyModel || preset.storyModel}
+                  onChange={(e) => setStoryModel(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  {Object.entries(AI_MODELS)
+                    .filter(([, config]) => {
+                      const isBYOKProvider =
+                        config.provider === "openrouter" ||
+                        config.provider === "deepseek" ||
+                        config.provider === "novelai";
+                      return byokMode ? isBYOKProvider : !isBYOKProvider;
+                    })
+                    .map(([key, config]) => (
+                      <option key={key} value={key}>
+                        {config.name} ({config.cost} coin
+                        {config.cost > 1 ? "s" : ""},{" "}
+                        {(config.maxTokens / 1000).toFixed(0)}K)
+                      </option>
+                    ))}
+                  {byokMode && customModels.length > 0 && (
+                    <optgroup label="Custom Models">
+                      {customModels.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.name} (FREE,{" "}
+                          {(model.contextSize / 1000).toFixed(0)}K)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+
+              {/* Tools Model */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Tools & Game State Model
+                </label>
+                <select
+                  value={toolsModel || preset.toolsModel}
+                  onChange={(e) => setToolsModel(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  {Object.entries(AI_MODELS)
+                    .filter(([, config]) => {
+                      const isBYOKProvider =
+                        config.provider === "openrouter" ||
+                        config.provider === "deepseek" ||
+                        config.provider === "novelai";
+                      return byokMode ? isBYOKProvider : !isBYOKProvider;
+                    })
+                    .map(([key, config]) => (
+                      <option key={key} value={key}>
+                        {config.name} ({(config as any).cost || 1} coin
+                        {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
+                        {(config.maxTokens / 1000).toFixed(0)}K)
+                      </option>
+                    ))}
+                  {byokMode && customModels.length > 0 && (
+                    <optgroup label="Custom Models">
+                      {customModels.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.name} (FREE,{" "}
+                          {(model.contextSize / 1000).toFixed(0)}K)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+
+              {/* Choices Model */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Player Choices Model
+                </label>
+                <select
+                  value={choicesModel || preset.choicesModel}
+                  onChange={(e) => setChoicesModel(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  {Object.entries(AI_MODELS)
+                    .filter(([, config]) => {
+                      const isBYOKProvider =
+                        config.provider === "openrouter" ||
+                        config.provider === "deepseek" ||
+                        config.provider === "novelai";
+                      return byokMode ? isBYOKProvider : !isBYOKProvider;
+                    })
+                    .map(([key, config]) => (
+                      <option key={key} value={key}>
+                        {config.name} ({(config as any).cost || 1} coin
+                        {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
+                        {(config.maxTokens / 1000).toFixed(0)}K)
+                      </option>
+                    ))}
+                  {byokMode && customModels.length > 0 && (
+                    <optgroup label="Custom Models">
+                      {customModels.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.name} (FREE,{" "}
+                          {(model.contextSize / 1000).toFixed(0)}K)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Custom Models Management - Only in BYOK mode */}
+      {byokMode && (
+        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
+          <button
+            onClick={() => setShowCustomModels(!showCustomModels)}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+              <DynamicIcon name="Plus" className="w-4 h-4" />
+              Custom Models
+              {customModels.length > 0 && (
+                <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full">
+                  {customModels.length}
+                </span>
+              )}
+            </h4>
+            <DynamicIcon
+              name={showCustomModels ? "ChevronUp" : "ChevronDown"}
+              className="w-4 h-4 text-gray-500"
+            />
+          </button>
+
+          {showCustomModels && (
+            <div className="space-y-4 pt-2">
+              {/* Existing Custom Models */}
+              {customModels.length > 0 && (
+                <div className="space-y-2">
+                  {customModels.map((model) => (
+                    <div
+                      key={model.id}
+                      className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+                    >
+                      {editingModelId === model.id ? (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={newModelId}
+                            onChange={(e) => setNewModelId(e.target.value)}
+                            placeholder="Model ID"
+                            className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
+                          />
+                          <input
+                            type="text"
+                            value={newModelName}
+                            onChange={(e) => setNewModelName(e.target.value)}
+                            placeholder="Display Name"
+                            className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="number"
+                              value={newContextSize}
+                              onChange={(e) =>
+                                setNewContextSize(
+                                  parseInt(e.target.value) || 4096
+                                )
+                              }
+                              placeholder="Context Size"
+                              className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
+                            />
+                            <input
+                              type="number"
+                              value={newMaxOutput}
+                              onChange={(e) =>
+                                setNewMaxOutput(
+                                  parseInt(e.target.value) || 1000
+                                )
+                              }
+                              placeholder="Max Output"
+                              className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleUpdateModel}
+                              className="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="flex-1 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {model.name}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {model.modelId} • {model.contextSize} tokens
+                            </p>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleEditModel(model)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                            >
+                              <DynamicIcon
+                                name="Edit2"
+                                className="w-3.5 h-3.5"
+                              />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteModel(model.id)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                            >
+                              <DynamicIcon
+                                name="Trash2"
+                                className="w-3.5 h-3.5"
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add New Model Form */}
+              {!editingModelId && (
+                <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                    Add New Model
+                  </p>
+                  <input
+                    type="text"
+                    value={newModelId}
+                    onChange={(e) => setNewModelId(e.target.value)}
+                    placeholder="Model ID (e.g., anthropic/claude-3-opus)"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={newModelName}
+                    onChange={(e) => setNewModelName(e.target.value)}
+                    placeholder="Display Name (e.g., Claude 3 Opus)"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        Context Size
+                      </label>
+                      <input
+                        type="number"
+                        value={newContextSize}
+                        onChange={(e) =>
+                          setNewContextSize(parseInt(e.target.value) || 4096)
+                        }
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        Max Output
+                      </label>
+                      <input
+                        type="number"
+                        value={newMaxOutput}
+                        onChange={(e) =>
+                          setNewMaxOutput(parseInt(e.target.value) || 1000)
+                        }
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleAddModel}
+                    className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium"
+                  >
+                    Add Model
+                  </button>
+                </div>
+              )}
+
+              {/* Sync Button */}
+              {customModels.length > 0 && (
+                <button
+                  onClick={handleSaveSettings}
+                  disabled={isSaving || !user}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                >
+                  {isSaving ? "Saving..." : "Sync Custom Models"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Sampling Settings - For Coins mode and OpenRouter */}
+      <SamplingSettingsTab
+        byokMode={byokMode}
+        hasOpenRouterKey={hasKey("openRouterKey")}
+      />
+
       {/* Tool Calling Settings */}
       <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
         <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
@@ -1040,342 +1383,6 @@ export default function AIConfigTab() {
           </>
         )}
       </div>
-
-      {/* Custom Model Config (only for custom preset) */}
-      {currentPreset === "custom" && (
-        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
-          <button
-            onClick={() => setShowModelConfig(!showModelConfig)}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-              <DynamicIcon name="Settings" className="w-4 h-4" />
-              Configure Custom Models
-            </h4>
-            <DynamicIcon
-              name={showModelConfig ? "ChevronUp" : "ChevronDown"}
-              className="w-4 h-4 text-gray-500"
-            />
-          </button>
-
-          {showModelConfig && (
-            <div className="space-y-4 pt-2">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Choose models for each generation stage
-              </p>
-
-              {/* Story Model */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Story Narration Model
-                </label>
-                <select
-                  value={storyModel || preset.storyModel}
-                  onChange={(e) => setStoryModel(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  {Object.entries(AI_MODELS)
-                    .filter(([, config]) => {
-                      const isBYOKProvider =
-                        config.provider === "openrouter" ||
-                        config.provider === "deepseek" ||
-                        config.provider === "novelai";
-                      return byokMode ? isBYOKProvider : !isBYOKProvider;
-                    })
-                    .map(([key, config]) => (
-                      <option key={key} value={key}>
-                        {config.name} ({config.cost} coin
-                        {config.cost > 1 ? "s" : ""},{" "}
-                        {(config.maxTokens / 1000).toFixed(0)}K)
-                      </option>
-                    ))}
-                  {byokMode && customModels.length > 0 && (
-                    <optgroup label="Custom Models">
-                      {customModels.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.name} (FREE,{" "}
-                          {(model.contextSize / 1000).toFixed(0)}K)
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-
-              {/* Tools Model */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Tools & Game State Model
-                </label>
-                <select
-                  value={toolsModel || preset.toolsModel}
-                  onChange={(e) => setToolsModel(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  {Object.entries(AI_MODELS)
-                    .filter(([, config]) => {
-                      const isBYOKProvider =
-                        config.provider === "openrouter" ||
-                        config.provider === "deepseek" ||
-                        config.provider === "novelai";
-                      return byokMode ? isBYOKProvider : !isBYOKProvider;
-                    })
-                    .map(([key, config]) => (
-                      <option key={key} value={key}>
-                        {config.name} ({(config as any).cost || 1} coin
-                        {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
-                        {(config.maxTokens / 1000).toFixed(0)}K)
-                      </option>
-                    ))}
-                  {byokMode && customModels.length > 0 && (
-                    <optgroup label="Custom Models">
-                      {customModels.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.name} (FREE,{" "}
-                          {(model.contextSize / 1000).toFixed(0)}K)
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-
-              {/* Choices Model */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Player Choices Model
-                </label>
-                <select
-                  value={choicesModel || preset.choicesModel}
-                  onChange={(e) => setChoicesModel(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  {Object.entries(AI_MODELS)
-                    .filter(([, config]) => {
-                      const isBYOKProvider =
-                        config.provider === "openrouter" ||
-                        config.provider === "deepseek" ||
-                        config.provider === "novelai";
-                      return byokMode ? isBYOKProvider : !isBYOKProvider;
-                    })
-                    .map(([key, config]) => (
-                      <option key={key} value={key}>
-                        {config.name} ({(config as any).cost || 1} coin
-                        {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
-                        {(config.maxTokens / 1000).toFixed(0)}K)
-                      </option>
-                    ))}
-                  {byokMode && customModels.length > 0 && (
-                    <optgroup label="Custom Models">
-                      {customModels.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.name} (FREE,{" "}
-                          {(model.contextSize / 1000).toFixed(0)}K)
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Custom Models Management */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
-        <button
-          onClick={() => setShowCustomModels(!showCustomModels)}
-          className="flex items-center justify-between w-full text-left"
-        >
-          <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-            <DynamicIcon name="Plus" className="w-4 h-4" />
-            Custom Models
-            {customModels.length > 0 && (
-              <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full">
-                {customModels.length}
-              </span>
-            )}
-          </h4>
-          <DynamicIcon
-            name={showCustomModels ? "ChevronUp" : "ChevronDown"}
-            className="w-4 h-4 text-gray-500"
-          />
-        </button>
-
-        {showCustomModels && (
-          <div className="space-y-4 pt-2">
-            {/* Existing Custom Models */}
-            {customModels.length > 0 && (
-              <div className="space-y-2">
-                {customModels.map((model) => (
-                  <div
-                    key={model.id}
-                    className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
-                  >
-                    {editingModelId === model.id ? (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          value={newModelId}
-                          onChange={(e) => setNewModelId(e.target.value)}
-                          placeholder="Model ID"
-                          className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                        />
-                        <input
-                          type="text"
-                          value={newModelName}
-                          onChange={(e) => setNewModelName(e.target.value)}
-                          placeholder="Display Name"
-                          className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                        />
-                        <div className="grid grid-cols-2 gap-2">
-                          <input
-                            type="number"
-                            value={newContextSize}
-                            onChange={(e) =>
-                              setNewContextSize(
-                                parseInt(e.target.value) || 4096
-                              )
-                            }
-                            placeholder="Context Size"
-                            className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                          />
-                          <input
-                            type="number"
-                            value={newMaxOutput}
-                            onChange={(e) =>
-                              setNewMaxOutput(parseInt(e.target.value) || 1000)
-                            }
-                            placeholder="Max Output"
-                            className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleUpdateModel}
-                            className="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="flex-1 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded text-xs font-medium"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            {model.name}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {model.modelId} • {model.contextSize} tokens
-                          </p>
-                        </div>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => handleEditModel(model)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
-                          >
-                            <DynamicIcon name="Edit2" className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteModel(model.id)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                          >
-                            <DynamicIcon
-                              name="Trash2"
-                              className="w-3.5 h-3.5"
-                            />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Add New Model Form */}
-            {!editingModelId && (
-              <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                  Add New Model
-                </p>
-                <input
-                  type="text"
-                  value={newModelId}
-                  onChange={(e) => setNewModelId(e.target.value)}
-                  placeholder="Model ID (e.g., anthropic/claude-3-opus)"
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-                />
-                <input
-                  type="text"
-                  value={newModelName}
-                  onChange={(e) => setNewModelName(e.target.value)}
-                  placeholder="Display Name (e.g., Claude 3 Opus)"
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      Context Size
-                    </label>
-                    <input
-                      type="number"
-                      value={newContextSize}
-                      onChange={(e) =>
-                        setNewContextSize(parseInt(e.target.value) || 4096)
-                      }
-                      className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      Max Output
-                    </label>
-                    <input
-                      type="number"
-                      value={newMaxOutput}
-                      onChange={(e) =>
-                        setNewMaxOutput(parseInt(e.target.value) || 1000)
-                      }
-                      className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-                    />
-                  </div>
-                </div>
-                <button
-                  onClick={handleAddModel}
-                  className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium"
-                >
-                  Add Model
-                </button>
-              </div>
-            )}
-
-            {/* Sync Button */}
-            {customModels.length > 0 && (
-              <button
-                onClick={handleSaveSettings}
-                disabled={isSaving || !user}
-                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-              >
-                {isSaving ? "Saving..." : "Sync Custom Models"}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Sampling Settings - For Coins mode and OpenRouter */}
-      <SamplingSettingsTab
-        byokMode={byokMode}
-        hasOpenRouterKey={hasKey("openRouterKey")}
-      />
     </div>
   );
 }

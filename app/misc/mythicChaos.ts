@@ -5,14 +5,14 @@
  * Chaos increases when players struggle, decreases when they succeed.
  */
 
-import { MythicState, SkillCheckResult } from "./structs";
+import { AGMTState, SkillCheckResult } from "./structs";
 
 /**
  * Calculate chaos adjustment based on recent performance
  * @returns Delta to apply to chaos factor (-2 to +2)
  */
-export function calculateChaosAdjustment(mythicState: MythicState): number {
-  const history = mythicState.skillCheckHistory;
+export function calculateChaosAdjustment(agmtState: AGMTState): number {
+  const history = agmtState.skillCheckHistory;
 
   // Don't adjust if:
   // 1. Not enough data (< 5 checks)
@@ -20,8 +20,8 @@ export function calculateChaosAdjustment(mythicState: MythicState): number {
   // 3. Adjusted within last 2 scenes
   if (
     history.length < 5 ||
-    mythicState.lastChaosAdjustment === mythicState.sceneCount ||
-    mythicState.sceneCount - mythicState.lastChaosAdjustment < 2
+    agmtState.lastChaosAdjustment === agmtState.sceneCount ||
+    agmtState.sceneCount - agmtState.lastChaosAdjustment < 2
   ) {
     return 0; // No change
   }
@@ -49,7 +49,7 @@ export function calculateChaosAdjustment(mythicState: MythicState): number {
   const weightedSuccessRate = weightedSuccesses / totalWeight;
 
   // Check streak momentum
-  const streak = mythicState.currentStreak;
+  const streak = agmtState.currentStreak;
   const streakBonus = Math.abs(streak) >= 3 ? Math.sign(streak) * 0.5 : 0;
 
   // Final score: -1 to +1
@@ -76,21 +76,21 @@ export function calculateChaosAdjustment(mythicState: MythicState): number {
 
 /**
  * Apply chaos adjustment based on performance
- * @returns Updated MythicState with adjusted chaos
+ * @returns Updated AGMTState with adjusted chaos
  */
-export function applyChaosAdjustment(mythicState: MythicState): MythicState {
-  const delta = calculateChaosAdjustment(mythicState);
+export function applyChaosAdjustment(agmtState: AGMTState): AGMTState {
+  const delta = calculateChaosAdjustment(agmtState);
 
   if (delta === 0) {
-    return mythicState;
+    return agmtState;
   }
 
-  const newChaos = Math.max(1, Math.min(9, mythicState.chaosFactor + delta));
+  const newChaos = Math.max(1, Math.min(9, agmtState.chaosFactor + delta));
 
   return {
-    ...mythicState,
+    ...agmtState,
     chaosFactor: newChaos,
-    lastChaosAdjustment: mythicState.sceneCount,
+    lastChaosAdjustment: agmtState.sceneCount,
   };
 }
 
@@ -100,12 +100,12 @@ export function applyChaosAdjustment(mythicState: MythicState): MythicState {
 export function getChaosAdjustmentReason(
   oldChaos: number,
   newChaos: number,
-  mythicState: MythicState
+  agmtState: AGMTState
 ): string {
   if (oldChaos === newChaos) return "";
 
   const delta = newChaos - oldChaos;
-  const streak = mythicState.currentStreak;
+  const streak = agmtState.currentStreak;
 
   if (delta > 0) {
     // Chaos increased
@@ -130,14 +130,14 @@ export function getChaosAdjustmentReason(
  * Add a skill check result to history and update streak
  */
 export function addSkillCheckResult(
-  mythicState: MythicState,
+  agmtState: AGMTState,
   result: SkillCheckResult
-): MythicState {
+): AGMTState {
   // Add to history (keep last 15 checks)
-  const updatedHistory = [...mythicState.skillCheckHistory, result].slice(-15);
+  const updatedHistory = [...agmtState.skillCheckHistory, result].slice(-15);
 
   // Update streak
-  let newStreak = mythicState.currentStreak || 0;
+  let newStreak = agmtState.currentStreak || 0;
   if (result.success) {
     newStreak = newStreak > 0 ? newStreak + 1 : 1;
   } else {
@@ -145,24 +145,24 @@ export function addSkillCheckResult(
   }
 
   return {
-    ...mythicState,
+    ...agmtState,
     skillCheckHistory: updatedHistory,
     currentStreak: newStreak,
   };
 }
 
 /**
- * Initialize mythicState with new fields for existing adventures
+ * Initialize agmtState with new fields for existing adventures
  */
-export function migrateMythicState(
-  mythicState: MythicState | undefined
-): MythicState | undefined {
-  if (!mythicState) return undefined;
+export function migrateAGMTState(
+  agmtState: AGMTState | undefined
+): AGMTState | undefined {
+  if (!agmtState) return undefined;
 
   return {
-    ...mythicState,
-    skillCheckHistory: mythicState.skillCheckHistory || [],
-    currentStreak: mythicState.currentStreak || 0,
-    lastChaosAdjustment: mythicState.lastChaosAdjustment ?? -999,
+    ...agmtState,
+    skillCheckHistory: agmtState.skillCheckHistory || [],
+    currentStreak: agmtState.currentStreak || 0,
+    lastChaosAdjustment: agmtState.lastChaosAdjustment ?? -999,
   };
 }

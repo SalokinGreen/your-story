@@ -181,176 +181,196 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             <AIConfigTab />
           ) : activeTab === "llm" ? (
             <>
-              {/* OpenRouter Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
+              {/* Sync Toggle - Prominent at top */}
+              {user && (
+                <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700/50 -mt-2 mb-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">OR</span>
-                    </div>
+                    <DynamicIcon
+                      name="Cloud"
+                      className="w-4 h-4 text-blue-600 dark:text-blue-400"
+                    />
                     <div>
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                        OpenRouter
-                      </h3>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        Sync across devices
+                      </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Access 100+ AI models
+                        Keys are encrypted and stored securely
                       </p>
                     </div>
                   </div>
-                  {hasKey("openRouterKey") ? (
-                    <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                      <DynamicIcon name="CheckCircle" className="w-3.5 h-3.5" />
-                      Connected
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-400">Not connected</span>
-                  )}
-                </div>
-
-                {/* OAuth Connect Button */}
-                {!hasKey("openRouterKey") ? (
-                  <button
-                    onClick={connectOpenRouter}
-                    disabled={isConnectingOpenRouter}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-linear-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg font-medium text-sm transition-all disabled:opacity-50"
-                  >
-                    {isConnectingOpenRouter ? (
-                      <>
-                        <DynamicIcon
-                          name="Loader2"
-                          className="w-4 h-4 animate-spin"
-                        />
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        <DynamicIcon name="ExternalLink" className="w-4 h-4" />
-                        Connect with OpenRouter
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type={showKeys ? "text" : "password"}
-                        value={keys.openRouterKey}
-                        onChange={(e) =>
-                          setKey("openRouterKey", e.target.value)
-                        }
-                        placeholder="sk-or-..."
-                        className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-mono"
-                      />
+                  <div className="flex items-center gap-2">
+                    {useGlobalKeys && (
                       <button
-                        onClick={disconnectOpenRouter}
-                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                        title="Disconnect"
+                        onClick={async () => {
+                          await setUseGlobalKeys(true);
+                          addNotification("Keys synced to cloud", "success");
+                        }}
+                        className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                        title="Force sync all keys to cloud"
                       >
-                        <DynamicIcon name="Unlink" className="w-4 h-4" />
+                        Sync Now
                       </button>
-                    </div>
+                    )}
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useGlobalKeys}
+                        onChange={(e) => setUseGlobalKeys(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
+                    </label>
                   </div>
-                )}
-
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  <a
-                    href="https://openrouter.ai/keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-500 hover:underline"
-                  >
-                    Get an API key →
-                  </a>
-                </p>
-              </div>
-
-              {/* Divider with "or" */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200 dark:border-gray-700" />
                 </div>
-                <div className="relative flex justify-center">
-                  <span className="px-2 text-xs text-gray-400 bg-white dark:bg-gray-900">
-                    or enter manually
-                  </span>
-                </div>
-              </div>
+              )}
 
-              {/* DeepSeek Section */}
+              {/* Compact API Keys Grid */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-linear-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">DS</span>
+                {/* OpenRouter */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">OR</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        OpenRouter
+                      </span>
+                      {hasKey("openRouterKey") && (
+                        <DynamicIcon
+                          name="CheckCircle"
+                          className="w-3.5 h-3.5 text-green-500"
+                        />
+                      )}
                     </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                    {!hasKey("openRouterKey") ? (
+                      <button
+                        onClick={connectOpenRouter}
+                        disabled={isConnectingOpenRouter}
+                        className="mt-1 text-xs text-purple-500 hover:text-purple-600 flex items-center gap-1"
+                      >
+                        {isConnectingOpenRouter ? (
+                          <>
+                            <DynamicIcon
+                              name="Loader2"
+                              className="w-3 h-3 animate-spin"
+                            />
+                            Connecting...
+                          </>
+                        ) : (
+                          <>
+                            <DynamicIcon
+                              name="ExternalLink"
+                              className="w-3 h-3"
+                            />
+                            Connect with OAuth
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1 mt-1">
+                        <input
+                          type={showKeys ? "text" : "password"}
+                          value={keys.openRouterKey}
+                          onChange={(e) =>
+                            setKey("openRouterKey", e.target.value)
+                          }
+                          placeholder="sk-or-..."
+                          className="flex-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                        />
+                        <button
+                          onClick={disconnectOpenRouter}
+                          className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                          title="Disconnect"
+                        >
+                          <DynamicIcon name="X" className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* DeepSeek */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">DS</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
                         DeepSeek
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Cost-effective reasoning models
-                      </p>
+                      </span>
+                      {hasKey("deepseekKey") && (
+                        <DynamicIcon
+                          name="CheckCircle"
+                          className="w-3.5 h-3.5 text-green-500"
+                        />
+                      )}
+                      <a
+                        href="https://platform.deepseek.com/api_keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-500 hover:underline ml-auto"
+                      >
+                        Get key →
+                      </a>
                     </div>
+                    <input
+                      type={showKeys ? "text" : "password"}
+                      value={keys.deepseekKey}
+                      onChange={(e) => setKey("deepseekKey", e.target.value)}
+                      placeholder="sk-..."
+                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                    />
                   </div>
-                  {hasKey("deepseekKey") && (
-                    <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                      <DynamicIcon name="CheckCircle" className="w-3.5 h-3.5" />
-                      Configured
-                    </span>
-                  )}
                 </div>
-                <input
-                  type={showKeys ? "text" : "password"}
-                  value={keys.deepseekKey}
-                  onChange={(e) => setKey("deepseekKey", e.target.value)}
-                  placeholder="sk-..."
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-mono"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  <a
-                    href="https://platform.deepseek.com/api_keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-500 hover:underline"
-                  >
-                    Get an API key →
-                  </a>{" "}
-                  • Required to use DeepSeek models
-                </p>
+
+                {/* NovelAI */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">📖</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        NovelAI
+                      </span>
+                      {hasKey("novelaiKey") && (
+                        <DynamicIcon
+                          name="CheckCircle"
+                          className="w-3.5 h-3.5 text-green-500"
+                        />
+                      )}
+                      <span className="text-xs text-gray-400 ml-auto">
+                        Story only
+                      </span>
+                    </div>
+                    <input
+                      type={showKeys ? "text" : "password"}
+                      value={keys.novelaiKey}
+                      onChange={(e) => setKey("novelaiKey", e.target.value)}
+                      placeholder="pst-..."
+                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* NovelAI Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-linear-to-br from-orange-500 to-red-600 flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">📖</span>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                        NovelAI
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Creative writing focused
-                      </p>
-                    </div>
-                  </div>
-                  {hasKey("novelaiKey") && (
-                    <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                      <DynamicIcon name="CheckCircle" className="w-3.5 h-3.5" />
-                      Configured
-                    </span>
-                  )}
-                </div>
-                <input
-                  type={showKeys ? "text" : "password"}
-                  value={keys.novelaiKey}
-                  onChange={(e) => setKey("novelaiKey", e.target.value)}
-                  placeholder="pst-..."
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-mono"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Requires NovelAI subscription • Story generation only
+              {/* Show/Hide Keys & Privacy Info */}
+              <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => setShowKeys(!showKeys)}
+                  className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                >
+                  <DynamicIcon
+                    name={showKeys ? "EyeOff" : "Eye"}
+                    className="w-3.5 h-3.5"
+                  />
+                  {showKeys ? "Hide" : "Show"}
+                </button>
+                <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                  <DynamicIcon name="Shield" className="w-3 h-3" />
+                  Keys are never shared
                 </p>
               </div>
             </>
@@ -626,60 +646,6 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
               </div>
             </>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 space-y-4">
-          {/* Show/Hide Keys Toggle */}
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setShowKeys(!showKeys)}
-              className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              <DynamicIcon
-                name={showKeys ? "EyeOff" : "Eye"}
-                className="w-4 h-4"
-              />
-              {showKeys ? "Hide API Keys" : "Show API Keys"}
-            </button>
-          </div>
-
-          {/* Global Keys Toggle */}
-          {user && (
-            <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-3">
-                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded">
-                  <DynamicIcon
-                    name="Cloud"
-                    className="w-4 h-4 text-blue-600 dark:text-blue-400"
-                  />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    Sync across devices
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Keys are encrypted and stored securely
-                  </p>
-                </div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useGlobalKeys}
-                  onChange={(e) => setUseGlobalKeys(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
-              </label>
-            </div>
-          )}
-
-          {/* Info */}
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-            <DynamicIcon name="Shield" className="w-3 h-3 inline mr-1" />
-            Your API keys are never shared and are used only for your requests
-          </p>
         </div>
       </div>
     </div>
