@@ -4,7 +4,7 @@
  * Client-side orchestration for sequential stage-by-stage adventure generation.
  * Handles:
  * - Sequential stage execution
- * - Timeout detection and automatic retry
+ * - Timeout detection with continuation (not restart)
  * - Partial content recovery
  * - Progress tracking and autosave
  */
@@ -24,7 +24,7 @@ import {
 // Configuration for timeout detection
 const TIMEOUT_THRESHOLD_MS = 280000; // 4 min 40 sec - slightly less than Vercel's 5 min limit
 const HEARTBEAT_TIMEOUT_MS = 60000; // If no heartbeat for 60 seconds, assume timeout
-const MAX_RETRIES_PER_STAGE = 2;
+const MAX_CONTINUATIONS_PER_STAGE = 5; // Max times to continue a timed-out stage
 
 export interface GenerationCallbacks {
   onStageStart: (
@@ -81,20 +81,22 @@ interface StageResult {
 
 /**
  * Generate a single stage with timeout detection
+ * If continueFrom is provided, tells the API to continue from that partial content
  */
 async function generateSingleStage(
   config: BigAdventureConfig,
   stage: GenerationStage,
   previousResults: Partial<BigAdventureResult> | undefined,
   options: GenerationOptions,
-  callbacks: GenerationCallbacks
+  callbacks: GenerationCallbacks,
+  continueFrom?: string
 ): Promise<StageResult> {
   const token = await getAuthToken();
   if (!token) {
     return {
       success: false,
       result: null,
-      rawContent: "",
+      rawContent: continueFrom || "",
       promptTokens: 0,
       completionTokens: 0,
       error: "Not authenticated",
@@ -103,7 +105,7 @@ async function generateSingleStage(
 
   const startTime = Date.now();
   let lastHeartbeat = Date.now();
-  let fullContent = "";
+  let fullContent = continueFrom || "";
   let promptTokens = 0;
   let completionTokens = 0;
 
@@ -122,6 +124,7 @@ async function generateSingleStage(
         openRouterKey: options.openRouterKey,
         deepseekKey: options.deepseekKey,
         novelaiKey: options.novelaiKey,
+        continueFrom: continueFrom || undefined,
       }),
       signal: options.abortSignal,
     });
@@ -329,16 +332,21 @@ export async function generateAdventureSequential(
         ? mergeBigAdventureResults(...stageResults.filter((r) => r !== null))
         : undefined;
 
-    let retryCount = 0;
+    let continuationCount = 0;
     let stageCompleted = false;
+    let partialContent = ""; // Accumulated content for continuation
 
-    while (!stageCompleted && retryCount <= MAX_RETRIES_PER_STAGE) {
-      if (retryCount > 0) {
-        callbacks.onStageWarning(
+    while (
+      !stageCompleted &&
+      continuationCount <= MAX_CONTINUATIONS_PER_STAGE
+    ) {
+      const isContinuation = continuationCount > 0;
+
+      if (isContinuation) {
+        callbacks.onStageContinuation(
           stage,
-          `Retrying stage (attempt ${retryCount + 1}/${
-            MAX_RETRIES_PER_STAGE + 1
-          })...`
+          continuationCount,
+          MAX_CONTINUATIONS_PER_STAGE
         );
       }
 
@@ -347,8 +355,14 @@ export async function generateAdventureSequential(
         stage,
         previousResults,
         options,
-        callbacks
+        callbacks,
+        isContinuation ? partialContent : undefined
       );
+
+      // Accumulate content regardless of success (for potential continuation)
+      if (result.rawContent) {
+        partialContent = result.rawContent;
+      }
 
       if (result.success && result.result) {
         // Stage completed successfully
@@ -381,19 +395,27 @@ export async function generateAdventureSequential(
         callbacks.onAutosave(autosave);
 
         stageCompleted = true;
-      } else if (result.timedOut && retryCount < MAX_RETRIES_PER_STAGE) {
-        // Timeout - retry
-        retryCount++;
-        callbacks.onStageError(
+      } else if (
+        result.timedOut &&
+        continuationCount < MAX_CONTINUATIONS_PER_STAGE &&
+        partialContent.length > 100
+      ) {
+        // Timeout with partial content - continue from where we left off
+        continuationCount++;
+        callbacks.onStageWarning(
           stage,
-          `Stage timed out, retrying... (attempt ${retryCount + 1}/${
-            MAX_RETRIES_PER_STAGE + 1
-          })`,
-          true
+          `Connection timed out. Continuing from ${partialContent.length} characters... (${continuationCount}/${MAX_CONTINUATIONS_PER_STAGE})`
         );
+        // Accumulate tokens from partial generation
+        totalPromptTokens += result.promptTokens;
+        totalCompletionTokens += result.completionTokens;
       } else {
-        // Fatal error or max retries exceeded
-        callbacks.onStageError(stage, result.error || "Unknown error", false);
+        // Fatal error or max continuations exceeded or no content to continue from
+        const errorMsg =
+          result.timedOut && partialContent.length <= 100
+            ? "Stage timed out with insufficient content to continue"
+            : result.error || "Unknown error";
+        callbacks.onStageError(stage, errorMsg, false);
 
         // Still save partial progress
         if (stageResults.length > 0) {
@@ -413,7 +435,7 @@ export async function generateAdventureSequential(
         }
 
         callbacks.onError(
-          `Stage "${getStageInfo(stage).name}" failed: ${result.error}. ` +
+          `Stage "${getStageInfo(stage).name}" failed: ${errorMsg}. ` +
             `Progress saved (${completedStages.length}/${stages.length} stages completed). ` +
             `You can resume later.`
         );
@@ -455,13 +477,15 @@ export async function generateSingleStageOnly(
     | "onStageComplete"
     | "onStageError"
     | "onStageWarning"
-  >
+  >,
+  continueFrom?: string
 ): Promise<StageResult> {
   return generateSingleStage(
     config,
     stage,
     previousResults,
     options as GenerationOptions,
-    callbacks as GenerationCallbacks
+    callbacks as GenerationCallbacks,
+    continueFrom
   );
 }

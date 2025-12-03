@@ -49,6 +49,8 @@ interface RequestBody {
   openRouterKey?: string;
   deepseekKey?: string;
   novelaiKey?: string;
+  // For continuation after timeout - the partial content generated so far
+  continueFrom?: string;
 }
 
 function getApiKey(
@@ -397,6 +399,7 @@ export async function POST(req: NextRequest) {
           openRouterKey,
           deepseekKey,
           novelaiKey,
+          continueFrom,
         } = body;
 
         if (!config || !config.prompt) {
@@ -488,6 +491,7 @@ export async function POST(req: NextRequest) {
               stageName: stageInfo.name,
               stageNumber: stageInfo.number,
               maxOutputTokens,
+              isContinuation: !!continueFrom,
             })}\n\n`
           )
         );
@@ -504,22 +508,67 @@ export async function POST(req: NextRequest) {
         let totalCompletionTokens = 0;
         let continuationAttempts = 0;
 
-        // Initial generation
-        const initialResult = await streamAIResponse(
-          messages.map((m) => ({ role: m.role, content: m.content })),
-          modelConfig,
-          apiKey,
-          maxOutputTokens,
-          temperature,
-          controller,
-          encoder,
-          stage,
-          heartbeatInterval
-        );
+        // If continuing from partial content, start from there instead of fresh
+        if (continueFrom && continueFrom.trim()) {
+          fullContent = continueFrom;
 
-        fullContent = initialResult.content;
-        totalPromptTokens += initialResult.promptTokens;
-        totalCompletionTokens += initialResult.completionTokens;
+          // Check if the existing content is incomplete
+          const incompleteCheck = detectIncompleteJSON(fullContent);
+
+          if (incompleteCheck.isIncomplete) {
+            // Build continuation prompt
+            const continuationPrompt = buildContinuationPrompt(
+              incompleteCheck.truncatedContent,
+              stage
+            );
+
+            // Create continuation messages with existing content as assistant response
+            const continuationMessages = [
+              ...messages.map((m) => ({ role: m.role, content: m.content })),
+              { role: "assistant", content: fullContent },
+              { role: "user", content: continuationPrompt },
+            ];
+
+            logger.info(
+              `Stage ${stage} continuing from ${fullContent.length} chars of partial content`
+            );
+
+            // Stream the continuation
+            const continuationResult = await streamAIResponse(
+              continuationMessages,
+              modelConfig,
+              apiKey,
+              maxOutputTokens,
+              0.3, // Lower temperature for consistent continuation
+              controller,
+              encoder,
+              stage,
+              heartbeatInterval
+            );
+
+            fullContent += continuationResult.content;
+            totalPromptTokens += continuationResult.promptTokens;
+            totalCompletionTokens += continuationResult.completionTokens;
+          }
+          // If content is already complete, just use it as-is
+        } else {
+          // Fresh generation - initial generation
+          const initialResult = await streamAIResponse(
+            messages.map((m) => ({ role: m.role, content: m.content })),
+            modelConfig,
+            apiKey,
+            maxOutputTokens,
+            temperature,
+            controller,
+            encoder,
+            stage,
+            heartbeatInterval
+          );
+
+          fullContent = initialResult.content;
+          totalPromptTokens += initialResult.promptTokens;
+          totalCompletionTokens += initialResult.completionTokens;
+        }
 
         // Check if JSON is incomplete and attempt continuation
         let incompleteCheck = detectIncompleteJSON(fullContent);
