@@ -4608,9 +4608,15 @@ ${result.description || ""}`;
             <div className="flex justify-center gap-4">
               <button
                 onClick={finishStageEarly}
-                disabled={activeStages.length === 0}
+                disabled={activeStages.length !== 1}
                 className="px-6 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-800 disabled:text-amber-400 text-white rounded-lg transition-colors"
-                title="Tell AI to finish the current stage and move on"
+                title={
+                  activeStages.length > 1
+                    ? "Cannot finish early while multiple stages are running in parallel"
+                    : activeStages.length === 0
+                    ? "No stage is currently generating"
+                    : "Tell AI to finish the current stage and move on"
+                }
               >
                 Finish Stage Early
               </button>

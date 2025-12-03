@@ -559,7 +559,7 @@ export async function generateAdventureSequential(
         : undefined;
 
     if (useParallelMode) {
-      // Parallel execution
+      // Parallel execution - callbacks are fired as each stage completes
       const parallelResults = await runStagesInParallel(
         config,
         parallelizableStagesToRun,
@@ -568,24 +568,15 @@ export async function generateAdventureSequential(
         callbacks
       );
 
-      // Process results
+      // Collect results (callbacks already fired in runStagesInParallel)
       for (const { stage, result } of parallelResults) {
         if (result.success && result.result) {
           stageResults.push(result.result);
           completedStages.push(stage);
           totalPromptTokens += result.promptTokens;
           totalCompletionTokens += result.completionTokens;
-
-          callbacks.onStageComplete(
-            stage,
-            result.result,
-            result.promptTokens,
-            result.completionTokens
-          );
-        } else {
-          // Log error but continue with other results
-          callbacks.onStageError(stage, result.error || "Unknown error", false);
         }
+        // Errors already reported via callbacks in runStagesInParallel
       }
 
       callbacks.onProgress(completedStages, stages.length);
@@ -874,7 +865,7 @@ async function runSingleStageWithRetry(
 }
 
 /**
- * Run multiple stages in parallel using Promise.allSettled
+ * Run multiple stages in parallel, processing each result as it completes
  */
 async function runStagesInParallel(
   config: BigAdventureConfig,
@@ -889,11 +880,13 @@ async function runStagesInParallel(
     `Starting parallel generation of ${stages.length} stages...`
   );
 
-  // Create promises for each stage
+  const results: { stage: GenerationStage; result: StageResult }[] = [];
+
+  // Create a promise for each stage that resolves when done
   const stagePromises = stages.map(async (stage) => {
     // Check for abort before starting
     if (options.abortSignal?.aborted) {
-      return {
+      const result = {
         stage,
         result: {
           success: false,
@@ -904,6 +897,8 @@ async function runStagesInParallel(
           error: "Cancelled",
         } as StageResult,
       };
+      results.push(result);
+      return result;
     }
 
     // Generate the stage
@@ -923,7 +918,7 @@ async function runStagesInParallel(
         );
       }
 
-      const result = await generateSingleStage(
+      const genResult = await generateSingleStage(
         config,
         stage,
         previousResults,
@@ -932,45 +927,68 @@ async function runStagesInParallel(
         isContinuation ? partialContent : undefined
       );
 
-      if (result.rawContent) {
-        partialContent = result.rawContent;
+      if (genResult.rawContent) {
+        partialContent = genResult.rawContent;
       }
 
-      if (result.success && result.result) {
-        return {
+      if (genResult.success && genResult.result) {
+        const stageResult = {
           stage,
           result: {
             success: true,
-            result: result.result,
+            result: genResult.result,
             rawContent: partialContent,
-            promptTokens: totalPromptTokens + result.promptTokens,
-            completionTokens: totalCompletionTokens + result.completionTokens,
+            promptTokens: totalPromptTokens + genResult.promptTokens,
+            completionTokens:
+              totalCompletionTokens + genResult.completionTokens,
           } as StageResult,
         };
+        results.push(stageResult);
+
+        // Immediately notify that this stage is complete
+        callbacks.onStageComplete(
+          stage,
+          genResult.result,
+          stageResult.result.promptTokens,
+          stageResult.result.completionTokens
+        );
+
+        return stageResult;
       } else if (
-        result.timedOut &&
+        genResult.timedOut &&
         continuationCount < MAX_CONTINUATIONS_PER_STAGE &&
         partialContent.length > 100
       ) {
         continuationCount++;
-        totalPromptTokens += result.promptTokens;
-        totalCompletionTokens += result.completionTokens;
+        totalPromptTokens += genResult.promptTokens;
+        totalCompletionTokens += genResult.completionTokens;
       } else {
-        return {
+        const stageResult = {
           stage,
           result: {
             success: false,
             result: null,
             rawContent: partialContent,
-            promptTokens: totalPromptTokens + result.promptTokens,
-            completionTokens: totalCompletionTokens + result.completionTokens,
-            error: result.error || "Unknown error",
+            promptTokens: totalPromptTokens + genResult.promptTokens,
+            completionTokens:
+              totalCompletionTokens + genResult.completionTokens,
+            error: genResult.error || "Unknown error",
           } as StageResult,
         };
+        results.push(stageResult);
+
+        // Immediately notify that this stage failed
+        callbacks.onStageError(
+          stage,
+          stageResult.result.error || "Unknown error",
+          false
+        );
+
+        return stageResult;
       }
     }
 
-    return {
+    const stageResult = {
       stage,
       result: {
         success: false,
@@ -981,29 +999,18 @@ async function runStagesInParallel(
         error: "Max continuations exceeded",
       } as StageResult,
     };
+    results.push(stageResult);
+
+    // Immediately notify that this stage failed
+    callbacks.onStageError(stage, "Max continuations exceeded", false);
+
+    return stageResult;
   });
 
-  // Wait for all stages to complete (or fail)
-  const settledResults = await Promise.allSettled(stagePromises);
+  // Wait for all stages to complete (callbacks already fired as each finished)
+  await Promise.allSettled(stagePromises);
 
-  // Convert settled results to our format
-  return settledResults.map((settled, index) => {
-    if (settled.status === "fulfilled") {
-      return settled.value;
-    } else {
-      return {
-        stage: stages[index],
-        result: {
-          success: false,
-          result: null,
-          rawContent: "",
-          promptTokens: 0,
-          completionTokens: 0,
-          error: settled.reason?.message || "Promise rejected",
-        } as StageResult,
-      };
-    }
-  });
+  return results;
 }
 
 /**
