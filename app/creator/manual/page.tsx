@@ -8403,12 +8403,14 @@ ${description || ""}`;
                                       {entry.off_triggers.join(", ")}
                                     </div>
                                   )}
-                                {entry.secrtet && entry.keys.length > 0 && (
-                                  <div className="text-xs text-yellow-400">
-                                    <strong>Triggers:</strong>{" "}
-                                    {entry.keys.join(", ")}
-                                  </div>
-                                )}
+                                {entry.secret &&
+                                  entry.keys &&
+                                  entry.keys.length > 0 && (
+                                    <div className="text-xs text-yellow-400">
+                                      <strong>Triggers:</strong>{" "}
+                                      {entry.keys.join(", ")}
+                                    </div>
+                                  )}
                                 {entry.var_on_triggers &&
                                   entry.var_on_triggers.length > 0 && (
                                     <div className="text-xs text-cyan-400 mb-1">
