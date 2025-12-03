@@ -216,49 +216,6 @@ export function buildInfoMessage(
       : "";
   }
 
-  // Build plot beats section - linear progression showing last done, current, and next
-  let plotBeatsSection = "";
-  if (storyData.plot_beats.length > 0) {
-    // Find the index of the first unfulfilled beat (current beat)
-    const currentIndex = storyData.plot_beats.findIndex((b) => !b.fulfilled);
-
-    const beatLines: string[] = [];
-
-    // Last completed beat (one before current, if exists)
-    if (currentIndex > 0) {
-      const lastBeat = storyData.plot_beats[currentIndex - 1];
-      beatLines.push(
-        `[COMPLETED] ${lastBeat.title}: ${cleanString(lastBeat.content)}`
-      );
-    } else if (currentIndex === -1 && storyData.plot_beats.length > 0) {
-      // All beats are fulfilled, show the last one
-      const lastBeat = storyData.plot_beats[storyData.plot_beats.length - 1];
-      beatLines.push(
-        `[COMPLETED] ${lastBeat.title}: ${cleanString(lastBeat.content)}`
-      );
-    }
-
-    // Current beat (first unfulfilled)
-    if (currentIndex !== -1) {
-      const currentBeat = storyData.plot_beats[currentIndex];
-      beatLines.push(
-        `[CURRENT] ${currentBeat.title}: ${cleanString(currentBeat.content)}`
-      );
-
-      // Next beat (one after current, if exists)
-      if (currentIndex + 1 < storyData.plot_beats.length) {
-        const nextBeat = storyData.plot_beats[currentIndex + 1];
-        beatLines.push(
-          `[NEXT] ${nextBeat.title}: ${cleanString(nextBeat.content)}`
-        );
-      }
-    }
-
-    if (beatLines.length > 0) {
-      plotBeatsSection = `## Story Progression\n${beatLines.join("\n")}`;
-    }
-  }
-
   // Build relationships section if any exist
   const relationshipsSection =
     storyData.relationships && storyData.relationships.length > 0
@@ -402,7 +359,6 @@ ${
     achievementsSection,
     loreSection,
     memorySection,
-    plotBeatsSection,
     relationshipsSection,
     conditionsSection,
     questsSection,

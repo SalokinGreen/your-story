@@ -1951,22 +1951,6 @@ function convertToolToCommand(
       return `/lore_update: ${args.title} | ${newTitle} | ${content} | ${on} | ${onTriggersStr} | ${offTriggersStr}`;
     }
 
-    // Plot Beats
-    case "mark_beat":
-      return `/mark_beat: ${args.beatIndex}`;
-
-    case "unmark_beat":
-      return `/unmark_beat: ${args.beatIndex}`;
-
-    case "create_beat":
-      return `/create_beat: ${args.description}`;
-
-    case "delete_beat":
-      return `/delete_beat: ${args.beatIndex}`;
-
-    case "edit_beat":
-      return `/edit_beat: ${args.beatIndex} | ${args.description}`;
-
     // Momentum
     case "modify_momentum":
       return `/modify_momentum: ${args.amount >= 0 ? "+" : ""}${args.amount}`;

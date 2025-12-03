@@ -9,7 +9,6 @@ const kids_on_machines: StoryData = {
     "You are a daring teenager who tries to make his dead pa proud by taking over the gang.",
   intro:
     "You rev your motorcycle's engine as you and your friends speed through the neon-lit streets of Neo City. The wind rushes past you, carrying the scent of rain and electricity. Ahead, the towering skyscrapers loom like giants, their windows glowing with vibrant colors. Suddenly, a rival gang appears, blocking your path. What do you do?",
-  plot_beats: [],
   memory: [],
   max_chapters: 0,
   currentChapter: 0,
@@ -23,7 +22,6 @@ const kids_on_machines: StoryData = {
   momentum: 3,
   maxMomentum: 5,
   points: 0,
-  earnedPointsFromBeats: [],
   earnedPointsFromChapters: [],
   quests: [],
   earnedPointsFromQuests: [],
@@ -40,26 +38,6 @@ const goblin_layer: StoryData = {
     "You are a skilled rogue with a mysterious past, driven by a desire for justice and treasure.",
   intro:
     "You find yourself at the entrance of a rancid village. You see it has been looted and partly burned. The villagers look at you with a mix of fear and hope, whispering about the goblin lair that lies ahead.",
-  plot_beats: [
-    {
-      title: "Prologue",
-      content:
-        "Eldrin receives a quest from a village elder to retrieve a stolen artifact from a goblin lair.",
-      fulfilled: false,
-    },
-    {
-      title: "Opening Image",
-      content:
-        "Eldrin approaches the entrance of a dark cave, the rumored goblin lair.",
-      fulfilled: false,
-    },
-    {
-      title: "First Plot Point",
-      content:
-        "Eldrin encounters the first wave of goblin guards and must use stealth or combat to proceed.",
-      fulfilled: false,
-    },
-  ],
   memory: [],
   max_chapters: 26,
   currentChapter: 0,
@@ -173,7 +151,6 @@ const goblin_layer: StoryData = {
   momentum: 3,
   maxMomentum: 5,
   points: 0,
-  earnedPointsFromBeats: [],
   earnedPointsFromChapters: [],
   quests: [],
   earnedPointsFromQuests: [],

@@ -24,7 +24,6 @@ describe("Tool Call History Preservation", () => {
     memory: [],
     quests: [],
     relationships: [],
-    plot_beats: [],
     scene: {
       parts: [],
     },
@@ -34,7 +33,6 @@ describe("Tool Call History Preservation", () => {
     points: 0,
     momentum: 0,
     maxMomentum: 10,
-    earnedPointsFromBeats: [],
     earnedPointsFromChapters: [],
     earnedPointsFromQuests: [],
   });

@@ -95,7 +95,6 @@ export function getSubstageConfig(
 export type ContentSubStage =
   | "lore"
   | "achievements"
-  | "plotBeats"
   | "relationships"
   | "quests"
   | "inventory";
@@ -103,7 +102,6 @@ export type ContentSubStage =
 export interface ContentIterationConfig {
   lore: number; // 1-5 iterations
   achievements: number;
-  plotBeats: number;
   relationships: number;
   quests: number;
   inventory: number;
@@ -112,7 +110,6 @@ export interface ContentIterationConfig {
 export const DEFAULT_CONTENT_ITERATIONS: ContentIterationConfig = {
   lore: 1,
   achievements: 1,
-  plotBeats: 1,
   relationships: 1,
   quests: 1,
   inventory: 1,
@@ -506,7 +503,6 @@ export type RegenerateSection =
   | "lore" // Regenerate lore entries
   | "achievements" // Regenerate achievements
   | "quests" // Regenerate quests
-  | "plotBeats" // Regenerate plot beats
   | "relationships" // Regenerate relationships
   | "presets" // Regenerate character presets
   | "agmt" // Regenerate agmt state
@@ -582,12 +578,6 @@ export const REGENERATE_SECTIONS: Record<
     name: "Quests",
     description: "Quest objectives",
     emoji: "📋",
-    stage: "content",
-  },
-  plotBeats: {
-    name: "Plot Beats",
-    description: "Story milestones",
-    emoji: "🎭",
     stage: "content",
   },
   relationships: {
@@ -770,7 +760,6 @@ const COMPLEXITY_COUNTS: Record<
     stats: number;
     resources: number;
     abilities: number;
-    plotBeats: number;
     lore: number;
     achievements: number;
     quests: number;
@@ -784,7 +773,6 @@ const COMPLEXITY_COUNTS: Record<
     stats: 5,
     resources: 3,
     abilities: 4,
-    plotBeats: 8,
     lore: 12,
     achievements: 8,
     quests: 4,
@@ -797,7 +785,6 @@ const COMPLEXITY_COUNTS: Record<
     stats: 7,
     resources: 4,
     abilities: 8,
-    plotBeats: 12,
     lore: 20,
     achievements: 12,
     quests: 8,
@@ -810,7 +797,6 @@ const COMPLEXITY_COUNTS: Record<
     stats: 10,
     resources: 5,
     abilities: 14,
-    plotBeats: 18,
     lore: 30,
     achievements: 18,
     quests: 12,
@@ -1172,7 +1158,7 @@ REQUIRED LORE CATEGORIES (distribute entries across all):
 
 5. UPCOMING THREATS & EVENTS (at least 2-3 entries):
    - Looming dangers or prophecies about the future
-   - Set these as secret=true with beats_trigger for dramatic reveals
+   - Set these as secret=true for dramatic reveals
 
 6. WORLD LORE (remaining entries):
    - Magic systems, religions, customs, creatures, artifacts
@@ -1180,7 +1166,6 @@ REQUIRED LORE CATEGORIES (distribute entries across all):
 LORE TRIGGERS (make lore dynamic):
 - on_triggers: words/phrases that reveal this lore when mentioned
   IMPORTANT: Include variations for word boundaries ["gun", "guns", "pistol", "pistols"]
-- beats_trigger: plot beat indices (0-based) that reveal this lore
 - secrtet: true for hidden lore the AI knows but player hasn't discovered
 - alwaysOn: true for fundamental world facts
 
@@ -1197,7 +1182,6 @@ OUTPUT JSON SCHEMA:
       "alwaysOn": false,
       "on_triggers": ["trigger1", "trigger2", "trigger3"],
       "off_triggers": [],
-      "beats_trigger": [],
       "var_on_triggers": []
     }
   ]
@@ -1209,9 +1193,6 @@ Remember: Output ONLY the JSON object, nothing else.`;
   if (stage === "content-achievements") {
     const contentIterations =
       config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
-    const plotBeatCount = Math.round(
-      counts.plotBeats * durationMultiplier * contentIterations.plotBeats
-    );
     const achievementCount = Math.round(
       counts.achievements * durationMultiplier * contentIterations.achievements
     );
@@ -1222,12 +1203,11 @@ Remember: Output ONLY the JSON object, nothing else.`;
     return `${basePrompt}
 
 STAGE 3B: GOALS & MILESTONES
-Generate achievements, quests, and plot beats.
+Generate achievements and quests.
 
 TARGET COUNTS:
 - Achievements: ${achievementCount}
 - Quests: ${questCount}
-- Plot Beats: ${plotBeatCount}
 
 OUTPUT JSON SCHEMA:
 {
@@ -1236,9 +1216,6 @@ OUTPUT JSON SCHEMA:
   ],
   "quests": [
     { "id": "quest_xxx", "title": "string", "shortDescription": "string", "description": "string", "points": number, "active": boolean, "fulfilled": false }
-  ],
-  "plot_beats": [
-    { "title": "string", "content": "string (detailed beat description)", "fulfilled": false, "points": number }
   ]
 }
 
@@ -1930,7 +1907,6 @@ export function parseBigAdventureStageOutput(
         storyTemplate: {
           achievements: parsed.achievements,
           quests: parsed.quests,
-          plot_beats: parsed.plot_beats,
         },
       };
     }
@@ -1995,7 +1971,6 @@ export function mergeBigAdventureResults(
       player_name: "Adventurer",
       player_summary: "",
       intro: "",
-      plot_beats: [],
       memory: [],
       max_chapters: 10,
       currentChapter: 1,
@@ -2010,7 +1985,6 @@ export function mergeBigAdventureResults(
       momentum: 0,
       maxMomentum: 5,
       points: 0,
-      earnedPointsFromBeats: [],
       earnedPointsFromChapters: [],
       quests: [],
       earnedPointsFromQuests: [],
@@ -2140,10 +2114,7 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
       outputForStage = Math.round(outputForStage * outputMultiplier);
     } else if (stage === "content-achievements") {
       const avgMultiplier =
-        (contentIterations.achievements +
-          contentIterations.quests +
-          contentIterations.plotBeats) /
-        3;
+        (contentIterations.achievements + contentIterations.quests) / 2;
       const outputMultiplier = Math.min(2, avgMultiplier);
       outputForStage = Math.round(outputForStage * outputMultiplier);
     } else if (stage === "content-items") {
@@ -2373,10 +2344,9 @@ TRIGGERS - CRITICAL:
 - ALWAYS include variations: ["gun", "guns", "pistol", "pistols", "firearm"]
 - ALWAYS include nicknames: ["Naomy", "Nao", "Lady Naomy", "Miss Blackwood"]
 - Be thorough! List every form/alias a player might naturally use
-- Use beats_trigger for plot-gated dramatic reveals
 - Use alwaysOn for core world facts the player should always know
 - EVERY lore entry MUST have on_triggers OR alwaysOn=true - no empty triggers!`,
-      schema: `{ "lore": [{ "title": "Lord Varen Blackwood", "content": "string (2-4 detailed paragraphs)", "secrtet": false, "on": false, "alwaysOn": false, "on_triggers": ["Varen", "Blackwood", "Lord Blackwood", "the lord"], "off_triggers": [], "beats_trigger": [], "var_on_triggers": [] }] }`,
+      schema: `{ "lore": [{ "title": "Lord Varen Blackwood", "content": "string (2-4 detailed paragraphs)", "secrtet": false, "on": false, "alwaysOn": false, "on_triggers": ["Varen", "Blackwood", "Lord Blackwood", "the lord"], "off_triggers": [], "var_on_triggers": [] }] }`,
       count: Math.round(counts.lore * durationMultiplier),
     },
     achievements: {
@@ -2392,13 +2362,6 @@ TRIGGERS - CRITICAL:
       )} quests with objectives.`,
       schema: `{ "quests": [{ "id": "quest_xxx", "title": "string", "shortDescription": "string", "description": "string", "points": number, "active": boolean, "fulfilled": false }] }`,
       count: Math.round(counts.quests * durationMultiplier),
-    },
-    plotBeats: {
-      instruction: `Generate ${Math.round(
-        counts.plotBeats * durationMultiplier
-      )} plot beats (story milestones).`,
-      schema: `{ "plot_beats": [{ "title": "string", "content": "string", "fulfilled": false, "points": number }] }`,
-      count: Math.round(counts.plotBeats * durationMultiplier),
     },
     relationships: {
       instruction: `Generate ${Math.round(
@@ -2553,8 +2516,6 @@ export function parseRegenerateSectionOutput(
         return { storyTemplate: { achievements: parsed.achievements } };
       case "quests":
         return { storyTemplate: { quests: parsed.quests } };
-      case "plotBeats":
-        return { storyTemplate: { plot_beats: parsed.plot_beats } };
       case "relationships":
         return { storyTemplate: { relationships: parsed.relationships } };
       case "presets":
@@ -2587,7 +2548,6 @@ export const EXTENDABLE_SECTIONS: RegenerateSection[] = [
   "lore",
   "achievements",
   "quests",
-  "plotBeats",
   "relationships",
   "presets",
   "customTables",
@@ -2690,16 +2650,6 @@ export function buildExtendSectionMessages(
           .filter(Boolean)
           .join(", ");
         break;
-      case "plotBeats":
-        existingItems = (template.plot_beats || []) as {
-          name?: string;
-          title?: string;
-        }[];
-        existingItemsPreview = existingItems
-          .map((p) => p.title)
-          .filter(Boolean)
-          .join(", ");
-        break;
       case "relationships":
         existingItems = (template.relationships || []) as {
           name?: string;
@@ -2796,10 +2746,9 @@ TRIGGERS - IMPORTANT:
 - Triggers use WORD BOUNDARIES - "gun" won't match "guns"
 - Include all variations: ["gun", "guns", "pistol", "pistols"]
 - Include nicknames/aliases: ["Naomy", "Nao", "Lady Naomy"]
-- Use beats_trigger for plot-gated secrets
 - EVERY lore entry MUST have on_triggers OR alwaysOn=true - no empty triggers!
 Ensure new lore references and connects to existing lore entries.`,
-      schema: `{ "lore": [{ "title": "Captain Sera Vex", "content": "string (2-4 detailed paragraphs)", "secrtet": false, "on": false, "alwaysOn": false, "on_triggers": ["Sera", "Vex", "Captain Vex", "the captain"], "off_triggers": [], "beats_trigger": [], "var_on_triggers": [] }] }`,
+      schema: `{ "lore": [{ "title": "Captain Sera Vex", "content": "string (2-4 detailed paragraphs)", "secrtet": false, "on": false, "alwaysOn": false, "on_triggers": ["Sera", "Vex", "Captain Vex", "the captain"], "off_triggers": [], "var_on_triggers": [] }] }`,
     },
     achievements: {
       instruction: `Generate NEW achievements with ai_hint for precise triggering. Generate as many as possible.`,
@@ -2808,10 +2757,6 @@ Ensure new lore references and connects to existing lore entries.`,
     quests: {
       instruction: `Generate NEW quests with objectives. Generate as many as possible.`,
       schema: `{ "quests": [{ "id": "quest_xxx", "title": "string", "shortDescription": "string", "description": "string", "points": number, "active": boolean, "fulfilled": false }] }`,
-    },
-    plotBeats: {
-      instruction: `Generate NEW plot beats (story milestones). Generate as many as possible.`,
-      schema: `{ "plot_beats": [{ "title": "string", "content": "string", "fulfilled": false, "points": number }] }`,
     },
     relationships: {
       instruction: `Generate NEW NPC relationships (-100 to +100). Generate as many as possible.`,
@@ -2999,15 +2944,6 @@ export function parseExtendSectionOutput(
         return {
           storyTemplate: {
             quests: [...(template.quests || []), ...(parsed.quests || [])],
-          },
-        };
-      case "plotBeats":
-        return {
-          storyTemplate: {
-            plot_beats: [
-              ...(template.plot_beats || []),
-              ...(parsed.plot_beats || []),
-            ],
           },
         };
       case "relationships":

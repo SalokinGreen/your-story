@@ -20,7 +20,6 @@ describe("AI Context Building", () => {
     resources: [],
     inventory: [],
     achievements: [],
-    plot_beats: [],
     lore: [
       {
         ...baseLore,
@@ -55,7 +54,6 @@ describe("AI Context Building", () => {
     points: 0,
     momentum: 0,
     maxMomentum: 10,
-    earnedPointsFromBeats: [],
     earnedPointsFromChapters: [],
     earnedPointsFromQuests: [],
   };

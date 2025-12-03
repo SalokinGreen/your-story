@@ -76,7 +76,6 @@ import {
   StoryLore,
   Quest,
   Relationship,
-  PlotBeat,
   Variable,
 } from "@/app/misc/structs";
 import { AdventureVisualization } from "./AdventureVisualization";
@@ -620,20 +619,6 @@ function ContentBrowser({
         name: r.name,
         description: r.description,
         symbol: r.value > 0 ? "💚" : r.value < 0 ? "💔" : "💛",
-      })),
-    });
-  }
-
-  if (storyTemplate?.plot_beats && storyTemplate.plot_beats.length > 0) {
-    sections.push({
-      key: "plotBeats",
-      label: "Plot Beats",
-      icon: "🎭",
-      color: "red",
-      items: storyTemplate.plot_beats.map((p, i) => ({
-        name: `Beat ${i + 1}: ${p.title}`,
-        description: p.content,
-        symbol: p.fulfilled ? "✅" : "⬜",
       })),
     });
   }
@@ -3003,20 +2988,6 @@ ${result.description || ""}`;
                       </div>
                     )}
                     {previewStageData.partialResult.storyTemplate
-                      .plot_beats && (
-                      <div className="bg-blue-900/30 rounded px-3 py-2">
-                        <span className="text-green-400 font-bold">
-                          {
-                            previewStageData.partialResult.storyTemplate
-                              .plot_beats.length
-                          }
-                        </span>
-                        <span className="text-blue-300/60 ml-2">
-                          Plot Beats
-                        </span>
-                      </div>
-                    )}
-                    {previewStageData.partialResult.storyTemplate
                       .relationships && (
                       <div className="bg-blue-900/30 rounded px-3 py-2">
                         <span className="text-pink-400 font-bold">
@@ -4264,13 +4235,6 @@ ${result.description || ""}`;
                           }
                         />
                         <IterationSlider
-                          label="📖 Plot Beats"
-                          value={config.contentIterations?.plotBeats ?? 1}
-                          onChange={(v) =>
-                            updateContentIterations({ plotBeats: v })
-                          }
-                        />
-                        <IterationSlider
                           label="🤝 Relationships"
                           value={config.contentIterations?.relationships ?? 1}
                           onChange={(v) =>
@@ -4702,7 +4666,6 @@ ${result.description || ""}`;
                           "stats",
                           "resources",
                           "abilities",
-                          "plotBeats",
                           "lore",
                           "achievements",
                           "quests",
@@ -4857,45 +4820,6 @@ ${result.description || ""}`;
                             <span className="text-blue-400 text-xs px-1.5 py-0.5 bg-blue-900/50 rounded">
                               {ability.grade}
                             </span>
-                          </div>
-                        );
-                      }}
-                    />
-
-                    {/* Plot Beats */}
-                    <ExpandableContentCard
-                      section="plotBeats"
-                      label="Plot Beats"
-                      count={result.storyTemplate.plot_beats?.length || 0}
-                      color="green"
-                      items={result.storyTemplate.plot_beats || []}
-                      isExpanded={expandedSections.has("plotBeats")}
-                      onToggleExpand={() => toggleSectionExpanded("plotBeats")}
-                      onRegenerate={() =>
-                        handleRegenerateSection(
-                          "plotBeats",
-                          extensionInstructions
-                        )
-                      }
-                      onExtend={() =>
-                        handleExtendSection(
-                          "plotBeats",
-                          extensionOutputSize,
-                          extensionInstructions
-                        )
-                      }
-                      isRegenerating={regeneratingSection === "plotBeats"}
-                      isExtending={extendingSection === "plotBeats"}
-                      renderItem={(item) => {
-                        const beat = item as PlotBeat;
-                        return (
-                          <div>
-                            <div className="font-medium text-green-300 truncate">
-                              {beat.title}
-                            </div>
-                            <div className="text-xs text-blue-300/60 line-clamp-2">
-                              {beat.content}
-                            </div>
                           </div>
                         );
                       }}

@@ -205,9 +205,7 @@ describe("Lore Manipulation Commands", () => {
       scene: {
         parts: [],
       },
-      plot_beats: [],
       points: 0,
-      earnedPointsFromBeats: [],
       earnedPointsFromChapters: [],
       earnedPointsFromQuests: [],
       currentChapter: 0,

@@ -235,7 +235,6 @@ Relationship Commands:
 
 Achievement & Beat Commands:
 - /trigger_achievement: achievement title - Triggers/unlocks an existing achievement. ⚠️ CRITICAL: You MUST use the EXACT title from the "Achievements Available to Unlock" section below. Do NOT make up achievement names or paraphrase them. Only trigger achievements that are explicitly listed in the context. Example: /trigger_achievement: First Blood
-- /mark_beat: beat index - Marks a story beat as COMPLETE/FULFILLED (past tense). ⚠️ CRITICAL: Only use this command AFTER all events in the beat have concluded in the narrative. Do NOT mark a beat while its events are actively happening. Example: If beat says "infiltrate the castle," mark it AFTER the infiltration is complete, not during. Marking means "this objective is done," not "this is happening now."
 
 Lore Commands:
 - /create_lore: title | content | on_triggers | off_triggers - Creates a new lore entry. Triggers are comma-separated keywords. Set on_triggers to empty if lore should be visible from start. Example: /create_lore: The Ancient Order | A secret society of mages | ancient,order,mages | disbanded,destroyed
@@ -266,21 +265,9 @@ Relationship Change Guidelines:
 - Use relationships to open/close narrative paths: high reputation unlocks exclusive quests, low reputation creates obstacles
 - Don't track every minor NPC - focus on recurring characters and important factions
 
-Plot Beat Guidelines:
-- Each plot beat represents a significant story milestone with multiple scenes and events.
-- The "Current Plot Beat" section shows what needs to be accomplished - read it carefully.
-- ⚠️ IMPORTANT: /mark_beat means "this is DONE" (past tense), NOT "this is happening now" (present tense).
-- Only use /mark_beat AFTER the player has fully experienced and completed everything described in that beat's content.
-- If a beat describes multiple events or objectives, ensure ALL of them happen before marking it complete.
-- Beats should feel substantial - don't rush through them. Let the story breathe and develop naturally.
-- After marking a beat complete, it moves to "Previous Plot Beat" for context, and the next beat becomes current.
-- Reference the "Previous Plot Beat" if you need context about recently completed objectives.
-
 Progression System:
 - Players earn upgrade points from story progression and achievements.
-- Points are automatically awarded when you use /mark_beat.
 - Players spend points in the Upgrades shop to increase stats, expand resource maximums, or add custom items.
-- Balance story progression rewards - complete meaningful beats with /mark_beat to grant points for character growth.
 
 Narrative Best Practices:
 - Show, don't tell: Use vivid descriptions, sensory details, and character actions instead of exposition dumps.
@@ -506,52 +493,6 @@ export function storyDataToString(storyData: StoryData): string {
       lockedAchievements
         .map((ach) => `- ${ach.title}: ${ach.ai_hint || ach.description}`)
         .join("\n") + "\n\n";
-  }
-
-  result += `## Plot Beats:\n`;
-
-  // Find the first unfulfilled beat (current beat)
-  const currentBeatIndex = storyData.plot_beats.findIndex(
-    (beat) => !beat.fulfilled
-  );
-
-  // Show previous beat (most recently completed) for context
-  if (currentBeatIndex > 0) {
-    const previousBeat = storyData.plot_beats[currentBeatIndex - 1];
-    result += `\n### Previous Plot Beat (Recently Completed)\n#### ${currentBeatIndex}. ${previousBeat.title}\n${previousBeat.content}\n`;
-  }
-
-  // Show current beat (with full content)
-  if (
-    currentBeatIndex !== -1 &&
-    currentBeatIndex < storyData.plot_beats.length
-  ) {
-    const currentBeat = storyData.plot_beats[currentBeatIndex];
-    result += `\n### Current Plot Beat\n#### ${currentBeatIndex + 1}. ${
-      currentBeat.title
-    }\n${currentBeat.content}\n`;
-  }
-
-  // Show next beat (with full content)
-  if (
-    currentBeatIndex !== -1 &&
-    currentBeatIndex + 1 < storyData.plot_beats.length
-  ) {
-    const nextBeat = storyData.plot_beats[currentBeatIndex + 1];
-    result += `\n### Next Plot Beat\n#### ${currentBeatIndex + 2}. ${
-      nextBeat.title
-    }\n${nextBeat.content}\n`;
-  }
-
-  // Show future beats (just titles)
-  if (
-    currentBeatIndex !== -1 &&
-    currentBeatIndex + 2 < storyData.plot_beats.length
-  ) {
-    result += `\n### Future Plot Beats:\n`;
-    for (let i = currentBeatIndex + 2; i < storyData.plot_beats.length; i++) {
-      result += `- ${i + 1}. ${storyData.plot_beats[i].title}\n`;
-    }
   }
 
   result += `## Memory:\n`;

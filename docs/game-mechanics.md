@@ -214,15 +214,15 @@ interface StoryLore {
   on: boolean;           // Currently visible to player and AI
   on_triggers: string[]; // Words that enable this lore
   off_triggers: string[]; // Words that disable this lore
-  beats_trigger: number[]; // Beat indices that enable this lore
-  beats_untrigger: number[]; // Beat indices that disable this lore
+  var_on_triggers: string[]; // Variable names that enable this lore
+  var_off_triggers: string[]; // Variable names that disable this lore
 }
 ```
 
 **Dynamic Visibility**:
 - Lore entries can be turned on/off based on story events
 - **Trigger Words**: When AI response contains trigger word, lore is enabled
-- **Beat Triggers**: When specific plot beats are fulfilled, lore is enabled/disabled
+- **Variable Triggers**: When specific boolean variables become true, lore is enabled/disabled
 - Only enabled lore (`on: true`) is shown to player and sent to AI
 - Useful for revealing backstory, hints, or changing world state
 
@@ -233,8 +233,8 @@ interface StoryLore {
   on: false,
   on_triggers: ["Found the Ancient Map", "discovered the map"],
   off_triggers: ["Destroyed the Map"],
-  beats_trigger: [3, 5], // Enable when beat 3 or 5 is fulfilled
-  beats_untrigger: [8]   // Disable when beat 8 is fulfilled
+  var_on_triggers: ["mapFound"],  // Enable when variable is true
+  var_off_triggers: ["mapDestroyed"]  // Disable when variable is true
 }
 ```
 
@@ -359,7 +359,6 @@ The AI can modify game state using commands in the `<commands>` block.
 /modify_stat: stat name(amount)
 /modify_resource: resource name(amount)
 /trigger_achievement: achievement title
-/mark_beat: beat index
 /modify_momentum: amount
 </commands>
 ```
@@ -469,22 +468,6 @@ The AI can modify game state using commands in the `<commands>` block.
 - Don't over-reward (1 momentum per milestone is sufficient)
 - Avoid deducting momentum unless absolutely necessary
 - Remember: Players earn momentum automatically from strong rolls
-
-### /mark_beat: index
-
-```
-/mark_beat: 2
-```
-- Marks plot beat at index (0-based) as fulfilled
-- Awards ${UPGRADE_COSTS.BEAT_REWARD} progression points
-- Notification: "📖 Plot Beat Fulfilled: [Beat Title]"
-- Use only when beat's objectives are fully completed
-
-**Other Beat Commands**:
-- `/edit_beat_title: new title (index)` - Changes beat title
-- `/edit_beat_content: new content (index)` - Changes beat content  
-- `/add_beat: title | content` - Adds new story beat
-- `/remove_beat: index` - Removes beat at index
 
 ## Player Input Options
 
@@ -617,11 +600,6 @@ AI can end the story with markers:
 
 Players earn upgrade points from story progression:
 
-**Beat Completion**: 25 points
-- AI uses `/mark_beat: index` to mark a story beat complete
-- Points awarded once per beat (tracked in `earnedPointsFromBeats[]`)
-- Example: `/mark_beat: 0` awards 25 points for the first beat
-
 **Chapter Completion**: 50 points
 - AI ends chapter with `!!! END CHAPTER !!!` marker
 - Points awarded once per chapter (tracked in `earnedPointsFromChapters[]`)
@@ -668,9 +646,8 @@ Current points displayed in:
 
 The AI is aware of the points system:
 - Sees current point balance in context
-- Uses `/mark_beat` to reward progression
 - Times chapter endings for satisfying milestones
-- Balances beat completion pacing with story flow
+- Triggers achievements to reward progression
 
 ### Cost Constants
 
@@ -680,7 +657,6 @@ export const UPGRADE_COSTS = {
     RESOURCE_MAX_INCREASE: 15,
     ADD_ITEM: 20,
     CHAPTER_REWARD: 50,
-    BEAT_REWARD: 25,
 } as const;
 ```
 

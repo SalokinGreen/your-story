@@ -12,13 +12,11 @@ BEGIN
     SELECT COUNT(*) INTO stories_to_update
     FROM stories
     WHERE story_data->'points' IS NULL
-       OR story_data->'earnedPointsFromBeats' IS NULL
        OR story_data->'earnedPointsFromChapters' IS NULL;
     
     SELECT COUNT(*) INTO adventures_to_update
     FROM adventures
     WHERE story_template->'points' IS NULL
-       OR story_template->'earnedPointsFromBeats' IS NULL
        OR story_template->'earnedPointsFromChapters' IS NULL;
     
     RAISE NOTICE 'Stories to update: %', stories_to_update;
@@ -37,21 +35,15 @@ BEGIN
             SELECT id
             FROM stories
             WHERE story_data->'points' IS NULL
-               OR story_data->'earnedPointsFromBeats' IS NULL
                OR story_data->'earnedPointsFromChapters' IS NULL
             LIMIT batch_size
         )
         UPDATE stories
         SET story_data = jsonb_set(
             jsonb_set(
-                jsonb_set(
-                    story_data,
-                    '{points}',
-                    '0',
-                    true
-                ),
-                '{earnedPointsFromBeats}',
-                '[]',
+                story_data,
+                '{points}',
+                '0',
                 true
             ),
             '{earnedPointsFromChapters}',
@@ -87,21 +79,15 @@ BEGIN
             SELECT id
             FROM adventures
             WHERE story_template->'points' IS NULL
-               OR story_template->'earnedPointsFromBeats' IS NULL
                OR story_template->'earnedPointsFromChapters' IS NULL
             LIMIT batch_size
         )
         UPDATE adventures
         SET story_template = jsonb_set(
             jsonb_set(
-                jsonb_set(
-                    story_template,
-                    '{points}',
-                    '0',
-                    true
-                ),
-                '{earnedPointsFromBeats}',
-                '[]',
+                story_template,
+                '{points}',
+                '0',
                 true
             ),
             '{earnedPointsFromChapters}',

@@ -68,7 +68,6 @@ function getMinimalFallbackJSON(stage: GenerationStage): string {
       return JSON.stringify({
         achievements: [],
         quests: [],
-        plot_beats: [],
       });
     case "content-items":
       return JSON.stringify({

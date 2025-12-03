@@ -54,7 +54,6 @@ describe("buildMessages - Command Response Integration", () => {
     relationships: [],
     lore: [],
     memory: [],
-    plot_beats: [],
     chapters: [],
     currentChapter: 0,
     scene: {
@@ -71,7 +70,6 @@ describe("buildMessages - Command Response Integration", () => {
     momentum: 0,
     maxMomentum: 10,
     points: 0,
-    earnedPointsFromBeats: [],
     earnedPointsFromChapters: [],
     quests: [],
     earnedPointsFromQuests: [],

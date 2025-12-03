@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 
 interface ConfirmDialogProps {
@@ -25,6 +26,27 @@ export default function ConfirmDialog({
   onCancel,
   icon = "AlertTriangle",
 }: ConfirmDialogProps) {
+  // Keyboard shortcuts: Enter to confirm, Escape to cancel
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onConfirm();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      }
+    },
+    [onConfirm, onCancel]
+  );
+
+  useEffect(() => {
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [isOpen, handleKeyDown]);
+
   if (!isOpen) return null;
 
   return (

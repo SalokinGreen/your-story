@@ -21,7 +21,9 @@ export function DraggableScroll({
   showIndicators = true,
 }: DraggableScrollProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDraggingProgress, setIsDraggingProgress] = useState(false);
   const startXRef = useRef(0);
   const scrollLeftRef = useRef(0);
   const hasMovedRef = useRef(false);
@@ -52,7 +54,6 @@ export function DraggableScroll({
     hasMovedRef.current = false;
     startXRef.current = e.pageX;
     scrollLeftRef.current = container.scrollLeft;
-    container.style.cursor = "grabbing";
     container.style.userSelect = "none";
   }, []);
 
@@ -77,7 +78,6 @@ export function DraggableScroll({
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      container.style.cursor = "grab";
       container.style.userSelect = "";
     };
 
@@ -119,11 +119,10 @@ export function DraggableScroll({
     container.scrollLeft = touchScrollLeftRef.current - walk;
   }, []);
 
-  // Set initial cursor style and scroll indicators
+  // Set initial scroll indicators
   useEffect(() => {
     const container = containerRef.current;
     if (container) {
-      container.style.cursor = "grab";
       updateScrollIndicators();
     }
   }, [updateScrollIndicators]);
@@ -146,6 +145,88 @@ export function DraggableScroll({
     return () => resizeObserver.disconnect();
   }, [updateScrollIndicators]);
 
+  // Progress bar dragging
+  const handleProgressMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingProgress(true);
+
+    // Immediately jump to clicked position
+    const progressBar = progressBarRef.current;
+    const container = containerRef.current;
+    if (!progressBar || !container) return;
+
+    const rect = progressBar.getBoundingClientRect();
+    const clickPosition = (e.clientX - rect.left) / rect.width;
+    const maxScroll = container.scrollWidth - container.clientWidth;
+    container.scrollLeft = clickPosition * maxScroll;
+  }, []);
+
+  // Progress bar drag handling
+  useEffect(() => {
+    if (!isDraggingProgress) return;
+
+    const progressBar = progressBarRef.current;
+    const container = containerRef.current;
+    if (!progressBar || !container) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      e.preventDefault();
+      const rect = progressBar.getBoundingClientRect();
+      const dragPosition = Math.max(
+        0,
+        Math.min(1, (e.clientX - rect.left) / rect.width)
+      );
+      const maxScroll = container.scrollWidth - container.clientWidth;
+      container.scrollLeft = dragPosition * maxScroll;
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingProgress(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDraggingProgress]);
+
+  // Progress bar touch support
+  const handleProgressTouchStart = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    setIsDraggingProgress(true);
+
+    const progressBar = progressBarRef.current;
+    const container = containerRef.current;
+    if (!progressBar || !container) return;
+
+    const rect = progressBar.getBoundingClientRect();
+    const touchPosition = (e.touches[0].clientX - rect.left) / rect.width;
+    const maxScroll = container.scrollWidth - container.clientWidth;
+    container.scrollLeft = touchPosition * maxScroll;
+  }, []);
+
+  const handleProgressTouchMove = useCallback((e: React.TouchEvent) => {
+    const progressBar = progressBarRef.current;
+    const container = containerRef.current;
+    if (!progressBar || !container) return;
+
+    const rect = progressBar.getBoundingClientRect();
+    const touchPosition = Math.max(
+      0,
+      Math.min(1, (e.touches[0].clientX - rect.left) / rect.width)
+    );
+    const maxScroll = container.scrollWidth - container.clientWidth;
+    container.scrollLeft = touchPosition * maxScroll;
+  }, []);
+
+  const handleProgressTouchEnd = useCallback(() => {
+    setIsDraggingProgress(false);
+  }, []);
+
   // Scroll by clicking arrows
   const scrollBy = useCallback((direction: "left" | "right") => {
     const container = containerRef.current;
@@ -166,7 +247,7 @@ export function DraggableScroll({
       {showScrollUI && canScrollLeft && (
         <button
           onClick={() => scrollBy("left")}
-          className="absolute left-0 top-0 bottom-0 z-10 w-8 flex items-center justify-center bg-linear-to-r from-blue-950/90 to-transparent hover:from-blue-900/95 transition-colors"
+          className="absolute left-0 top-0 bottom-0 z-10 w-12 flex items-center justify-start pl-1 bg-linear-to-r from-blue-950 via-blue-950/80 to-transparent hover:from-blue-900 hover:via-blue-900/80 transition-colors"
           aria-label="Scroll left"
         >
           <svg
@@ -189,7 +270,7 @@ export function DraggableScroll({
       {showScrollUI && canScrollRight && (
         <button
           onClick={() => scrollBy("right")}
-          className="absolute right-0 top-0 bottom-0 z-10 w-8 flex items-center justify-center bg-linear-to-l from-blue-950/90 to-transparent hover:from-blue-900/95 transition-colors"
+          className="absolute right-0 top-0 bottom-0 z-10 w-12 flex items-center justify-end pr-1 bg-linear-to-l from-blue-950 via-blue-950/80 to-transparent hover:from-blue-900 hover:via-blue-900/80 transition-colors"
           aria-label="Scroll right"
         >
           <svg
@@ -210,7 +291,9 @@ export function DraggableScroll({
 
       <div
         ref={containerRef}
-        className={`overflow-x-auto overflow-y-hidden scrollbar-hide ${className}`}
+        className={`overflow-x-auto overflow-y-hidden scrollbar-hide cursor-grab ${
+          isDragging ? "cursor-grabbing **:cursor-grabbing!" : "**:cursor-grab!"
+        } ${className}`}
         onMouseDown={handleMouseDown}
         onClickCapture={handleClick}
         onTouchStart={handleTouchStart}
@@ -220,11 +303,20 @@ export function DraggableScroll({
         <div className={`flex w-max ${innerClassName}`}>{children}</div>
       </div>
 
-      {/* Scroll progress indicator */}
+      {/* Scroll progress indicator - draggable */}
       {showScrollUI && (
-        <div className="mt-2 w-full h-1 bg-blue-900/40 rounded-full overflow-hidden">
+        <div
+          ref={progressBarRef}
+          className="mt-2 w-full h-2 bg-blue-900/40 rounded-full overflow-hidden cursor-pointer hover:bg-blue-900/60 transition-colors"
+          onMouseDown={handleProgressMouseDown}
+          onTouchStart={handleProgressTouchStart}
+          onTouchMove={handleProgressTouchMove}
+          onTouchEnd={handleProgressTouchEnd}
+        >
           <div
-            className="h-full bg-purple-500/70 rounded-full transition-all duration-150"
+            className={`h-full bg-purple-500/70 rounded-full ${
+              isDraggingProgress ? "" : "transition-all duration-150"
+            }`}
             style={{
               width: "20%",
               marginLeft: `${scrollProgress * 80}%`,

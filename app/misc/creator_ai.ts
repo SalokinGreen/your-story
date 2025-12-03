@@ -37,7 +37,7 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - The JSON block must be valid JSON.
 - It should be wrapped in \`\`\`json ... \`\`\` code blocks.
 - You can return a PARTIAL StoryData object. Only include the fields you want to change or add.
-- Arrays (like 'inventory', 'stats', 'plot_beats', 'lore', 'achievements', 'quests', 'presets', 'variables', 'relationships', 'customTables') in your JSON will be MERGED with the existing data by default.
+- Arrays (like 'inventory', 'stats', 'lore', 'achievements', 'quests', 'presets', 'variables', 'relationships', 'customTables') in your JSON will be MERGED with the existing data by default.
 - Scalar fields (like 'story_name', 'premise', 'player_name', 'title', 'shortDescription', 'description') will be REPLACED.
 
 ### IMPORTANT: Item Commands
@@ -169,11 +169,7 @@ You can control how items in arrays are applied using the **_command** field:
   - currentCooldown: Current cooldown remaining (usually 0 for new abilities)
   - stat: Optional stat name this ability is associated with (for skill checks)
   - symbol: Emoji/icon representing the ability
-- plot_beats (Array of { title, content, fulfilled })
-  - title: Beat title/name
-  - content: Detailed description of what should happen in this beat
-  - fulfilled: false (always start as unfulfilled)
-- lore (Array of { title, content, secrtet, on, alwaysOn, on_triggers, off_triggers, trigger_lores, untrigger_lores, beats_trigger, beats_untrigger, var_on_triggers, var_off_triggers })
+- lore (Array of { title, content, secrtet, on, alwaysOn, on_triggers, off_triggers, trigger_lores, untrigger_lores, var_on_triggers, var_off_triggers })
   - title: Lore entry title
   - content: Full lore text
   - secrtet: If true, lore starts hidden and must be revealed
@@ -183,8 +179,6 @@ You can control how items in arrays are applied using the **_command** field:
   - off_triggers: Array of trigger words/phrases - when these appear in story, lore becomes hidden
   - trigger_lores: Array of lore titles - when those lores become visible, this lore becomes visible
   - untrigger_lores: Array of lore titles - when those lores become visible, this lore becomes hidden
-  - beats_trigger: Array of plot beat indices (0-based) - when these beats complete, lore becomes visible
-  - beats_untrigger: Array of plot beat indices (0-based) - when these beats complete, lore becomes hidden
   - var_on_triggers: Array of boolean variable names - when variable is true, lore becomes visible
   - var_off_triggers: Array of boolean variable names - when variable is true, lore becomes hidden
 - relationships (Array of { name, value, description, symbol })

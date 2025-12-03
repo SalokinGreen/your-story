@@ -184,92 +184,6 @@ export function RelationshipGraph({
   );
 }
 
-interface StoryTimelineProps {
-  plotBeats: Array<{
-    title: string;
-    content?: string;
-    fulfilled?: boolean;
-    points?: number;
-  }>;
-}
-
-/**
- * Story Timeline - Displays plot beats as a visual timeline
- */
-export function StoryTimeline({ plotBeats }: StoryTimelineProps) {
-  const [expandedBeat, setExpandedBeat] = useState<number | null>(null);
-
-  if (!plotBeats || plotBeats.length === 0) {
-    return (
-      <div className="text-center text-blue-300/50 py-8">
-        No plot beats to display
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative px-4">
-      {/* Timeline line */}
-      <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-linear-to-b from-purple-500 via-blue-500 to-emerald-500" />
-
-      {/* Plot beats */}
-      <div className="space-y-4">
-        {plotBeats.map((beat, i) => (
-          <div
-            key={i}
-            className="relative pl-12 cursor-pointer"
-            onClick={() => setExpandedBeat(expandedBeat === i ? null : i)}
-          >
-            {/* Timeline node */}
-            <div
-              className={`absolute left-6 w-5 h-5 rounded-full border-2 transition-all ${
-                beat.fulfilled
-                  ? "bg-emerald-500 border-emerald-400"
-                  : "bg-blue-900 border-purple-500"
-              }`}
-            >
-              {beat.fulfilled && (
-                <span className="absolute inset-0 flex items-center justify-center text-xs text-white">
-                  ✓
-                </span>
-              )}
-            </div>
-
-            {/* Content */}
-            <div
-              className={`bg-blue-900/40 rounded-lg p-3 border transition-all ${
-                expandedBeat === i
-                  ? "border-purple-500/50 bg-blue-900/60"
-                  : "border-blue-700/30 hover:border-blue-600/50"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium text-white text-sm">{beat.title}</h4>
-                <div className="flex items-center gap-2">
-                  {beat.points && (
-                    <span className="text-xs text-amber-400">
-                      +{beat.points} pts
-                    </span>
-                  )}
-                  <span className="text-xs text-blue-300/50">
-                    {expandedBeat === i ? "▼" : "▶"}
-                  </span>
-                </div>
-              </div>
-
-              {expandedBeat === i && beat.content && (
-                <p className="text-sm text-blue-300/70 mt-2 animate-in slide-in-from-top-1">
-                  {beat.content}
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 interface QuestFlowProps {
   quests: Array<{
     id?: string;
@@ -410,34 +324,30 @@ interface AdventureVisualizationProps {
 }
 
 /**
- * Adventure Visualization Panel - Combined view of relationships, timeline, and quests
+ * Adventure Visualization Panel - Combined view of relationships and quests
  */
 export function AdventureVisualization({
   result,
 }: AdventureVisualizationProps) {
-  const [activeTab, setActiveTab] = useState<
-    "relationships" | "timeline" | "quests"
-  >("relationships");
+  const [activeTab, setActiveTab] = useState<"relationships" | "quests">(
+    "relationships"
+  );
 
   const hasRelationships =
     result.storyTemplate?.relationships &&
     result.storyTemplate.relationships.length > 0;
-  const hasPlotBeats =
-    result.storyTemplate?.plot_beats &&
-    result.storyTemplate.plot_beats.length > 0;
   const hasQuests =
     result.storyTemplate?.quests && result.storyTemplate.quests.length > 0;
 
-  if (!hasRelationships && !hasPlotBeats && !hasQuests) {
+  if (!hasRelationships && !hasQuests) {
     return null;
   }
 
   // Auto-select first available tab
   const availableTabs = [
     hasRelationships && "relationships",
-    hasPlotBeats && "timeline",
     hasQuests && "quests",
-  ].filter(Boolean) as ("relationships" | "timeline" | "quests")[];
+  ].filter(Boolean) as ("relationships" | "quests")[];
 
   if (!availableTabs.includes(activeTab)) {
     // Switch to first available if current tab not available
@@ -466,18 +376,6 @@ export function AdventureVisualization({
             💕 Relationships
           </button>
         )}
-        {hasPlotBeats && (
-          <button
-            onClick={() => setActiveTab("timeline")}
-            className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-              activeTab === "timeline"
-                ? "bg-purple-600 text-white"
-                : "bg-blue-900/40 text-blue-300 hover:bg-blue-800/50"
-            }`}
-          >
-            📅 Story Timeline
-          </button>
-        )}
         {hasQuests && (
           <button
             onClick={() => setActiveTab("quests")}
@@ -499,9 +397,6 @@ export function AdventureVisualization({
             relationships={result.storyTemplate!.relationships!}
             playerName={result.storyTemplate?.player_name || "Player"}
           />
-        )}
-        {activeTab === "timeline" && hasPlotBeats && (
-          <StoryTimeline plotBeats={result.storyTemplate!.plot_beats!} />
         )}
         {activeTab === "quests" && hasQuests && (
           <QuestFlow quests={result.storyTemplate!.quests!} />

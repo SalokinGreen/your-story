@@ -779,16 +779,6 @@ const createLoreTool: ToolSchema = {
           items: { type: "string" },
           description: "Words that hide this lore when mentioned (optional)",
         },
-        beatsTrigger: {
-          type: "array",
-          items: { type: "number" },
-          description: "Beat indices that reveal this lore (optional)",
-        },
-        beatsUntrigger: {
-          type: "array",
-          items: { type: "number" },
-          description: "Beat indices that hide this lore (optional)",
-        },
       },
       required: ["title", "content"],
     },
@@ -900,106 +890,6 @@ const updateLoreTool: ToolSchema = {
         },
       },
       required: ["title"],
-    },
-  },
-};
-
-// Plot Beat Tools
-const markBeatTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "mark_beat",
-    description:
-      "Mark a story beat as completed. This tracks major plot progression and can trigger lore reveals.",
-    parameters: {
-      type: "object",
-      properties: {
-        beatIndex: {
-          type: "number",
-          description: "Beat index (1-based)",
-          minimum: 1,
-        },
-      },
-      required: ["beatIndex"],
-    },
-  },
-};
-
-const unmarkBeatTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "unmark_beat",
-    description: "Unmark a story beat (mark as incomplete)",
-    parameters: {
-      type: "object",
-      properties: {
-        beatIndex: {
-          type: "number",
-          description: "Beat index (1-based)",
-          minimum: 1,
-        },
-      },
-      required: ["beatIndex"],
-    },
-  },
-};
-
-const createBeatTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "create_beat",
-    description: "Add a new story beat to track plot progression",
-    parameters: {
-      type: "object",
-      properties: {
-        description: {
-          type: "string",
-          description: "What this beat represents",
-        },
-      },
-      required: ["description"],
-    },
-  },
-};
-
-const deleteBeatTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "delete_beat",
-    description: "Remove a story beat entirely",
-    parameters: {
-      type: "object",
-      properties: {
-        beatIndex: {
-          type: "number",
-          description: "Beat index (1-based)",
-          minimum: 1,
-        },
-      },
-      required: ["beatIndex"],
-    },
-  },
-};
-
-const editBeatTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "edit_beat",
-    description: "Change a story beat's description",
-    parameters: {
-      type: "object",
-      properties: {
-        beatIndex: {
-          type: "number",
-          description: "Beat index (1-based)",
-          minimum: 1,
-        },
-        description: {
-          type: "string",
-          description: "New beat description",
-        },
-      },
-      required: ["beatIndex", "description"],
     },
   },
 };
@@ -1595,13 +1485,6 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   hideLoreTool,
   updateLoreTool,
   listInactiveLoreTool,
-
-  // Plot Beats (5 tools)
-  markBeatTool,
-  unmarkBeatTool,
-  createBeatTool,
-  deleteBeatTool,
-  editBeatTool,
 
   // Momentum (1 tool)
   modifyMomentumTool,

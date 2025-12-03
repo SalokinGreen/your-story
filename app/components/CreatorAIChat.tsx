@@ -660,15 +660,6 @@ function ChangeSummary({
       icon: "Wand2",
     });
   }
-  if (data.plot_beats?.length) {
-    changes.push({
-      type: "Add/Update",
-      label: "Plot Beats",
-      value: `${data.plot_beats.length} beats`,
-      details: data.plot_beats,
-      icon: "TrendingUp",
-    });
-  }
   if (data.lore?.length) {
     changes.push({
       type: "Add/Update",

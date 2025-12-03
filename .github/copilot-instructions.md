@@ -15,7 +15,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/story/story.tsx: Presentational story component. Receives full StoryData via spread props, renders scenes with choices. Includes custom input toggle, retry button, and momentum mode selection.
 - app/story/stats.tsx: Stats display component showing character stats, resources, inventory, achievements.
 - app/story/lore.tsx: Lore display component, filters by `on` state (only shows active lore).
-- app/story/menu.tsx: In-game editor for story state (stats, resources, inventory, achievements, lore, plot beats). Feature parity with creator for all systems. Includes AI Config tab with model selection and TTS settings.
+- app/story/menu.tsx: In-game editor for story state (stats, resources, inventory, achievements, lore). Feature parity with creator for all systems. Includes AI Config tab with model selection and TTS settings.
 - app/story/upgrades.tsx: Character upgrade shop for spending progression points.
 - app/library/page.tsx: Library page showing user's stories and adventures with authenticated fetch.
 - app/creator/page.tsx: Adventure creation interface with full editing capabilities for all story elements.
@@ -29,7 +29,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Ability**: Skills/spells/techniques with `name`, `description`, `grade` (AbilityGrade), `cost` (AbilityCost[]), `cooldown`, `currentCooldown`, `stat` (optional), `symbol`.
   - **AbilityCost**: { type: "resource" | "variable", name: string, amount: number }
   - **AbilityGrade**: "novice" | "apprentice" | "adept" | "expert" | "master" | "legendary"
-  - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `beats_trigger` (number[]), `beats_untrigger` (number[]) for dynamic visibility.
+  - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `var_on_triggers` (string[]), `var_off_triggers` (string[]) for dynamic visibility.
   - **ScenePart**: Includes optional `toolCalls` (ToolCall[]) and `toolResponses` (CommandResponse[]) for preserving tool calling conversation history. Also includes `stateChanges` (string[]) for human-readable game state modifications that are sent to the story stage.
   - **CommandResponse**: Includes optional `toolCallId` for linking responses to specific tool calls in conversation history.
   - **Condition**: Afflictions/injuries with tiers I-VI that penalize skill checks. Includes `id`, `name`, `tier` (1-6), `description`, `affects` (array of stat names), `affectsAll` (boolean), `source`, `permanent`, `createdAt`.
@@ -137,7 +137,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
     - LOCATIONS (3-4): Major places with atmosphere, features, dangers, history
     - FACTIONS (2-3): Organizations with goals, methods, leaders
     - HISTORY (2-3): Past events that shaped the world
-    - UPCOMING THREATS (2-3): Looming dangers, prophecies (set secrtet=true, use beats_trigger)
+    - UPCOMING THREATS (2-3): Looming dangers, prophecies (set secret=true, use var_on_triggers)
     - WORLD LORE: Magic, religions, customs, creatures, artifacts
 
 ### Components

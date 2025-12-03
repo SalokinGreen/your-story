@@ -493,7 +493,7 @@ export default function StatsPage(storyData: StoryData) {
                             </span>
                           </div>
                           {item.description && (
-                            <p className="text-xs text-blue-200/40 line-clamp-1 mt-0.5">
+                            <p className="text-xs text-blue-200/40 mt-0.5">
                               {item.description}
                             </p>
                           )}
@@ -656,7 +656,7 @@ export default function StatsPage(storyData: StoryData) {
                             )}
                           </div>
                           {/* Cooldown bar */}
-                          {ability.cooldown && ability.cooldown > 0 && (
+                          {ability.cooldown != null && ability.cooldown > 0 && (
                             <div className="mt-1.5">
                               <div className="flex items-center justify-between text-xs mb-0.5">
                                 <span className="text-blue-200/40">

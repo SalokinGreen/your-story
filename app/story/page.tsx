@@ -384,37 +384,6 @@ export function processCommands(
       continue;
     }
 
-    // /mark_beat: beat index
-    const markBeatMatch = trimmed.match(/^\/mark_beat:\s*(\d+)$/i);
-    if (markBeatMatch) {
-      const beatIndex = parseInt(markBeatMatch[1], 10) - 1;
-      if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
-        storyData.plot_beats[beatIndex].fulfilled = true;
-        logger.action("Story beat completed via command", {
-          beatIndex: beatIndex + 1,
-          title: storyData.plot_beats[beatIndex].title,
-        });
-        addNotification(`Story beat ${beatIndex + 1} completed`, "success");
-
-        // Award points for completing a new beat (use custom points if set, otherwise default)
-        if (!storyData.earnedPointsFromBeats.includes(beatIndex)) {
-          storyData.earnedPointsFromBeats.push(beatIndex);
-          const pointsAwarded =
-            storyData.plot_beats[beatIndex].points ?? UPGRADE_COSTS.BEAT_REWARD;
-          storyData.points += pointsAwarded;
-          logger.action("Points awarded for beat", {
-            points: pointsAwarded,
-            totalPoints: storyData.points,
-          });
-          addNotification(
-            `Earned ${pointsAwarded} points! Total: ${storyData.points}`,
-            "success"
-          );
-        }
-      }
-      continue;
-    }
-
     // /create_quest: title | short description | full description | points
     const createQuestMatch = trimmed.match(
       /^\/create_quest:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)$/i
@@ -1418,65 +1387,6 @@ export function processCommands(
           name: relationship.name,
           newDescription,
         });
-      }
-      continue;
-    }
-
-    // /edit_beat_title: new title (index)
-    const editBeatTitleMatch = trimmed.match(
-      /^\/edit_beat_title:\s*(.+?)\((\d+)\)$/i
-    );
-    if (editBeatTitleMatch) {
-      const newTitle = editBeatTitleMatch[1].trim();
-      const beatIndex = parseInt(editBeatTitleMatch[2], 10);
-      if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
-        storyData.plot_beats[beatIndex].title = newTitle;
-        logger.action("Beat title updated via command", {
-          beatIndex,
-          newTitle,
-        });
-      }
-      continue;
-    }
-
-    ///edit_beat_content:new content(index)
-    const editBeatContentMatch = trimmed.match(
-      /^\/edit_beat_content:\s*(.+?)\((\d+)\)$/i
-    );
-    if (editBeatContentMatch) {
-      const newContent = editBeatContentMatch[1].trim();
-      const beatIndex = parseInt(editBeatContentMatch[2], 10);
-      if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
-        storyData.plot_beats[beatIndex].content = newContent;
-        logger.action("Beat content updated via command", {
-          beatIndex,
-          newContent,
-        });
-      }
-      continue;
-    }
-
-    ///add_beat:title|content
-    const addBeatMatch = trimmed.match(/^\/add_beat:\s*(.+?)\|(.+)$/i);
-    if (addBeatMatch) {
-      const title = addBeatMatch[1].trim();
-      const content = addBeatMatch[2].trim();
-      storyData.plot_beats.push({
-        title: title,
-        content: content,
-        fulfilled: false,
-      });
-      logger.action("Beat added via command", { title, content });
-      continue;
-    }
-
-    ///remove_beat:beatindex
-    const removeBeatMatch = trimmed.match(/^\/remove_beat:\s*(\d+)$/i);
-    if (removeBeatMatch) {
-      const beatIndex = parseInt(removeBeatMatch[1], 10);
-      if (beatIndex >= 0 && beatIndex < storyData.plot_beats.length) {
-        const removed = storyData.plot_beats.splice(beatIndex, 1)[0];
-        logger.action("Beat removed via command", { beatIndex, removed });
       }
       continue;
     }
@@ -5118,10 +5028,6 @@ function StoryPageContent() {
       (a) => a.dateAchieved
     ).length;
     const totalAchievements = storyData.achievements.length;
-    const completedBeats = storyData.plot_beats.filter(
-      (b) => b.fulfilled
-    ).length;
-    const totalBeats = storyData.plot_beats.length;
     const completedQuests =
       storyData.quests?.filter((q) => q.fulfilled).length || 0;
     const totalQuests = storyData.quests?.length || 0;
@@ -5167,27 +5073,6 @@ function StoryPageContent() {
                 <div className="text-xs text-blue-200/40">
                   {totalAchievements > 0
                     ? Math.round((achievedCount / totalAchievements) * 100)
-                    : 0}
-                  % Complete
-                </div>
-              </div>
-
-              <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                <div className="flex items-center gap-2 mb-1">
-                  <DynamicIcon
-                    name="BookOpen"
-                    className="w-5 h-5 text-blue-400"
-                  />
-                  <span className="text-sm font-medium text-white">
-                    Story Beats
-                  </span>
-                </div>
-                <div className="text-2xl font-bold text-blue-400">
-                  {completedBeats}/{totalBeats}
-                </div>
-                <div className="text-xs text-blue-200/40">
-                  {totalBeats > 0
-                    ? Math.round((completedBeats / totalBeats) * 100)
                     : 0}
                   % Complete
                 </div>
@@ -5309,13 +5194,8 @@ function StoryPageContent() {
                           chapters: [],
                           momentum: storyData.momentum,
                           points: 0,
-                          earnedPointsFromBeats: [],
                           earnedPointsFromChapters: [],
                           earnedPointsFromQuests: [],
-                          plot_beats: storyData.plot_beats.map((b) => ({
-                            ...b,
-                            fulfilled: false,
-                          })),
                           achievements: storyData.achievements.map((a) => ({
                             ...a,
                             dateAchieved: null,
@@ -5424,13 +5304,8 @@ function StoryPageContent() {
                           momentum: storyData.momentum,
                           maxMomentum: storyData.maxMomentum + bonusMomentum,
                           points: bonusPoints, //Startwithbonuspoints
-                          earnedPointsFromBeats: [],
                           earnedPointsFromChapters: [],
                           earnedPointsFromQuests: [],
-                          plot_beats: storyData.plot_beats.map((b) => ({
-                            ...b,
-                            fulfilled: false,
-                          })),
                           //Keepachievements,stats,resources,andinventory!
                           achievements: storyData.achievements,
                           stats: storyData.stats, //Keepstats

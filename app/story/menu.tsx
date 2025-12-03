@@ -7,7 +7,6 @@ import {
   InventoryItem,
   Achievement,
   StoryLore,
-  PlotBeat,
   Quest,
   Relationship,
   AGMTState,
@@ -2408,12 +2407,10 @@ function AbilitiesEditor({
 // Lore Editor
 function LoreEditor({
   lore,
-  plotBeats,
   variables,
   onUpdate,
 }: {
   lore: StoryLore[];
-  plotBeats: PlotBeat[];
   variables: Variable[];
   onUpdate: (lore: StoryLore[]) => void;
 }) {
@@ -2508,8 +2505,6 @@ function LoreEditor({
       off_triggers: [],
       trigger_lores: [],
       untrigger_lores: [],
-      beats_trigger: [],
-      beats_untrigger: [],
     };
     const updated = [...localLore, newLore];
     setLocalLore(updated);
@@ -2983,102 +2978,6 @@ function LoreEditor({
                         </div>
                       </div>
 
-                      {/* Plot Beat Triggers */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-blue-200 mb-2">
-                            <DynamicIcon
-                              name="CheckCircle"
-                              className="inline-block w-4 h-4 mr-1 text-green-600"
-                            />
-                            Beats that turn this lore ON
-                          </label>
-                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/30">
-                            {plotBeats.length === 0 ? (
-                              <p className="text-xs text-blue-300/50 italic">
-                                No plot beats yet.
-                              </p>
-                            ) : (
-                              plotBeats.map((beat, beatIndex) => (
-                                <label
-                                  key={beatIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/50 rounded cursor-pointer"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={(
-                                      editLore.beats_trigger || []
-                                    ).includes(beatIndex)}
-                                    onChange={(e) => {
-                                      const current =
-                                        editLore.beats_trigger || [];
-                                      setEditLore({
-                                        ...editLore,
-                                        beats_trigger: e.target.checked
-                                          ? [...current, beatIndex]
-                                          : current.filter(
-                                              (i) => i !== beatIndex
-                                            ),
-                                      });
-                                    }}
-                                    className="w-4 h-4 text-green-600 rounded"
-                                  />
-                                  <span className="text-xs text-white">
-                                    {beat.title || `Beat ${beatIndex + 1}`}
-                                  </span>
-                                </label>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-blue-200 mb-2">
-                            <DynamicIcon
-                              name="XCircle"
-                              className="inline-block w-4 h-4 mr-1 text-red-600"
-                            />
-                            Beats that turn this lore OFF
-                          </label>
-                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/30">
-                            {plotBeats.length === 0 ? (
-                              <p className="text-xs text-blue-300/50 italic">
-                                No plot beats yet.
-                              </p>
-                            ) : (
-                              plotBeats.map((beat, beatIndex) => (
-                                <label
-                                  key={beatIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/50 rounded cursor-pointer"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={(
-                                      editLore.beats_untrigger || []
-                                    ).includes(beatIndex)}
-                                    onChange={(e) => {
-                                      const current =
-                                        editLore.beats_untrigger || [];
-                                      setEditLore({
-                                        ...editLore,
-                                        beats_untrigger: e.target.checked
-                                          ? [...current, beatIndex]
-                                          : current.filter(
-                                              (i) => i !== beatIndex
-                                            ),
-                                      });
-                                    }}
-                                    className="w-4 h-4 text-red-600 rounded"
-                                  />
-                                  <span className="text-xs text-white">
-                                    {beat.title || `Beat ${beatIndex + 1}`}
-                                  </span>
-                                </label>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
                       {/* Variable Triggers (Boolean) */}
                       {variables.filter((v) => v.type === "boolean").length >
                         0 && (
@@ -3264,30 +3163,6 @@ function LoreEditor({
                           Triggers:
                         </strong>{" "}
                         {loreItem.off_triggers.join(", ")}
-                      </div>
-                    )}
-                  {loreItem.beats_trigger &&
-                    loreItem.beats_trigger.length > 0 && (
-                      <div className="text-xs text-green-700 dark:text-green-400 mt-1 flex items-center gap-1">
-                        <strong className="flex items-center gap-1">
-                          <DynamicIcon name="CheckCircle" className="w-3 h-3" />{" "}
-                          Beats turning ON:
-                        </strong>{" "}
-                        {loreItem.beats_trigger
-                          .map((i) => plotBeats[i]?.title || `Beat ${i + 1}`)
-                          .join(", ")}
-                      </div>
-                    )}
-                  {loreItem.beats_untrigger &&
-                    loreItem.beats_untrigger.length > 0 && (
-                      <div className="text-xs text-red-700 dark:text-red-400 mt-1 flex items-center gap-1">
-                        <strong className="flex items-center gap-1">
-                          <DynamicIcon name="XCircle" className="w-3 h-3" />{" "}
-                          Beats turning OFF:
-                        </strong>{" "}
-                        {loreItem.beats_untrigger
-                          .map((i) => plotBeats[i]?.title || `Beat ${i + 1}`)
-                          .join(", ")}
                       </div>
                     )}
                   {loreItem.var_on_triggers &&
@@ -4261,308 +4136,24 @@ function VariablesEditor({
 
 // Story Meta Editor
 function StoryMetaEditor({
-  plotBeats,
   memory,
   premise,
   authorNotes,
   onUpdate,
 }: {
-  plotBeats: PlotBeat[];
   memory: string[];
   premise: string;
   authorNotes?: string;
   onUpdate: (updates: Partial<StoryData>) => void;
 }) {
-  const [localPlotBeats, setLocalPlotBeats] = useState<PlotBeat[]>([
-    ...plotBeats,
-  ]);
   const [localAuthorNotes, setLocalAuthorNotes] = useState<string>(
     authorNotes || ""
   );
   const [localMemory, setLocalMemory] = useState<string[]>([...memory]);
   const [newMemoryEntry, setNewMemoryEntry] = useState<string>("");
-  const [draggedPlotBeatIndex, setDraggedPlotBeatIndex] = useState<
-    number | null
-  >(null);
-  const [editingPlotBeatIndex, setEditingPlotBeatIndex] = useState<
-    number | null
-  >(null);
-  const [editPlotBeat, setEditPlotBeat] = useState<Partial<PlotBeat>>({});
-
-  const updateBeat = (index: number, field: keyof PlotBeat, value: any) => {
-    const updated = [...localPlotBeats];
-    (updated[index] as any)[field] = value;
-    setLocalPlotBeats(updated);
-    onUpdate({ plot_beats: updated });
-  };
-
-  const addBeat = () => {
-    const newBeat: PlotBeat = {
-      title: "New plot beat",
-      content: "Description...",
-      fulfilled: false,
-    };
-    const updated = [...localPlotBeats, newBeat];
-    setLocalPlotBeats(updated);
-    onUpdate({ plot_beats: updated });
-  };
-
-  const removeBeat = (index: number) => {
-    const updated = localPlotBeats.filter((_, i) => i !== index);
-    setLocalPlotBeats(updated);
-    onUpdate({ plot_beats: updated });
-  };
-
-  const handlePlotBeatDragStart = (index: number) => {
-    setDraggedPlotBeatIndex(index);
-  };
-
-  const handlePlotBeatDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedPlotBeatIndex === null || draggedPlotBeatIndex === index) return;
-
-    const newPlotBeats = [...localPlotBeats];
-    const draggedItem = newPlotBeats[draggedPlotBeatIndex];
-    newPlotBeats.splice(draggedPlotBeatIndex, 1);
-    newPlotBeats.splice(index, 0, draggedItem);
-
-    setLocalPlotBeats(newPlotBeats);
-    setDraggedPlotBeatIndex(index);
-    onUpdate({ plot_beats: newPlotBeats });
-  };
-
-  const handlePlotBeatDragEnd = () => {
-    setDraggedPlotBeatIndex(null);
-  };
-
-  const movePlotBeatUp = (index: number) => {
-    if (index === 0) return;
-    const newPlotBeats = [...localPlotBeats];
-    [newPlotBeats[index - 1], newPlotBeats[index]] = [
-      newPlotBeats[index],
-      newPlotBeats[index - 1],
-    ];
-    setLocalPlotBeats(newPlotBeats);
-    onUpdate({ plot_beats: newPlotBeats });
-  };
-
-  const movePlotBeatDown = (index: number) => {
-    if (index === localPlotBeats.length - 1) return;
-    const newPlotBeats = [...localPlotBeats];
-    [newPlotBeats[index], newPlotBeats[index + 1]] = [
-      newPlotBeats[index + 1],
-      newPlotBeats[index],
-    ];
-    setLocalPlotBeats(newPlotBeats);
-    onUpdate({ plot_beats: newPlotBeats });
-  };
-
-  const startEditPlotBeat = (index: number) => {
-    setEditingPlotBeatIndex(index);
-    setEditPlotBeat({ ...localPlotBeats[index] });
-  };
-
-  const cancelEditPlotBeat = () => {
-    setEditingPlotBeatIndex(null);
-    setEditPlotBeat({});
-  };
-
-  const saveEditPlotBeat = () => {
-    if (
-      editingPlotBeatIndex !== null &&
-      editPlotBeat.title &&
-      editPlotBeat.content
-    ) {
-      const updated = [...localPlotBeats];
-      updated[editingPlotBeatIndex] = editPlotBeat as PlotBeat;
-      setLocalPlotBeats(updated);
-      onUpdate({ plot_beats: updated });
-      setEditingPlotBeatIndex(null);
-      setEditPlotBeat({});
-    }
-  };
 
   return (
     <div className="space-y-6">
-      {/* Plot Beats */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-white flex items-center gap-2">
-            <DynamicIcon name="BookOpen" className="w-6 h-6" /> Plot Beats
-          </h4>
-          <button
-            onClick={addBeat}
-            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
-          >
-            + Add Beat
-          </button>
-        </div>
-        <p className="text-xs text-blue-200/60 mb-3">
-          <DynamicIcon name="Lightbulb" className="w-3 h-3 inline mr-1" /> Drag
-          and drop to reorder (or use arrow buttons on mobile)
-        </p>
-        <div className="space-y-3">
-          {localPlotBeats.map((beat, index) => (
-            <div
-              key={index}
-              draggable={editingPlotBeatIndex !== index}
-              onDragStart={() => handlePlotBeatDragStart(index)}
-              onDragOver={(e) => handlePlotBeatDragOver(e, index)}
-              onDragEnd={handlePlotBeatDragEnd}
-              className={`p-4 bg-blue-900/20 rounded-lg transition-opacity ${
-                editingPlotBeatIndex === index ? "" : "cursor-move"
-              } ${
-                draggedPlotBeatIndex === index ? "opacity-50" : "opacity-100"
-              }`}
-            >
-              {editingPlotBeatIndex === index ? (
-                // Edit mode
-                <div className="space-y-3">
-                  <h5 className="text-sm font-bold text-white flex items-center gap-2">
-                    <DynamicIcon name="Edit" className="w-4 h-4" /> Editing Plot
-                    Beat
-                  </h5>
-                  <input
-                    type="text"
-                    value={editPlotBeat.title || ""}
-                    onChange={(e) =>
-                      setEditPlotBeat({
-                        ...editPlotBeat,
-                        title: e.target.value,
-                      })
-                    }
-                    placeholder="Title"
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
-                  />
-                  <textarea
-                    value={editPlotBeat.content || ""}
-                    onChange={(e) =>
-                      setEditPlotBeat({
-                        ...editPlotBeat,
-                        content: e.target.value,
-                      })
-                    }
-                    placeholder="Content"
-                    rows={3}
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
-                  />
-                  <div>
-                    <input
-                      type="number"
-                      value={editPlotBeat.points ?? ""}
-                      onChange={(e) =>
-                        setEditPlotBeat({
-                          ...editPlotBeat,
-                          points: e.target.value
-                            ? parseInt(e.target.value)
-                            : undefined,
-                        })
-                      }
-                      placeholder="Points (default: 25)"
-                      min="0"
-                      className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
-                    />
-                    <p className="text-xs text-blue-300/50 mt-1 flex items-center gap-1">
-                      <DynamicIcon name="Coins" className="w-3 h-3" /> Custom
-                      points reward
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={saveEditPlotBeat}
-                      disabled={!editPlotBeat.title || !editPlotBeat.content}
-                      className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded"
-                    >
-                      <DynamicIcon
-                        name="Check"
-                        className="w-4 h-4 inline mr-1"
-                      />{" "}
-                      Save
-                    </button>
-                    <button
-                      onClick={cancelEditPlotBeat}
-                      className="flex-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                // View mode
-                <div className="flex items-start gap-3">
-                  <div className="text-xl cursor-grab active:cursor-grabbing select-none pt-1">
-                    <DynamicIcon name="GripVertical" className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-bold text-white mb-1">
-                      {beat.title}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                      {beat.content}
-                    </div>
-                    {beat.points !== undefined && (
-                      <div className="text-xs text-orange-600 dark:text-orange-400 mb-2 font-semibold flex items-center gap-1">
-                        <DynamicIcon name="Coins" className="w-3 h-3" />{" "}
-                        {beat.points} points
-                      </div>
-                    )}
-                    <label className="flex items-center gap-2 text-sm text-blue-200">
-                      <input
-                        type="checkbox"
-                        checked={beat.fulfilled || false}
-                        onChange={(e) =>
-                          updateBeat(index, "fulfilled", e.target.checked)
-                        }
-                        className="rounded"
-                      />
-                      <span>
-                        <DynamicIcon
-                          name="Check"
-                          className="w-4 h-4 inline mr-1"
-                        />{" "}
-                        Fulfilled
-                      </span>
-                    </label>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => movePlotBeatUp(index)}
-                        disabled={index === 0}
-                        className="px-2 py-1 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs"
-                        title="Move up"
-                      >
-                        <DynamicIcon name="ChevronUp" className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => movePlotBeatDown(index)}
-                        disabled={index === localPlotBeats.length - 1}
-                        className="px-2 py-1 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs"
-                        title="Move down"
-                      >
-                        <DynamicIcon name="ChevronDown" className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <button
-                      onClick={() => startEditPlotBeat(index)}
-                      className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs"
-                    >
-                      <DynamicIcon name="Edit" className="w-4 h-4" /> Edit
-                    </button>
-                    <button
-                      onClick={() => removeBeat(index)}
-                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Author Notes */}
       <div>
         <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
@@ -4688,7 +4279,6 @@ export default function MenuPage({
   const [editingInventory, setEditingInventory] = useState(false);
   const [editingAchievements, setEditingAchievements] = useState(false);
   const [editingLore, setEditingLore] = useState(false);
-  const [editingPlotBeats, setEditingPlotBeats] = useState(false);
   const [activeTab, setActiveTab] = useState<
     | "basic"
     | "stats"
@@ -4856,26 +4446,27 @@ export default function MenuPage({
 
   const calculateStoryProgress = () => {
     const totalParts = storyData.scene.parts.length;
-    const totalBeats = storyData.plot_beats.length;
-    const fulfilledBeats = storyData.plot_beats.filter(
-      (b) => b.fulfilled
-    ).length;
     const achievementCount = storyData.achievements.length;
+    const achievedCount = storyData.achievements.filter(
+      (a) => a.dateAchieved
+    ).length;
 
     return {
       totalParts,
-      totalBeats,
-      fulfilledBeats,
       achievementCount,
+      achievedCount,
       progress:
-        totalBeats > 0 ? Math.round((fulfilledBeats / totalBeats) * 100) : 0,
+        achievementCount > 0
+          ? Math.round((achievedCount / achievementCount) * 100)
+          : 0,
     };
   };
 
   const stats = calculateStoryProgress();
-  const totalEarnedPoints =
-    (storyData.earnedPointsFromBeats || []).reduce((a, b) => a + b, 0) +
-    (storyData.earnedPointsFromChapters || []).reduce((a, b) => a + b, 0);
+  const totalEarnedPoints = (storyData.earnedPointsFromChapters || []).reduce(
+    (a: number, b: number) => a + b,
+    0
+  );
   const availablePoints = storyData.points;
 
   return (
@@ -4910,9 +4501,9 @@ export default function MenuPage({
           </div>
           <div className="bg-purple-900/30 rounded-lg py-2 px-1">
             <p className="text-lg font-bold text-purple-400">
-              {stats.fulfilledBeats}/{stats.totalBeats}
+              {stats.achievedCount}/{stats.achievementCount}
             </p>
-            <p className="text-[10px] text-purple-300/50">Beats</p>
+            <p className="text-[10px] text-purple-300/50">Achieved</p>
           </div>
           <div className="bg-yellow-900/30 rounded-lg py-2 px-1">
             <p className="text-lg font-bold text-yellow-400">
@@ -5083,13 +4674,8 @@ export default function MenuPage({
                       chapters: [],
                       momentum: storyData.momentum,
                       points: 0,
-                      earnedPointsFromBeats: [],
                       earnedPointsFromChapters: [],
                       earnedPointsFromQuests: [],
-                      plot_beats: storyData.plot_beats.map((b) => ({
-                        ...b,
-                        fulfilled: false,
-                      })),
                       achievements: storyData.achievements.map((a) => ({
                         ...a,
                         dateAchieved: null,
@@ -5391,7 +4977,6 @@ export default function MenuPage({
                 <div className="mt-4">
                   <LoreEditor
                     lore={storyData.lore}
-                    plotBeats={storyData.plot_beats}
                     variables={storyData.variables || []}
                     onUpdate={(lore) => onUpdateStoryData({ lore })}
                   />
@@ -6124,9 +5709,9 @@ export default function MenuPage({
               {activeTab === "story" && (
                 <div className="mt-4">
                   <StoryMetaEditor
-                    plotBeats={storyData.plot_beats}
                     memory={storyData.memory}
                     premise={storyData.premise}
+                    authorNotes={storyData.author_notes}
                     onUpdate={(updates) => onUpdateStoryData(updates)}
                   />
                 </div>

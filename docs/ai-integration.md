@@ -44,7 +44,7 @@ The system uses a comprehensive system prompt that instructs the AI to:
 - Act as a narrative engine.
 - Output strict XML-like tags.
 - Manage game mechanics (skills, resources, items).
-- Track plot beats and quests.
+- Track quests and story progression.
 
 ### Staged Mode (`ai_staged.ts`)
 

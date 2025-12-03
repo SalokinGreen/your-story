@@ -15,10 +15,6 @@ describe("processLoreTriggers", () => {
     resources: [],
     inventory: [],
     achievements: [],
-    plot_beats: [
-      { title: "Beat 1", content: "Content 1", fulfilled: true },
-      { title: "Beat 2", content: "Content 2", fulfilled: false },
-    ],
     lore: lore,
     memory: [],
     scene: {
@@ -39,7 +35,6 @@ describe("processLoreTriggers", () => {
     points: 0,
     momentum: 0,
     maxMomentum: 10,
-    earnedPointsFromBeats: [],
     earnedPointsFromChapters: [],
     earnedPointsFromQuests: [],
     relationships: [],
@@ -70,40 +65,6 @@ describe("processLoreTriggers", () => {
     // Notification removed - granular lore notifications no longer shown
   });
 
-  it("should activate lore when beats_trigger match fulfilled beats", () => {
-    const lore: StoryLore[] = [
-      {
-        ...baseLore,
-        title: "Lore 2",
-        content: "Content 2",
-        beats_trigger: [0], // Beat 1 is fulfilled
-        on: false,
-      },
-    ];
-    const storyData = createMockStoryData(lore);
-
-    processLoreTriggers(storyData, mockAddNotification);
-
-    expect(storyData.lore[0].on).toBe(true);
-  });
-
-  it("should NOT activate lore when beats_trigger match unfulfilled beats", () => {
-    const lore: StoryLore[] = [
-      {
-        ...baseLore,
-        title: "Lore 3",
-        content: "Content 3",
-        beats_trigger: [1], // Beat 2 is NOT fulfilled
-        on: false,
-      },
-    ];
-    const storyData = createMockStoryData(lore);
-
-    processLoreTriggers(storyData, mockAddNotification);
-
-    expect(storyData.lore[0].on).toBe(false);
-  });
-
   it("should deactivate lore when off_triggers match content", () => {
     const lore: StoryLore[] = [
       {
@@ -120,23 +81,6 @@ describe("processLoreTriggers", () => {
 
     expect(storyData.lore[0].on).toBe(false);
     // Notification removed - granular lore notifications no longer shown
-  });
-
-  it("should deactivate lore when beats_untrigger match fulfilled beats", () => {
-    const lore: StoryLore[] = [
-      {
-        ...baseLore,
-        title: "Lore 5",
-        content: "Content 5",
-        beats_untrigger: [0], // Beat 1 is fulfilled
-        on: true,
-      },
-    ];
-    const storyData = createMockStoryData(lore);
-
-    processLoreTriggers(storyData, mockAddNotification);
-
-    expect(storyData.lore[0].on).toBe(false);
   });
 
   it("should respect manual disable (enabled: false)", () => {

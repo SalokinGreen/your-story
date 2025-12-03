@@ -114,8 +114,6 @@ export interface StoryLore {
   var_off_triggers?: string[]; // Boolean variable names that turn this off when true
   thumbnailUrl?: string;
   on?: boolean;
-  beats_trigger?: number[];
-  beats_untrigger?: number[];
   lastTriggeredIndex?: number; // Track when lore was last triggered for auto-expiry
 }
 export interface Chapter {
@@ -161,12 +159,6 @@ export interface Choice {
 }
 export interface Scene {
   parts: ScenePart[];
-}
-export interface PlotBeat {
-  title: string;
-  content: string;
-  fulfilled?: boolean;
-  points?: number; // Custom points reward for completing this beat (defaults to BEAT_REWARD if not set)
 }
 export interface Quest {
   id: string; // Unique identifier for the quest
@@ -287,7 +279,6 @@ export interface StoryData {
   player_name: string;
   player_summary: string;
   intro: string;
-  plot_beats: PlotBeat[];
   memory: string[];
   max_chapters: number;
   currentChapter: number;
@@ -302,7 +293,6 @@ export interface StoryData {
   momentum: number;
   maxMomentum: number;
   points: number;
-  earnedPointsFromBeats: number[];
   earnedPointsFromChapters: number[];
   quests: Quest[]; // Quest system
   earnedPointsFromQuests: string[]; // Array of quest IDs that have awarded points

@@ -96,7 +96,7 @@ All tables use Row Level Security (RLS) policies:
   - All game state (scenes, chapters, choices)
   - Player stats, resources, inventory, achievements
   - **Momentum system** (momentum, maxMomentum)
-  - Plot beats and memory
+  - Memory and lore
 
 ## Automatic Features
 

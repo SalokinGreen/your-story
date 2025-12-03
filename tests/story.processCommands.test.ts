@@ -14,19 +14,6 @@ describe("processCommands", () => {
       player_name: "Hero",
       player_summary: "A brave hero",
       intro: "The adventure begins...",
-      plot_beats: [
-        {
-          title: "First Beat",
-          content: "First beat content",
-          fulfilled: false,
-          points: 30,
-        },
-        {
-          title: "Second Beat",
-          content: "Second beat content",
-          fulfilled: false,
-        },
-      ],
       memory: [],
       max_chapters: 8,
       currentChapter: 0,
@@ -66,7 +53,6 @@ describe("processCommands", () => {
       momentum: 0,
       maxMomentum: 3,
       points: 0,
-      earnedPointsFromBeats: [],
       earnedPointsFromChapters: [],
       author_notes: "",
       selected_preset: "custom",
@@ -304,48 +290,6 @@ describe("processCommands", () => {
     });
   });
 
-  describe("/mark_beat command", () => {
-    it("should mark beat as fulfilled and award custom points", () => {
-      processCommands(["/mark_beat: 1"], mockStoryData, mockNotification);
-
-      expect(mockStoryData.plot_beats[0].fulfilled).toBe(true);
-      expect(mockStoryData.points).toBe(30);
-      expect(mockStoryData.earnedPointsFromBeats).toContain(0);
-      expect(mockNotification).toHaveBeenCalledWith(
-        "✨ Story beat 1 completed",
-        "success"
-      );
-      expect(mockNotification).toHaveBeenCalledWith(
-        "?? Earned 30 points! Total: 30",
-        "success"
-      );
-    });
-
-    it("should award default points if no custom points set", () => {
-      processCommands(["/mark_beat: 2"], mockStoryData, mockNotification);
-
-      expect(mockStoryData.plot_beats[1].fulfilled).toBe(true);
-      expect(mockStoryData.points).toBe(UPGRADE_COSTS.BEAT_REWARD);
-      expect(mockStoryData.earnedPointsFromBeats).toContain(1);
-    });
-
-    it("should not award points twice for same beat", () => {
-      processCommands(["/mark_beat: 1"], mockStoryData, mockNotification);
-      const firstPoints = mockStoryData.points;
-
-      processCommands(["/mark_beat: 1"], mockStoryData, mockNotification);
-
-      expect(mockStoryData.points).toBe(firstPoints);
-      expect(mockStoryData.earnedPointsFromBeats).toHaveLength(1);
-    });
-
-    it("should handle invalid beat index", () => {
-      processCommands(["/mark_beat: 99"], mockStoryData, mockNotification);
-
-      expect(mockStoryData.points).toBe(0);
-    });
-  });
-
   describe("/create_quest command", () => {
     it("should create new quest", () => {
       processCommands(
@@ -532,7 +476,6 @@ describe("processCommands", () => {
         [
           "/add_item: Sword | A sharp blade | normal | 1",
           "/trigger_achievement: First Victory",
-          "/mark_beat: 1",
           "/modify_momentum: 2",
         ],
         mockStoryData,
@@ -541,9 +484,8 @@ describe("processCommands", () => {
 
       expect(mockStoryData.inventory).toHaveLength(1);
       expect(mockStoryData.achievements[0].dateAchieved).toBeInstanceOf(Date);
-      expect(mockStoryData.plot_beats[0].fulfilled).toBe(true);
       expect(mockStoryData.momentum).toBe(2);
-      expect(mockStoryData.points).toBe(55); // 25 (achievement) + 30 (beat)
+      expect(mockStoryData.points).toBe(25); // 25 (achievement)
     });
   });
 

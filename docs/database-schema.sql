@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS public.stories (
 -- - All story state (scenes, choices, chapters)
 -- - Player stats, resources, inventory, achievements
 -- - Momentum system: { momentum: number, maxMomentum: number }
--- - Plot beats and memory
+-- - Memory and lore
 -- See app/misc/structs.ts StoryData interface for full structure
 
 -- Add indexes for stories
