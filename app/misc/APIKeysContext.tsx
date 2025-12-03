@@ -8,6 +8,7 @@ import React, {
   useCallback,
 } from "react";
 import { useAuth } from "./AuthContext";
+import { useSubscription } from "./SubscriptionContext";
 import { supabase } from "./supabase";
 
 export interface APIKeys {
@@ -24,11 +25,13 @@ export interface APIKeysContextType {
   isLoaded: boolean;
   // Whether user has enabled global (DB) key storage
   useGlobalKeys: boolean;
+  // Whether user has BYOK access (based on subscription tier)
+  hasByokAccess: boolean;
   // Update a specific key
   setKey: (provider: keyof APIKeys, key: string) => void;
   // Toggle global key storage
   setUseGlobalKeys: (enabled: boolean) => Promise<void>;
-  // Check if a provider is configured
+  // Check if a provider is configured AND user has access
   hasKey: (provider: keyof APIKeys) => boolean;
   // Refresh keys from storage
   refreshKeys: () => Promise<void>;
@@ -59,6 +62,7 @@ const LOCAL_KEYS = {
 
 export function APIKeysProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { hasByokAccess } = useSubscription();
   const [keys, setKeys] = useState<APIKeys>(defaultKeys);
   const [isLoaded, setIsLoaded] = useState(false);
   const [useGlobalKeys, setUseGlobalKeysState] = useState(false);
@@ -239,12 +243,14 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
     [user, keys]
   );
 
-  // Check if a provider has a key configured
+  // Check if a provider has a key configured AND user has BYOK access
+  // Note: Keys are always stored, but only usable if user has BYOK access
   const hasKey = useCallback(
     (provider: keyof APIKeys) => {
-      return !!keys[provider];
+      // Key must exist AND user must have BYOK access to use it
+      return !!keys[provider] && hasByokAccess;
     },
-    [keys]
+    [keys, hasByokAccess]
   );
 
   // Generate code verifier and challenge for PKCE
@@ -304,6 +310,7 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
         keys,
         isLoaded,
         useGlobalKeys,
+        hasByokAccess,
         setKey,
         setUseGlobalKeys,
         hasKey,

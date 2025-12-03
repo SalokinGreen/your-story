@@ -107,6 +107,15 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/api/tokens/mint/route.ts: POST to mint tokens (admin only); uses service role.
 - app/api/tokens/remove/route.ts: POST to remove/burn tokens (admin only); uses service role and deductTokens.
 
+#### Subscriptions
+
+- app/api/subscriptions/route.ts: GET current user's subscription status, tier, coins remaining, period dates.
+- app/api/subscriptions/checkout/route.ts: POST to create Stripe checkout session for subscription purchase.
+- app/api/subscriptions/portal/route.ts: POST to create Stripe customer portal session for subscription management.
+- app/api/subscriptions/webhook/route.ts: POST Stripe webhook handler for subscription lifecycle events.
+- app/misc/subscriptions.ts: Subscription types (SubscriptionTier), SUBSCRIPTION_TIERS config, helper functions.
+- app/misc/SubscriptionContext.tsx: React context providing subscription state and actions (startCheckout, openCustomerPortal).
+
 #### Content
 
 - app/api/stories/route.ts: GET user stories with RLS; uses NEXT_PUBLIC keys for user context.
@@ -189,8 +198,27 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - **Balance counting**: Use aggregate counts (via head count) to bypass Supabase 1000-row limit; getUserTokenBalance in tokens.ts returns { total, tradable, locked }.
 - **Operations**: deductTokens (burn newest first), giftTokens (transfer tradable only), mintTokens (admin only).
 - **API balance**: Always use /api/tokens/balance with service role for accurate counts.
-- **Token costs**: Currently reserved for future local model hosting. TTS/STT cost tokens only when using server keys (not BYOK).
-- **BYOK (Bring Your Own Key)**: All AI generation now requires user-provided API keys. No token billing for AI generation - users pay providers directly.
+- **Token costs**: AI generation via Coins mode uses tokens (2.5x markup). TTS/STT cost tokens only when using server keys (not BYOK).
+- **BYOK (Bring Your Own Key)**: Available to paid subscribers only. Users provide their own API keys and pay providers directly (no coin cost).
+
+### Subscription System
+
+- **Tiers**: free (100 coins/week, no BYOK), starter ($10/month, 700 coins/week + BYOK), pro ($15/month, 1200 coins/week + BYOK), premium ($30/month, 2800 coins/week + BYOK).
+- **Database**: user_subscriptions table with subscription_tier enum, Stripe IDs, period tracking, weekly coin refills. See docs/subscription-migration.sql.
+- **Stripe Integration**: Uses Stripe Checkout for subscription creation, Customer Portal for management, webhooks for lifecycle events.
+- **Weekly Coins**: Refilled automatically on first request after 7 days since last refill. Coins don't roll over - reset to tier amount.
+- **Coin Purchases**: Paid subscribers can buy additional coin packages ($5-$40) via one-time Stripe Checkout. Packages in COIN_PACKAGES (subscriptions.ts).
+- **API Routes**:
+  - /api/subscriptions - GET current subscription status
+  - /api/subscriptions/checkout - POST to create Stripe checkout session
+  - /api/subscriptions/portal - POST to create Stripe customer portal session
+  - /api/subscriptions/webhook - POST for Stripe webhook events (handles both subscriptions and coin purchases)
+  - /api/subscriptions/coins - GET/POST for coin package purchases (requires paid subscription)
+- **Client Context**: SubscriptionContext provides tier, hasByokAccess, coinsRemaining, canBuyCoins, coinPackages, startCheckout(), openCustomerPortal(), purchaseCoins(), refreshSubscription().
+- **UI Components**: SubscriptionCard (profile display with Buy Coins button), BuyCoinsModal (coin purchase interface), PricingTable (plan comparison).
+- **BYOK Gating**: APIKeysContext checks hasByokAccess from SubscriptionContext before allowing key usage.
+- **Environment Variables**: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_STARTER, STRIPE_PRICE_PRO, STRIPE_PRICE_PREMIUM, STRIPE_PRICE_COINS_500, STRIPE_PRICE_COINS_1200, STRIPE_PRICE_COINS_2500, STRIPE_PRICE_COINS_5500.
+- **Markup**: MARKUP_MULTIPLIER in ai_prices.ts is 2.5x (platform takes 60% margin on Coins usage).
 
 ### Adventure Visibility System
 
@@ -282,6 +310,11 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - SUPABASE_URL=<your_url> (same as NEXT_PUBLIC)
   - SUPABASE_KEY=<your_anon_key> (same as NEXT_PUBLIC)
   - SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
+  - STRIPE_SECRET_KEY=<your_stripe_secret_key>
+  - STRIPE_WEBHOOK_SECRET=<your_webhook_secret>
+  - STRIPE_PRICE_STARTER=<stripe_price_id_for_starter>
+  - STRIPE_PRICE_PRO=<stripe_price_id_for_pro>
+  - STRIPE_PRICE_PREMIUM=<stripe_price_id_for_premium>
   - Optional: DEFAULT_AI_MODEL=Deepseek Chat
   - Optional: DEEPSEEK_MODEL=deepseek-chat
   - Optional: NEXT_PUBLIC_SITE_URL=<your_site_url>

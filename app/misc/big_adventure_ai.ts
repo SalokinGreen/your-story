@@ -6,10 +6,12 @@
  * - Stage 2: Mechanics (stats, resources, abilities, variables)
  * - Stage 3: Content (inventory, lore, relationships, achievements, quests)
  * - Stage 4: Advanced (presets, agmt, custom tables, upgrades, starting choices)
+ * - Stage 5: Icons (assigns thematic icons to all elements)
  */
 
 import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
+import { ALL_GAME_ICON_IDS } from "@/app/misc/gameIcons";
 
 export type RPGSystemType =
   | "3d6"
@@ -33,7 +35,8 @@ export type GenerationStage =
   | "content-items"
   | "advanced-presets"
   | "advanced-tables"
-  | "advanced-other";
+  | "advanced-other"
+  | "icons";
 
 // Legacy stage type for backward compatibility and UI grouping
 export type LegacyStage = "core" | "mechanics" | "content" | "advanced";
@@ -43,6 +46,7 @@ export function getParentStage(stage: GenerationStage): LegacyStage {
   if (stage === "core") return "core";
   if (stage === "mechanics") return "mechanics";
   if (stage.startsWith("content-")) return "content";
+  if (stage === "icons") return "advanced"; // Icons stage uses advanced config
   return "advanced";
 }
 
@@ -742,6 +746,15 @@ export interface GenerationProgress {
   isComplete: boolean;
 }
 
+export interface IconAssignments {
+  stats?: Record<string, string>;
+  resources?: Record<string, string>;
+  inventory?: Record<string, string>;
+  abilities?: Record<string, string>;
+  achievements?: Record<string, string>;
+  relationships?: Record<string, string>;
+}
+
 export interface BigAdventureResult {
   // Adventure metadata
   title: string;
@@ -751,6 +764,9 @@ export interface BigAdventureResult {
   // Story template
   storyTemplate: Partial<StoryData>;
   startingChoices?: StartingChoice[];
+
+  // Icon assignments (from icons stage)
+  iconAssignments?: IconAssignments;
 }
 
 // Complexity determines counts for various elements
@@ -976,6 +992,21 @@ export function getStageInfo(stage: GenerationStage): {
         "Shape upgrade paths, starting variations, or progression balance",
       number: 8,
       emoji: "🛒",
+    },
+    icons: {
+      name: "Icon Assignment",
+      description: "Assigns thematic icons to all elements",
+      detailedDescription:
+        "Reviews all stats, resources, items, abilities, achievements, and lore entries to assign appropriate icons from the game-icons.net library.",
+      generates: [
+        "Icons for stats and resources",
+        "Icons for items and abilities",
+        "Icons for achievements and relationships",
+      ],
+      instructionHint:
+        "The AI will automatically choose thematic icons for each element",
+      number: 9,
+      emoji: "🎨",
     },
   };
   return stages[stage];
@@ -1471,6 +1502,44 @@ OUTPUT JSON SCHEMA:
 Remember: Output ONLY the JSON object, nothing else.`;
   }
 
+  if (stage === "icons") {
+    // Build the icon list - all 4000+ icons
+    const iconList = ALL_GAME_ICON_IDS.join(", ");
+
+    return `You are assigning thematic icons to adventure elements.
+
+TASK: Review all elements that need icons and assign appropriate icons from the available list.
+
+AVAILABLE ICONS (${ALL_GAME_ICON_IDS.length} total):
+${iconList}
+
+ELEMENTS THAT NEED ICONS:
+You will receive a list of stats, resources, items, abilities, achievements, and relationships.
+For each element, choose the most thematically appropriate icon from the list above.
+
+GUIDELINES:
+- Match icons to the element's theme/function (e.g., "Health" → "heart", "Strength" → "muscle-up")
+- For weapons, use specific weapon icons (e.g., "sword", "bow-arrow", "axe")
+- For magic, use mystical icons (e.g., "magic-swirl", "crystal-ball", "spell-book")
+- For creatures, use creature icons (e.g., "dragon-head", "wolf-head", "skull")
+- Be creative but thematic - the icon should represent what the element does
+- If no perfect match exists, choose the closest thematic option
+
+OUTPUT JSON SCHEMA:
+{
+  "iconAssignments": {
+    "stats": { "StatName": "icon-id", ... },
+    "resources": { "ResourceName": "icon-id", ... },
+    "inventory": { "ItemName": "icon-id", ... },
+    "abilities": { "AbilityName": "icon-id", ... },
+    "achievements": { "AchievementTitle": "icon-id", ... },
+    "relationships": { "NPCName": "icon-id", ... }
+  }
+}
+
+Output ONLY valid JSON matching the schema. Include only elements that exist in the adventure.`;
+  }
+
   // Fallback - should never reach here
   return `${basePrompt}
 
@@ -1579,6 +1648,64 @@ export function buildBigAdventureMessages(
       content:
         "I understand the adventure context. I'll generate content that integrates with the established elements.",
     });
+  }
+
+  // Special handling for icons stage - list all elements that need icons
+  if (stage === "icons" && previousResults?.storyTemplate) {
+    const template = previousResults.storyTemplate;
+    let elementsMessage = "ELEMENTS THAT NEED ICONS:\n\n";
+
+    if (template.stats && template.stats.length > 0) {
+      elementsMessage += `STATS:\n`;
+      template.stats.forEach((s) => {
+        elementsMessage += `- "${s.name}": ${s.description || "No description"}\n`;
+      });
+      elementsMessage += "\n";
+    }
+
+    if (template.resources && template.resources.length > 0) {
+      elementsMessage += `RESOURCES:\n`;
+      template.resources.forEach((r) => {
+        elementsMessage += `- "${r.name}": ${r.description || "No description"}\n`;
+      });
+      elementsMessage += "\n";
+    }
+
+    if (template.inventory && template.inventory.length > 0) {
+      elementsMessage += `INVENTORY ITEMS:\n`;
+      template.inventory.forEach((i) => {
+        elementsMessage += `- "${i.name}": ${i.description || "No description"} (${i.type})\n`;
+      });
+      elementsMessage += "\n";
+    }
+
+    if (template.abilities && template.abilities.length > 0) {
+      elementsMessage += `ABILITIES:\n`;
+      template.abilities.forEach((a) => {
+        elementsMessage += `- "${a.name}": ${a.description || "No description"}\n`;
+      });
+      elementsMessage += "\n";
+    }
+
+    if (template.achievements && template.achievements.length > 0) {
+      elementsMessage += `ACHIEVEMENTS:\n`;
+      template.achievements.forEach((a) => {
+        elementsMessage += `- "${a.title}": ${a.description || "No description"}\n`;
+      });
+      elementsMessage += "\n";
+    }
+
+    if (template.relationships && template.relationships.length > 0) {
+      elementsMessage += `RELATIONSHIPS:\n`;
+      template.relationships.forEach((r) => {
+        elementsMessage += `- "${r.name}": ${r.description || "No description"}\n`;
+      });
+      elementsMessage += "\n";
+    }
+
+    elementsMessage += "Assign an appropriate icon from the available list to each element above.";
+
+    messages.push({ role: "user", content: elementsMessage });
   }
 
   // Final user message to trigger generation
@@ -1943,6 +2070,13 @@ export function parseBigAdventureStageOutput(
       };
     }
 
+    // Icons stage returns icon assignments to be applied to elements
+    if (stage === "icons") {
+      return {
+        iconAssignments: parsed.iconAssignments,
+      };
+    }
+
     return null;
   } catch (e) {
     console.error("Failed to parse big adventure stage output:", e);
@@ -2004,6 +2138,70 @@ export function mergeBigAdventureResults(
         ...result.storyTemplate,
       };
     }
+
+    // Apply icon assignments to elements
+    if (result.iconAssignments) {
+      const assignments = result.iconAssignments;
+
+      // Apply to stats
+      if (assignments.stats && merged.storyTemplate.stats) {
+        merged.storyTemplate.stats = merged.storyTemplate.stats.map((stat) => ({
+          ...stat,
+          symbol: assignments.stats![stat.name] || stat.symbol,
+        }));
+      }
+
+      // Apply to resources
+      if (assignments.resources && merged.storyTemplate.resources) {
+        merged.storyTemplate.resources = merged.storyTemplate.resources.map(
+          (resource) => ({
+            ...resource,
+            symbol: assignments.resources![resource.name] || resource.symbol,
+          })
+        );
+      }
+
+      // Apply to inventory
+      if (assignments.inventory && merged.storyTemplate.inventory) {
+        merged.storyTemplate.inventory = merged.storyTemplate.inventory.map(
+          (item) => ({
+            ...item,
+            symbol: assignments.inventory![item.name] || item.symbol,
+          })
+        );
+      }
+
+      // Apply to abilities
+      if (assignments.abilities && merged.storyTemplate.abilities) {
+        merged.storyTemplate.abilities = merged.storyTemplate.abilities.map(
+          (ability) => ({
+            ...ability,
+            symbol: assignments.abilities![ability.name] || ability.symbol,
+          })
+        );
+      }
+
+      // Apply to achievements
+      if (assignments.achievements && merged.storyTemplate.achievements) {
+        merged.storyTemplate.achievements =
+          merged.storyTemplate.achievements.map((achievement) => ({
+            ...achievement,
+            symbol:
+              assignments.achievements![achievement.title] || achievement.symbol,
+          }));
+      }
+
+      // Apply to relationships
+      if (assignments.relationships && merged.storyTemplate.relationships) {
+        merged.storyTemplate.relationships =
+          merged.storyTemplate.relationships.map((relationship) => ({
+            ...relationship,
+            symbol:
+              assignments.relationships![relationship.name] ||
+              relationship.symbol,
+          }));
+      }
+    }
   }
 
   return merged;
@@ -2053,6 +2251,9 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
     stages.push("advanced-other");
   }
 
+  // Icons stage - always runs last to assign icons to all elements
+  stages.push("icons");
+
   return stages;
 }
 
@@ -2094,6 +2295,7 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
     "advanced-presets": 4000,
     "advanced-tables": 3000,
     "advanced-other": 3000,
+    icons: 50000, // Large because we include the full icon list
   };
 
   let totalInput = 0;

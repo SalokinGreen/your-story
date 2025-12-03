@@ -262,6 +262,9 @@ export default function AdventureDetailPage() {
   }, [user]);
 
   const handleStartAdventure = async () => {
+    // Prevent double-submission
+    if (startingAdventure) return;
+
     if (!user) {
       addNotification("Please sign in to start an adventure", "warning");
       router.push("/");

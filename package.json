@@ -19,7 +19,8 @@
     "next": "16.0.2",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "stripe": "^20.0.0"
   },
   "devDependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",

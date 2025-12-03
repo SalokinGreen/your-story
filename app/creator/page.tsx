@@ -512,7 +512,7 @@ export default function CreatorLandingPage() {
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
                     placeholder={`Describe your ${selectedGenre.name.toLowerCase()} adventure idea, or leave blank for AI to decide...`}
-                    className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/30 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                    className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/30 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y min-h-20"
                     rows={3}
                   />
                 </div>

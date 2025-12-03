@@ -53,7 +53,9 @@ export default function CreatorAIChat({
       const saved = localStorage.getItem(chatKey);
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          // Filter out any empty messages that may have been saved
+          return parsed.filter((msg: ChatMessage) => msg.content && msg.content.trim());
         } catch (e) {
           console.error("Failed to parse saved chat:", e);
         }
@@ -326,6 +328,19 @@ export default function CreatorAIChat({
           ...data.meta,
           isByok: byokMode,
         };
+      }
+
+      // Skip empty messages - they break the chat
+      if (!content || !content.trim()) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "I apologize, but I generated an empty response. Please try again or rephrase your request.",
+            meta,
+          },
+        ]);
+        return;
       }
 
       const assistantMsg: ChatMessage & { meta?: any } = {

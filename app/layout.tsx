@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "./misc/AuthContext";
 import { NotificationProvider } from "./misc/NotificationContext";
 import { APIKeysProvider } from "./misc/APIKeysContext";
+import { SubscriptionProvider } from "./misc/SubscriptionContext";
 import NotificationContainer from "./components/NotificationContainer";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import SiteHeader from "./components/SiteHeader";
@@ -74,10 +75,12 @@ export default function RootLayout({
       >
         <NotificationProvider>
           <AuthProvider>
-            <APIKeysProvider>
-              <SiteHeader />
-              {children}
-            </APIKeysProvider>
+            <SubscriptionProvider>
+              <APIKeysProvider>
+                <SiteHeader />
+                {children}
+              </APIKeysProvider>
+            </SubscriptionProvider>
           </AuthProvider>
           <NotificationContainer />
           <PWAInstallPrompt />

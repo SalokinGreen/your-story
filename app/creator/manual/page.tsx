@@ -1562,6 +1562,8 @@ function AdventureCreatorContent() {
   const [loreSearchQuery, setLoreSearchQuery] = useState("");
   const [lorePage, setLorePage] = useState(1);
   const loreItemsPerPage = 10;
+  // Pending tag deletion confirmation (key format: "type:context:value")
+  const [pendingTagDelete, setPendingTagDelete] = useState<string | null>(null);
 
   // Relationships
   const [relationships, setRelationships] = useState<Relationship[]>([]);
@@ -6921,9 +6923,10 @@ ${description || ""}`;
                           onClick={() =>
                             setNewLore({ ...newLore, thumbnailUrl: "" })
                           }
-                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs"
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center"
+                          title="Remove thumbnail"
                         >
-                          ?
+                          <DynamicIcon name="X" className="w-4 h-4" />
                         </button>
                       </div>
                     ) : (
@@ -7027,28 +7030,53 @@ ${description || ""}`;
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {(newLore.on_triggers || []).map((trigger) => (
-                      <span
-                        key={trigger}
-                        className="px-2 py-1 bg-green-900/30 text-green-300 rounded-full text-sm flex items-center gap-1"
-                      >
-                        <DynamicIcon name="Check" className="w-3 h-3" />{" "}
-                        {trigger}
-                        <button
-                          onClick={() =>
-                            setNewLore({
-                              ...newLore,
-                              on_triggers: (newLore.on_triggers || []).filter(
-                                (t) => t !== trigger
-                              ),
-                            })
-                          }
-                          className="hover:text-green-100"
+                    {(newLore.on_triggers || []).map((trigger) => {
+                      const deleteKey = `newLore:on:${trigger}`;
+                      const isPending = pendingTagDelete === deleteKey;
+                      return (
+                        <span
+                          key={trigger}
+                          className={`px-2 py-1 rounded-full text-sm flex items-center gap-1 transition-colors ${
+                            isPending
+                              ? "bg-red-900/50 text-red-300"
+                              : "bg-green-900/30 text-green-300"
+                          }`}
                         >
-                          ?
-                        </button>
-                      </span>
-                    ))}
+                          <DynamicIcon name="Check" className="w-3 h-3" />{" "}
+                          {trigger}
+                          <button
+                            onClick={() => {
+                              if (isPending) {
+                                setNewLore({
+                                  ...newLore,
+                                  on_triggers: (
+                                    newLore.on_triggers || []
+                                  ).filter((t) => t !== trigger),
+                                });
+                                setPendingTagDelete(null);
+                              } else {
+                                setPendingTagDelete(deleteKey);
+                              }
+                            }}
+                            onBlur={() =>
+                              setTimeout(() => setPendingTagDelete(null), 200)
+                            }
+                            className={`ml-1 transition-colors ${
+                              isPending
+                                ? "text-red-400 hover:text-red-200"
+                                : "text-green-400 hover:text-green-200"
+                            }`}
+                            title={
+                              isPending
+                                ? "Click again to remove"
+                                : "Click to remove"
+                            }
+                          >
+                            <DynamicIcon name="X" className="w-3 h-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
                 <div>
@@ -7079,27 +7107,52 @@ ${description || ""}`;
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {(newLore.off_triggers || []).map((trigger) => (
-                      <span
-                        key={trigger}
-                        className="px-2 py-1 bg-red-900/30 text-red-300 rounded-full text-sm flex items-center gap-1"
-                      >
-                        <DynamicIcon name="X" className="w-3 h-3" /> {trigger}
-                        <button
-                          onClick={() =>
-                            setNewLore({
-                              ...newLore,
-                              off_triggers: (newLore.off_triggers || []).filter(
-                                (t) => t !== trigger
-                              ),
-                            })
-                          }
-                          className="hover:text-red-100"
+                    {(newLore.off_triggers || []).map((trigger) => {
+                      const deleteKey = `newLore:off:${trigger}`;
+                      const isPending = pendingTagDelete === deleteKey;
+                      return (
+                        <span
+                          key={trigger}
+                          className={`px-2 py-1 rounded-full text-sm flex items-center gap-1 transition-colors ${
+                            isPending
+                              ? "bg-red-700/50 text-red-200 ring-2 ring-red-500"
+                              : "bg-red-900/30 text-red-300"
+                          }`}
                         >
-                          ?
-                        </button>
-                      </span>
-                    ))}
+                          <DynamicIcon name="X" className="w-3 h-3" /> {trigger}
+                          <button
+                            onClick={() => {
+                              if (isPending) {
+                                setNewLore({
+                                  ...newLore,
+                                  off_triggers: (
+                                    newLore.off_triggers || []
+                                  ).filter((t) => t !== trigger),
+                                });
+                                setPendingTagDelete(null);
+                              } else {
+                                setPendingTagDelete(deleteKey);
+                              }
+                            }}
+                            onBlur={() =>
+                              setTimeout(() => setPendingTagDelete(null), 200)
+                            }
+                            className={`ml-1 transition-colors ${
+                              isPending
+                                ? "text-red-200 hover:text-white"
+                                : "text-red-400 hover:text-red-200"
+                            }`}
+                            title={
+                              isPending
+                                ? "Click again to remove"
+                                : "Click to remove"
+                            }
+                          >
+                            <DynamicIcon name="X" className="w-3 h-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -7249,28 +7302,56 @@ ${description || ""}`;
                             </button>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {(newLore.keys || []).map((key) => (
-                              <span
-                                key={key}
-                                className="px-2 py-1 bg-yellow-900/30 text-yellow-300 rounded-full text-sm flex items-center gap-1"
-                              >
-                                <DynamicIcon name="Key" className="w-3 h-3" />{" "}
-                                {key}
-                                <button
-                                  onClick={() =>
-                                    setNewLore({
-                                      ...newLore,
-                                      keys: (newLore.keys || []).filter(
-                                        (k) => k !== key
-                                      ),
-                                    })
-                                  }
-                                  className="hover:text-yellow-100"
+                            {(newLore.keys || []).map((key) => {
+                              const deleteKey = `newLore:key:${key}`;
+                              const isPending = pendingTagDelete === deleteKey;
+                              return (
+                                <span
+                                  key={key}
+                                  className={`px-2 py-1 rounded-full text-sm flex items-center gap-1 transition-colors ${
+                                    isPending
+                                      ? "bg-red-900/50 text-red-300"
+                                      : "bg-yellow-900/30 text-yellow-300"
+                                  }`}
                                 >
-                                  ?
-                                </button>
-                              </span>
-                            ))}
+                                  <DynamicIcon name="Key" className="w-3 h-3" />{" "}
+                                  {key}
+                                  <button
+                                    onClick={() => {
+                                      if (isPending) {
+                                        setNewLore({
+                                          ...newLore,
+                                          keys: (newLore.keys || []).filter(
+                                            (k) => k !== key
+                                          ),
+                                        });
+                                        setPendingTagDelete(null);
+                                      } else {
+                                        setPendingTagDelete(deleteKey);
+                                      }
+                                    }}
+                                    onBlur={() =>
+                                      setTimeout(
+                                        () => setPendingTagDelete(null),
+                                        200
+                                      )
+                                    }
+                                    className={`ml-1 transition-colors ${
+                                      isPending
+                                        ? "text-red-400 hover:text-red-200"
+                                        : "text-yellow-400 hover:text-yellow-200"
+                                    }`}
+                                    title={
+                                      isPending
+                                        ? "Click again to remove"
+                                        : "Click to remove"
+                                    }
+                                  >
+                                    <DynamicIcon name="X" className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -7568,9 +7649,13 @@ ${description || ""}`;
                                             thumbnailUrl: "",
                                           })
                                         }
-                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs"
+                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center"
+                                        title="Remove thumbnail"
                                       >
-                                        ?
+                                        <DynamicIcon
+                                          name="X"
+                                          className="w-4 h-4"
+                                        />
                                       </button>
                                     </div>
                                   ) : (
@@ -7690,31 +7775,65 @@ ${description || ""}`;
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {(editLore.on_triggers || []).map(
-                                    (trigger) => (
-                                      <span
-                                        key={trigger}
-                                        className="px-2 py-1 bg-green-900/30 text-green-300 rounded-full text-sm flex items-center gap-1"
-                                      >
-                                        <DynamicIcon
-                                          name="Check"
-                                          className="w-3 h-3"
-                                        />{" "}
-                                        {trigger}
-                                        <button
-                                          onClick={() =>
-                                            setEditLore({
-                                              ...editLore,
-                                              on_triggers: (
-                                                editLore.on_triggers || []
-                                              ).filter((t) => t !== trigger),
-                                            })
-                                          }
-                                          className="hover:text-green-100"
+                                    (trigger) => {
+                                      const deleteKey = `editLore:on:${trigger}`;
+                                      const isPending =
+                                        pendingTagDelete === deleteKey;
+                                      return (
+                                        <span
+                                          key={trigger}
+                                          className={`px-2 py-1 rounded-full text-sm flex items-center gap-1 transition-colors ${
+                                            isPending
+                                              ? "bg-red-900/50 text-red-300"
+                                              : "bg-green-900/30 text-green-300"
+                                          }`}
                                         >
-                                          ?
-                                        </button>
-                                      </span>
-                                    )
+                                          <DynamicIcon
+                                            name="Check"
+                                            className="w-3 h-3"
+                                          />{" "}
+                                          {trigger}
+                                          <button
+                                            onClick={() => {
+                                              if (isPending) {
+                                                setEditLore({
+                                                  ...editLore,
+                                                  on_triggers: (
+                                                    editLore.on_triggers || []
+                                                  ).filter(
+                                                    (t) => t !== trigger
+                                                  ),
+                                                });
+                                                setPendingTagDelete(null);
+                                              } else {
+                                                setPendingTagDelete(deleteKey);
+                                              }
+                                            }}
+                                            onBlur={() =>
+                                              setTimeout(
+                                                () => setPendingTagDelete(null),
+                                                200
+                                              )
+                                            }
+                                            className={`ml-1 transition-colors ${
+                                              isPending
+                                                ? "text-red-400 hover:text-red-200"
+                                                : "text-green-400 hover:text-green-200"
+                                            }`}
+                                            title={
+                                              isPending
+                                                ? "Click again to remove"
+                                                : "Click to remove"
+                                            }
+                                          >
+                                            <DynamicIcon
+                                              name="X"
+                                              className="w-3 h-3"
+                                            />
+                                          </button>
+                                        </span>
+                                      );
+                                    }
                                   )}
                                 </div>
                               </div>
@@ -7750,31 +7869,65 @@ ${description || ""}`;
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {(editLore.off_triggers || []).map(
-                                    (trigger) => (
-                                      <span
-                                        key={trigger}
-                                        className="px-2 py-1 bg-red-900/30 text-red-300 rounded-full text-sm flex items-center gap-1"
-                                      >
-                                        <DynamicIcon
-                                          name="X"
-                                          className="w-3 h-3"
-                                        />{" "}
-                                        {trigger}
-                                        <button
-                                          onClick={() =>
-                                            setEditLore({
-                                              ...editLore,
-                                              off_triggers: (
-                                                editLore.off_triggers || []
-                                              ).filter((t) => t !== trigger),
-                                            })
-                                          }
-                                          className="hover:text-red-100"
+                                    (trigger) => {
+                                      const deleteKey = `editLore:off:${trigger}`;
+                                      const isPending =
+                                        pendingTagDelete === deleteKey;
+                                      return (
+                                        <span
+                                          key={trigger}
+                                          className={`px-2 py-1 rounded-full text-sm flex items-center gap-1 transition-colors ${
+                                            isPending
+                                              ? "bg-red-700/50 text-red-200 ring-2 ring-red-500"
+                                              : "bg-red-900/30 text-red-300"
+                                          }`}
                                         >
-                                          ?
-                                        </button>
-                                      </span>
-                                    )
+                                          <DynamicIcon
+                                            name="X"
+                                            className="w-3 h-3"
+                                          />{" "}
+                                          {trigger}
+                                          <button
+                                            onClick={() => {
+                                              if (isPending) {
+                                                setEditLore({
+                                                  ...editLore,
+                                                  off_triggers: (
+                                                    editLore.off_triggers || []
+                                                  ).filter(
+                                                    (t) => t !== trigger
+                                                  ),
+                                                });
+                                                setPendingTagDelete(null);
+                                              } else {
+                                                setPendingTagDelete(deleteKey);
+                                              }
+                                            }}
+                                            onBlur={() =>
+                                              setTimeout(
+                                                () => setPendingTagDelete(null),
+                                                200
+                                              )
+                                            }
+                                            className={`ml-1 transition-colors ${
+                                              isPending
+                                                ? "text-red-200 hover:text-white"
+                                                : "text-red-400 hover:text-red-200"
+                                            }`}
+                                            title={
+                                              isPending
+                                                ? "Click again to remove"
+                                                : "Click to remove"
+                                            }
+                                          >
+                                            <DynamicIcon
+                                              name="X"
+                                              className="w-3 h-3"
+                                            />
+                                          </button>
+                                        </span>
+                                      );
+                                    }
                                   )}
                                 </div>
                               </div>
@@ -7960,31 +8113,70 @@ ${description || ""}`;
                                           </button>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
-                                          {(editLore.keys || []).map((key) => (
-                                            <span
-                                              key={key}
-                                              className="px-2 py-1 bg-yellow-900/30 text-yellow-300 rounded-full text-sm flex items-center gap-1"
-                                            >
-                                              <DynamicIcon
-                                                name="Key"
-                                                className="w-3 h-3"
-                                              />{" "}
-                                              {key}
-                                              <button
-                                                onClick={() =>
-                                                  setEditLore({
-                                                    ...editLore,
-                                                    keys: (
-                                                      editLore.keys || []
-                                                    ).filter((k) => k !== key),
-                                                  })
-                                                }
-                                                className="hover:text-yellow-100"
+                                          {(editLore.keys || []).map((key) => {
+                                            const deleteKey = `editLore:key:${key}`;
+                                            const isPending =
+                                              pendingTagDelete === deleteKey;
+                                            return (
+                                              <span
+                                                key={key}
+                                                className={`px-2 py-1 rounded-full text-sm flex items-center gap-1 transition-colors ${
+                                                  isPending
+                                                    ? "bg-red-900/50 text-red-300"
+                                                    : "bg-yellow-900/30 text-yellow-300"
+                                                }`}
                                               >
-                                                ?
-                                              </button>
-                                            </span>
-                                          ))}
+                                                <DynamicIcon
+                                                  name="Key"
+                                                  className="w-3 h-3"
+                                                />{" "}
+                                                {key}
+                                                <button
+                                                  onClick={() => {
+                                                    if (isPending) {
+                                                      setEditLore({
+                                                        ...editLore,
+                                                        keys: (
+                                                          editLore.keys || []
+                                                        ).filter(
+                                                          (k) => k !== key
+                                                        ),
+                                                      });
+                                                      setPendingTagDelete(null);
+                                                    } else {
+                                                      setPendingTagDelete(
+                                                        deleteKey
+                                                      );
+                                                    }
+                                                  }}
+                                                  onBlur={() =>
+                                                    setTimeout(
+                                                      () =>
+                                                        setPendingTagDelete(
+                                                          null
+                                                        ),
+                                                      200
+                                                    )
+                                                  }
+                                                  className={`ml-1 transition-colors ${
+                                                    isPending
+                                                      ? "text-red-400 hover:text-red-200"
+                                                      : "text-yellow-400 hover:text-yellow-200"
+                                                  }`}
+                                                  title={
+                                                    isPending
+                                                      ? "Click again to remove"
+                                                      : "Click to remove"
+                                                  }
+                                                >
+                                                  <DynamicIcon
+                                                    name="X"
+                                                    className="w-3 h-3"
+                                                  />
+                                                </button>
+                                              </span>
+                                            );
+                                          })}
                                         </div>
                                       </div>
                                     )}
