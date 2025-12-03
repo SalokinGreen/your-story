@@ -8403,7 +8403,7 @@ ${description || ""}`;
                                       {entry.off_triggers.join(", ")}
                                     </div>
                                   )}
-                                {entry.secret &&
+                                {entry.secrtet &&
                                   entry.keys &&
                                   entry.keys.length > 0 && (
                                     <div className="text-xs text-yellow-400">
