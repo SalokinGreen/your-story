@@ -16,7 +16,7 @@ interface ProfileData {
 export default function SiteHeader() {
   const router = useRouter();
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
   const [showAPIKeysModal, setShowAPIKeysModal] = useState(false);
@@ -55,8 +55,8 @@ export default function SiteHeader() {
     loadProfile();
   }, [user]);
 
-  if (!user) return null;
-
+  // Always render the header container to prevent CLS
+  // Show placeholder/skeleton when loading or not logged in
   const isActive = (path: string) => pathname === path;
 
   const handleNavClick = (e: React.MouseEvent, path: string) => {
@@ -86,9 +86,29 @@ export default function SiteHeader() {
     }
   };
 
+  // If not logged in or still loading, render an invisible placeholder to prevent CLS
+  if (!user || loading) {
+    return (
+      <header className="sticky top-0 z-50 h-[57px] bg-white/95 dark:bg-blue-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14">
+            {/* Logo placeholder */}
+            <div className="flex items-center gap-2 text-lg font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <DynamicIcon
+                name="BookOpen"
+                className="w-5 h-5 text-purple-600"
+              />
+              Your Story
+            </div>
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white/95 dark:bg-blue-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 shadow-sm">
+      <header className="sticky top-0 z-50 h-[57px] bg-white/95 dark:bg-blue-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             {/* Logo/Brand */}

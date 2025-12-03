@@ -17,11 +17,11 @@ export default function LandingAuthSection() {
   const [showAuth, setShowAuth] = useState(false);
 
   if (loading) {
-    // Minimal skeleton to prevent CLS
+    // Skeleton with exact dimensions to prevent CLS
     return (
-      <div className="flex flex-wrap justify-center gap-3 mb-6 min-h-11">
-        <div className="w-24 h-10 bg-blue-600/30 rounded-lg animate-pulse" />
-        <div className="w-36 h-10 bg-blue-950/50 rounded-lg animate-pulse" />
+      <div className="flex flex-wrap justify-center gap-3 mb-6 h-11">
+        <div className="w-[92px] h-[42px] bg-blue-600/30 rounded-lg animate-pulse" />
+        <div className="w-[152px] h-[42px] bg-blue-950/50 rounded-lg animate-pulse" />
       </div>
     );
   }

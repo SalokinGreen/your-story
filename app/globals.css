@@ -3,6 +3,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --header-height: 57px; /* Fixed header height for CLS prevention */
 }
 
 @theme inline {
@@ -22,7 +23,25 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* CSS Containment for better performance */
+.contain-layout {
+  contain: layout;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+.contain-strict {
+  contain: strict;
+}
+
+/* Reserve header space to prevent CLS */
+.header-spacer {
+  min-height: var(--header-height);
 }
 
 @keyframes slide-in {

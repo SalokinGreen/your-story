@@ -563,15 +563,18 @@ export async function generateAdventureSequential(
 
     if (useParallelMode) {
       // Parallel execution - callbacks are fired as each stage completes
+      // Pass existing completed stages and results for incremental autosave
       const parallelResults = await runStagesInParallel(
         config,
         parallelizableStagesToRun,
         previousResults,
         options,
-        callbacks
+        callbacks,
+        completedStages,
+        stageResults
       );
 
-      // Collect results (callbacks already fired in runStagesInParallel)
+      // Collect results (callbacks and autosaves already fired in runStagesInParallel)
       for (const { stage, result } of parallelResults) {
         if (result.success && result.result) {
           stageResults.push(result.result);
@@ -584,23 +587,8 @@ export async function generateAdventureSequential(
 
       callbacks.onProgress(completedStages, stages.length);
 
-      // Save autosave after parallel phase
-      if (stageResults.length > 0) {
-        const mergedResults = mergeBigAdventureResults(
-          ...stageResults.filter((r) => r !== null)
-        );
-        const autosave: BigAdventureAutosave = {
-          id: options.sessionId,
-          timestamp: Date.now(),
-          config,
-          completedStages,
-          partialResults: mergedResults,
-          currentStage:
-            parallelizableStagesToRun[parallelizableStagesToRun.length - 1],
-        };
-        saveAutosave(autosave);
-        callbacks.onAutosave(autosave);
-      }
+      // Note: Autosave is now handled incrementally inside runStagesInParallel
+      // so we don't need to save again here
     } else {
       // Sequential execution for remaining stages
       for (const stage of parallelizableStagesToRun) {
@@ -955,13 +943,16 @@ async function runSingleStageWithRetry(
 
 /**
  * Run multiple stages in parallel, processing each result as it completes
+ * Saves autosave incrementally as each stage completes
  */
 async function runStagesInParallel(
   config: BigAdventureConfig,
   stages: GenerationStage[],
   previousResults: Partial<BigAdventureResult> | undefined,
   options: GenerationOptions,
-  callbacks: GenerationCallbacks
+  callbacks: GenerationCallbacks,
+  existingCompletedStages: GenerationStage[],
+  existingStageResults: (Partial<BigAdventureResult> | null)[]
 ): Promise<{ stage: GenerationStage; result: StageResult }[]> {
   // Notify about parallel execution
   callbacks.onStageWarning(
@@ -970,6 +961,10 @@ async function runStagesInParallel(
   );
 
   const results: { stage: GenerationStage; result: StageResult }[] = [];
+
+  // Track completed stages and results for incremental autosave
+  const parallelCompletedStages: GenerationStage[] = [];
+  const parallelStageResults: (Partial<BigAdventureResult> | null)[] = [];
 
   // Create a promise for each stage that resolves when done
   const stagePromises = stages.map(async (stage) => {
@@ -1031,6 +1026,10 @@ async function runStagesInParallel(
         };
         results.push(stageResult);
 
+        // Track this stage's completion for autosave
+        parallelCompletedStages.push(stage);
+        parallelStageResults.push(genResult.result);
+
         // Immediately notify that this stage is complete
         callbacks.onStageComplete(
           stage,
@@ -1038,6 +1037,29 @@ async function runStagesInParallel(
           stageResult.result.promptTokens,
           stageResult.result.completionTokens
         );
+
+        // Save autosave immediately after each parallel stage completes
+        const allCompletedStages = [
+          ...existingCompletedStages,
+          ...parallelCompletedStages,
+        ];
+        const allStageResults = [
+          ...existingStageResults,
+          ...parallelStageResults,
+        ];
+        const mergedResults = mergeBigAdventureResults(
+          ...allStageResults.filter((r) => r !== null)
+        );
+        const autosave: BigAdventureAutosave = {
+          id: options.sessionId,
+          timestamp: Date.now(),
+          config,
+          completedStages: allCompletedStages,
+          partialResults: mergedResults,
+          currentStage: stage,
+        };
+        saveAutosave(autosave);
+        callbacks.onAutosave(autosave);
 
         return stageResult;
       } else if (
@@ -1077,12 +1099,39 @@ async function runStagesInParallel(
           };
           results.push(stageResult);
 
+          // Track this stage's completion for autosave
+          parallelCompletedStages.push(stage);
+          parallelStageResults.push(wrapUpResult.result);
+
           callbacks.onStageComplete(
             stage,
             wrapUpResult.result,
             stageResult.result.promptTokens,
             stageResult.result.completionTokens
           );
+
+          // Save autosave immediately after each parallel stage completes
+          const allCompletedStages = [
+            ...existingCompletedStages,
+            ...parallelCompletedStages,
+          ];
+          const allStageResults = [
+            ...existingStageResults,
+            ...parallelStageResults,
+          ];
+          const mergedResults = mergeBigAdventureResults(
+            ...allStageResults.filter((r) => r !== null)
+          );
+          const autosave: BigAdventureAutosave = {
+            id: options.sessionId,
+            timestamp: Date.now(),
+            config,
+            completedStages: allCompletedStages,
+            partialResults: mergedResults,
+            currentStage: stage,
+          };
+          saveAutosave(autosave);
+          callbacks.onAutosave(autosave);
 
           return stageResult;
         }

@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { StaticIcon } from "./StaticIcon";
 
-interface PopularAdventure {
+export interface PopularAdventure {
   id: string;
   title: string;
   shortDescription: string;
@@ -14,30 +13,18 @@ interface PopularAdventure {
   playCount: number;
 }
 
+interface PopularAdventuresProps {
+  adventures: PopularAdventure[];
+}
+
 /**
  * Client-side popular adventures carousel.
- * Fetches from cached API endpoint.
+ * Receives pre-fetched adventures from server component.
  */
-export default function PopularAdventures() {
+export default function PopularAdventures({
+  adventures,
+}: PopularAdventuresProps) {
   const router = useRouter();
-  const [adventures, setAdventures] = useState<PopularAdventure[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchPopular = async () => {
-      try {
-        const response = await fetch("/api/adventures/popular?limit=6");
-        if (!response.ok) throw new Error("Failed to fetch");
-        const { adventures } = await response.json();
-        setAdventures(adventures);
-      } catch (error) {
-        console.error("Error fetching popular adventures:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPopular();
-  }, []);
 
   return (
     <div className="mb-8">
@@ -55,23 +42,7 @@ export default function PopularAdventures() {
       </div>
 
       <div className="flex gap-3 pb-2 -mx-4 px-4 overflow-x-auto scrollbar-hide">
-        {loading ? (
-          // Skeleton with fixed dimensions to prevent CLS
-          Array(6)
-            .fill(0)
-            .map((_, i) => (
-              <div
-                key={i}
-                className="shrink-0 w-64 h-[196px] bg-blue-950/50 rounded-xl border border-blue-800/30 overflow-hidden animate-pulse"
-              >
-                <div className="h-32 bg-blue-900/50" />
-                <div className="p-3 space-y-2">
-                  <div className="h-4 bg-blue-900/50 rounded w-3/4" />
-                  <div className="h-3 bg-blue-900/50 rounded w-full" />
-                </div>
-              </div>
-            ))
-        ) : adventures.length === 0 ? (
+        {adventures.length === 0 ? (
           <div className="w-full text-center py-8 text-blue-200/40">
             No adventures yet. Be the first to create one!
           </div>

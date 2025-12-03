@@ -23,6 +23,12 @@ import QuickStartGenres from "./components/QuickStartGenres";
 import PopularAdventures from "./components/PopularAdventures";
 import InfoTabs from "./components/InfoTabs";
 
+// Server-side data fetching
+import { getPopularAdventures } from "./misc/getPopularAdventures";
+
+// Enable ISR with 5 minute revalidation for the entire page
+export const revalidate = 300;
+
 // Roadmap data - static, server-rendered
 const road_map = [
   {
@@ -104,7 +110,10 @@ const features = [
   { Icon: Zap, label: "Fast Generation" },
 ];
 
-export default function Home() {
+export default async function Home() {
+  // Server-side fetch popular adventures
+  const popularAdventures = await getPopularAdventures(6);
+
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
       <main className="max-w-6xl mx-auto px-4 py-6">
@@ -125,8 +134,8 @@ export default function Home() {
         {/* Quick Start Genres - Client component */}
         <QuickStartGenres />
 
-        {/* Featured Adventures - Client component with cached API */}
-        <PopularAdventures />
+        {/* Featured Adventures - Server-fetched, client-rendered */}
+        <PopularAdventures adventures={popularAdventures} />
 
         {/* How It Works - Static server-rendered */}
         <div className="mb-8">

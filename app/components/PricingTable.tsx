@@ -121,7 +121,9 @@ export default function PricingTable({
                     <span className="text-white/60 text-sm">/month</span>
                   )}
                 </div>
-                <p className="text-white/60 text-sm mt-1 min-h-10">{tier.description}</p>
+                <p className="text-white/60 text-sm mt-1 min-h-10">
+                  {tier.description}
+                </p>
               </div>
 
               {/* Content */}
