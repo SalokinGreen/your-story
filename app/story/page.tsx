@@ -3356,10 +3356,10 @@ function StoryPageContent() {
     }
 
     // Apply stacking advantage/disadvantage system.
-    // - PbtA: each net advantage adds +1 to modifier; each net disadvantage adds -1 (no extra rolls).
+    // - PbtA/Fate: each net advantage adds +1 to modifier; each net disadvantage adds -1 (no extra rolls).
     // - Other non-YZE/non-Explosive systems: roll extra sets equal to |netAdvantage| and pick best/worst.
     let pbtaPenalty = 0; // Negative for advantage (adds), positive for disadvantage (subtracts)
-    if (rpgSystem.id === "pbta") {
+    if (rpgSystem.id === "pbta" || rpgSystem.id === "fate") {
       const netAdvantage = advantageCount - disadvantageCount;
       if (netAdvantage !== 0) {
         // Convert net advantage into modifier shift.
@@ -3378,7 +3378,7 @@ function StoryPageContent() {
           }${Math.abs(netAdvantage)} modifier from ${sourcesList}`,
           isAdvantage ? "success" : "warning"
         );
-        logger.action("PbtA modifier shift from advantage/disadvantage", {
+        logger.action("PbtA/Fate modifier shift from advantage/disadvantage", {
           netAdvantage,
           pbtaPenalty,
           sources: sourcesList,
@@ -3852,7 +3852,7 @@ function StoryPageContent() {
               dice_roll,
               statValue,
               dc,
-              conditionPenaltyModifier + itemGradeBonus + abilityGradeBonus, // Apply condition penalty and grade bonuses (YZE uses dice pool reduction)
+              conditionPenaltyModifier - itemGradeBonus - abilityGradeBonus, // Apply condition penalty (positive) and grade bonuses (negative to add)
               lastRoll
             );
 
@@ -3895,10 +3895,12 @@ function StoryPageContent() {
               dice_roll,
               statValue,
               dc,
-              (rpgSystem.id === "pbta" ? pbtaPenalty : 0) +
-                conditionPenaltyModifier +
-                itemGradeBonus +
-                abilityGradeBonus // PbtA uses +/-1 per net advantage/disadv; add condition penalty and grade bonuses
+              (rpgSystem.id === "pbta" || rpgSystem.id === "fate"
+                ? pbtaPenalty
+                : 0) +
+                conditionPenaltyModifier -
+                itemGradeBonus -
+                abilityGradeBonus // Condition penalty is positive (subtracts), grade bonuses are negative (adds)
             );
 
             dc_passed = successResult.success;

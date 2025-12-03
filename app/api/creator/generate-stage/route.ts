@@ -31,6 +31,68 @@ const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // NovelAI API endpoint
+
+// Minimum content length required to attempt JSON wrap-up
+const MIN_CONTENT_FOR_WRAPUP = 500;
+
+/**
+ * Get minimal fallback JSON for a stage when content is too short to repair.
+ * Returns a valid JSON that will parse successfully but with empty/minimal data.
+ */
+function getMinimalFallbackJSON(stage: GenerationStage): string {
+  switch (stage) {
+    case "core":
+      return JSON.stringify({
+        title: "Untitled Adventure",
+        shortDescription: "An adventure awaits",
+        description: "Your adventure begins here.",
+        story_name: "Untitled Story",
+        premise: "A new journey begins.",
+        player_name: "Adventurer",
+        player_summary: "A brave soul seeking adventure.",
+        intro: "Your story is about to begin...",
+        author_notes: "",
+      });
+    case "mechanics":
+      return JSON.stringify({
+        stats: [],
+        resources: [],
+        abilities: [],
+        variables: [],
+      });
+    case "content-lore":
+      return JSON.stringify({
+        lore: [],
+      });
+    case "content-achievements":
+      return JSON.stringify({
+        achievements: [],
+        quests: [],
+        plot_beats: [],
+      });
+    case "content-items":
+      return JSON.stringify({
+        inventory: [],
+        relationships: [],
+      });
+    case "advanced-presets":
+      return JSON.stringify({
+        presets: [],
+      });
+    case "advanced-tables":
+      return JSON.stringify({
+        agmtState: null,
+        customTables: [],
+      });
+    case "advanced-other":
+      return JSON.stringify({
+        upgradeSettings: null,
+        startingChoices: [],
+      });
+    default:
+      return "{}";
+  }
+}
 const NOVELAI_API_URL = "https://text.novelai.net/oa/v1/completions";
 
 export const runtime = "nodejs";
@@ -510,52 +572,77 @@ export async function POST(req: NextRequest) {
         let totalCompletionTokens = 0;
         let continuationAttempts = 0;
 
-        // Handle "Finish Early" request - wrap up with minimal content
-        if (finishEarly && continueFrom && continueFrom.trim()) {
-          fullContent = continueFrom;
+        // Handle "Finish Early" request
+        if (finishEarly) {
+          const partialContent = continueFrom?.trim() || "";
 
-          // Build a "wrap up" prompt to close the JSON cleanly
-          const wrapUpPrompt = `IMPORTANT: The user has requested to finish this stage early. Please complete the JSON output NOW with minimal additional content. Close all open arrays and objects properly. Do NOT add more items - just close the structure cleanly. Output ONLY the remaining JSON to close the structure, nothing else.`;
+          // If content is too short, use minimal fallback JSON
+          if (partialContent.length < MIN_CONTENT_FOR_WRAPUP) {
+            logger.info(
+              `Stage ${stage} finishing early with insufficient content (${partialContent.length} chars), using minimal fallback`
+            );
 
-          const wrapUpMessages = [
-            ...messages.map((m) => ({ role: m.role, content: m.content })),
-            { role: "assistant", content: fullContent },
-            { role: "user", content: wrapUpPrompt },
-          ];
+            // Notify client we're using fallback
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "stage_continuation",
+                  stage,
+                  attempt: 1,
+                  maxAttempts: 1,
+                  message: "Content too short to repair, using minimal fallback...",
+                })}\n\n`
+              )
+            );
 
-          logger.info(
-            `Stage ${stage} finishing early from ${fullContent.length} chars`
-          );
+            fullContent = getMinimalFallbackJSON(stage);
+          } else {
+            // Enough content to attempt wrap-up
+            fullContent = partialContent;
 
-          // Notify client we're wrapping up
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "stage_continuation",
-                stage,
-                attempt: 1,
-                maxAttempts: 1,
-                message: "Finishing stage early, closing JSON...",
-              })}\n\n`
-            )
-          );
+            // Build a "wrap up" prompt to close the JSON cleanly
+            const wrapUpPrompt = `IMPORTANT: The user has requested to finish this stage early. Please complete the JSON output NOW with minimal additional content. Close all open arrays and objects properly. Do NOT add more items - just close the structure cleanly. Output ONLY the remaining JSON to close the structure, nothing else.`;
 
-          // Request wrap-up with low token count
-          const wrapUpResult = await streamAIResponse(
-            wrapUpMessages,
-            modelConfig,
-            apiKey,
-            500, // Just enough tokens to close the JSON
-            0.1, // Very low temperature for consistent closing
-            controller,
-            encoder,
-            stage,
-            heartbeatInterval
-          );
+            const wrapUpMessages = [
+              ...messages.map((m) => ({ role: m.role, content: m.content })),
+              { role: "assistant", content: fullContent },
+              { role: "user", content: wrapUpPrompt },
+            ];
 
-          fullContent += wrapUpResult.content;
-          totalPromptTokens += wrapUpResult.promptTokens;
-          totalCompletionTokens += wrapUpResult.completionTokens;
+            logger.info(
+              `Stage ${stage} finishing early from ${fullContent.length} chars`
+            );
+
+            // Notify client we're wrapping up
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "stage_continuation",
+                  stage,
+                  attempt: 1,
+                  maxAttempts: 1,
+                  message: "Finishing stage early, closing JSON...",
+                })}\n\n`
+              )
+            );
+
+            // Request wrap-up with low token count
+            const wrapUpResult = await streamAIResponse(
+              wrapUpMessages,
+              modelConfig,
+              apiKey,
+              500, // Just enough tokens to close the JSON
+              0.1, // Very low temperature for consistent closing
+              controller,
+              encoder,
+              stage,
+              heartbeatInterval
+            );
+
+            fullContent += wrapUpResult.content;
+            totalPromptTokens += wrapUpResult.promptTokens;
+            totalCompletionTokens += wrapUpResult.completionTokens;
+          }
         } else if (continueFrom && continueFrom.trim()) {
           fullContent = continueFrom;
 
