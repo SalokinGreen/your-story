@@ -411,109 +411,113 @@ async function generateStage(
   // Check if JSON is incomplete
   let incompleteCheck = detectIncompleteJSON(fullContent);
 
-  // Strategy: Try local repair first (free & instant), then AI continuation if needed
+  // Strategy: Try AI continuation first (generates more complete data), then local repair as fallback
   if (incompleteCheck.isIncomplete) {
-    logger.info(
-      `Stage ${stage} JSON incomplete, attempting local repair first`
-    );
-
-    // Try parsing with local repair (parseBigAdventureStageOutput handles repair internally)
-    const localRepairResult = parseBigAdventureStageOutput(fullContent, stage);
-
-    if (localRepairResult !== null) {
-      // Local repair succeeded! No need for AI continuation
-      logger.info(`Stage ${stage} local repair successful`);
-      controller.enqueue(
-        encoder.encode(
-          `data: ${JSON.stringify({
-            type: "stage_warning",
-            stage,
-            message: `Response was cut off. Local repair successful.`,
-          })}\n\n`
-        )
-      );
-
-      // Send stage complete event
-      controller.enqueue(
-        encoder.encode(
-          `data: ${JSON.stringify({
-            type: "stage_complete",
-            stage,
-            stageName: stageInfo.name,
-            success: true,
-            promptTokens: totalPromptTokens,
-            completionTokens: totalCompletionTokens,
-            iteration,
-            partialResult: localRepairResult,
-          })}\n\n`
-        )
-      );
-
-      return {
-        result: localRepairResult,
-        promptTokens: totalPromptTokens,
-        completionTokens: totalCompletionTokens,
-        rawContent: fullContent,
-      };
-    }
-
-    // Local repair failed - try AI prefill continuation
-    // All providers support prefill (trailing assistant message)
-    logger.info(`Stage ${stage} local repair failed, trying AI continuation`);
-
-    const MAX_CONTINUATIONS = 2;
-    let continuationAttempts = 0;
     // All providers support prefill continuation (OpenRouter, DeepInfra, DeepSeek, Mistral)
     // NovelAI uses completions API so it doesn't support chat-style prefill
     const supportsPrefill = modelConfig.provider !== "novelai";
-    while (
-      incompleteCheck.isIncomplete &&
-      supportsPrefill &&
-      continuationAttempts < MAX_CONTINUATIONS
-    ) {
-      continuationAttempts++;
+
+    if (supportsPrefill) {
       logger.info(
-        `Stage ${stage} using prefill continuation (attempt ${continuationAttempts})`
-      );
-      controller.enqueue(
-        encoder.encode(
-          `data: ${JSON.stringify({
-            type: "stage_warning",
-            stage,
-            message: `Local repair failed. Continuing generation... (${continuationAttempts}/${MAX_CONTINUATIONS})`,
-          })}\n\n`
-        )
+        `Stage ${stage} JSON incomplete, attempting AI continuation first`
       );
 
-      // Build continuation messages with truncated content as prefill
-      const continuationMessages = [
-        ...messages.map((m) => ({ role: m.role, content: m.content })),
-        { role: "assistant", content: fullContent },
-      ];
+      const MAX_CONTINUATIONS = 2;
+      let continuationAttempts = 0;
 
-      const continuationTokens = Math.min(2000, maxOutputTokens);
-
-      try {
-        const continuationResult = await streamAIResponse(
-          continuationMessages,
-          modelConfig,
-          apiKey,
-          continuationTokens,
-          temperature,
-          controller,
-          encoder,
-          stage,
-          true
+      while (
+        incompleteCheck.isIncomplete &&
+        continuationAttempts < MAX_CONTINUATIONS
+      ) {
+        continuationAttempts++;
+        logger.info(
+          `Stage ${stage} using prefill continuation (attempt ${continuationAttempts})`
+        );
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "stage_warning",
+              stage,
+              message: `Response was cut off. Continuing generation... (${continuationAttempts}/${MAX_CONTINUATIONS})`,
+            })}\n\n`
+          )
         );
 
-        fullContent += continuationResult.content;
-        totalPromptTokens += continuationResult.promptTokens;
-        totalCompletionTokens += continuationResult.completionTokens;
+        // Build continuation messages with truncated content as prefill
+        const continuationMessages = [
+          ...messages.map((m) => ({ role: m.role, content: m.content })),
+          { role: "assistant", content: fullContent },
+        ];
 
-        incompleteCheck = detectIncompleteJSON(fullContent);
-      } catch (error) {
-        logger.error(`Prefill continuation failed: ${error}`);
-        break;
+        const continuationTokens = Math.min(2000, maxOutputTokens);
+
+        try {
+          const continuationResult = await streamAIResponse(
+            continuationMessages,
+            modelConfig,
+            apiKey,
+            continuationTokens,
+            temperature,
+            controller,
+            encoder,
+            stage,
+            true
+          );
+
+          fullContent += continuationResult.content;
+          totalPromptTokens += continuationResult.promptTokens;
+          totalCompletionTokens += continuationResult.completionTokens;
+
+          incompleteCheck = detectIncompleteJSON(fullContent);
+        } catch (error) {
+          logger.error(`Prefill continuation failed: ${error}`);
+          break;
+        }
+      }
+    }
+
+    // If still incomplete after AI continuation (or no prefill support), try local repair
+    if (incompleteCheck.isIncomplete) {
+      logger.info(
+        `Stage ${stage} still incomplete after AI continuation, trying local repair`
+      );
+
+      const localRepairResult = parseBigAdventureStageOutput(fullContent, stage);
+
+      if (localRepairResult !== null) {
+        logger.info(`Stage ${stage} local repair successful`);
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "stage_warning",
+              stage,
+              message: `Response was cut off. Local repair successful.`,
+            })}\n\n`
+          )
+        );
+
+        // Send stage complete event
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "stage_complete",
+              stage,
+              stageName: stageInfo.name,
+              success: true,
+              promptTokens: totalPromptTokens,
+              completionTokens: totalCompletionTokens,
+              iteration,
+              partialResult: localRepairResult,
+            })}\n\n`
+          )
+        );
+
+        return {
+          result: localRepairResult,
+          promptTokens: totalPromptTokens,
+          completionTokens: totalCompletionTokens,
+          rawContent: fullContent,
+        };
       }
     }
   }
