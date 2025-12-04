@@ -76,9 +76,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
 
     // Check prefill setting (default: true)
     const prefillSetting =
-      typeof window !== "undefined"
-        ? localStorage.getItem("usePrefill")
-        : null;
+      typeof window !== "undefined" ? localStorage.getItem("usePrefill") : null;
     // If not set, default to true
     setPrefillEnabled(prefillSetting !== "false");
 
@@ -670,7 +668,8 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                       ))}
                     </ul>
                     <div className="text-amber-600 dark:text-amber-500 mt-1 italic">
-                      These appear as [GM State Update] assistant messages in story history.
+                      These appear as [GM State Update] assistant messages in
+                      story history.
                     </div>
                   </div>
                 );

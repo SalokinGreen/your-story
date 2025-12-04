@@ -70,7 +70,7 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
 
   // Also check for partial matches at the beginning (streaming might have slight variations)
   // Look for the marker that ends the affirmation
-  const storyMarker = "[Scene]:";
+  const storyMarker = "NO meta-text.";
   const toolsMarker = "Thinking Process:";
   const choicesMarker = "Generating choices:";
 
@@ -520,7 +520,7 @@ export async function generateStoryTurn(
     const usePrefill = options.usePrefill !== false;
     let prefillStripped = !usePrefill; // If prefill disabled, consider it already "stripped"
     let rawContent = ""; // Buffer for finding the marker
-    const STORY_MARKER = "[Scene]:";
+    const STORY_MARKER = "NO meta-text.";
 
     for await (const event of parseSSEStream(storyResponse)) {
       if (event.type === "error") {
@@ -539,9 +539,13 @@ export async function generateStoryTurn(
           const markerIndex = rawContent.indexOf(STORY_MARKER);
           if (markerIndex !== -1) {
             // Found it! Extract content after the marker
-            const contentAfterMarker = rawContent
+            let contentAfterMarker = rawContent
               .slice(markerIndex + STORY_MARKER.length)
               .trimStart();
+            // Strip leading dividers (---, ***, ___) 
+            while (/^[-*_]{3,}/.test(contentAfterMarker)) {
+              contentAfterMarker = contentAfterMarker.replace(/^[-*_]{3,}[\s\n]*/, "").trimStart();
+            }
             storyContent = contentAfterMarker;
             prefillStripped = true;
             if (contentAfterMarker) {
@@ -570,6 +574,13 @@ export async function generateStoryTurn(
 
     // Strip [STOP] marker if the model added it (from following affirmation too literally)
     storyContent = storyContent.replace(/\s*\[STOP\]\s*$/i, "").trimEnd();
+
+    // Strip leading dividers (---, ***, ___) that the model might add
+    // Loop to handle multiple dividers or whitespace-separated dividers
+    while (/^[\s\n]*([-*_]{3,})/.test(storyContent)) {
+      storyContent = storyContent.replace(/^[\s\n]*([-*_]{3,})[\s\n]*/, "");
+    }
+    storyContent = storyContent.trimStart();
 
     callbacks.onStoryComplete?.(
       storyContent,

@@ -29,7 +29,7 @@ export const STORY_AFFIRMATION = `Understood. I will write the narrative respons
 - **Agency:** I will respect the Action Result (Success/Failure) and the Active Challenge state.
 - **Format:** Pure prose only - NO echoing mechanics, NO titles/headers, NO meta-text.
 
-[Scene]:`;
+`;
 
 export const TOOLS_AFFIRMATION = `Understood. I will audit the narrative for game state changes:
 - **Accuracy:** I will use EXACT string matching for items, stats, and quest names.
@@ -578,7 +578,9 @@ ${
       // We use stateChanges (human-readable) rather than raw tool_calls to avoid confusing
       // the story AI with tool schemas it doesn't have access to
       if (part.stateChanges && part.stateChanges.length > 0) {
-        const gmNote = `[GM State Update]\n${part.stateChanges.map((s) => `• ${s}`).join("\n")}`;
+        const gmNote = `[GM State Update]\n${part.stateChanges
+          .map((s) => `• ${s}`)
+          .join("\n")}`;
         historyMessages.push({
           role: "assistant",
           content: cleanString(gmNote),

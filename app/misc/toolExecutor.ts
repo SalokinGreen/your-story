@@ -2013,7 +2013,7 @@ export function executeTools(
 
         const challenge = storyData.activeChallenge;
         const challengeName = challenge.name;
-        
+
         // Clear the challenge without setting a result
         challenge.active = false;
         challenge.resolvedAt = Date.now();
