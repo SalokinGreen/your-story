@@ -68,11 +68,14 @@ import {
 } from "@/app/misc/localAdventureManager";
 import {
   OPENROUTER_IMAGE_MODELS,
+  DEEPINFRA_IMAGE_MODELS,
   estimateImageCost,
+  calculateDeepInfraImageCost,
 } from "@/app/misc/ai_prices";
 import { getAuthToken } from "@/app/misc/getAuthToken";
 
 type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
+type DeepInfraImageModelKey = keyof typeof DEEPINFRA_IMAGE_MODELS;
 type CreatorStep =
   | "basic"
   | "preset"
@@ -687,7 +690,12 @@ function AdventureCreatorContent() {
   // AI Image Generation state
   const [generatingThumbnail, setGeneratingThumbnail] = useState(false);
   const [generatingBanner, setGeneratingBanner] = useState(false);
-  const [imageModel, setImageModel] = useState<ImageModelKey>("Nano Banana");
+  const [imageProvider, setImageProvider] = useState<
+    "deepinfra" | "openrouter"
+  >("deepinfra");
+  const [imageModel, setImageModel] = useState<
+    ImageModelKey | DeepInfraImageModelKey
+  >("Bria 3.2");
   const [thumbnailPrompt, setThumbnailPrompt] = useState("");
   const [bannerPrompt, setBannerPrompt] = useState("");
   const [showAIImageModal, setShowAIImageModal] = useState<
@@ -2143,7 +2151,8 @@ ${description || ""}`;
       return;
     }
 
-    if (!apiKeys.openRouterKey) {
+    // Validate API key for OpenRouter provider
+    if (imageProvider === "openrouter" && !apiKeys.openRouterKey) {
       addNotification(
         "OpenRouter API key required. Please add your API key in Settings.",
         "warning"
@@ -2176,7 +2185,10 @@ ${description || ""}`;
           prompt,
           model: imageModel,
           imageType: type,
-          openRouterKey: apiKeys.openRouterKey,
+          provider: imageProvider,
+          openRouterKey:
+            imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
+          // DeepInfra uses server-side key (Coins mode)
         }),
       });
 
@@ -2210,8 +2222,17 @@ ${description || ""}`;
         .getPublicUrl(filePath);
 
       setUrl(data.publicUrl);
+
+      // Show appropriate success message
+      const costMessage = meta.isByok
+        ? "(BYOK - no coins)"
+        : meta.cost > 0
+        ? `Cost: ${meta.cost} coins`
+        : "(FREE)";
       addNotification(
-        `${type === "thumbnail" ? "Thumbnail" : "Banner"} generated!`,
+        `${
+          type === "thumbnail" ? "Thumbnail" : "Banner"
+        } generated! ${costMessage}`,
         "success"
       );
     } catch (error: any) {
@@ -11756,6 +11777,46 @@ ${description || ""}`;
               </button>
             </div>
 
+            {/* Provider Toggle */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-blue-300/80 mb-2">
+                Image Provider
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setImageProvider("deepinfra");
+                    setImageModel("Bria 3.2");
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    imageProvider === "deepinfra"
+                      ? "bg-purple-600 text-white"
+                      : "bg-blue-900/50 text-blue-300 hover:bg-blue-800/50"
+                  }`}
+                >
+                  🪙 DeepInfra (Coins)
+                </button>
+                <button
+                  onClick={() => {
+                    setImageProvider("openrouter");
+                    setImageModel("Nano Banana");
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    imageProvider === "openrouter"
+                      ? "bg-purple-600 text-white"
+                      : "bg-blue-900/50 text-blue-300 hover:bg-blue-800/50"
+                  }`}
+                >
+                  🔑 OpenRouter (BYOK)
+                </button>
+              </div>
+              <p className="text-xs text-blue-400/60 mt-1">
+                {imageProvider === "deepinfra"
+                  ? "Uses coins. Bria 3.2 is FREE!"
+                  : "Requires OpenRouter API key"}
+              </p>
+            </div>
+
             {/* Model Selection */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-blue-300/80 mb-2">
@@ -11763,15 +11824,34 @@ ${description || ""}`;
               </label>
               <select
                 value={imageModel}
-                onChange={(e) => setImageModel(e.target.value as ImageModelKey)}
+                onChange={(e) =>
+                  setImageModel(
+                    e.target.value as ImageModelKey | DeepInfraImageModelKey
+                  )
+                }
                 className="w-full px-4 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
               >
-                {Object.entries(OPENROUTER_IMAGE_MODELS).map(([key]) => (
-                  <option key={key} value={key}>
-                    {key} (~{estimateImageCost(key)} coins)
-                  </option>
-                ))}
+                {imageProvider === "deepinfra"
+                  ? Object.entries(DEEPINFRA_IMAGE_MODELS).map(
+                      ([key, model]) => (
+                        <option key={key} value={key}>
+                          {key}{" "}
+                          {model.cost > 0 ? `(~${model.cost} coins)` : "(FREE)"}
+                        </option>
+                      )
+                    )
+                  : Object.entries(OPENROUTER_IMAGE_MODELS).map(([key]) => (
+                      <option key={key} value={key}>
+                        {key} (~{estimateImageCost(key)} coins)
+                      </option>
+                    ))}
               </select>
+              {imageProvider === "deepinfra" && (
+                <p className="text-xs text-blue-400/60 mt-1">
+                  {DEEPINFRA_IMAGE_MODELS[imageModel as DeepInfraImageModelKey]
+                    ?.description || ""}
+                </p>
+              )}
             </div>
 
             {/* Prompt */}
@@ -11814,7 +11894,19 @@ ${description || ""}`;
               <div className="flex items-center justify-between text-sm">
                 <span className="text-blue-300/80">Estimated Cost:</span>
                 <span className="font-medium text-purple-300">
-                  ~{estimateImageCost(imageModel)} coins
+                  {imageProvider === "deepinfra"
+                    ? DEEPINFRA_IMAGE_MODELS[
+                        imageModel as DeepInfraImageModelKey
+                      ]?.cost > 0
+                      ? `~${
+                          DEEPINFRA_IMAGE_MODELS[
+                            imageModel as DeepInfraImageModelKey
+                          ]?.cost
+                        } coins`
+                      : "FREE"
+                    : imageProvider === "openrouter"
+                    ? "BYOK (no coins)"
+                    : `~${estimateImageCost(imageModel)} coins`}
                 </span>
               </div>
             </div>
@@ -11834,7 +11926,8 @@ ${description || ""}`;
                     ? !thumbnailPrompt.trim()
                     : !bannerPrompt.trim()) ||
                   generatingThumbnail ||
-                  generatingBanner
+                  generatingBanner ||
+                  (imageProvider === "openrouter" && !apiKeys.openRouterKey)
                 }
                 className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-blue-900/40 disabled:text-blue-300/50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
               >

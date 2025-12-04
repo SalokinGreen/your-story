@@ -66,7 +66,7 @@ export default function CustomVoiceManager({
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder="Enter Speechify voice ID"
+            placeholder="Enter voice ID (e.g. af_nova)"
             value={newVoiceInput}
             onChange={(e) => setNewVoiceInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addCustomVoice()}
@@ -100,9 +100,8 @@ export default function CustomVoiceManager({
           </div>
         )}
         <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 flex items-center gap-1">
-          <DynamicIcon name="Lightbulb" className="w-3 h-3" /> Add custom
-          Speechify voice IDs. Built-in voices: henry, snoop, gwyneth, cliff,
-          george
+          <DynamicIcon name="Lightbulb" className="w-3 h-3" /> Add custom voice
+          IDs. Kokoro voices follow pattern: af_name, am_name, bf_name, bm_name
         </p>
       </div>
     </div>

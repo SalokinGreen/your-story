@@ -831,11 +831,55 @@ export const OPENROUTER_IMAGE_MODELS = {
 // Helper type for image models
 export type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
 
+// DeepInfra Image Models (server-side key - users pay with coins, or BYOK)
+export const DEEPINFRA_IMAGE_MODELS = {
+  "Bria 3.2": {
+    name: "Bria 3.2",
+    model: "Bria/Bria-3.2",
+    description: "Fast, commercial-ready with great text rendering. FREE!",
+    provider: "deepinfra",
+    pricePerImage: 0.0, // FREE
+    cost: 0, // No coins needed
+  },
+  "P-Image": {
+    name: "P-Image",
+    model: "PrunaAI/p-image",
+    description: "State-of-the-art, <1 second, exceptional text rendering.",
+    provider: "deepinfra",
+    pricePerImage: 0.005,
+    cost: 13, // $0.005 × 2.5 markup × 1000 coins/$
+  },
+  "FLUX 2 Pro": {
+    name: "FLUX 2 Pro",
+    model: "black-forest-labs/FLUX-2-pro",
+    description: "Premium photorealistic with precise control.",
+    provider: "deepinfra",
+    pricePerImage: 0.015,
+    cost: 38, // $0.015 × 2.5 markup × 1000 coins/$
+  },
+} as const;
+
+// Helper type for DeepInfra image models
+export type DeepInfraImageModelKey = keyof typeof DEEPINFRA_IMAGE_MODELS;
+
 /**
  * Check if an image model is a pure image generation model (Flux) vs chat-based (Gemini/GPT)
  */
 export function isPureImageModel(modelId: string): boolean {
   return modelId.includes("flux") || modelId.includes("black-forest-labs");
+}
+
+/**
+ * Calculate the cost in coins for DeepInfra image generation
+ * @param modelKey - Key from DEEPINFRA_IMAGE_MODELS
+ * @returns Cost in coins (can be 0 for free models like Bria)
+ */
+export function calculateDeepInfraImageCost(modelKey: string): number {
+  const model = DEEPINFRA_IMAGE_MODELS[modelKey as DeepInfraImageModelKey];
+  if (!model) {
+    return MINIMUM_COST;
+  }
+  return model.cost;
 }
 
 /**
@@ -1160,17 +1204,38 @@ export const MARKUP_MULTIPLIER = 2.5; // 150% markup for service
 export const COINS_PER_DOLLAR = 1000; // 1 coin = $0.001
 export const MINIMUM_COST = 1; // Minimum 1 coin per API call
 
-// TTS pricing (Speechify)
-export const TTS_PRICE_PER_MILLION_CHARS = 10; // $10 per 1M characters
+// TTS pricing (DeepInfra)
+export const TTS_MODELS = {
+  kokoro: {
+    name: "Kokoro-82M",
+    provider: "DeepInfra",
+    pricePerMillionChars: 0.62, // $0.62 per 1M characters
+    description: "Fast, cost-effective TTS with natural voices",
+  },
+  orpheus: {
+    name: "Orpheus 3B",
+    provider: "DeepInfra",
+    pricePerMillionChars: 7.0, // $7.00 per 1M characters
+    description: "Premium expressive TTS with emotional range",
+  },
+} as const;
+
+export type TTSModelKey = keyof typeof TTS_MODELS;
 
 /**
  * Calculate the cost in coins for TTS generation
  * @param characterCount - Number of characters to convert to speech
+ * @param model - TTS model to use (kokoro or orpheus)
  * @returns Cost in coins (minimum 1)
  */
-export function calculateTTSCost(characterCount: number): number {
-  // Calculate raw cost in dollars ($10 per 1M characters)
-  const rawCost = (characterCount / 1_000_000) * TTS_PRICE_PER_MILLION_CHARS;
+export function calculateTTSCost(
+  characterCount: number,
+  model: TTSModelKey = "kokoro"
+): number {
+  const ttsModel = TTS_MODELS[model] || TTS_MODELS.kokoro;
+
+  // Calculate raw cost in dollars
+  const rawCost = (characterCount / 1_000_000) * ttsModel.pricePerMillionChars;
 
   // Apply markup and convert to coins
   const costWithMarkup = rawCost * MARKUP_MULTIPLIER;

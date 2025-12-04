@@ -37,7 +37,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
   // TTS Settings state (read from localStorage)
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [ttsAutoGenerate, setTtsAutoGenerate] = useState(false);
-  const [ttsVoice, setTtsVoice] = useState("henry");
+  const [ttsVoice, setTtsVoice] = useState("af_heart");
+  const [ttsModel, setTtsModel] = useState<"kokoro" | "orpheus">("kokoro");
   const [ttsVolume, setTtsVolume] = useState(1.0);
   const [sttEnabled, setSttEnabled] = useState(true);
   const [showHiddenMessages, setShowHiddenMessages] = useState(false);
@@ -48,7 +49,10 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
     if (typeof window !== "undefined") {
       setTtsEnabled(localStorage.getItem("ttsEnabled") !== "false");
       setTtsAutoGenerate(localStorage.getItem("ttsAutoGenerate") === "true");
-      setTtsVoice(localStorage.getItem("ttsLastVoice") || "henry");
+      setTtsVoice(localStorage.getItem("ttsLastVoice") || "af_heart");
+      setTtsModel(
+        (localStorage.getItem("ttsModel") as "kokoro" | "orpheus") || "kokoro"
+      );
       setTtsVolume(parseFloat(localStorage.getItem("ttsVolume") || "1.0"));
       setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
       setShowHiddenMessages(
@@ -376,53 +380,23 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             </>
           ) : activeTab === "services" ? (
             <>
-              {/* Speechify API Key Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-linear-to-br from-green-500 to-emerald-600 flex items-center justify-center">
-                      <DynamicIcon
-                        name="Volume2"
-                        className="w-4 h-4 text-white"
-                      />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                        Speechify API Key
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Text-to-Speech provider
-                      </p>
-                    </div>
+              {/* TTS Provider Info */}
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700/50 -mt-2 mb-4">
+                <div className="flex items-center gap-2">
+                  <DynamicIcon
+                    name="Volume2"
+                    className="w-4 h-4 text-blue-600 dark:text-blue-400"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      Powered by DeepInfra
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Choose between fast Kokoro or premium Orpheus voices
+                    </p>
                   </div>
-                  {hasKey("speechifyKey") && (
-                    <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                      <DynamicIcon name="CheckCircle" className="w-3.5 h-3.5" />
-                      Configured
-                    </span>
-                  )}
                 </div>
-                <input
-                  type={showKeys ? "text" : "password"}
-                  value={keys.speechifyKey}
-                  onChange={(e) => setKey("speechifyKey", e.target.value)}
-                  placeholder="speechify-..."
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-mono"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  <a
-                    href="https://speechify.com/api/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-500 hover:underline"
-                  >
-                    Get an API key →
-                  </a>
-                </p>
               </div>
-
-              {/* Divider */}
-              <hr className="border-gray-200 dark:border-gray-700" />
 
               {/* TTS Settings Section */}
               <div className="space-y-4">
@@ -495,7 +469,43 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </label>
                 </div>
 
-                {/* Voice Selector */}
+                {/* TTS Model Selector */}
+                <div>
+                  <label className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
+                    TTS Model
+                  </label>
+                  <select
+                    value={ttsModel}
+                    onChange={(e) => {
+                      const newModel = e.target.value as "kokoro" | "orpheus";
+                      setTtsModel(newModel);
+                      localStorage.setItem("ttsModel", newModel);
+                      // Reset voice to default for new model
+                      const defaultVoice =
+                        newModel === "orpheus" ? "tara" : "af_heart";
+                      setTtsVoice(defaultVoice);
+                      localStorage.setItem("ttsLastVoice", defaultVoice);
+                      addNotification(
+                        `Switched to ${
+                          newModel === "orpheus"
+                            ? "Orpheus (Premium)"
+                            : "Kokoro (Fast)"
+                        }`,
+                        "success"
+                      );
+                    }}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="kokoro">
+                      Kokoro - Fast & Affordable ($0.62/1M chars)
+                    </option>
+                    <option value="orpheus">
+                      Orpheus - Premium Expressive ($7/1M chars)
+                    </option>
+                  </select>
+                </div>
+
+                {/* Voice Selector - Dynamic based on model */}
                 <div>
                   <label className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
                     Voice
@@ -514,14 +524,46 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                     }}
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="henry">Henry (British)</option>
-                    <option value="snoop">Snoop</option>
-                    <option value="gwyneth">Gwyneth</option>
-                    <option value="cliff">Cliff (Deep)</option>
-                    <option value="george">George (US)</option>
+                    {ttsModel === "kokoro" ? (
+                      <>
+                        <optgroup label="American English - Female">
+                          <option value="af_heart">Heart ❤️</option>
+                          <option value="af_bella">Bella 🔥</option>
+                          <option value="af_nicole">Nicole 🎧</option>
+                          <option value="af_sarah">Sarah</option>
+                          <option value="af_sky">Sky</option>
+                        </optgroup>
+                        <optgroup label="American English - Male">
+                          <option value="am_adam">Adam</option>
+                          <option value="am_michael">Michael</option>
+                          <option value="am_fenrir">Fenrir</option>
+                        </optgroup>
+                        <optgroup label="British English">
+                          <option value="bf_emma">Emma (Female)</option>
+                          <option value="bf_isabella">Isabella (Female)</option>
+                          <option value="bm_george">George (Male)</option>
+                          <option value="bm_daniel">Daniel (Male)</option>
+                        </optgroup>
+                      </>
+                    ) : (
+                      <>
+                        <optgroup label="Female Voices">
+                          <option value="tara">Tara</option>
+                          <option value="leah">Leah</option>
+                          <option value="jess">Jess</option>
+                          <option value="mia">Mia</option>
+                          <option value="zoe">Zoe</option>
+                        </optgroup>
+                        <optgroup label="Male Voices">
+                          <option value="leo">Leo</option>
+                          <option value="dan">Dan</option>
+                          <option value="zac">Zac</option>
+                        </optgroup>
+                      </>
+                    )}
                     {customVoices.map((id) => (
                       <option key={id} value={id}>
-                        {id}
+                        {id} (Custom)
                       </option>
                     ))}
                   </select>

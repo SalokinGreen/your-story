@@ -944,6 +944,10 @@ async function runSingleStageWithRetry(
       }
       // If wrap-up failed, continue to error handling below
       partialContent = wrapUpResult.rawContent || partialContent;
+    } else if (!result.success) {
+      // Failed without timeout/error flags - treat as fatal error on first attempt
+      // This prevents infinite loops when the stage just returns success=false
+      retryCount = MAX_RETRY_ATTEMPTS; // Force exit on next check
     }
 
     // Fatal error - no more retries or insufficient content

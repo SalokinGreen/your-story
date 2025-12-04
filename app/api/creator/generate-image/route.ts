@@ -1,45 +1,68 @@
 /**
  * AI Image Generation API
  *
- * Generates adventure cover images (thumbnails/banners) using OpenRouter image models.
- * Returns the generated image URL.
+ * Generates adventure cover images (thumbnails/banners) using:
+ * 1. OpenRouter image models (BYOK only)
+ * 2. DeepInfra image models (Coins or BYOK)
  *
- * Supports two types of models:
- * 1. Chat-based image models (Gemini, GPT-5 Image) - use chat completions API
- * 2. Pure image models (Flux) - use flat per-image pricing
+ * Returns the generated image URL (base64 data URL or hosted URL).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import {
   OPENROUTER_IMAGE_MODELS,
+  DEEPINFRA_IMAGE_MODELS,
+  calculateDeepInfraImageCost,
   type ImageModelKey,
+  type DeepInfraImageModelKey,
 } from "@/app/misc/ai_prices";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // Allow up to 2 minutes for image generation
 
-// Image model config type
-type ImageModelConfig = (typeof OPENROUTER_IMAGE_MODELS)[ImageModelKey];
+const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL!;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+// Image model config types
+type OpenRouterImageModelConfig =
+  (typeof OPENROUTER_IMAGE_MODELS)[ImageModelKey];
+type DeepInfraImageModelConfig =
+  (typeof DEEPINFRA_IMAGE_MODELS)[DeepInfraImageModelKey];
 
 interface RequestBody {
   prompt: string;
   model?: string;
   imageType: "thumbnail" | "banner";
+  provider?: "openrouter" | "deepinfra";
   openRouterKey?: string;
+  deepInfraKey?: string; // For BYOK mode
 }
 
-// Get model config
-function getImageModelConfig(modelKey: string): ImageModelConfig {
+// Get OpenRouter model config
+function getOpenRouterModelConfig(
+  modelKey: string
+): OpenRouterImageModelConfig {
   if (modelKey in OPENROUTER_IMAGE_MODELS) {
     return OPENROUTER_IMAGE_MODELS[modelKey as ImageModelKey];
   }
-  // Default to Nano Banana
   return OPENROUTER_IMAGE_MODELS["Nano Banana"];
 }
 
+// Get DeepInfra model config
+function getDeepInfraModelConfig(
+  modelKey: string
+): DeepInfraImageModelConfig | null {
+  if (modelKey in DEEPINFRA_IMAGE_MODELS) {
+    return DEEPINFRA_IMAGE_MODELS[modelKey as DeepInfraImageModelKey];
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
-  const supabaseUrl = process.env.SUPABASE_URL!;
+  const supabaseUrl = SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_KEY!;
 
   if (!supabaseUrl || !supabaseKey) {
@@ -76,7 +99,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { prompt, model: requestedModel, imageType, openRouterKey } = body;
+  const {
+    prompt,
+    model: requestedModel,
+    imageType,
+    provider = "deepinfra",
+    openRouterKey,
+    deepInfraKey,
+  } = body;
 
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
@@ -89,7 +119,34 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Validate OpenRouter key (BYOK required)
+  // Route to appropriate provider
+  if (provider === "openrouter") {
+    return handleOpenRouter(
+      prompt,
+      requestedModel,
+      imageType,
+      openRouterKey,
+      user.id
+    );
+  } else {
+    return handleDeepInfra(
+      prompt,
+      requestedModel,
+      imageType,
+      deepInfraKey,
+      user.id
+    );
+  }
+}
+
+// Handle OpenRouter image generation (BYOK only)
+async function handleOpenRouter(
+  prompt: string,
+  requestedModel: string | undefined,
+  imageType: "thumbnail" | "banner",
+  openRouterKey: string | undefined,
+  userId: string
+) {
   if (!openRouterKey) {
     return NextResponse.json(
       {
@@ -100,12 +157,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Get model config
   const modelKey = requestedModel || "Nano Banana";
-  const modelConfig = getImageModelConfig(modelKey);
+  const modelConfig = getOpenRouterModelConfig(modelKey);
 
   console.log(
-    "[Image Gen] Model:",
+    "[Image Gen] OpenRouter Model:",
     modelKey,
     "(",
     modelConfig.model,
@@ -115,21 +171,12 @@ export async function POST(req: NextRequest) {
   );
 
   try {
-    // Build the image generation prompt with size hints based on type
     const sizeDescription =
       imageType === "thumbnail"
         ? "square or 4:3 aspect ratio cover image suitable for a thumbnail"
         : "wide landscape banner image with approximately 3:1 aspect ratio";
 
-    let imageUrl: string | null = null;
-
-    // All OpenRouter models use chat/completions endpoint
     const fullPrompt = `Please create a ${sizeDescription} for my text adventure:\n\n${prompt}\n\nStyle: Digital art, game cover style, vibrant colors, professional quality.`;
-
-    console.log(
-      "[Image Gen] Using chat completions API for",
-      modelConfig.model
-    );
 
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
@@ -144,121 +191,198 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           model: modelConfig.model,
-          messages: [
-            {
-              role: "user",
-              content: fullPrompt,
-            },
-          ],
+          messages: [{ role: "user", content: fullPrompt }],
         }),
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[Image Gen] API Error:", response.status, errorText);
+      console.error(
+        "[Image Gen] OpenRouter Error:",
+        response.status,
+        errorText
+      );
       throw new Error(
         `Image generation failed: ${response.status} - ${errorText}`
       );
     }
 
     const data = await response.json();
-    console.log("[Image Gen] Response structure:", Object.keys(data));
-
-    // Extract image from response - different models return images differently
-    const message = data.choices?.[0]?.message;
-    const content = message?.content;
-
-    // Log response for debugging
-    console.log(
-      "[Image Gen] Message keys:",
-      message ? Object.keys(message) : "no message"
-    );
-
-    // Check for images array on message (Gemini format)
-    // Format: message.images = [{ type: "image_url", image_url: { url: "data:image/png;base64,..." } }]
-    if (!imageUrl && Array.isArray(message?.images)) {
-      for (const img of message.images) {
-        if (img.type === "image_url" && img.image_url?.url) {
-          imageUrl = img.image_url.url;
-          break;
-        }
-        if (img.url) {
-          imageUrl = img.url;
-          break;
-        }
-      }
-    }
-
-    // Check for image in multimodal content array format
-    if (!imageUrl && Array.isArray(content)) {
-      // Multimodal response: [{ type: "image_url", image_url: { url: "..." } }, ...]
-      for (const part of content) {
-        if (part.type === "image_url" && part.image_url?.url) {
-          imageUrl = part.image_url.url;
-          break;
-        }
-        if (part.type === "image" && part.url) {
-          imageUrl = part.url;
-          break;
-        }
-      }
-    }
-
-    // Check for URL in text content
-    if (!imageUrl && typeof content === "string" && content.trim()) {
-      console.log("[Image Gen] Content preview:", content.substring(0, 300));
-
-      // Check for markdown image: ![alt](url)
-      const markdownMatch = content.match(/!\[.*?\]\((.*?)\)/);
-      if (markdownMatch) {
-        imageUrl = markdownMatch[1];
-      }
-
-      // Check for direct URL at start
-      if (!imageUrl && content.trim().startsWith("http")) {
-        imageUrl = content.trim().split(/\s/)[0];
-      }
-
-      // Check for base64 data URL
-      if (!imageUrl && content.includes("data:image")) {
-        const base64Match = content.match(
-          /(data:image\/[^;]+;base64,[A-Za-z0-9+/=]+)/
-        );
-        if (base64Match) {
-          imageUrl = base64Match[1];
-        }
-      }
-
-      // Check for any URL (image models often return just a URL)
-      if (!imageUrl) {
-        const urlMatch = content.match(/(https?:\/\/[^\s"'<>\]]+)/i);
-        if (urlMatch) {
-          imageUrl = urlMatch[1];
-        }
-      }
-    }
-
-    // Some image models return the image directly without content field
-    if (!imageUrl && message?.image_url) {
-      imageUrl = message.image_url;
-    }
-
-    // All providers use BYOK - no cost calculation or token billing
+    const imageUrl = extractImageFromOpenRouterResponse(data);
 
     if (!imageUrl) {
       console.error(
-        "[Image Gen] Could not extract image URL from response. Full response:",
+        "[Image Gen] Could not extract image URL from OpenRouter response:",
         JSON.stringify(data).substring(0, 1000)
       );
       throw new Error(
-        "Could not extract image from AI response. The model may not support image generation or the response format is unexpected."
+        "Could not extract image from AI response. The model may not support image generation."
       );
     }
 
+    return NextResponse.json({
+      imageUrl,
+      meta: {
+        model: modelKey,
+        imageType,
+        provider: "openrouter",
+        isByok: true,
+        cost: 0,
+      },
+    });
+  } catch (error) {
+    console.error("[Image Gen] OpenRouter Error:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Image generation failed";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+}
+
+// Handle DeepInfra image generation (Coins or BYOK)
+async function handleDeepInfra(
+  prompt: string,
+  requestedModel: string | undefined,
+  imageType: "thumbnail" | "banner",
+  deepInfraKey: string | undefined,
+  userId: string
+) {
+  const modelKey = requestedModel || "Bria 3.2";
+  const modelConfig = getDeepInfraModelConfig(modelKey);
+
+  if (!modelConfig) {
+    return NextResponse.json(
+      { error: `Invalid DeepInfra model: ${modelKey}` },
+      { status: 400 }
+    );
+  }
+
+  // Determine if using BYOK or Coins
+  const isByok = !!deepInfraKey;
+  const apiKey = deepInfraKey || DEEPINFRA_API_KEY;
+
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        error:
+          "DeepInfra API key not configured. Please add your API key or contact support.",
+      },
+      { status: 500 }
+    );
+  }
+
+  console.log(
+    "[Image Gen] DeepInfra Model:",
+    modelKey,
+    "(",
+    modelConfig.model,
+    ")",
+    "Type:",
+    imageType,
+    "BYOK:",
+    isByok
+  );
+
+  // Calculate cost and check balance (only for Coins mode)
+  let cost = 0;
+  if (!isByok) {
+    cost = calculateDeepInfraImageCost(modelKey);
+
+    // Check balance (only if cost > 0)
+    if (cost > 0) {
+      const serviceSupabase = createClient(
+        SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY
+      );
+      const balance = await getUserTokenBalance(userId, serviceSupabase);
+
+      if (!balance || balance.total < cost) {
+        return NextResponse.json(
+          {
+            error: `Insufficient coins. Required: ${cost}, Available: ${
+              balance?.total ?? 0
+            }`,
+          },
+          { status: 402 }
+        );
+      }
+    }
+  }
+
+  try {
+    // DeepInfra uses OpenAI-compatible API for image generation
+    // Note: FLUX 2 Pro has a max width of 1440px
+    const sizeDescription =
+      imageType === "thumbnail" ? "1024x1024" : "1440x1024";
+
+    const response = await fetch(
+      "https://api.deepinfra.com/v1/openai/images/generations",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: `${prompt}\n\nStyle: Digital art, game cover style, vibrant colors, professional quality.`,
+          model: modelConfig.model,
+          size: sizeDescription,
+          n: 1,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Image Gen] DeepInfra Error:", response.status, errorText);
+      throw new Error(
+        `Image generation failed: ${response.status} - ${errorText}`
+      );
+    }
+
+    const data = await response.json();
+    console.log("[Image Gen] DeepInfra response keys:", Object.keys(data));
+
+    // Extract image from DeepInfra response
+    // Format: { created: number, data: [{ b64_json?: string, url?: string, revised_prompt?: string }] }
+    let imageUrl: string | null = null;
+
+    if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+      const imageData = data.data[0];
+
+      if (imageData.b64_json) {
+        // Convert base64 to data URL
+        imageUrl = `data:image/webp;base64,${imageData.b64_json}`;
+      } else if (imageData.url) {
+        imageUrl = imageData.url;
+      }
+    }
+
+    if (!imageUrl) {
+      console.error(
+        "[Image Gen] Could not extract image from DeepInfra response:",
+        JSON.stringify(data).substring(0, 1000)
+      );
+      throw new Error("Could not extract image from DeepInfra response.");
+    }
+
+    // Deduct coins after successful generation (only for Coins mode with cost > 0)
+    let newBalance: number | null = null;
+    if (!isByok && cost > 0) {
+      const serviceSupabase = createClient(
+        SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY
+      );
+      await deductTokens(userId, cost, serviceSupabase);
+      const updatedBalance = await getUserTokenBalance(userId, serviceSupabase);
+      newBalance = updatedBalance?.total ?? null;
+    }
+
     console.log(
-      "[Image Gen] Successfully extracted image URL, length:",
-      imageUrl.length
+      "[Image Gen] DeepInfra success, URL length:",
+      imageUrl.length,
+      "Cost:",
+      cost
     );
 
     return NextResponse.json({
@@ -266,13 +390,67 @@ export async function POST(req: NextRequest) {
       meta: {
         model: modelKey,
         imageType,
-        isByok: true,
+        provider: "deepinfra",
+        isByok,
+        cost,
+        newBalance,
       },
     });
   } catch (error) {
-    console.error("[Image Gen] Error:", error);
+    console.error("[Image Gen] DeepInfra Error:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Image generation failed";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
+}
+
+// Extract image URL from OpenRouter response (various formats)
+function extractImageFromOpenRouterResponse(data: any): string | null {
+  const message = data.choices?.[0]?.message;
+  const content = message?.content;
+
+  // Check for images array (Gemini format)
+  if (Array.isArray(message?.images)) {
+    for (const img of message.images) {
+      if (img.type === "image_url" && img.image_url?.url)
+        return img.image_url.url;
+      if (img.url) return img.url;
+    }
+  }
+
+  // Check for multimodal content array
+  if (Array.isArray(content)) {
+    for (const part of content) {
+      if (part.type === "image_url" && part.image_url?.url)
+        return part.image_url.url;
+      if (part.type === "image" && part.url) return part.url;
+    }
+  }
+
+  // Check for URL in text content
+  if (typeof content === "string" && content.trim()) {
+    // Markdown image
+    const markdownMatch = content.match(/!\[.*?\]\((.*?)\)/);
+    if (markdownMatch) return markdownMatch[1];
+
+    // Direct URL at start
+    if (content.trim().startsWith("http")) return content.trim().split(/\s/)[0];
+
+    // Base64 data URL
+    if (content.includes("data:image")) {
+      const base64Match = content.match(
+        /(data:image\/[^;]+;base64,[A-Za-z0-9+/=]+)/
+      );
+      if (base64Match) return base64Match[1];
+    }
+
+    // Any URL
+    const urlMatch = content.match(/(https?:\/\/[^\s"'<>\]]+)/i);
+    if (urlMatch) return urlMatch[1];
+  }
+
+  // image_url field directly on message
+  if (message?.image_url) return message.image_url;
+
+  return null;
 }

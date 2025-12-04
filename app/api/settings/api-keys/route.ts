@@ -73,7 +73,6 @@ interface APIKeys {
   openRouterKey?: string;
   deepseekKey?: string;
   novelaiKey?: string;
-  speechifyKey?: string;
 }
 
 async function getUser(req: NextRequest) {

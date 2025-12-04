@@ -15,7 +15,6 @@ export interface APIKeys {
   openRouterKey: string;
   deepseekKey: string;
   novelaiKey: string;
-  speechifyKey: string;
 }
 
 export interface APIKeysContextType {
@@ -45,7 +44,6 @@ const defaultKeys: APIKeys = {
   openRouterKey: "",
   deepseekKey: "",
   novelaiKey: "",
-  speechifyKey: "",
 };
 
 const APIKeysContext = createContext<APIKeysContextType | undefined>(undefined);
@@ -55,7 +53,6 @@ const LOCAL_KEYS = {
   openRouterKey: "openRouterKey",
   deepseekKey: "deepseekKey",
   novelaiKey: "novelaiKey",
-  speechifyKey: "speechifyKey",
   useGlobalKeys: "useGlobalKeys",
   oauthCodeVerifier: "openrouter_code_verifier",
 };
@@ -75,7 +72,6 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
       openRouterKey: localStorage.getItem(LOCAL_KEYS.openRouterKey) || "",
       deepseekKey: localStorage.getItem(LOCAL_KEYS.deepseekKey) || "",
       novelaiKey: localStorage.getItem(LOCAL_KEYS.novelaiKey) || "",
-      speechifyKey: localStorage.getItem(LOCAL_KEYS.speechifyKey) || "",
     };
 
     const globalEnabled =
@@ -101,7 +97,6 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
               openRouterKey: dbKeys.openRouterKey || localKeys.openRouterKey,
               deepseekKey: dbKeys.deepseekKey || localKeys.deepseekKey,
               novelaiKey: dbKeys.novelaiKey || localKeys.novelaiKey,
-              speechifyKey: dbKeys.speechifyKey || localKeys.speechifyKey,
             });
             setIsLoaded(true);
             return;

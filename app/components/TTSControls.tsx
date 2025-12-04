@@ -11,8 +11,14 @@ interface TTSControlsProps {
 }
 
 const getSelectedVoice = (): string => {
-  if (typeof window === "undefined") return "henry";
-  return localStorage.getItem("ttsLastVoice") || "henry";
+  if (typeof window === "undefined") return "af_heart";
+  return localStorage.getItem("ttsLastVoice") || "af_heart";
+};
+
+const getSelectedModel = (): "kokoro" | "orpheus" => {
+  if (typeof window === "undefined") return "kokoro";
+  const model = localStorage.getItem("ttsModel");
+  return model === "orpheus" ? "orpheus" : "kokoro";
 };
 
 const getVolume = (): number => {
@@ -53,6 +59,7 @@ export default function TTSControls({
     if (disabled || !text.trim() || isGeneratingRef.current) return;
 
     const selectedVoice = getSelectedVoice();
+    const selectedModel = getSelectedModel();
     const volume = getVolume();
 
     if (audioRef.current && isPaused) {
@@ -93,18 +100,17 @@ export default function TTSControls({
         throw new Error("Authentication required. Please sign in to use TTS.");
       }
 
-      const speechifyKey =
-        typeof window !== "undefined"
-          ? localStorage.getItem("speechifyKey")
-          : undefined;
-
       const response = await fetch("/api/tts/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text, voiceId: selectedVoice, speechifyKey }),
+        body: JSON.stringify({
+          text,
+          voiceId: selectedVoice,
+          model: selectedModel,
+        }),
       });
 
       if (!response.ok) {
@@ -119,8 +125,31 @@ export default function TTSControls({
 
       const tokenCost = response.headers.get("X-Token-Cost");
       const tokenBalance = response.headers.get("X-Token-Balance");
+      const contentType = response.headers.get("Content-Type");
+      const ttsModel = response.headers.get("X-TTS-Model");
 
-      const audioBlob = await response.blob();
+      console.log("TTS Response headers:", {
+        contentType,
+        ttsModel,
+        tokenCost,
+      });
+
+      // Get the raw array buffer and create blob with correct MIME type
+      const arrayBuffer = await response.arrayBuffer();
+      console.log("TTS Audio buffer size:", arrayBuffer.byteLength);
+
+      // Check first few bytes to identify format
+      const header = new Uint8Array(arrayBuffer.slice(0, 4));
+      console.log(
+        "TTS Audio header bytes:",
+        Array.from(header)
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join(" ")
+      );
+
+      const audioBlob = new Blob([arrayBuffer], {
+        type: contentType || "audio/mpeg",
+      });
       savedAudioBlobRef.current = audioBlob;
 
       if (audioUrl) {
@@ -153,9 +182,11 @@ export default function TTSControls({
       if (tokenCost && tokenBalance) {
         console.log(`TTS: -${tokenCost} tokens, ${tokenBalance} remaining`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("TTS error:", error);
-      addNotification(error.message || "Failed to generate speech", "failure");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to generate speech";
+      addNotification(errorMessage, "failure");
     } finally {
       setIsLoading(false);
       isGeneratingRef.current = false;

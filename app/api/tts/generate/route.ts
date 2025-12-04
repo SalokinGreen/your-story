@@ -1,16 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Speechify } from "@speechify/api-sdk";
 import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import { createClient } from "@supabase/supabase-js";
-import { getUserSettings } from "@/app/misc/user_settings";
-import { calculateTTSCost } from "@/app/misc/ai_prices";
+import { calculateTTSCost, TTSModelKey } from "@/app/misc/ai_prices";
 
-const SPEECHIFY_API_KEY = process.env.SPEECHIFY_API_KEY;
+const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// Speechify Speech endpoint has 2000 char limit
-const CHUNK_SIZE = 1800; // Leave some buffer for safety
+// DeepInfra TTS endpoints
+const KOKORO_ENDPOINT =
+  "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M";
+const ORPHEUS_ENDPOINT =
+  "https://api.deepinfra.com/v1/inference/canopylabs/orpheus-3b-0.1-ft";
+
+// Kokoro voices (multi-language support)
+export const KOKORO_VOICES = {
+  // American English Female
+  af_heart: "Heart (American Female)",
+  af_bella: "Bella (American Female)",
+  af_nicole: "Nicole (American Female)",
+  af_sarah: "Sarah (American Female)",
+  af_sky: "Sky (American Female)",
+  // American English Male
+  am_adam: "Adam (American Male)",
+  am_michael: "Michael (American Male)",
+  am_fenrir: "Fenrir (American Male)",
+  // British English
+  bf_emma: "Emma (British Female)",
+  bf_isabella: "Isabella (British Female)",
+  bm_george: "George (British Male)",
+  bm_daniel: "Daniel (British Male)",
+} as const;
+
+// Orpheus voices
+export const ORPHEUS_VOICES = {
+  tara: "Tara",
+  leah: "Leah",
+  jess: "Jess",
+  mia: "Mia",
+  zoe: "Zoe",
+  leo: "Leo",
+  dan: "Dan",
+  zac: "Zac",
+} as const;
+
+// Maximum text length per request
+const MAX_TEXT_LENGTH = 10000;
 
 // Split text into chunks at sentence boundaries
 function splitTextIntoChunks(text: string, maxChunkSize: number): string[] {
@@ -26,26 +61,36 @@ function splitTextIntoChunks(text: string, maxChunkSize: number): string[] {
     // Find a good break point (end of sentence) within the limit
     let breakPoint = maxChunkSize;
 
-    // Try to find sentence endings (.!?) followed by space or newline
+    // Try to find the last sentence ending (.!?) within the chunk limit
     const searchArea = remaining.substring(0, maxChunkSize);
-    const sentenceEndMatch = searchArea.match(/.*[.!?][\s\n]/);
 
-    if (sentenceEndMatch) {
-      breakPoint = sentenceEndMatch[0].length;
+    // Find the last sentence-ending punctuation followed by space/newline or at end
+    const lastPeriod = Math.max(
+      searchArea.lastIndexOf(". "),
+      searchArea.lastIndexOf(".\n"),
+      searchArea.lastIndexOf("! "),
+      searchArea.lastIndexOf("!\n"),
+      searchArea.lastIndexOf("? "),
+      searchArea.lastIndexOf("?\n")
+    );
+
+    if (lastPeriod > maxChunkSize / 3) {
+      // Include the punctuation, exclude the space/newline
+      breakPoint = lastPeriod + 1;
     } else {
       // Fall back to paragraph break
       const lastNewline = searchArea.lastIndexOf("\n\n");
-      if (lastNewline > maxChunkSize / 2) {
+      if (lastNewline > maxChunkSize / 3) {
         breakPoint = lastNewline + 2;
       } else {
         // Fall back to any newline
         const lastSingleNewline = searchArea.lastIndexOf("\n");
-        if (lastSingleNewline > maxChunkSize / 2) {
+        if (lastSingleNewline > maxChunkSize / 3) {
           breakPoint = lastSingleNewline + 1;
         } else {
           // Fall back to space
           const lastSpace = searchArea.lastIndexOf(" ");
-          if (lastSpace > maxChunkSize / 2) {
+          if (lastSpace > maxChunkSize / 3) {
             breakPoint = lastSpace + 1;
           }
           // Otherwise just cut at maxChunkSize
@@ -60,9 +105,13 @@ function splitTextIntoChunks(text: string, maxChunkSize: number): string[] {
   return chunks.filter((chunk) => chunk.length > 0);
 }
 
-// Concatenate MP3 audio buffers
-// MP3 files can be concatenated by simply appending the data
-function concatenateMP3Buffers(buffers: ArrayBuffer[]): ArrayBuffer {
+// Concatenate audio buffers
+// Note: For WAV files with multiple chunks, we'd need to merge headers properly
+// But since most TTS requests fit in one chunk, simple concatenation works
+function concatenateAudioBuffers(buffers: ArrayBuffer[]): ArrayBuffer {
+  if (buffers.length === 0) return new ArrayBuffer(0);
+  if (buffers.length === 1) return buffers[0];
+
   const totalLength = buffers.reduce((sum, buf) => sum + buf.byteLength, 0);
   const result = new Uint8Array(totalLength);
   let offset = 0;
@@ -77,9 +126,9 @@ function concatenateMP3Buffers(buffers: ArrayBuffer[]): ArrayBuffer {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!SPEECHIFY_API_KEY) {
+    if (!DEEPINFRA_API_KEY) {
       return NextResponse.json(
-        { error: "Speechify API key not configured" },
+        { error: "DeepInfra API key not configured" },
         { status: 500 }
       );
     }
@@ -117,37 +166,11 @@ export async function POST(req: NextRequest) {
 
     const userId = user.id;
 
-    const { text, voiceId = "henry", speechifyKey } = await req.json();
-
-    // Validate voice ID - use fallback for invalid IDs
-    const validVoices = [
-      "mrbeast",
-      "henry",
-      "snoop",
-      "gwyneth",
-      "cliff",
-      "george",
-    ];
-    // Custom voice IDs are typically UUIDs, so accept those too
-    const isCustomVoice =
-      voiceId && voiceId.length > 20 && voiceId.includes("-");
-    const finalVoiceId =
-      validVoices.includes(voiceId) || isCustomVoice ? voiceId : "henry";
-
-    // Check user settings for BYOK
-    const userSettings = await getUserSettings(userId, supabase);
-    const isSubscriber = userSettings?.is_subscriber || false;
-    const byokEnabled = userSettings?.byok_enabled || false;
-
-    // Determine if we should use tokens
-    let shouldUseTokens = true;
-    let apiKeyToUse = SPEECHIFY_API_KEY;
-
-    if (isSubscriber && byokEnabled && speechifyKey) {
-      shouldUseTokens = false;
-      apiKeyToUse = speechifyKey;
-      console.log(`User ${userId} using BYOK (Speechify)`);
-    }
+    const {
+      text,
+      voiceId = "af_heart",
+      model = "kokoro" as TTSModelKey,
+    } = await req.json();
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return NextResponse.json(
@@ -156,9 +179,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Set a reasonable max total length (20000 chars = ~10 chunks max)
-    const MAX_TOTAL_LENGTH = 20000;
-    const truncatedText = text.slice(0, MAX_TOTAL_LENGTH);
+    // Validate model
+    const ttsModel: TTSModelKey = model === "orpheus" ? "orpheus" : "kokoro";
+    const isOrpheus = ttsModel === "orpheus";
+
+    // Validate voice ID based on model
+    let finalVoiceId = voiceId;
+    if (isOrpheus) {
+      const validOrpheusVoices = Object.keys(ORPHEUS_VOICES);
+      if (!validOrpheusVoices.includes(voiceId)) {
+        finalVoiceId = "tara"; // Default Orpheus voice
+      }
+    } else {
+      const validKokoroVoices = Object.keys(KOKORO_VOICES);
+      // Also allow custom voice IDs (for advanced users)
+      if (
+        !validKokoroVoices.includes(voiceId) &&
+        !voiceId.match(/^[a-z]{2}_[a-z]+$/)
+      ) {
+        finalVoiceId = "af_heart"; // Default Kokoro voice
+      }
+    }
+
+    // Truncate text if too long
+    const truncatedText = text.slice(0, MAX_TEXT_LENGTH);
 
     // Strip markdown formatting for better speech output
     const cleanText = truncatedText
@@ -169,12 +213,6 @@ export async function POST(req: NextRequest) {
       .replace(/[<>{}[\]]/g, "") // Remove brackets that might confuse the API
       .trim();
 
-    // Initialize Speechify client
-    const speechify = new Speechify({
-      apiKey: apiKeyToUse,
-    });
-
-    // Validate text before sending
     if (cleanText.length === 0) {
       return NextResponse.json(
         { error: "Text is empty after cleaning" },
@@ -182,100 +220,143 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Split text into chunks
-    const chunks = splitTextIntoChunks(cleanText, CHUNK_SIZE);
+    // Choose chunk size based on model
+    // Orpheus truncates long text internally - use smaller chunks (~300 chars)
+    // Kokoro handles longer text well
+    const chunkSize = isOrpheus ? 300 : 1500;
+    const chunks = splitTextIntoChunks(cleanText, chunkSize);
 
-    // Log what we're sending (for debugging)
     console.log("TTS request:", {
       textLength: cleanText.length,
       chunks: chunks.length,
       voiceId: finalVoiceId,
-      originalVoiceId: voiceId !== finalVoiceId ? voiceId : undefined,
+      model: ttsModel,
       textPreview:
         cleanText.substring(0, 100) + (cleanText.length > 100 ? "..." : ""),
     });
 
     // Generate speech for each chunk
     const audioBuffers: ArrayBuffer[] = [];
+    const endpoint = isOrpheus ? ORPHEUS_ENDPOINT : KOKORO_ENDPOINT;
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
 
       try {
-        const response = await speechify.audioGenerate({
-          input: chunk,
-          voiceId: finalVoiceId,
-          audioFormat: "mp3",
+        // Build request body based on model
+        // Orpheus: uses "response_format", "max_tokens" (default 2000, max 4096)
+        // Kokoro: uses "output_format"
+        const requestBody: Record<string, unknown> = isOrpheus
+          ? {
+              input: chunk,
+              voice: finalVoiceId,
+              response_format: "mp3",
+              max_tokens: 3000,
+            }
+          : {
+              text: chunk,
+              preset: finalVoiceId,
+              output_format: "mp3",
+            };
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${DEEPINFRA_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
         });
 
-        if (!response.audioData) {
-          console.error(`No audio data for chunk ${i + 1}/${chunks.length}`);
-          continue;
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`DeepInfra TTS error on chunk ${i + 1}:`, {
+            status: response.status,
+            error: errorText,
+          });
+
+          if (response.status === 429) {
+            return NextResponse.json(
+              {
+                error:
+                  "TTS rate limit reached. Please wait a moment before trying again.",
+              },
+              { status: 429 }
+            );
+          }
+
+          if (response.status === 401 || response.status === 403) {
+            return NextResponse.json(
+              { error: "TTS authentication failed." },
+              { status: response.status }
+            );
+          }
+
+          throw new Error(
+            `DeepInfra API error: ${response.status} - ${errorText}`
+          );
         }
 
-        const buffer = await response.audioData.arrayBuffer();
-        audioBuffers.push(buffer);
+        const data = await response.json();
 
-        console.log(
-          `TTS chunk ${i + 1}/${chunks.length} complete (${chunk.length} chars)`
-        );
-      } catch (speechifyError: any) {
-        console.error(`Speechify API error on chunk ${i + 1}:`, speechifyError);
-
-        // Handle specific Speechify errors
-        const statusCode = speechifyError.statusCode || 500;
-        const errorMessage =
-          speechifyError.message || "Unknown Speechify error";
-
-        // Log full error details for debugging
-        console.error("Speechify error details:", {
-          statusCode,
-          message: errorMessage,
-          voiceId: finalVoiceId,
-          chunkIndex: i,
-          chunkLength: chunk.length,
+        // Log the actual response to debug format issues
+        console.log(`TTS API response for chunk ${i + 1}:`, {
+          hasAudio: !!data.audio,
+          audioLength: data.audio?.length,
+          output_format: data.output_format,
+          first20CharsOfAudio: data.audio?.substring(0, 20),
         });
 
-        if (statusCode === 400) {
-          return NextResponse.json(
-            {
-              error: `Invalid TTS request: ${errorMessage}. Try a different voice or shorter text.`,
-            },
-            { status: 400 }
-          );
-        }
+        // DeepInfra returns audio as a data URL (data:audio/mp3;base64,...)
+        if (data.audio) {
+          // Strip the data URL prefix if present
+          let base64Data = data.audio;
+          if (base64Data.startsWith("data:")) {
+            base64Data = base64Data.split(",")[1];
+          }
 
-        if (statusCode === 503) {
-          return NextResponse.json(
-            {
-              error:
-                "Speechify service is temporarily unavailable. Please try again in a few moments.",
-            },
-            { status: 503 }
-          );
-        }
+          const audioBuffer = Buffer.from(base64Data, "base64");
 
-        if (statusCode === 429) {
-          return NextResponse.json(
-            {
-              error:
-                "TTS rate limit reached. Please wait a moment before trying again.",
-            },
-            { status: 429 }
-          );
-        }
+          // Log first bytes to verify format
+          const headerBytes = Array.from(
+            new Uint8Array(
+              audioBuffer.buffer.slice(
+                audioBuffer.byteOffset,
+                audioBuffer.byteOffset + 8
+              )
+            )
+          )
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join(" ");
+          console.log(`TTS chunk ${i + 1} header bytes: ${headerBytes}`);
 
-        if (statusCode === 401 || statusCode === 403) {
-          return NextResponse.json(
-            { error: "TTS authentication failed. Please check your API key." },
-            { status: statusCode }
+          audioBuffers.push(
+            audioBuffer.buffer.slice(
+              audioBuffer.byteOffset,
+              audioBuffer.byteOffset + audioBuffer.byteLength
+            )
           );
+          console.log(
+            `TTS chunk ${i + 1}/${chunks.length} complete (${
+              chunk.length
+            } chars, format: ${data.output_format || "unknown"}, size: ${
+              audioBuffer.byteLength
+            })`
+          );
+        } else {
+          console.error(`No audio data for chunk ${i + 1}/${chunks.length}`, {
+            output_format: data.output_format,
+            inference_status: data.inference_status,
+            hasAudio: !!data.audio,
+          });
         }
-
-        return NextResponse.json(
-          { error: speechifyError.message || "Failed to generate speech" },
-          { status: statusCode }
-        );
+      } catch (chunkError: unknown) {
+        console.error(`Error processing chunk ${i + 1}:`, chunkError);
+        // If first chunk fails, abort
+        if (i === 0) {
+          throw chunkError;
+        }
+        // Continue with other chunks if one fails
       }
     }
 
@@ -288,22 +369,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Concatenate all audio buffers
-    const finalAudioBuffer = concatenateMP3Buffers(audioBuffers);
+    const finalAudioBuffer = concatenateAudioBuffers(audioBuffers);
 
-    // Calculate dynamic TTS cost based on character count
-    const ttsCost = calculateTTSCost(cleanText.length);
+    // Calculate dynamic TTS cost based on character count and model
+    const ttsCost = calculateTTSCost(cleanText.length, ttsModel);
 
-    // Deduct tokens after successful generation IF using tokens
-    if (shouldUseTokens) {
-      try {
-        await deductTokens(userId, ttsCost, supabase);
-      } catch (deductError: any) {
-        console.error("Failed to deduct tokens:", deductError);
-        // Still return the audio since generation succeeded
-        // Log this for manual correction if needed
-      }
-    } else {
-      console.log(`BYOK used, no tokens deducted for user ${userId}`);
+    // Deduct tokens after successful generation
+    try {
+      await deductTokens(userId, ttsCost, supabase);
+    } catch (deductError: unknown) {
+      console.error("Failed to deduct tokens:", deductError);
+      // Still return the audio since generation succeeded
     }
 
     // Get updated balance
@@ -315,17 +391,17 @@ export async function POST(req: NextRequest) {
       headers: {
         "Content-Type": "audio/mpeg",
         "Content-Length": finalAudioBuffer.byteLength.toString(),
-        "Cache-Control": "public, max-age=3600", // Cache for 1 hour
-        "X-Token-Cost": shouldUseTokens ? ttsCost.toString() : "0",
+        "Cache-Control": "public, max-age=3600",
+        "X-Token-Cost": ttsCost.toString(),
         "X-Token-Balance": (newBalance?.total ?? 0).toString(),
         "X-Chunks-Generated": chunks.length.toString(),
+        "X-TTS-Model": ttsModel,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("TTS generation error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to generate speech" },
-      { status: 500 }
-    );
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to generate speech";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

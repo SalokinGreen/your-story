@@ -75,6 +75,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **BYOK providers** (user provides API key): OpenRouter, DeepSeek, NovelAI
   - **Coins provider** (server-side key, user pays with coins): Mistral (mistral-small-2506, mistral-medium-2508, codestral-2508)
   - **APIKeysAvailable**: Interface with `coinsEnabled` flag for Mistral models
+  - **Image models**: `OPENROUTER_IMAGE_MODELS` (BYOK via OpenRouter), `DEEPINFRA_IMAGE_MODELS` (Coins: Bria 3.2 FREE, P-Image $0.005, FLUX 2 Pro $0.015)
 - app/misc/story_creator_ai.ts: **Story Creative Assistant utilities**. Exports buildStoryCreatorMessages() and applyCreatorChangesToStoryData(). Converts between Adventure-style AI outputs and StoryData structures.
   - **buildStoryCreatorMessages**: Builds prompts with story history (last 15 scene parts), recent memory context, and current game state. Returns messages array with Adventure-style output format.
   - **applyCreatorChangesToStoryData**: Applies AI-suggested changes (stats, resources, inventory, abilities, achievements, lore) to StoryData. Uses mergeArrayWithCommands() for array modifications.
@@ -89,11 +90,11 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/api/generate-stream/route.ts: **Thin AI proxy** (SSE streaming). Supports BYOK and Coins modes. Streams events: { type: "content", content }, { type: "tool_calls", toolCalls }, { type: "done", meta }. Mistral models check balance before generation and deduct coins after.
 - app/api/novelai/generate-stream/route.ts: **NovelAI BYOK proxy** (SSE streaming). Accepts { messages, novelaiKey, maxTokens, temperature }. Converts chat messages to completion prompt, forwards to NovelAI GLM-4-6, streams back. No token deduction (BYOK). Story stage only.
 - app/misc/novelai.ts: NovelAI types and utilities. Exports NOVELAI_MODEL ("glm-4-6"), NOVELAI_DEFAULT_PARAMS, convertMessagesToPrompt(), buildNovelAIRequest(), NOVELAI_CONTEXT_SIZE (8192).
-- app/api/tts/generate/route.ts: POST endpoint for Speechify text-to-speech generation; supports BYOK via speechifyKey field; deducts tokens only when using server key.
+- app/api/tts/generate/route.ts: POST endpoint for DeepInfra text-to-speech generation; supports Kokoro (fast, $0.62/M chars) and Orpheus (premium, $7/M chars) models; deducts coins based on character count and model.
 - app/api/stt/transcribe/route.ts: POST endpoint for Voxtral speech-to-text transcription (Mistral API); accepts FormData with audio file; uses server MISTRAL_API_KEY; deducts 2 coins per transcription.
 - app/api/settings/api-keys/route.ts: GET/POST/DELETE encrypted API key storage. Uses AES-256-GCM encryption with API_KEY_ENCRYPTION_SECRET env var.
 - app/misc/APIKeysContext.tsx: React context for managing API keys. Supports localStorage (default) and optional encrypted server storage. Includes OpenRouter OAuth PKCE flow.
-- app/components/APIKeysModal.tsx: Settings modal for API key management with tabs for OpenRouter (OAuth + manual), DeepSeek, NovelAI, Speechify.
+- app/components/APIKeysModal.tsx: Settings modal for API key management with tabs for OpenRouter (OAuth + manual), DeepSeek, NovelAI. Includes TTS model/voice selection (Kokoro/Orpheus).
 
 ### API Routes
 
@@ -139,6 +140,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/api/creator/regenerate-section/route.ts: Regenerate a specific section of an existing adventure.
 - app/api/creator/extend-section/route.ts: Add more content to an existing section (lore, achievements, etc.).
 - app/api/creator/generate-stage/route.ts: Single-stage generation. Uses same repair strategy: local repair first, then prefill AI continuation if needed.
+- app/api/creator/generate-image/route.ts: AI image generation for adventure covers. Supports two providers: DeepInfra (Coins mode with Bria 3.2 FREE, P-Image $0.005/img, FLUX 2 Pro $0.015/img) and OpenRouter (BYOK with Gemini/GPT image models). Returns base64 or URL, uploads to Supabase storage.
 - app/misc/big_adventure_ai.ts: Big Adventure AI configuration and prompt builders. Key exports:
   - `GenerationStage`: "core" | "mechanics" | "content" | "advanced"
   - `BigAdventureConfig`: Full configuration with complexity, duration, RPG system, feature toggles
@@ -165,7 +167,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/components/EditProfile.tsx: Edit profile (bio, location, website, avatar). Avatar uploads use unique timestamped filenames, cache-busting URLs, and proper old file deletion.
 - app/components/NotificationContainer.tsx: Toast notifications display.
 - app/components/TTSControls.tsx: Text-to-speech controls with voice selection, volume, play/pause/stop, and auto-generation support.
-- app/components/CustomVoiceManager.tsx: Manage custom Speechify voice IDs for TTS.
+- app/components/CustomVoiceManager.tsx: Manage custom voice IDs for TTS (Kokoro format: [lang][gender]\_[name]).
 - app/components/DiceVisualizer.tsx: Main dice animation component with 4-phase system (rolling→stopped→calculating→result). Supports all 8 RPG systems with visual feedback for advantage/disadvantage, explosions, stress dice, partial success, and Fate ladder outcomes. Click or keyboard (Enter/Space/Escape) to skip animation.
 - app/components/StoryCreativeAssistant.tsx: AI-powered story editing modal for in-game modifications. Features BYOK/Coins toggle, model selection, output size slider, cost estimation, chat history persistence. Uses story_creator_ai.ts to build prompts with recent story history (last 15 scene parts) and memory context, then applies AI-suggested changes to StoryData.
 
@@ -240,9 +242,9 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Toast notifications via NotificationContext; use addNotification("message", "success"|"failure"|"warning").
 - Profile page: Admin controls must always be at the very bottom (see comment in profile/[userId]/page.tsx).
 - **AI Config Menu**: Model selection saved to localStorage as "aiPreset", with presets defined in MODEL_PRESETS. Custom presets allow per-stage model overrides.
-- **API Keys Settings**: Users must provide their own API keys via Settings modal (gear icon in header). Supports OpenRouter (OAuth + manual), DeepSeek, NovelAI, Speechify. Keys stored in localStorage (default) or encrypted on server (optional).
+- **API Keys Settings**: Users must provide their own API keys via Settings modal (gear icon in header). Supports OpenRouter (OAuth + manual), DeepSeek, NovelAI. TTS uses server-side DeepInfra key (no BYOK). Keys stored in localStorage (default) or encrypted on server (optional).
 - **NovelAI Settings**: BYOK integration for story generation only. Settings saved to localStorage (novelaiEnabled, novelaiKey, novelaiTemperature). When enabled, story stage uses NovelAI GLM-4-6 while tools/choices stages use OpenRouter/DeepSeek.
-- **TTS Settings**: All TTS preferences saved to localStorage (ttsEnabled, ttsLastVoice, ttsAutoGenerate, ttsVolume, ttsCustomVoices).
+- **TTS Settings**: All TTS preferences saved to localStorage (ttsEnabled, ttsLastVoice, ttsAutoGenerate, ttsVolume, ttsCustomVoices, ttsModel). Two models: Kokoro (fast, cheap) and Orpheus (premium, expressive).
 - **STT Settings**: Speech-to-text uses Voxtral (Mistral API) and costs 2 coins per transcription. Settings saved to localStorage (sttEnabled). STTButton in ChoicesModal sends audio to /api/stt/transcribe with auto-stop after 3s silence.
 - **Embeddings Settings**: Semantic search settings saved to localStorage (embeddingsEnabled, embeddingThreshold). When enabled, uses Mistral embeddings to find relevant lore/memories. embeddingThreshold (0.1-0.5, default 0.25) controls strictness: lower = more results (relaxed), higher = fewer results (strict). Auto-activates for stories with 30+ lore or 50+ memories. Cost: ~0.5 coins per 100 turns.
 - **Hidden Messages**: AI can use ||double pipes|| syntax for hidden text (DM notes). Players can't see hidden text unless "showHiddenMessages" is enabled in localStorage. When revealed, hidden text appears with purple highlighting.
@@ -309,8 +311,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - DEEPSEEK_API_KEY=<your_key>
   - OPENROUTER_API_KEY=<your_key>
   - MISTRAL_API_KEY=<your_key> (server-side for Coins mode and STT)
-  - DEEPINFRA_API_KEY=<your_key> (server-side for Coins mode)
-  - SPEECHIFY_API_KEY=<your_key>
+  - DEEPINFRA_API_KEY=<your_key> (server-side for Coins mode and TTS)
   - NEXT_PUBLIC_SUPABASE_URL=<your_url>
   - NEXT_PUBLIC_SUPABASE_KEY=<your_anon_key>
   - SUPABASE_URL=<your_url> (same as NEXT_PUBLIC)
