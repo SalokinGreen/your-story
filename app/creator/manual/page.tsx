@@ -11294,7 +11294,7 @@ ${description || ""}`;
                   {editAdventureId ? "Edit Adventure" : "Create Adventure"}
                 </h1>
                 <p className="text-xs text-blue-300/50">
-                  {title || "Untitled"} ? Step {currentStepIndex + 1}/
+                  {title || "Untitled"} Step {currentStepIndex + 1}/
                   {steps.length}
                 </p>
               </div>
