@@ -323,6 +323,10 @@ async function generateSingleStage(
                 promptTokens: event.meta?.usage?.promptTokens || promptTokens,
                 completionTokens:
                   event.meta?.usage?.completionTokens || completionTokens,
+                error:
+                  event.result === null
+                    ? "Failed to parse stage output - AI response may be malformed or incomplete"
+                    : undefined,
               };
 
             case "error":
@@ -348,6 +352,10 @@ async function generateSingleStage(
       rawContent: fullContent,
       promptTokens,
       completionTokens,
+      error:
+        stageResult === null
+          ? "Stream ended unexpectedly without result - connection may have been interrupted"
+          : undefined,
     };
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
@@ -492,6 +500,10 @@ async function generateSingleStageFinishEarly(
                 promptTokens: event.meta?.usage?.promptTokens || promptTokens,
                 completionTokens:
                   event.meta?.usage?.completionTokens || completionTokens,
+                error:
+                  event.result === null
+                    ? "Failed to wrap up partial content - AI may have returned incomplete JSON"
+                    : undefined,
               };
 
             case "error":

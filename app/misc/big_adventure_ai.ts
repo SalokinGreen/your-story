@@ -513,7 +513,8 @@ export type RegenerateSection =
   | "agmt" // Regenerate agmt state
   | "customTables" // Regenerate custom tables
   | "upgradeShop" // Regenerate upgrade shop
-  | "startingChoices"; // Regenerate starting choices
+  | "startingChoices" // Regenerate starting choices
+  | "icons"; // Regenerate icon assignments
 
 // Section metadata for UI (uses LegacyStage for grouping)
 export const REGENERATE_SECTIONS: Record<
@@ -619,6 +620,12 @@ export const REGENERATE_SECTIONS: Record<
     name: "Starting Choices",
     description: "Adventure beginning options",
     emoji: "🚀",
+    stage: "advanced",
+  },
+  icons: {
+    name: "Icons",
+    description: "Thematic icon assignments for all elements",
+    emoji: "🎨",
     stage: "advanced",
   },
 };
@@ -2696,6 +2703,23 @@ Write full, standalone content - not fragments!`,
       instruction: "Generate 2-4 starting choices for the adventure beginning.",
       schema: `{ "startingChoices": [{ "text": "string", "intro_override": "string (optional)", "skill_used": "string (optional)", "skill_dc": number (optional), "resource_used": "string (optional)", "item_used": "string (optional)" }] }`,
     },
+    icons: {
+      instruction: `Assign thematic icons to all adventure elements from the game-icons.net library.
+
+AVAILABLE ICONS (${ALL_GAME_ICON_IDS.length} total):
+${ALL_GAME_ICON_IDS.slice(0, 500).join(", ")}... and ${
+        ALL_GAME_ICON_IDS.length - 500
+      } more.
+
+Match icons to element themes:
+- Combat: sword, axe, shield, bow-arrow, crossbow
+- Magic: magic-swirl, crystal-ball, spell-book, fire-breath
+- Nature: oak-leaf, wolf-head, bear-head, tree
+- Social: conversation, handshake, crown
+- Movement: running-shoe, wingfoot, sprint
+- Stealth: hidden, cloak, shadow`,
+      schema: `{ "iconAssignments": { "stats": { "StatName": "icon-id" }, "resources": { "ResourceName": "icon-id" }, "inventory": { "ItemName": "icon-id" }, "abilities": { "AbilityName": "icon-id" }, "achievements": { "AchievementTitle": "icon-id" }, "relationships": { "NPCName": "icon-id" }, "presets": { "PresetName": "icon-id" } } }`,
+    },
   };
 
   const sectionPrompt = sectionPrompts[section];
@@ -2829,6 +2853,8 @@ export function parseRegenerateSectionOutput(
         return { storyTemplate: { upgradeSettings: parsed.upgradeSettings } };
       case "startingChoices":
         return { startingChoices: parsed.startingChoices };
+      case "icons":
+        return { iconAssignments: parsed.iconAssignments };
       default:
         return null;
     }
@@ -3085,6 +3111,10 @@ Each table MUST have 20-50 entries for proper variety. Use weights 1-10 (higher 
       schema: "",
     },
     startingChoices: {
+      instruction: "",
+      schema: "",
+    },
+    icons: {
       instruction: "",
       schema: "",
     },

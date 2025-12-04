@@ -1180,18 +1180,20 @@ function BigAdventureCreatorPage() {
   // Resume mode - when user is resuming from autosaved partial progress
   const [resumeMode, setResumeMode] = useState(false);
 
-  // Regeneration state
-  const [regeneratingSection, setRegeneratingSection] =
-    useState<RegenerateSection | null>(null);
+  // Regeneration state - use Set to support multiple simultaneous regenerations
+  const [regeneratingSections, setRegeneratingSections] = useState<
+    Set<RegenerateSection>
+  >(new Set());
   const [regenerationContent, setRegenerationContent] = useState("");
 
-  // Extension state (Add More)
-  const [extendingSection, setExtendingSection] =
-    useState<RegenerateSection | null>(null);
+  // Extension state (Add More) - use Set to support multiple simultaneous extensions
+  const [extendingSections, setExtendingSections] = useState<
+    Set<RegenerateSection>
+  >(new Set());
   const [extensionContent, setExtensionContent] = useState("");
   const [extensionOutputSize, setExtensionOutputSize] = useState(4000);
   const [extensionInstructions, setExtensionInstructions] = useState("");
-  const [extensionModel, setExtensionModel] = useState("Deepseek Chat");
+  const [extensionModel, setExtensionModel] = useState("Mistral Large 3.0");
   const [extensionByokMode, setExtensionByokMode] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("bigAdventureExtensionByokMode");
@@ -1223,7 +1225,7 @@ function BigAdventureCreatorPage() {
       setExtensionModel("Deepseek Chat");
     }
     if (!extensionByokMode && isBYOKProvider) {
-      setExtensionModel("DeepInfra DeepSeek V3.2");
+      setExtensionModel("Mistral Large 3.0");
     }
   }, [extensionByokMode, extensionModel]);
 
@@ -2131,7 +2133,8 @@ function BigAdventureCreatorPage() {
         return;
       }
 
-      setRegeneratingSection(section);
+      // Add section to regenerating set
+      setRegeneratingSections((prev) => new Set(prev).add(section));
       setRegenerationContent("");
 
       try {
@@ -2207,6 +2210,12 @@ function BigAdventureCreatorPage() {
                     if (event.result.startingChoices) {
                       updated.startingChoices = event.result.startingChoices;
                     }
+                    // Handle icon assignments by merging with existing result
+                    if (event.result.iconAssignments) {
+                      return mergeBigAdventureResults(updated, {
+                        iconAssignments: event.result.iconAssignments,
+                      });
+                    }
 
                     return updated;
                   });
@@ -2237,7 +2246,12 @@ function BigAdventureCreatorPage() {
           "failure"
         );
       } finally {
-        setRegeneratingSection(null);
+        // Remove section from regenerating set
+        setRegeneratingSections((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(section);
+          return newSet;
+        });
         setRegenerationContent("");
       }
     },
@@ -2276,7 +2290,8 @@ function BigAdventureCreatorPage() {
         return;
       }
 
-      setExtendingSection(section);
+      // Add section to extending set
+      setExtendingSections((prev) => new Set(prev).add(section));
       setExtensionContent("");
 
       try {
@@ -2378,7 +2393,12 @@ function BigAdventureCreatorPage() {
           error instanceof Error ? error.message : String(error);
         addNotification(errorMessage || "Failed to extend section", "failure");
       } finally {
-        setExtendingSection(null);
+        // Remove section from extending set
+        setExtendingSections((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(section);
+          return newSet;
+        });
         setExtensionContent("");
       }
     },
@@ -4677,11 +4697,11 @@ ${result.description || ""}`;
                   onClick={() =>
                     handleRegenerateSection("title", extensionInstructions)
                   }
-                  disabled={regeneratingSection !== null}
+                  disabled={regeneratingSections.has("title")}
                   className="text-xs px-2 py-1 bg-blue-800/50 hover:bg-blue-700/50 disabled:bg-blue-900/30 disabled:text-blue-300/30 text-blue-300 rounded transition-colors"
                   title="Regenerate title & descriptions"
                 >
-                  {regeneratingSection === "title" ? "⏳" : "🔄"}
+                  {regeneratingSections.has("title") ? "⏳" : "🔄"}
                 </button>
               </div>
               <p className="text-blue-300/60 mb-4">{result.shortDescription}</p>
@@ -4693,11 +4713,14 @@ ${result.description || ""}`;
               </div>
 
               {/* Regenerating overlay */}
-              {regeneratingSection && (
+              {regeneratingSections.size > 0 && (
                 <div className="mt-6 pt-6 border-t border-blue-800/30">
                   <h4 className="text-sm font-medium text-purple-400 mb-3 flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                    Regenerating {REGENERATE_SECTIONS[regeneratingSection].name}
+                    Regenerating{" "}
+                    {Array.from(regeneratingSections)
+                      .map((s) => REGENERATE_SECTIONS[s].name)
+                      .join(", ")}
                     ...
                   </h4>
                   {regenerationContent && (
@@ -4772,8 +4795,8 @@ ${result.description || ""}`;
                           extensionInstructions
                         )
                       }
-                      isRegenerating={regeneratingSection === "stats"}
-                      isExtending={extendingSection === "stats"}
+                      isRegenerating={regeneratingSections.has("stats")}
+                      isExtending={extendingSections.has("stats")}
                       renderItem={(item) => {
                         const stat = item as Stat;
                         return (
@@ -4817,8 +4840,8 @@ ${result.description || ""}`;
                           extensionInstructions
                         )
                       }
-                      isRegenerating={regeneratingSection === "resources"}
-                      isExtending={extendingSection === "resources"}
+                      isRegenerating={regeneratingSections.has("resources")}
+                      isExtending={extendingSections.has("resources")}
                       renderItem={(item) => {
                         const resource = item as Resource;
                         return (
@@ -4862,8 +4885,8 @@ ${result.description || ""}`;
                           extensionInstructions
                         )
                       }
-                      isRegenerating={regeneratingSection === "abilities"}
-                      isExtending={extendingSection === "abilities"}
+                      isRegenerating={regeneratingSections.has("abilities")}
+                      isExtending={extendingSections.has("abilities")}
                       renderItem={(item) => {
                         const ability = item as Ability;
                         return (
@@ -4904,8 +4927,8 @@ ${result.description || ""}`;
                           extensionInstructions
                         )
                       }
-                      isRegenerating={regeneratingSection === "lore"}
-                      isExtending={extendingSection === "lore"}
+                      isRegenerating={regeneratingSections.has("lore")}
+                      isExtending={extendingSections.has("lore")}
                       renderItem={(item) => {
                         const lore = item as StoryLore;
                         return (
@@ -4945,8 +4968,8 @@ ${result.description || ""}`;
                           extensionInstructions
                         )
                       }
-                      isRegenerating={regeneratingSection === "achievements"}
-                      isExtending={extendingSection === "achievements"}
+                      isRegenerating={regeneratingSections.has("achievements")}
+                      isExtending={extendingSections.has("achievements")}
                       renderItem={(item) => {
                         const achievement = item as Achievement;
                         return (
@@ -4989,8 +5012,8 @@ ${result.description || ""}`;
                           extensionInstructions
                         )
                       }
-                      isRegenerating={regeneratingSection === "quests"}
-                      isExtending={extendingSection === "quests"}
+                      isRegenerating={regeneratingSections.has("quests")}
+                      isExtending={extendingSections.has("quests")}
                       renderItem={(item) => {
                         const quest = item as Quest;
                         return (
@@ -5030,8 +5053,8 @@ ${result.description || ""}`;
                           extensionInstructions
                         )
                       }
-                      isRegenerating={regeneratingSection === "relationships"}
-                      isExtending={extendingSection === "relationships"}
+                      isRegenerating={regeneratingSections.has("relationships")}
+                      isExtending={extendingSections.has("relationships")}
                       renderItem={(item) => {
                         const rel = item as Relationship;
                         // Calculate slider position (0-100 from -100 to +100 value)
@@ -5112,8 +5135,8 @@ ${result.description || ""}`;
                           extensionInstructions
                         )
                       }
-                      isRegenerating={regeneratingSection === "presets"}
-                      isExtending={extendingSection === "presets"}
+                      isRegenerating={regeneratingSections.has("presets")}
+                      isExtending={extendingSections.has("presets")}
                       renderItem={(item) => {
                         const preset = item as {
                           name: string;
@@ -5156,8 +5179,8 @@ ${result.description || ""}`;
                           extensionInstructions
                         )
                       }
-                      isRegenerating={regeneratingSection === "inventory"}
-                      isExtending={extendingSection === "inventory"}
+                      isRegenerating={regeneratingSections.has("inventory")}
+                      isExtending={extendingSections.has("inventory")}
                       renderItem={(item) => {
                         const inv = item as InventoryItem;
                         return (
@@ -5202,8 +5225,8 @@ ${result.description || ""}`;
                           extensionInstructions
                         )
                       }
-                      isRegenerating={regeneratingSection === "variables"}
-                      isExtending={extendingSection === "variables"}
+                      isRegenerating={regeneratingSections.has("variables")}
+                      isExtending={extendingSections.has("variables")}
                       renderItem={(item) => {
                         const variable = item as Variable;
                         const getValue = () => {
@@ -5248,7 +5271,9 @@ ${result.description || ""}`;
                         )
                       }
                       onExtend={() => {}}
-                      isRegenerating={regeneratingSection === "startingChoices"}
+                      isRegenerating={regeneratingSections.has(
+                        "startingChoices"
+                      )}
                       isExtending={false}
                       canExtend={false}
                       renderItem={(item) => {
@@ -5297,10 +5322,10 @@ ${result.description || ""}`;
                               extensionInstructions
                             )
                           }
-                          isRegenerating={
-                            regeneratingSection === "customTables"
-                          }
-                          isExtending={extendingSection === "customTables"}
+                          isRegenerating={regeneratingSections.has(
+                            "customTables"
+                          )}
+                          isExtending={extendingSections.has("customTables")}
                           renderItem={(item) => {
                             const table = item as {
                               name: string;
@@ -5470,11 +5495,15 @@ ${result.description || ""}`;
               )}
 
               {/* Extension progress overlay */}
-              {extendingSection && (
+              {extendingSections.size > 0 && (
                 <div className="mt-6 pt-6 border-t border-blue-800/30">
                   <h4 className="text-sm font-medium text-green-400 mb-3 flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-                    Adding more {REGENERATE_SECTIONS[extendingSection].name}...
+                    Adding more{" "}
+                    {Array.from(extendingSections)
+                      .map((s) => REGENERATE_SECTIONS[s].name)
+                      .join(", ")}
+                    ...
                   </h4>
                   {extensionContent && (
                     <div className="bg-green-950/50 rounded-lg p-4 border border-green-700/30 max-h-64 overflow-auto">
@@ -5786,6 +5815,23 @@ ${result.description || ""}`;
                 className="px-4 py-2.5 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors text-sm"
               >
                 Start Over
+              </button>
+
+              <button
+                onClick={() =>
+                  handleRegenerateSection("icons", extensionInstructions)
+                }
+                disabled={regeneratingSections.has("icons")}
+                className="px-4 py-2.5 bg-blue-900/40 hover:bg-blue-800/50 disabled:bg-blue-900/20 disabled:text-blue-300/50 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
+              >
+                {regeneratingSections.has("icons") ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    Regenerating...
+                  </>
+                ) : (
+                  <>🎨 Regenerate Icons</>
+                )}
               </button>
 
               <button
