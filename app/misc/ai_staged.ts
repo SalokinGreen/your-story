@@ -600,6 +600,12 @@ ${
       choiceMessage = `[Game State Updates from previous turn:\n- ${stateChangesStr}]\n\n${choiceMessage}`;
     }
 
+    // Append role affirmation to the user message if enabled
+    // This primes the model to follow output constraints without requiring provider-specific prefill support
+    if (usePrefill) {
+      choiceMessage += `\n\n---\nNarrator confirms: ${STORY_AFFIRMATION}`;
+    }
+
     historyMessages.push({
       role: "user",
       content: cleanString(choiceMessage),
@@ -636,15 +642,6 @@ ${
     console.log(
       `[buildStoryPrompt] Token budget: ${actualStoryBudget}, Used: ${currentTokens}, Info: ${infoTokens}`
     );
-  }
-
-  // Add role affirmation (prefill) if enabled
-  // This primes the model to follow output constraints by appearing as if it already committed
-  if (usePrefill) {
-    messages.push({
-      role: "assistant",
-      content: STORY_AFFIRMATION,
-    });
   }
 
   return { messages, prunedParts };
@@ -801,21 +798,16 @@ ${
   }
 
   // Add the new story content
+  // Append role affirmation if enabled and this is the first tool round
+  const toolUserContent =
+    usePrefill && (!existingToolCalls || existingToolCalls.length === 0)
+      ? `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.\n\n---\nGame State Manager confirms: ${TOOLS_AFFIRMATION}`
+      : `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.`;
+
   messages.push({
     role: "user",
-    content: cleanString(
-      `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.`
-    ),
+    content: cleanString(toolUserContent),
   });
-
-  // Add role affirmation (prefill) if enabled and no existing tool calls
-  // For multi-round tool calling, we skip the affirmation after the first round
-  if (usePrefill && (!existingToolCalls || existingToolCalls.length === 0)) {
-    messages.push({
-      role: "assistant",
-      content: TOOLS_AFFIRMATION,
-    });
-  }
 
   // If we have existing tool calls, add them to history and prompt for more
   if (existingToolCalls && existingToolCalls.length > 0) {
@@ -1155,20 +1147,15 @@ Example: "Take a risk <table: ${
   }
 
   // Add the new story content
+  // Append role affirmation if enabled
+  const choicesUserContent = usePrefill
+    ? `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?\n\n---\nChoice Generator confirms: ${CHOICES_AFFIRMATION}`
+    : `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?`;
+
   messages.push({
     role: "user",
-    content: cleanString(
-      `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?`
-    ),
+    content: cleanString(choicesUserContent),
   });
-
-  // Add role affirmation (prefill) if enabled
-  if (usePrefill) {
-    messages.push({
-      role: "assistant",
-      content: CHOICES_AFFIRMATION,
-    });
-  }
 
   return { messages };
 }
