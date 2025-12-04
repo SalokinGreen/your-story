@@ -48,6 +48,7 @@ import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { IconPicker } from "@/app/components/IconPicker";
 import { CustomTablesEditor } from "@/app/components/CustomTablesEditor";
 import { DraggableScroll } from "@/app/components/DraggableScroll";
+import { ClockCategorySelector } from "@/app/components/ClockCategorySelector";
 import {
   GRADE_CONFIG,
   getMaxDurability,
@@ -11275,7 +11276,8 @@ ${description || ""}`;
       <div className="max-w-6xl mx-auto p-3 sm:p-6">
         {/* Compact Header */}
         <div className="bg-blue-950/50 rounded-xl p-4 border border-blue-800/30 mb-4">
-          <div className="flex items-center justify-between">
+          {/* Top row: Title and action buttons */}
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push("/library")}
@@ -11324,28 +11326,187 @@ ${description || ""}`;
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Progress Steps */}
-        <div className="mb-4 bg-blue-950/50 rounded-xl p-3 border border-blue-800/30">
-          <DraggableScroll innerClassName="gap-2">
-            {steps.map((step, index) => (
+          {/* Bottom row: Category selector (left) and Save/Publish buttons (right) */}
+          <div className="flex items-center justify-between gap-4">
+            <ClockCategorySelector
+              categories={steps}
+              currentIndex={currentStepIndex}
+              onSelect={(index) => setCurrentStep(steps[index].id)}
+              completedIndices={Array.from(
+                { length: currentStepIndex },
+                (_, i) => i
+              )}
+            />
+
+            <div className="flex items-center gap-3">
+              {/* Local/Online Toggle */}
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-xs font-medium ${
+                    isLocal ? "text-blue-300" : "text-blue-300/50"
+                  }`}
+                >
+                  Local
+                </span>
+                <button
+                  onClick={async () => {
+                    if (isLocal) {
+                      // Switching from Local to Online - nothing special needed
+                      setIsLocal(false);
+                    } else {
+                      // Switching from Online to Local
+                      // If adventure exists in database, confirm and delete it
+                      if (
+                        editAdventureId &&
+                        !editAdventureId.startsWith("local:")
+                      ) {
+                        const confirmed = window.confirm(
+                          "Switching to Local will remove this adventure from the online database. It will only exist on your device. Continue?"
+                        );
+                        if (!confirmed) return;
+
+                        try {
+                          // Delete from database
+                          const response = await authenticatedFetch(
+                            `/api/adventures/${editAdventureId}`,
+                            {
+                              method: "DELETE",
+                            }
+                          );
+
+                          if (!response.ok) {
+                            throw new Error("Failed to remove from database");
+                          }
+
+                          // Save locally with a new local ID
+                          const localId = `local:${Date.now()}_${Math.random()
+                            .toString(36)
+                            .substr(2, 9)}`;
+                          const adventureTemplate: Partial<Adventure> = {
+                            title,
+                            shortDescription,
+                            description,
+                            thumbnailUrl: thumbnailUrl || "",
+                            bannerUrl: bannerUrl || "",
+                            tags,
+                            difficulty,
+                            nsfw,
+                            estimatedDuration: "1-2 hours",
+                            storyTemplate: {
+                              story_name: title,
+                              premise,
+                              player_name: playerName || "Hero",
+                              player_summary: playerSummary || "An adventurer",
+                              intro,
+                              memory: [],
+                              max_chapters: maxChapters,
+                              currentChapter: 0,
+                              chapters: [],
+                              scene: { parts: [] },
+                              stats,
+                              resources,
+                              inventory,
+                              abilities,
+                              achievements,
+                              lore,
+                              relationships,
+                              quests,
+                              customTables,
+                              variables,
+                              earnedPointsFromQuests: [],
+                              momentum,
+                              maxMomentum,
+                              points,
+                              earnedPointsFromChapters: [],
+                              author_notes: authorNotes,
+                              selected_preset: selectedPreset,
+                              presets: presets,
+                              upgradeSettings: upgradeSettings,
+                              rpgSystem: rpgSystem,
+                              agmtState: agmtEnabled ? agmtState : undefined,
+                            },
+                            presets: presets,
+                            startingChoices:
+                              startingChoices.length > 0
+                                ? startingChoices
+                                : undefined,
+                          };
+
+                          await saveLocalAdventure(localId, adventureTemplate);
+
+                          // Update URL to the new local ID
+                          window.history.replaceState(
+                            null,
+                            "",
+                            `/creator/manual?edit=${localId}`
+                          );
+
+                          addNotification(
+                            "Adventure moved to local storage",
+                            "success"
+                          );
+                        } catch (error: any) {
+                          console.error("Error switching to local:", error);
+                          addNotification(
+                            `Failed to switch to local: ${error.message}`,
+                            "failure"
+                          );
+                          return;
+                        }
+                      }
+                      setIsLocal(true);
+                    }
+                  }}
+                  disabled={saving}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    isLocal ? "bg-blue-600" : "bg-green-600"
+                  }`}
+                  title={
+                    isLocal
+                      ? "Currently saving locally"
+                      : "Currently saving online"
+                  }
+                >
+                  <div
+                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                      isLocal ? "left-1" : "left-7"
+                    }`}
+                  />
+                </button>
+                <span
+                  className={`text-xs font-medium ${
+                    !isLocal ? "text-green-300" : "text-green-300/50"
+                  }`}
+                >
+                  Online
+                </span>
+              </div>
+
+              {/* Save Button */}
               <button
-                key={step.id}
-                onClick={() => setCurrentStep(step.id)}
-                className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all whitespace-nowrap text-sm ${
-                  currentStep === step.id
-                    ? "bg-purple-600 text-white shadow-md"
-                    : index < currentStepIndex
-                    ? "bg-green-900/30 text-green-400 border border-green-800/30"
-                    : "bg-blue-900/30 text-blue-300 hover:bg-blue-800/40"
-                }`}
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap"
+                title={isLocal ? "Save to your device" : "Save to the database"}
               >
-                <DynamicIcon name={step.icon} className="w-4 h-4" />
-                <span className="hidden sm:inline">{step.label}</span>
+                {saving ? (
+                  <>
+                    <DynamicIcon
+                      name="Loader2"
+                      className="w-4 h-4 animate-spin"
+                    />
+                    <span className="hidden sm:inline">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <DynamicIcon name="Save" className="w-4 h-4" />
+                    <span className="hidden sm:inline">Save</span>
+                  </>
+                )}
               </button>
-            ))}
-          </DraggableScroll>
+            </div>
+          </div>
         </div>
 
         {/* Content */}
