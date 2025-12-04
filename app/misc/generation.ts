@@ -626,6 +626,12 @@ export async function generateStoryTurn(
     }
     storyContent = storyContent.trimStart();
 
+    // Strip [GM State Update] blocks that the model might echo from history
+    // These appear as "[GM State Update]" followed by bullet points until a double newline or end
+    storyContent = storyContent
+      .replace(/\[GM State Update\][\s\S]*?(?=\n\n|$)/gi, "")
+      .trim();
+
     callbacks.onStoryComplete?.(
       storyContent,
       storyMeta?.usage || {
