@@ -27,7 +27,7 @@ export const STORY_AFFIRMATION = `Understood. I will write the narrative respons
 - **Perspective:** Strict Second Person ("You"), deep POV.
 - **Style:** "Show, Don't Tell" with visceral sensory details; varying sentence structure; NO banned words.
 - **Agency:** I will respect the Action Result (Success/Failure) and the Active Challenge state.
-- **Format:** Pure prose only - NO echoing mechanics, NO titles/headers, NO meta-text.
+- **Format:** Rich markdown prose with scene headers, emphasis, and structure for readability.
 
 Here is the narrative:
 `;
@@ -74,6 +74,32 @@ export function cleanString(text: string): string {
     .replace(/[ \t]+$/gm, "")
     .replace(/^[ \t]+/gm, "")
     .trim();
+}
+
+// Strips markdown formatting from text to save tokens in older messages
+// Removes headers, bold, italics, horizontal rules while preserving the text content
+export function stripMarkdown(text: string): string {
+  if (!text) return "";
+  return (
+    text
+      // Remove headers (## Header -> Header)
+      .replace(/^#{1,6}\s+/gm, "")
+      // Remove horizontal rules
+      .replace(/^---+$/gm, "")
+      // Remove bold (**text** or __text__ -> text)
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/__([^_]+)__/g, "$1")
+      // Remove italics (*text* or _text_ -> text)
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/_([^_]+)_/g, "$1")
+      // Remove strikethrough (~~text~~ -> text)
+      .replace(/~~([^~]+)~~/g, "$1")
+      // Remove inline code (`code` -> code)
+      .replace(/`([^`]+)`/g, "$1")
+      // Collapse multiple newlines left by removed elements
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
 }
 
 // Helper to describe chaos factor level
@@ -527,9 +553,12 @@ When an [ACTIVE CHALLENGE] is shown in the game state:
 - **Keep It Episodic:** Each turn during a challenge should advance ONE step - do not skip ahead. Let the mechanics (the score) pace the resolution.
 
 ## 7. OUTPUT FORMAT
-- **Pure Prose Only:** Write ONLY narrative text. No headers, titles, progress indicators, or meta-commentary.
-- **No UI Elements:** Do NOT write things like "Scene:", "Chapter:", "Progress 2/3", "(Challenge Won)", or any labels.
-- **No Mechanical Summaries:** Do NOT echo back the skill check results, item usage, or resource costs. Those are INPUT context for you - the player already saw the dice roll. Just write the story outcome.
+- **Rich Markdown:** Use markdown for a better reading experience:
+    - **Headers:** Use ## for scene transitions, location changes, or time skips (e.g., "## The Tavern", "## Later That Night").
+    - **Emphasis:** Use *italics* for internal thoughts, sounds, or whispers. Use **bold** for impactful moments.
+    - **Breaks:** Use --- for dramatic pauses or perspective shifts within a scene.
+- **No Meta-Text:** Do NOT write progress indicators, mechanical echoes, or UI labels like "Scene:", "Chapter:", "Progress 2/3".
+- **No Mechanical Summaries:** Do NOT echo back the skill check results, item usage, or resource costs. Those are INPUT context - the player already saw the dice roll.
 - **No Stop Markers in Output:** Do not literally write "[STOP]" - just stop writing at the appropriate moment.
 
 WRITE THE NARRATIVE RESPONSE ONLY!
@@ -624,8 +653,23 @@ ${
   }
 
   // Add the (possibly pruned) history
+  // Strip markdown from older messages to save tokens and prevent AI oversaturation
+  // Keep markdown only in the last 4 messages for immediate context
   const prunedHistory = historyMessages.slice(startIndex);
-  messages.push(...prunedHistory);
+  const markdownThreshold = prunedHistory.length - 4;
+
+  for (let i = 0; i < prunedHistory.length; i++) {
+    const msg = prunedHistory[i];
+    if (i < markdownThreshold && msg.role === "assistant") {
+      // Strip markdown from older assistant messages
+      messages.push({
+        ...msg,
+        content: stripMarkdown(msg.content),
+      });
+    } else {
+      messages.push(msg);
+    }
+  }
 
   if (prunedParts > 0) {
     console.log(
