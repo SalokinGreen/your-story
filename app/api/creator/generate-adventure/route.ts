@@ -482,7 +482,10 @@ async function generateStage(
         `Stage ${stage} still incomplete after AI continuation, trying local repair`
       );
 
-      const localRepairResult = parseBigAdventureStageOutput(fullContent, stage);
+      const localRepairResult = parseBigAdventureStageOutput(
+        fullContent,
+        stage
+      );
 
       if (localRepairResult !== null) {
         logger.info(`Stage ${stage} local repair successful`);

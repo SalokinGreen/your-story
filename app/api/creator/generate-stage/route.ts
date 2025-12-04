@@ -743,7 +743,10 @@ export async function POST(req: NextRequest) {
                 );
 
                 const continuationMessages = [
-                  ...messages.map((m) => ({ role: m.role, content: m.content })),
+                  ...messages.map((m) => ({
+                    role: m.role,
+                    content: m.content,
+                  })),
                   { role: "assistant", content: fullContent },
                 ];
 
@@ -831,7 +834,8 @@ export async function POST(req: NextRequest) {
                         usage: {
                           promptTokens: totalPromptTokens,
                           completionTokens: totalCompletionTokens,
-                          totalTokens: totalPromptTokens + totalCompletionTokens,
+                          totalTokens:
+                            totalPromptTokens + totalCompletionTokens,
                         },
                       },
                     })}\n\n`

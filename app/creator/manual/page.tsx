@@ -3427,10 +3427,10 @@ ${description || ""}`;
                 onChange={(e) => setShortDescription(e.target.value)}
                 placeholder="A brief one-line summary"
                 className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
-                maxLength={150}
+                maxLength={300}
               />
               <p className="text-xs text-blue-300/60 mt-1">
-                {shortDescription.length}/150 characters
+                {shortDescription.length}/300 characters
               </p>
             </div>
 
@@ -3444,10 +3444,10 @@ ${description || ""}`;
                 placeholder="Write a compelling description of your adventure..."
                 rows={5}
                 className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
-                maxLength={1000}
+                maxLength={5000}
               />
               <p className="text-xs text-blue-300/60 mt-1">
-                {description.length}/1000 characters
+                {description.length}/5000 characters
               </p>
             </div>
 
