@@ -200,6 +200,22 @@ export interface GameOver {
   timestamp: number; // When the game ended
 }
 
+// Scene Challenge (Progress Clock) for multi-step challenges
+export interface SceneChallenge {
+  id: string; // Unique identifier
+  name: string; // Display name (e.g., "Battle with the Orcs")
+  description?: string; // Optional description of the challenge
+  requiredSuccesses: number; // Successes needed to win (typically 3-5)
+  maxFailures: number; // Failures allowed before losing (typically 3)
+  currentSuccesses: number; // Current success count
+  currentFailures: number; // Current failure count
+  active: boolean; // Whether challenge is ongoing
+  createdAt: number; // Timestamp when challenge started
+  resolvedAt?: number; // Timestamp when challenge ended
+  result?: "won" | "lost"; // Outcome if resolved
+  pointsAwarded?: number; // Points given on completion
+}
+
 export interface Choices {
   choices: Choice[];
 }
@@ -299,6 +315,7 @@ export interface StoryData {
   relationships: Relationship[]; // Relationship tracking system
   conditions: Condition[]; // Active conditions/afflictions affecting the player
   gameOver?: GameOver; // Game over state if the player has permanently died/lost
+  activeChallenge?: SceneChallenge; // Current scene challenge (progress clock)
   author_notes?: string;
   player_notes?: string;
   selected_preset?: string; // ID of the preset used
@@ -558,6 +575,11 @@ export interface ActionAnalysis {
   agmt_table?: string | null;
   custom_table?: string | null;
   is_plain_action: boolean; // True if no mechanics, just narration
+  // Scene Challenge handling
+  challenge_handling?: {
+    is_complex_event: boolean; // True if this implies a multi-step task
+    challenge_name: string | null; // Name for new challenge (e.g., "Escape the burning inn")
+  };
 }
 
 // For manual action building when AI analysis fails

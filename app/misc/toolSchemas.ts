@@ -1438,6 +1438,123 @@ const deleteVariableTool: ToolSchema = {
   },
 };
 
+// Scene Challenge (Progress Clock) Tools
+const startChallengeTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "start_challenge",
+    description:
+      "Start a new Scene Challenge (Progress Clock) for multi-step tasks like combat, chases, heists, or complex negotiations. Use when a task is too significant to resolve in one roll. Guidelines: Small brawl/locked door = don't use (simple check). Dangerous combat/chase = 3 successes, 3 failures. Boss fight/war = 5+ successes. Only one challenge can be active at a time.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description:
+            "Challenge name (e.g., 'Battle with the Orcs', 'Escape the Burning Inn', 'Convince the Council')",
+        },
+        description: {
+          type: "string",
+          description:
+            "Brief description of the challenge and win/lose conditions",
+        },
+        requiredSuccesses: {
+          type: "number",
+          description:
+            "Number of successes needed to win (3 = normal, 5 = hard, 7+ = epic)",
+          minimum: 2,
+          maximum: 10,
+        },
+        maxFailures: {
+          type: "number",
+          description:
+            "Number of failures before losing (typically 3, lower for high-stakes)",
+          minimum: 1,
+          maximum: 10,
+        },
+        points: {
+          type: "number",
+          description: "Progression points awarded on victory (default: 25)",
+          minimum: 0,
+        },
+      },
+      required: ["name", "requiredSuccesses", "maxFailures"],
+    },
+  },
+};
+
+const updateChallengeTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "update_challenge",
+    description:
+      "Update the active challenge progress after a skill check. Call this after each roll during a challenge. Add successes when player succeeds, failures when they fail. Award 2 points for critical success/failure if narratively appropriate.",
+    parameters: {
+      type: "object",
+      properties: {
+        successIncrement: {
+          type: "number",
+          description: "Successes to add (typically 1, or 2 for crits)",
+          minimum: 0,
+          maximum: 3,
+        },
+        failureIncrement: {
+          type: "number",
+          description: "Failures to add (typically 1, or 2 for crits)",
+          minimum: 0,
+          maximum: 3,
+        },
+      },
+      required: [],
+    },
+  },
+};
+
+const resolveChallengeTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "resolve_challenge",
+    description:
+      "Manually resolve the active challenge. Usually called automatically when success/failure thresholds are met, but can be called manually for narrative reasons (e.g., enemy surrenders, unexpected rescue).",
+    parameters: {
+      type: "object",
+      properties: {
+        result: {
+          type: "string",
+          enum: ["won", "lost"],
+          description: "Challenge outcome",
+        },
+        reason: {
+          type: "string",
+          description:
+            "Why the challenge ended (optional, for non-standard resolutions)",
+        },
+      },
+      required: ["result"],
+    },
+  },
+};
+
+const cancelChallengeTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "cancel_challenge",
+    description:
+      "Cancel the active challenge without a win/loss result. Use when the challenge becomes irrelevant (e.g., both parties flee, the objective changes, scene transitions, or the situation fundamentally changes so the challenge no longer applies). No points are awarded.",
+    parameters: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description:
+            "Why the challenge was cancelled (e.g., 'Enemies fled the scene', 'Negotiation interrupted by dragon attack')",
+        },
+      },
+      required: ["reason"],
+    },
+  },
+};
+
 // Export all tools as array
 export const TOOL_SCHEMAS: ToolSchema[] = [
   // Quest Management (5 tools)
@@ -1515,6 +1632,12 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   clearListTool,
   createVariableTool,
   deleteVariableTool,
+
+  // Scene Challenges (4 tools)
+  startChallengeTool,
+  updateChallengeTool,
+  resolveChallengeTool,
+  cancelChallengeTool,
 
   // Advanced RPG Tools (9 tools)
   ...MYTHIC_TOOLS,

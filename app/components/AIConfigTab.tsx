@@ -90,6 +90,13 @@ export default function AIConfigTab() {
     }
     return 0.25;
   });
+  const [usePrefill, setUsePrefill] = useState(() => {
+    if (typeof window !== "undefined") {
+      // Default to true (enabled)
+      return localStorage.getItem("usePrefill") !== "false";
+    }
+    return true;
+  });
   const [customMaxContext, setCustomMaxContext] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("customMaxContext");
@@ -1323,6 +1330,55 @@ export default function AIConfigTab() {
               When enabled, uses Mistral embeddings to semantically search lore
               and memories for more relevant context. Cost: ~0.5 coins per 100
               turns.
+            </span>
+          </p>
+        </div>
+      </div>
+
+      {/* Role Affirmation (Prefill) Section */}
+      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+          <DynamicIcon name="MessageSquare" className="w-4 h-4" />
+          Role Affirmation
+        </h4>
+
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Enable Prefill Messages
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Prime AI to follow output format by adding commitment messages
+            </p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={usePrefill}
+              onChange={(e) => {
+                const newValue = e.target.checked;
+                setUsePrefill(newValue);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("usePrefill", String(newValue));
+                }
+              }}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
+          </label>
+        </div>
+
+        <div className="p-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+          <p className="text-xs text-purple-700 dark:text-purple-300 flex items-start gap-1.5">
+            <DynamicIcon
+              name="Sparkles"
+              className="w-3.5 h-3.5 mt-0.5 shrink-0"
+            />
+            <span>
+              Adds assistant messages like &ldquo;Understood. I will follow the
+              rules...&rdquo; before generation. This technique improves output
+              consistency by making the AI &ldquo;commit&rdquo; to constraints.
+              Disable for A/B testing.
             </span>
           </p>
         </div>

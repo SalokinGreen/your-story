@@ -2477,6 +2477,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
           : 0.25;
+      const usePrefill =
+        typeof window !== "undefined"
+          ? localStorage.getItem("usePrefill") !== "false"
+          : true;
 
       // Track parallel completion of tools and choices
       let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -2508,6 +2512,7 @@ function StoryPageContent() {
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
           samplingSettings: getSamplingSettings(),
+          usePrefill,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -4308,6 +4313,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
         : 0.25;
+    const usePrefill =
+      typeof window !== "undefined"
+        ? localStorage.getItem("usePrefill") !== "false"
+        : true;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -4425,6 +4434,7 @@ function StoryPageContent() {
             enableEmbeddings: embeddingsEnabled,
             embeddingThreshold,
             samplingSettings: getSamplingSettings(),
+            usePrefill,
           },
           {
             onStoryContent: (chunk: string, fullContent: string) => {
@@ -4694,6 +4704,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
         : 0.25;
+    const usePrefill =
+      typeof window !== "undefined"
+        ? localStorage.getItem("usePrefill") !== "false"
+        : true;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -4726,6 +4740,7 @@ function StoryPageContent() {
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
           samplingSettings: getSamplingSettings(),
+          usePrefill,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {

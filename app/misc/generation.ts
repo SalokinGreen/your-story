@@ -71,6 +71,8 @@ export interface GenerationOptions {
   embeddingThreshold?: number; // Similarity threshold (0.1-0.5, default 0.25)
   // Sampling settings (for story stage only, Coins mode)
   samplingSettings?: SamplingSettings;
+  // Role Affirmation (prefill) - primes model to follow output constraints
+  usePrefill?: boolean; // Default: true
 }
 
 export interface GenerationCallbacks {
@@ -406,6 +408,7 @@ export async function generateStoryTurn(
       modelName: options.storyModel,
       customMaxContext: options.customMaxContext,
       embeddingContext,
+      usePrefill: options.usePrefill !== false, // Default to true
     });
 
     if (storyPrompt.prunedParts > 0) {
@@ -528,6 +531,7 @@ export async function generateStoryTurn(
           existingToolCalls: allToolCalls,
           existingToolResponses: allToolResponses,
           embeddingContext,
+          usePrefill: options.usePrefill !== false, // Default to true
         });
 
         // Try primary model first, then fallback on rate limit
@@ -684,6 +688,7 @@ export async function generateStoryTurn(
         storyData,
         storyContent,
         embeddingContext,
+        usePrefill: options.usePrefill !== false, // Default to true
       });
 
       const choicesResponse = await fetch("/api/generate-stream", {

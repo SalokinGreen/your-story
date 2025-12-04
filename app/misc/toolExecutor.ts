@@ -107,6 +107,11 @@ const STATE_CHANGE_TOOLS = new Set([
   "modify_momentum",
   // Game state
   "game_over",
+  // Scene Challenges
+  "start_challenge",
+  "update_challenge",
+  "resolve_challenge",
+  "cancel_challenge",
 ]);
 
 /**
@@ -1659,6 +1664,369 @@ export function executeTools(
           message: `⚠️ GAME OVER: ${reason}${
             conditionName ? ` (due to ${conditionName})` : ""
           }`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // === SCENE CHALLENGE (PROGRESS CLOCK) TOOL HANDLERS ===
+
+      // Start a new challenge
+      if (toolCall.function.name === "start_challenge") {
+        const name = args.name?.trim();
+        const description = args.description?.trim();
+        const requiredSuccesses = args.requiredSuccesses;
+        const maxFailures = args.maxFailures;
+        const points = args.points ?? 25; // Default 25 points
+
+        if (!name || name.length < 3) {
+          const errorMsg = "Challenge name must be at least 3 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/start_challenge: ${name || ""}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!requiredSuccesses || requiredSuccesses < 2) {
+          const errorMsg =
+            "Challenge requires at least 2 successes to complete";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/start_challenge: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!maxFailures || maxFailures < 1) {
+          const errorMsg = "Challenge must allow at least 1 failure";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/start_challenge: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Check if there's already an active challenge
+        if (storyData.activeChallenge?.active) {
+          const errorMsg = `Cannot start new challenge: "${storyData.activeChallenge.name}" is still active`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/start_challenge: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Create the new challenge
+        storyData.activeChallenge = {
+          id: crypto.randomUUID(),
+          name,
+          description,
+          requiredSuccesses,
+          maxFailures,
+          currentSuccesses: 0,
+          currentFailures: 0,
+          active: true,
+          createdAt: Date.now(),
+          pointsAwarded: points,
+        };
+
+        logger.action("Challenge started via tool", {
+          toolCallId: toolId,
+          name,
+          requiredSuccesses,
+          maxFailures,
+          points,
+        });
+        responses.push({
+          command: `/start_challenge: ${name}`,
+          success: true,
+          message: `🎯 CHALLENGE STARTED: ${name} [Progress: 0/${requiredSuccesses}] [Danger: 0/${maxFailures}]${
+            points > 0 ? ` (${points} points on victory)` : ""
+          }`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Update challenge progress
+      if (toolCall.function.name === "update_challenge") {
+        const successIncrement = args.successIncrement ?? 0;
+        const failureIncrement = args.failureIncrement ?? 0;
+
+        if (!storyData.activeChallenge?.active) {
+          const errorMsg = "No active challenge to update";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/update_challenge`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (successIncrement === 0 && failureIncrement === 0) {
+          const errorMsg = "Must specify successIncrement or failureIncrement";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/update_challenge`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const challenge = storyData.activeChallenge;
+        const oldSuccesses = challenge.currentSuccesses;
+        const oldFailures = challenge.currentFailures;
+
+        challenge.currentSuccesses += successIncrement;
+        challenge.currentFailures += failureIncrement;
+
+        // Check for automatic resolution
+        let autoResolved = false;
+        let autoResult: "won" | "lost" | null = null;
+
+        if (challenge.currentSuccesses >= challenge.requiredSuccesses) {
+          autoResolved = true;
+          autoResult = "won";
+          challenge.active = false;
+          challenge.resolvedAt = Date.now();
+          challenge.result = "won";
+
+          // Award points
+          if (challenge.pointsAwarded && challenge.pointsAwarded > 0) {
+            storyData.points =
+              (storyData.points || 0) + challenge.pointsAwarded;
+          }
+        } else if (challenge.currentFailures >= challenge.maxFailures) {
+          autoResolved = true;
+          autoResult = "lost";
+          challenge.active = false;
+          challenge.resolvedAt = Date.now();
+          challenge.result = "lost";
+        }
+
+        const progressStr = `[Progress: ${challenge.currentSuccesses}/${challenge.requiredSuccesses}] [Danger: ${challenge.currentFailures}/${challenge.maxFailures}]`;
+        let message = "";
+
+        if (successIncrement > 0 && failureIncrement > 0) {
+          message = `${challenge.name}: +${successIncrement} success, +${failureIncrement} failure ${progressStr}`;
+        } else if (successIncrement > 0) {
+          message = `${challenge.name}: +${successIncrement} success${
+            successIncrement > 1 ? "es" : ""
+          } ${progressStr}`;
+        } else {
+          message = `${challenge.name}: +${failureIncrement} failure${
+            failureIncrement > 1 ? "s" : ""
+          } ${progressStr}`;
+        }
+
+        if (autoResolved) {
+          if (autoResult === "won") {
+            message += `\n🏆 CHALLENGE WON: ${challenge.name}!${
+              challenge.pointsAwarded
+                ? ` (+${challenge.pointsAwarded} points)`
+                : ""
+            }`;
+          } else {
+            message += `\n💀 CHALLENGE LOST: ${challenge.name}!`;
+          }
+        }
+
+        logger.action("Challenge updated via tool", {
+          toolCallId: toolId,
+          name: challenge.name,
+          oldSuccesses,
+          newSuccesses: challenge.currentSuccesses,
+          oldFailures,
+          newFailures: challenge.currentFailures,
+          autoResolved,
+          autoResult,
+        });
+        responses.push({
+          command: `/update_challenge: +${successIncrement}s, +${failureIncrement}f`,
+          success: true,
+          message,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Manually resolve challenge
+      if (toolCall.function.name === "resolve_challenge") {
+        const result = args.result as "won" | "lost";
+        const reason = args.reason?.trim();
+
+        if (!storyData.activeChallenge?.active) {
+          const errorMsg = "No active challenge to resolve";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/resolve_challenge`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (result !== "won" && result !== "lost") {
+          const errorMsg = "Result must be 'won' or 'lost'";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/resolve_challenge`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const challenge = storyData.activeChallenge;
+        challenge.active = false;
+        challenge.resolvedAt = Date.now();
+        challenge.result = result;
+
+        let message = "";
+        if (result === "won") {
+          // Award points
+          if (challenge.pointsAwarded && challenge.pointsAwarded > 0) {
+            storyData.points =
+              (storyData.points || 0) + challenge.pointsAwarded;
+          }
+          message = `🏆 CHALLENGE WON: ${challenge.name}!${
+            challenge.pointsAwarded
+              ? ` (+${challenge.pointsAwarded} points)`
+              : ""
+          }${reason ? ` - ${reason}` : ""}`;
+        } else {
+          message = `💀 CHALLENGE LOST: ${challenge.name}!${
+            reason ? ` - ${reason}` : ""
+          }`;
+        }
+
+        logger.action("Challenge resolved via tool", {
+          toolCallId: toolId,
+          name: challenge.name,
+          result,
+          reason,
+          pointsAwarded: result === "won" ? challenge.pointsAwarded : 0,
+        });
+        responses.push({
+          command: `/resolve_challenge: ${result}`,
+          success: true,
+          message,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Cancel challenge (no win/loss)
+      if (toolCall.function.name === "cancel_challenge") {
+        const reason = args.reason?.trim();
+
+        if (!storyData.activeChallenge?.active) {
+          const errorMsg = "No active challenge to cancel";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/cancel_challenge`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!reason || reason.length < 5) {
+          const errorMsg = "Cancellation reason must be at least 5 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/cancel_challenge`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const challenge = storyData.activeChallenge;
+        const challengeName = challenge.name;
+        
+        // Clear the challenge without setting a result
+        challenge.active = false;
+        challenge.resolvedAt = Date.now();
+        // Note: result remains undefined for cancelled challenges
+
+        const message = `⏹️ CHALLENGE CANCELLED: ${challengeName} - ${reason}`;
+
+        logger.action("Challenge cancelled via tool", {
+          toolCallId: toolId,
+          name: challengeName,
+          reason,
+          progress: `${challenge.currentSuccesses}/${challenge.requiredSuccesses}`,
+        });
+        responses.push({
+          command: `/cancel_challenge: ${reason}`,
+          success: true,
+          message,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });

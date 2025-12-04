@@ -364,6 +364,17 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - AI manages conditions via tools: add_condition, upgrade_condition, downgrade_condition, remove_condition
   - Tier 6 = permanent, cannot be downgraded (use remove_condition with force=true for miraculous cures)
   - game_over tool for when tier 6 conditions narratively end the story
+- **Scene Challenges (Progress Clocks)**:
+  - Multi-step challenges for tasks too significant to resolve in one roll (combat with groups, chases, heists, negotiations)
+  - SceneChallenge interface: id, name, description, requiredSuccesses, maxFailures, currentSuccesses, currentFailures, active, result, pointsAwarded
+  - StoryData.activeChallenge stores the current challenge (only one active at a time)
+  - Tools: start_challenge (begins new challenge), update_challenge (adds success/failure increments), resolve_challenge (manual win/lost), cancel_challenge (abort without resolution)
+  - Auto-resolves when currentSuccesses >= requiredSuccesses (won) or currentFailures >= maxFailures (lost)
+  - cancel_challenge: Use when challenge becomes irrelevant (enemies flee, scene changes, objective shifts) - no points awarded, result stays undefined
+  - Victory awards progression points (default 25, configurable)
+  - Guidelines: Simple tasks = regular skill check, dangerous combat/chase = 3/3, boss fight = 5+ successes
+  - Story prompt adapts based on challenge progress: low (initial clash), mid (tide turning), completed (conclusion)
+  - ActionAnalysis includes challenge_handling field: { is_complex_event, challenge_name } for detecting when to start challenges
 - **Custom input**: handleCustomInput function allows free-form text submission to AI without predefined choices.
 - **Retry system**: handleRetry removes last AI response and regenerates with same context.
 - **TTS Integration**: Auto-generate narration clears old audio on text change, triggers handlePlay after 500ms delay when enabled.

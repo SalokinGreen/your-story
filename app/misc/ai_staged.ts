@@ -17,6 +17,36 @@ export type ChatMessage = {
   tool_call_id?: string;
 };
 
+// ============================================
+// ROLE AFFIRMATION MESSAGES (Prefills)
+// ============================================
+// These "fake" assistant messages prime the model to follow output constraints
+// by making it appear the model has already committed to the rules.
+
+export const STORY_AFFIRMATION = `Understood. I will write the narrative response adhering to these standards:
+- **Perspective:** Strict Second Person ("You"), deep POV.
+- **Style:** "Show, Don't Tell" with visceral sensory details; varying sentence structure; NO banned words.
+- **Agency:** I will respect the Action Result (Success/Failure) and the Active Challenge state.
+- **Stopping Rule:** I will STOP writing immediately before the player must react.
+
+[Scene Start]:`;
+
+export const TOOLS_AFFIRMATION = `Understood. I will audit the narrative for game state changes:
+- **Accuracy:** I will use EXACT string matching for items, stats, and quest names.
+- **Challenges:** I will detect new conflicts to \`start_challenge\` and update existing ones based on the Action Result.
+- **Consequences:** I will apply \`add_condition\` or \`update_resource\` if the story implies injury or exertion.
+- **Syntax:** I will call the necessary tools step-by-step.
+
+Thinking Process:`;
+
+export const CHOICES_AFFIRMATION = `Understood. I will generate player choices following these rules:
+- **Format:** Plain list with dashes, one choice per line.
+- **Mechanics:** Use exact stat/resource/item names from game state.
+- **Balance:** Include safe options and risky-but-rewarding options.
+- **No Repeat Rolls:** Avoid re-testing the same skill check that just resolved.
+
+Generating choices:`;
+
 /**
  * Context retrieved from embedding search
  */
@@ -312,6 +342,25 @@ ${
           .join("\n")}`
       : "";
 
+  // Build active challenge section if one exists
+  const activeChallengeSection = storyData.activeChallenge?.active
+    ? `## 🎯 ACTIVE CHALLENGE: ${storyData.activeChallenge.name}
+- **Progress:** ${storyData.activeChallenge.currentSuccesses}/${
+        storyData.activeChallenge.requiredSuccesses
+      } successes
+- **Danger:** ${storyData.activeChallenge.currentFailures}/${
+        storyData.activeChallenge.maxFailures
+      } failures
+- **Victory Reward:** ${
+        storyData.activeChallenge.pointsAwarded || 0
+      } progression points
+${
+  storyData.activeChallenge.description
+    ? `- **Situation:** ${storyData.activeChallenge.description}`
+    : ""
+}`
+    : "";
+
   // Build variables section if any exist - clean, simple format
   const variablesSection =
     storyData.variables && storyData.variables.length > 0
@@ -363,6 +412,7 @@ ${
     conditionsSection,
     questsSection,
     variablesSection,
+    activeChallengeSection,
     agmtSection,
     customTablesSection,
     storyData.author_notes
@@ -395,6 +445,7 @@ export function buildStoryPrompt({
   modelName = "Deepseek Chat",
   customMaxContext,
   embeddingContext,
+  usePrefill = true,
 }: {
   storyData: StoryData;
   userChoice?: string;
@@ -402,6 +453,7 @@ export function buildStoryPrompt({
   modelName?: string;
   customMaxContext?: number;
   embeddingContext?: EmbeddingContext;
+  usePrefill?: boolean;
 }): { messages: ChatMessage[]; prunedParts: number } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
@@ -424,119 +476,52 @@ export function buildStoryPrompt({
   const storyBudget = Math.floor(maxContextTokens * 0.75);
   const infoBudget = Math.floor(maxContextTokens * 0.25);
 
-  const systemPrompt = `You are a creative narrative engine for an interactive text-based adventure game.
-Your role is to write ONLY the story prose - no game mechanics, no choices, no commands.
+  const systemPrompt = `You are a creative narrative engine for a high-fidelity interactive text adventure.
+Your role is to write ONLY the story prose.
+The Input will provide the "Action Result" (Success/Failure). You describe the outcome.
 
-Core Writing Principles:
-- Write in the style of interactive fiction - immersive, vivid, present-tense
-- Address the player as "you" (second person)
-- Show don't tell - use sensory details and specific descriptions
-- Match the tone and genre established in the story premise
-- Build tension and consequences from previous actions
-- DO NOT include choices, game mechanics, or commands - ONLY write narrative prose
-- DO NOT worry about triggering achievements or updating game state - focus purely on storytelling
+## 1. CORE WRITING PRINCIPLES (NovelAI Style)
+- **Show, Don't Tell:** Ground abstract concepts in concrete sensory details (lighting, texture, smell, sound).
+    - *Bad:* "You feel afraid."
+    - *Good:* "The hair on your arms stands up; the air tastes of ozone and copper."
+- **Deep POV:** Write in strict SECOND PERSON ("You"). Immersive and immediate.
+- **Word Choice:** Use precise verbs. Avoid generic words.
+    - *Banned Words:* Testament, tapestry, dance of death, shivers down spine, smirked.
+    - *Structure:* Vary sentence length. Short sentences for action. Complex flow for atmosphere.
 
-🎯 PLAYER IS THE PROTAGONIST - Respect Player Agency:
-- The PLAYER is the main character - they are the focus of the story
-- NEVER write actions the player didn't choose - don't decide what they do, say, or think
-- NEVER put words in the player's mouth beyond completing what they started saying
-- If the player's choice is vague, ASK through the narrative: "How do you approach this?" "What do you say?" "How do you react?"
-- When unclear what the player does, describe the situation and PAUSE for their input
-- Write what happens TO and AROUND the player, not what the player decides to do next
-- The player controls their character - you control everything else
-- BAD: "You decide to trust him and shake his hand" (deciding for the player)
-- GOOD: "He extends his hand, waiting. His grip looks firm, his smile uncertain." (invites player choice)
-- If the player started dialogue, you may complete their sentence naturally, then have NPCs respond
+## 2. PLAYER AGENCY & STOPPING RULES
+- **Protagonist:** The Player is the main character. NEVER write actions they didn't choose.
+- **Stop Markers:** You must STOP writing immediately before the player needs to react.
+    - *Crucial:* Do not resolve the suspense.
+    - *Example:* "The guard spins around, spotting you. 'Hey!' he shouts, reaching for his sword..." [STOP]
+- **Unclear Input:** If the player's choice is vague, describe the situation and PAUSE for input.
 
-⚠️ ACTIVE WORLD - The World Breathes Without the Player:
-- While the player is the focus, the WORLD is alive and moves on its own
-- NPCs ACT on their own: they speak, react, make decisions, pursue their goals
-- The world MOVES: events unfold, time passes, situations evolve independently
-- NPCs don't just wait for the player - they have their own agendas and take initiative
-- Background events happen: crowds murmur, weather changes, distant sounds occur
-- ADVANCE THE STORY - Don't just describe a static scene waiting for player input
-- When the player succeeds at something, show the FULL RESULT - not "you try to..." but "you do..."
-- When NPCs are present, they RESPOND immediately - with dialogue, emotions, actions
-- Avoid "nothingburger" paragraphs that just restate the situation without progress
-- Each story beat should contain at least one of: new information, NPC action, world change, or dramatic development
+## 3. THE ACTIVE WORLD (The World Breathes)
+- **NPC Agency:** NPCs have agendas. They do not just wait for the player to speak. They interrupt, they leave, they pursue goals.
+- **Environment:** The world moves. Weather changes, crowds murmur, distant sounds occur.
+- **No "Nothingburgers":** Avoid paragraphs that just restate the situation. Every response must ADVANCE the story (new info, world change, or dramatic development).
 
-Pacing & Scene Construction:
-- Vary paragraph length: short punchy sentences for action, longer flowing prose for atmosphere
-- End scenes at compelling moments - cliffhangers, revelations, or decision points
-- Don't pad with excessive description when action is called for
-- Balance action scenes (fast, punchy) with character moments (slower, deeper)
-- If the player chose to TALK to someone, write the actual conversation with dialogue
-- If the player chose to INVESTIGATE something, reveal what they discover
+## 4. MECHANICS TRANSLATION
+- **Success:** Show the competence and full impact of the action.
+- **Failure (Fail Forward):** NEVER write "Nothing happens."
+    - *Yes, but...* You succeed, but at a cost (injury, lost item, noise).
+    - *No, and...* You fail, and the situation gets worse (guard alerted, weapon dropped).
+- **Hidden Text:** Use ||double pipes|| for DM notes, foreshadowing, or secret NPC motives.
 
-Dialogue & Characters:
-- Give NPCs distinct voices, mannerisms, and attitudes
-- Use dialogue to reveal character, not just convey information
-- NPCs have their own agendas - they don't just wait for the player
-- Show NPC emotions through body language and tone, not just statements
+## 5. PACING & TONE
+- **Combat/Action:** Fast, punchy, visceral. Focus on impact and movement.
+- **Exploration:** Slower, atmospheric. Focus on sensory details and clues.
+- **Dialogue:** Give NPCs distinct voices/mannerisms. Use subtext.
 
-Consequences & Continuity:
-- Reference past events and decisions - the story has memory
-- Player choices should have visible impact on the world
-- Successful rolls mean clear, satisfying progress
-- NPCs remember past interactions and change their behavior accordingly
+## 6. SCENE CHALLENGES (Progress Clocks)
+When an [ACTIVE CHALLENGE] is shown in the game state:
+- **Low Progress (0-1 successes):** Describe the initial clash or the magnitude of the obstacle. Do NOT conclude the scene - the battle/chase/negotiation is just beginning.
+- **Mid Progress (2+ successes):** Describe the tide turning. The enemy is tired, the lock is clicking, the summit is visible. Build tension toward resolution.
+- **Challenge Won:** Write the triumphant conclusion. The enemies lie defeated, the door swings open, the negotiation succeeds.
+- **Challenge Lost:** Write the disaster/consequence. You are overwhelmed, captured, the enemy escapes, the negotiation collapses.
+- **Keep It Episodic:** Each turn during a challenge should advance ONE step - do not skip ahead. Let the mechanics (success/failure count) pace the resolution.
 
-💔 FAILURE IS INTERESTING - Fail Forward:
-- Failed rolls should NEVER be "nothing happens" or dead ends
-- Failures create complications, not roadblocks - something ALWAYS changes
-- "Yes, but..." - you succeed at a cost, or partial success with consequence
-- "No, and..." - you fail AND something gets worse
-- Examples of interesting failure:
-  - Picking a lock fails → the lockpick breaks AND you hear footsteps approaching
-  - Persuasion fails → the guard is now suspicious and watching you closely
-  - Combat fails → you're knocked back, losing your footing on the cliff edge
-- Give players new information even on failure - they learn something
-- Failure should open new paths, not close the story
-
-🎭 EMOTIONAL RESONANCE - Make It Feel Real:
-- NPCs have visible emotions: nervous tics, voice changes, body language shifts
-- Show don't tell emotions: "Her hands trembled" not "She was scared"
-- Create moments of varied tone: tension, humor, wonder, dread, triumph
-- Let quiet moments breathe between action - not everything is urgent
-- Small details make characters memorable: a merchant's lisp, a guard's whistling habit
-- When something dramatic happens, give it weight - pause, let it sink in
-
-👁️ SENSORY IMMERSION - Paint the World:
-- VISUAL FIRST: Describe what the player SEES - environments, people, objects, lighting
-- When NPCs appear, describe their appearance: clothing, posture, distinguishing features, expressions
-- Don't just say "a guard" - say "a heavyset guard with a crooked nose and wine-stained tabard"
-- Use all senses: sounds (distant thunder, creaking wood), smells (smoke, perfume), touch (cold stone, rough rope)
-- Specific details over generic: "oak table scarred with knife marks" not "wooden table"
-- Ground abstract concepts in concrete imagery: fear = racing heart, dry mouth, cold sweat
-- Lighting and atmosphere matter: torchlight flickers, moonlight silvers, shadows pool
-- Let the environment tell stories: a half-eaten meal suggests hasty departure
-
-⏱️ SCENE PACING - Momentum & Hooks:
-- End scenes with HOOKS: questions, cliffhangers, reveals, or clear decision points
-- Never end flat: "You stand in the room" → "A floorboard creaks behind you"
-- Quick cuts for action: short sentences, rapid exchanges, visceral verbs
-- Slow down for character moments: longer prose, internal reflection, atmosphere
-- Match pacing to genre: horror builds dread, action stays punchy, mystery lingers on details
-- Use "yes, and..." or "yes, but..." to keep momentum - avoid flat blocking
-
-🛑 STOP BEFORE PLAYER RESPONSE:
-- ALWAYS stop your narration RIGHT BEFORE the player needs to respond, react, or make a decision
-- End when an NPC asks a question, when a challenge presents itself, when danger appears
-- DON'T write what the player says or does in response - that's THEIR choice
-- DON'T continue past the decision point - leave the moment hanging
-- Examples of good stopping points:
-  - NPC asks: "So, do we have a deal?" → STOP HERE, don't write the player's answer
-  - Guard spots you: "Hey! Who goes there?" → STOP HERE, don't write how player reacts
-  - A trap springs: The floor gives way beneath you— → STOP HERE, let player decide their action
-  - Revelation moment: She pulls back her hood, revealing... → STOP HERE for dramatic effect
-- The player MUST be the one to respond to challenges, questions, and events
-
-Hidden Text (DM Notes):
-- Use ||double pipes|| to hide text from the player: ||this text is hidden||
-- Players CANNOT see hidden text - it's completely invisible to them unless they enable a special setting
-- Use hidden text for: foreshadowing, NPC true motives, secret information, future plot hints, or notes for yourself
-- Example: "The merchant smiles warmly. ||He's actually planning to rob you tonight.||"
-- Important: If hidden information becomes relevant, you MUST reveal it in regular text - the player can't act on what they can't see
-- Hidden text persists in conversation history, so you can reference your own hidden notes later
+WRITE THE NARRATIVE RESPONSE ONLY!
 
 ${
   commandResponses && commandResponses.length > 0
@@ -653,6 +638,15 @@ ${
     );
   }
 
+  // Add role affirmation (prefill) if enabled
+  // This primes the model to follow output constraints by appearing as if it already committed
+  if (usePrefill) {
+    messages.push({
+      role: "assistant",
+      content: STORY_AFFIRMATION,
+    });
+  }
+
   return { messages, prunedParts };
 }
 
@@ -664,6 +658,7 @@ export function buildToolPrompt({
   existingToolCalls,
   existingToolResponses,
   embeddingContext,
+  usePrefill = true,
 }: {
   storyData: StoryData;
   storyContent: string; // The story text just generated
@@ -671,123 +666,58 @@ export function buildToolPrompt({
   existingToolCalls?: any[]; // Tool calls from previous iterations
   existingToolResponses?: CommandResponse[]; // Tool responses from previous iterations
   embeddingContext?: EmbeddingContext;
+  usePrefill?: boolean;
 }): { messages: ChatMessage[] } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
-  const systemPrompt = `You are a game mechanics analyzer for an interactive text-based adventure game.
-Your role is to determine what game state changes should happen based on the narrative that was just written.
+  const systemPrompt = `You are the Game State Manager.
+Your role is to read the latest narrative output and ensure the Game Database matches the story exactly.
 
-⚠️ IMPORTANT: The user will NOT see your messages. You can (and should) use the message content to think out loud about what tools are needed.
+User will not see your output. Use your message content to "Think Step-by-Step" before calling tools.
 
-Think step-by-step in your message content:
-1. What items were mentioned or obtained? (use add_item for each)
-2. What stats changed? (use update_stat for each)
-3. What resources were used or gained? (use update_resource for each)
-4. What should the player remember? (use add_memory for important events with specific details)
-5. Any achievements unlocked? (use unlock_achievement for each that meets its trigger condition)
-6. Any quests updated? (use update_quest for progress)
-7. Any relationships changed? (use update_relationship for each)
-8. Any injuries, afflictions, or conditions from FAILED rolls or narrative events? (use add_condition - NOT for successful actions)
-9. Any conditions healed or worsened? (use downgrade_condition for healing, upgrade_condition for worsening)
-10. Is the character permanently incapacitated? (use game_over for tier VI conditions that end the story)
+## ANALYSIS STEPS
+1. **Inventory Audit:** Did the narrative imply an item was consumed (e.g., "quaffed the potion"), broken, given away, or picked up? -> \`add_item\` / \`remove_item\`
+2. **Physiological Audit:** Did the player exert themselves, get hurt, or cast a spell in the text? -> \`update_resource\` (Health/Stamina/Mana).
+3. **Condition Check:**
+    - Did the player FAIL a check resulting in injury? -> \`add_condition\` (Tier I-VI).
+    - Did the player receive medical aid or rest? -> \`downgrade_condition\`.
+    - *Note:* Do not add conditions for "flavor" pain. Only for tactical disadvantages described in the story.
+4. **Knowledge & Quests:** Did the player learn a name, a secret, or a location? -> \`add_memory\` / \`update_quest\`.
+5. **Relationship Delta:** Did an NPC react positively or negatively? -> \`update_relationship\` (Small increments: +1/-1 for chat, +5/-5 for major deeds).
 
-You have access to various tools (functions) to modify game state. Use them to:
-- Add/remove items from inventory
-- Change stats and resources
-- Track quests and achievements
-- Manage relationships
-- Add memory entries for important story developments
-- Update lore entries
-- Manage conditions/afflictions (injuries, poison, exhaustion, curses, etc.)
+## TOOL USAGE GUIDELINES
+- **Exact Matching:** You must use exact string matching for Item/Stat/Quest names.
+- **Lore Triggers:** If the story mentions a keyword (e.g., "The Order of the Rose"), check if \`onTrigger\` exists for it.
+- **Fail Forward:** If the narrative described a failure, ensure the *cost* of that failure is applied (lost resource, condition, etc.).
 
-⚠️ EXACT NAME MATCHING REQUIREMENT:
-When referencing skills, resources, items, achievements, quests, or relationships, you MUST use the EXACT names as they appear in the game state.
-- Copy exact spelling, capitalization, and punctuation
-- Do NOT paraphrase, abbreviate, or modify names
-- The system uses exact string matching and will fail if names don't match perfectly
+## LORE MANAGEMENT
+- If the narrative introduces a NEW permanent concept/faction/NPC not in the database, call \`create_lore\`.
+- If an existing hidden lore was triggered by a keyword, call \`show_lore\`.
 
-Guidelines:
-- Call ALL necessary tools. You can make MULTIPLE tool calls in one response.
-- Only use tools for clear, explicit changes in the story
-- Don't unlock achievements unless their trigger conditions are explicitly met
-- Track resource and stat changes that result from story events
-- Use add_memory for important story developments with specific details
-- Add quest objectives as they're discovered or mentioned
-- Add lore entries for world-building information revealed in the story
-- Use game_over tool if the story clearly ends (death, complete victory, etc.)
+## SCENE CHALLENGES (Progress Clocks)
+Manage complex multi-step tasks using the Challenge Tools.
 
-Lore Guidelines:
-- When creating lore, ALWAYS provide onTriggers for discoverable information
-- Triggers use EXACT word matching (case-insensitive) - "zombie" won't match "zombies"
-- Include word variations: ["dragon", "dragons", "Dragon", "Dragons", "dragonkin"]
-- Set on=false for lore that should be hidden until triggered
-- Only use on=true (no triggers) for lore that should be visible from the start
-- Example: create_lore(title="Undead Horde", content="...", on=false, onTriggers=["zombie", "zombies", "undead", "Undead"])
-- To reveal existing hidden lore: first call list_inactive_lore() to see what's available, then show_lore({ title: "..." })
-- show_lore uses fuzzy matching - close approximations of titles will work
+1. **Detecting New Challenges:**
+   - If the narrative describes the START of a significant conflict (combat with multiple foes, a heist, a chase, a complex negotiation) AND no challenge is active -> Call \`start_challenge\`.
+   - Guidelines:
+     - Simple action (single enemy, locked door, quick conversation): Do NOT start a challenge - use regular skill checks.
+     - Dangerous combat / chase / multi-step task: 3 successes / 3 failures.
+     - Boss fight / war / major heist: 5+ successes needed.
 
-Condition/Affliction Guidelines:
-- ONLY add conditions when: (1) player FAILS a skill check with consequences, or (2) it makes strong narrative sense (ambush, trap, curse, etc.)
-- Do NOT add conditions for successful actions or minor setbacks
-- Use add_condition when the player suffers injuries, curses, poison, exhaustion, or other afflictions
-- Condition tiers: I (minor), II (noticeable), III (significant), IV (severe), V (critical), VI (permanent/disability)
-- Use upgrade_condition when a condition worsens (e.g., untreated wound becomes infected)
-- Use downgrade_condition when healing occurs (magical healing, rest, medical treatment)
-- Use remove_condition when a condition is fully cured
-- Tier VI conditions are PERMANENT and typically mean game over - use game_over when appropriate
-- Set "affects" to the stats penalized by this condition (e.g., broken arm affects Strength, Athletics)
-- Set "affectsAll" to true for conditions affecting all actions (e.g., severe exhaustion, dying)
-- Example conditions: "Broken Arm" (affects Strength), "Poisoned" (affects all), "Exhausted" (affects all)
+2. **Updating Active Challenges:**
+   - If a Challenge is ACTIVE and this turn involved a skill check:
+     - Player succeeded at their action? -> \`update_challenge\` with \`successIncrement: 1\`
+     - Player failed at their action? -> \`update_challenge\` with \`failureIncrement: 1\`
+     - **Critical Success/Failure:** Award 2 points for exceptional narrative outcomes.
+   - Do NOT update if no skill check was made this turn.
 
-Memory Guidelines:
-- Add NEW memory entries that don't already exist in the Memory section
-- Make entries DETAILED and SPECIFIC with names, locations, consequences, emotional context
-- Track important story developments, character actions, world changes
-- Avoid overusing memory for minor details or repetitive events
-- BAD: "Met a merchant" GOOD: "Met Aldric, a suspicious merchant in Darkwater who tried to sell cursed artifacts and fled when confronted"
+3. **Auto-Resolution:**
+   - Challenges automatically resolve when thresholds are met:
+     - \`currentSuccesses >= requiredSuccesses\` -> Player WINS (points awarded automatically)
+     - \`currentFailures >= maxFailures\` -> Player LOSES
+   - Use \`resolve_challenge\` only for non-standard endings (enemy surrenders, rescue arrives, player retreats).
 
-Ability Guidelines:
-- Use add_ability to grant new spells, skills, or techniques when the player learns/gains them from training, mentors, magical items, or story events
-- Ability grades: novice (+0), apprentice (+1), adept (+2), expert (+3), master (+4), legendary (+5)
-- Set appropriate costs (resource or variable) based on ability power - powerful abilities should cost more
-- Use cooldowns for abilities that shouldn't be spammable (0 = no cooldown)
-- Use remove_ability when abilities are lost (curse, injury, story event, sacrifice)
-- Use modify_ability to change costs, descriptions, or stat associations as abilities evolve
-- Use upgrade_ability when the player improves through training, practice, or story rewards
-- Use reset_ability_cooldown to refresh abilities (rest, special items, story events)
-- Example: add_ability(name="Fireball", description="Hurl a ball of flame", grade="apprentice", stat="Magic", cost=[{type:"resource", name:"Mana", amount:15}], cooldown=2)
-
-Relationship Guidelines:
-- Relationships change SLOWLY over time - trust and bonds are built through meaningful interactions
-- Use SMALL increments: +1 to +3 for positive interactions, -1 to -3 for negative ones
-- Reserve larger changes (+5 to +10) for MAJOR story moments only:
-  - Saving someone's life, deep personal sacrifice, major betrayal, life-changing revelations
-  - Succeeding at a critical skill check that directly helps the NPC
-  - Dramatic scenes with strong emotional weight
-- Most interactions should be +1 or +2: friendly chat, small favors, showing interest
-- Failed skill checks that affect an NPC might cause -1 to -3 depending on severity
-- Don't update relationships every turn - only when there's meaningful interaction
-- Consider the NPC's personality: some warm up quickly, others are guarded and slow to trust
-- Relationship scale is typically 0-100; going from stranger (20-30) to close friend (70+) should take many interactions
-
-Advanced RPG Tools Guidelines (if enabled):
-- ACTIVELY create threads and characters! Don't be conservative - the AGMT system thrives on a full list.
-- Use add_thread when new plotlines/mysteries/goals emerge - ANY loose end is a valid thread
-  - Overheard rumors, unanswered questions, promised rewards, mysterious figures, unexplained events
-  - "Who killed the merchant?", "Find the source of the corruption", "The stranger's warning"
-- Use add_character for ANY named NPC with potential story relevance, not just major characters
-  - Shopkeepers who gave useful info, guards who showed suspicion, strangers who helped
-  - Include brief descriptors: "Mira - nervous apothecary who mentioned seeing shadows"
-- Use close_thread when plotlines resolve, fail, or become irrelevant
-- Use reopen_thread if a resolved plotline becomes relevant again
-- Use update_thread to refine descriptions as threads develop
-- Use update_character to reflect character development (e.g., "Suspicious merchant" → "Revealed traitor")
-- Use update_character_status when characters die, leave, or return to the story
-- Use increment_scene for major scene transitions (new location, significant time skip)
-  - Chaos will automatically adjust based on player performance (more failures = higher chaos, more successes = lower chaos)
-- Keep thread descriptions clear and specific (e.g., "Find the stolen crown" not "Quest")
-- Always include the ID when updating/closing threads or updating characters
-- Having 5-10 threads and 8-15 characters is NORMAL for an active story - err on the side of adding more!
+Think through the narrative sentence-by-sentence, then execute the required Tool Calls.
 
 ${
   commandResponses && commandResponses.length > 0
@@ -878,6 +808,15 @@ ${
     ),
   });
 
+  // Add role affirmation (prefill) if enabled and no existing tool calls
+  // For multi-round tool calling, we skip the affirmation after the first round
+  if (usePrefill && (!existingToolCalls || existingToolCalls.length === 0)) {
+    messages.push({
+      role: "assistant",
+      content: TOOLS_AFFIRMATION,
+    });
+  }
+
   // If we have existing tool calls, add them to history and prompt for more
   if (existingToolCalls && existingToolCalls.length > 0) {
     // Add assistant's previous tool calls
@@ -939,10 +878,12 @@ export function buildChoicesPrompt({
   storyData,
   storyContent,
   embeddingContext,
+  usePrefill = true,
 }: {
   storyData: StoryData;
   storyContent: string; // The story text just generated
   embeddingContext?: EmbeddingContext;
+  usePrefill?: boolean;
 }): { messages: ChatMessage[] } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
@@ -1221,6 +1162,14 @@ Example: "Take a risk <table: ${
     ),
   });
 
+  // Add role affirmation (prefill) if enabled
+  if (usePrefill) {
+    messages.push({
+      role: "assistant",
+      content: CHOICES_AFFIRMATION,
+    });
+  }
+
   return { messages };
 }
 
@@ -1287,186 +1236,58 @@ export function buildActionAnalysisPrompt({
     : [];
   const hasAnyTables = customTableNames.length > 0 || agmtTableNames.length > 0;
 
-  const systemPrompt = `You analyze player actions for an interactive RPG game and determine what game mechanics apply.
+  const systemPrompt = `You are the Game Mechanics Engine. Your job is to translate player intent into strict game logic.
 
-RESPOND WITH VALID JSON ONLY - no markdown, no explanation, just the JSON object:
+INPUT: Player's raw text + Current Game State.
+OUTPUT: A single valid JSON object.
+
+CONTEXTUAL ANALYSIS RULES:
+1.  **Implicit Item Usage:** If the player implies using an item they have (e.g., "I shoot him" -> implies Bow/Gun), assign that item.
+2.  **Implicit Resource Usage:** If an action is physically taxing (sprinting, climbing, magic), assign the relevant Resource (Stamina/Mana) even if not explicitly stated.
+3.  **Skill Continuity:** If the player *just* succeeded at a check (see history), do NOT call for a new check for the same continuous action. Set \`is_plain_action: true\`.
+4.  **No God-Moding:** If the player attempts an impossible action (flying without wings), set \`is_plain_action: false\` but \`skill_used: null\` (The story engine will handle the narrative failure).
+
+JSON STRUCTURE:
 {
-  "action_summary": "brief description of what the player is trying to do",
-  "skill_used": "exact stat name from the list below, or null if no skill check needed",
-  "skill_dc": number or null (only if skill_used is set),
-  "item_used": "exact item name from inventory, or null",
-  "ability_used": "exact ability name from abilities list, or null",
-  "resource_used": "exact resource name from the list below, or null",
-  "agmt_check": "yes/no question (likelihood)" or null,
-  "table": "table name" or null,
-  "is_plain_action": true/false (true if this is just dialogue/narration with no mechanics)
+  "action_summary": "Objective description of intent (e.g., 'Attack guard with Longsword')",
+  "skill_used": "Exact Stat Name" OR null,
+  "skill_dc": Number (10=Easy, 15=Med, 20=Hard, 25=Very Hard) OR null,
+  "item_used": "Exact Item Name" OR null,
+  "ability_used": "Exact Ability Name" OR null,
+  "resource_used": "Exact Resource Name" OR null,
+  "agmt_check": "Question (Likelihood)" OR null,
+  "table": "Table Name" OR null,
+  "is_plain_action": Boolean (true = dialogue/looking/flavor, false = mechanic needed),
+  "challenge_handling": {
+    "is_complex_event": Boolean (true = multi-step task like combat with group, chase, heist),
+    "challenge_name": "Descriptive name" OR null (e.g., "Battle with the Bandits", "Escape the Collapsing Mine")
+  }
 }
 
-⚠️ EXACT NAME MATCHING - Use these EXACT names:
+COMPLEX EVENTS VS SIMPLE ACTIONS:
+- If the player attempts something HUGE that cannot resolve in one roll (e.g., "Fight the whole bandit camp", "Climb the infinite tower", "Convince the King to abdicate"), do NOT resolve it in one roll.
+- Set \`challenge_handling.is_complex_event: true\` and provide a \`challenge_name\`.
+- If a Challenge is ALREADY ACTIVE (see game state), this action is just a "step" in that challenge - set \`is_complex_event: false\`.
 
-AVAILABLE STATS (for skill_used):
-${
-  storyData.stats.length > 0
-    ? storyData.stats.map((s) => `• ${s.name}`).join("\n")
-    : "• (No stats - set skill_used to null)"
-}
+DECISION PRIORITY:
+1. Is this just dialogue or looking around? -> \`is_plain_action: true\`
+2. Is the player trying to overcome an obstacle or opponent? -> Set \`skill_used\` + \`skill_dc\`.
+3. Is it an AGMT (Oracle) question? (e.g., "Is the door locked?") -> Set \`agmt_check\`.
+4. Is it a random discovery? (e.g., "Loot the body") -> Set \`table\`.
+5. Is it a BIG multi-step task? -> Set \`challenge_handling.is_complex_event: true\`.
 
-AVAILABLE RESOURCES (for resource_used):
-${
-  storyData.resources.length > 0
-    ? storyData.resources
-        .map((r) => `• ${r.name} (${r.value}/${r.maxValue})`)
-        .join("\n")
-    : "• (No resources - set resource_used to null)"
-}
+AVAILABLE DATA:
+STATS: ${storyData.stats.map((s) => s.name).join(", ") || "None"}
+RESOURCES: ${storyData.resources.map((r) => r.name).join(", ") || "None"}
+ITEMS: ${storyData.inventory.map((i) => i.name).join(", ") || "None"}
+ABILITIES: ${storyData.abilities?.map((a) => a.name).join(", ") || "None"}
+ACTIVE CHALLENGE: ${
+    storyData.activeChallenge?.active
+      ? `"${storyData.activeChallenge.name}" [${storyData.activeChallenge.currentSuccesses}/${storyData.activeChallenge.requiredSuccesses}]`
+      : "None"
+  }
 
-AVAILABLE ITEMS (for item_used):
-${
-  storyData.inventory.length > 0
-    ? storyData.inventory
-        .map((i) => {
-          const gradeLabel = i.grade ? `(${i.grade})` : "";
-          const durInfo =
-            i.type !== "consumable" && i.grade !== "agmt"
-              ? ` dur:${i.durability ?? "?"}/${i.maxDurability ?? "?"}`
-              : i.grade === "agmt"
-              ? " dur:∞"
-              : "";
-          return `• ${i.name} ${gradeLabel}[${i.type}]${durInfo} x${i.quantity}`;
-        })
-        .join("\n")
-    : "• (No items - set item_used to null)"
-}
-
-AVAILABLE ABILITIES (for ability_used):
-${
-  storyData.abilities?.length
-    ? storyData.abilities
-        .map((a) => {
-          const gradeLabel = a.grade
-            ? `(${
-                ABILITY_GRADE_CONFIG[a.grade as AbilityGrade]?.label || a.grade
-              })`
-            : "";
-          const cooldownInfo =
-            (a.cooldown || 0) > 0
-              ? ` [cd: ${a.currentCooldown || 0}/${a.cooldown}]`
-              : "";
-          const costInfo = a.cost?.length
-            ? ` [costs: ${a.cost
-                .map((c) => `${c.amount} ${c.name}`)
-                .join(", ")}]`
-            : "";
-          const readyStatus =
-            (a.currentCooldown || 0) > 0 ? " (on cooldown)" : "";
-          return `• ${a.name} ${gradeLabel}${cooldownInfo}${costInfo}${readyStatus}`;
-        })
-        .join("\n")
-    : "• (No abilities - set ability_used to null)"
-}
-
-ACTIVE CONDITIONS (apply penalties to skill checks):
-${
-  storyData.conditions && storyData.conditions.length > 0
-    ? storyData.conditions
-        .map((c) => {
-          const tierLabel = ["I", "II", "III", "IV", "V", "VI"][c.tier - 1];
-          const affectsLabel = c.affectsAll
-            ? "ALL checks"
-            : c.affects.length > 0
-            ? c.affects.join(", ")
-            : "unspecified";
-          return `• ${c.name} (Tier ${tierLabel}): affects ${affectsLabel}${
-            c.permanent ? " [PERMANENT]" : ""
-          }`;
-        })
-        .join("\n")
-    : "• (No active conditions)"
-}
-
-${
-  hasAnyTables
-    ? `RANDOM TABLES (for table):
-Use these tables for random generation when the player's action involves discovery or uncertainty.
-${
-  customTableNames.length > 0
-    ? `Custom Tables: ${customTableNames.join(", ")}`
-    : ""
-}
-${agmtTableNames.length > 0 ? `AGMT Tables: ${agmtTableNames.join(", ")}` : ""}
-
-Example uses:
-- Player searches a room → table: "scavenging_results" or "objects"
-- Player asks about an NPC's motives → table: "character_motivations"
-- Player explores a dungeon → table: "dungeon" or "dungeon_traps"
-- Player encounters a creature → table: "creature_abilities"`
-    : ""
-}
-${
-  storyData.agmtState
-    ? `
-Advanced RPG Tools (for agmt_check):
-Use agmt_check for yes/no questions about the world that skill checks can't answer.
-Format: "question (likelihood)" where likelihood is one of:
-Impossible, No Way, Very Unlikely, Unlikely, 50/50, Somewhat Likely, Likely, Very Likely, Near Sure Thing, A Sure Thing, Has To Be
-
-Current Chaos Factor: ${storyData.agmtState.chaosFactor}/9
-
-Good uses: "Is the door locked? (50/50)", "Is someone watching? (Likely)", "Are there guards nearby? (Somewhat Likely)"
-Bad uses: Don't use agmt_check to determine success of skill-based actions - that's what skill_used is for.
-If skill_used is set, only use agmt_check for CONTEXT questions that don't override the skill result.`
-    : ""
-}
-
-DC GUIDELINES (${rpgSystem.name}):
-${rpgSystem.aiInstructions.dcGuidelines}
-
-RESOURCE USAGE RULES:
-- Resources CAN and SHOULD be assigned even if the player has low or zero value
-- Low/empty resources give DISADVANTAGE on the roll, but the action is still attempted
-- Match resources thematically: Stamina for physical exertion, Health for dangerous combat, Mana for spellcasting, etc.
-- Example: Sprinting to escape → use Stamina even if at 0 (player attempts while exhausted, with disadvantage)
-
-ITEM USAGE RULES:
-- Items NOT in inventory can still be set as item_used if the action would benefit from having one
-- Missing items give DISADVANTAGE on the roll (attempting without proper tools)
-- Only set item_used to null if the action genuinely doesn't need any equipment
-- Exception: If an action is IMPOSSIBLE without a specific item (e.g., "unlock door with key" when no key exists), set is_plain_action: false but item_used: null, and the story will handle the impossibility
-- Example: Climbing a wall → could use "Rope" even if not owned (climbing without rope = disadvantage)
-
-ABILITY USAGE RULES:
-- Abilities are skills, spells, or techniques that cost resources/variables to use
-- Only set ability_used if the player explicitly uses a named ability or describes an action fitting an ability
-- Abilities on cooldown (cd > 0) CANNOT be used - set ability_used to null
-- Abilities provide grade-based bonuses: novice (+0), apprentice (+1), adept (+2), expert (+3), master (+4), legendary (+5)
-- A player CAN use BOTH an item AND an ability on the same action (bonuses stack)
-- Only abilities that are "ready" (not on cooldown) can be used
-- Example: Casting "Fireball" → set ability_used to "Fireball" if it exists and is ready
-
-🎲 SKILL CHECK FINALITY - One Roll Per Task:
-- Check the recent story context for RECENT SKILL CHECK RESULTS
-- If the player JUST SUCCEEDED at a task, they are WINNING - do NOT require another roll for the same action
-- If the player JUST FAILED at a task, they FAILED - do NOT allow a retry for the same approach
-- Only call for NEW skill checks when:
-  - A genuinely NEW challenge appears (different obstacle, new opponent)
-  - Circumstances have MEANINGFULLY changed
-  - The player tries a DIFFERENT approach (not "try again harder")
-- Example: Player just succeeded climbing → "climb higher" needs NO skill check (already climbing)
-- Example: Player just failed persuasion → "keep trying to convince them" = is_plain_action: true (no retry)
-- This prevents frustrating "roll until you win" loops
-
-DECISION RULES:
-1. Simple actions (talking, walking, looking around, basic interactions) → is_plain_action: true, everything else null
-2. Challenging physical actions → appropriate physical stat + DC based on difficulty
-3. Social challenges (persuasion, deception, intimidation) → social/charisma stat if available
-4. Using a specific item the player mentions → set item_used to the exact item name
-5. Using a specific ability the player mentions → set ability_used to the exact ability name (if ready)
-6. Strenuous or costly actions → set resource_used to an appropriate resource
-7. Only set skill_dc if skill_used is set
-8. If the action mentions using a specific item or ability, include it even without a skill check
-9. Be conservative with skill checks - not every action needs one
-10. Both item_used AND ability_used can be set together if the action involves both
-11. If a skill check for this same task was JUST resolved, set is_plain_action: true (no re-rolling)`;
+RESPOND WITH JSON ONLY.`;
 
   // Build minimal context - just recent story for situational awareness
   const recentParts = storyData.scene.parts.slice(-4);
