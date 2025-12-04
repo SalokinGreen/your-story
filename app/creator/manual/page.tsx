@@ -3372,20 +3372,51 @@ ${description || ""}`;
                 Choose how dice rolls determine success in your adventure.
               </p>
 
-              {/* Popular Systems */}
+              {/* Recommended Systems */}
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <button
-                  onClick={() => setRpgSystem("3d6")}
+                  onClick={() => setRpgSystem("pbta")}
                   className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
-                    rpgSystem === "3d6"
+                    rpgSystem === "pbta"
                       ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
                       : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                   }`}
                 >
-                  <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
-                  3d6 (Recommended)
+                  <DynamicIcon name="Zap" className="w-5 h-5 inline mr-2" />
+                  PbtA (Recommended)
                   <div className="text-xs opacity-75 mt-1">
-                    Roll 3-18, predictable bell curve
+                    2d6+mod: 10+ success, 7-9 partial
+                  </div>
+                </button>
+                <button
+                  onClick={() => setRpgSystem("fate")}
+                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
+                    rpgSystem === "fate"
+                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
+                  }`}
+                >
+                  <DynamicIcon name="Scale" className="w-5 h-5 inline mr-2" />
+                  Fate Core (4dF)
+                  <div className="text-xs opacity-75 mt-1">
+                    Fudge dice, fail/tie/succeed/style
+                  </div>
+                </button>
+                <button
+                  onClick={() => setRpgSystem("percentile")}
+                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
+                    rpgSystem === "percentile"
+                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
+                  }`}
+                >
+                  <DynamicIcon
+                    name="TrendingDown"
+                    className="w-5 h-5 inline mr-2"
+                  />
+                  Classic Percentile
+                  <div className="text-xs opacity-75 mt-1">
+                    Roll under stat to win
                   </div>
                 </button>
                 <button
@@ -3402,23 +3433,6 @@ ${description || ""}`;
                     Roll 1-20, swingy results
                   </div>
                 </button>
-                <button
-                  onClick={() => setRpgSystem("narrative")}
-                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
-                    rpgSystem === "narrative"
-                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon
-                    name="BookHeart"
-                    className="w-5 h-5 inline mr-2"
-                  />
-                  Narrative (No Dice)
-                  <div className="text-xs opacity-75 mt-1">
-                    Pure storytelling, outcomes from dramatic logic
-                  </div>
-                </button>
               </div>
 
               {/* Show More Systems Toggle */}
@@ -3432,12 +3446,26 @@ ${description || ""}`;
                 />
                 {showAllSystems
                   ? "Hide advanced systems"
-                  : "Show more systems (6 more)"}
+                  : "Show more systems (5 more)"}
               </button>
 
               {/* Advanced Systems (Collapsible) */}
               {showAllSystems && (
                 <div className="grid grid-cols-2 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200">
+                  <button
+                    onClick={() => setRpgSystem("3d6")}
+                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
+                      rpgSystem === "3d6"
+                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
+                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
+                    }`}
+                  >
+                    <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
+                    3d6
+                    <div className="text-xs opacity-75 mt-1">
+                      Roll 3-18, predictable bell curve
+                    </div>
+                  </button>
                   <button
                     onClick={() => setRpgSystem("1d100")}
                     className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
@@ -3453,48 +3481,20 @@ ${description || ""}`;
                     </div>
                   </button>
                   <button
-                    onClick={() => setRpgSystem("percentile")}
-                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
-                      rpgSystem === "percentile"
+                    onClick={() => setRpgSystem("narrative")}
+                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
+                      rpgSystem === "narrative"
                         ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
                         : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
                     }`}
                   >
                     <DynamicIcon
-                      name="TrendingDown"
+                      name="BookHeart"
                       className="w-5 h-5 inline mr-2"
                     />
-                    Classic Percentile
+                    Narrative (No Dice)
                     <div className="text-xs opacity-75 mt-1">
-                      Roll under stat to win
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setRpgSystem("pbta")}
-                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
-                      rpgSystem === "pbta"
-                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                    }`}
-                  >
-                    <DynamicIcon name="Zap" className="w-5 h-5 inline mr-2" />
-                    Powered by the Apocalypse (PbtA)
-                    <div className="text-xs opacity-75 mt-1">
-                      2d6+mod: 10+ success, 7-9 partial, 6- failure
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setRpgSystem("fate")}
-                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
-                      rpgSystem === "fate"
-                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                    }`}
-                  >
-                    <DynamicIcon name="Scale" className="w-5 h-5 inline mr-2" />
-                    Fate Core (4dF)
-                    <div className="text-xs opacity-75 mt-1">
-                      Fudge dice + ladder: fail/tie/succeed/style
+                      Pure storytelling, outcomes from dramatic logic
                     </div>
                   </button>
                   <button
