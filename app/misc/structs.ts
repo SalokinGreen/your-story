@@ -200,13 +200,12 @@ export interface GameOver {
   timestamp: number; // When the game ended
 }
 
-// Scene Challenge (Progress Clock) for multi-step challenges
+// Scene Challenge (Best of X) for multi-step challenges
 export interface SceneChallenge {
   id: string; // Unique identifier
   name: string; // Display name (e.g., "Battle with the Orcs")
   description?: string; // Optional description of the challenge
-  requiredSuccesses: number; // Successes needed to win (typically 3-5)
-  maxFailures: number; // Failures allowed before losing (typically 3)
+  rounds: number; // Total rounds in "best of X" format (odd: 3, 5, 7, 9). First to majority wins.
   currentSuccesses: number; // Current success count
   currentFailures: number; // Current failure count
   active: boolean; // Whether challenge is ongoing

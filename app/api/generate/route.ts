@@ -90,8 +90,7 @@ async function callAI(
 ): Promise<AIResponse> {
   // Check if we have a prefill (trailing assistant message)
   const hasPrefill =
-    messages.length > 0 &&
-    messages[messages.length - 1].role === "assistant";
+    messages.length > 0 && messages[messages.length - 1].role === "assistant";
   const hasTools = tools && tools.length > 0;
 
   let endpoint: string;

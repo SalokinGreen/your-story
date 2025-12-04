@@ -1458,19 +1458,12 @@ const startChallengeTool: ToolSchema = {
           description:
             "Brief description of the challenge and win/lose conditions",
         },
-        requiredSuccesses: {
+        rounds: {
           type: "number",
           description:
-            "Number of successes needed to win (3 = normal, 5 = hard, 7+ = epic)",
-          minimum: 2,
-          maximum: 10,
-        },
-        maxFailures: {
-          type: "number",
-          description:
-            "Number of failures before losing (typically 3, lower for high-stakes)",
-          minimum: 1,
-          maximum: 10,
+            "Total rounds in 'best of X' format (odd: 3, 5, 7, 9). First to majority wins. Use 3 for quick encounters, 5 for standard, 7-9 for boss fights.",
+          minimum: 3,
+          maximum: 9,
         },
         points: {
           type: "number",
@@ -1492,7 +1485,7 @@ const startChallengeTool: ToolSchema = {
           maximum: 3,
         },
       },
-      required: ["name", "requiredSuccesses", "maxFailures"],
+      required: ["name", "rounds"],
     },
   },
 };
@@ -1502,7 +1495,7 @@ const updateChallengeTool: ToolSchema = {
   function: {
     name: "update_challenge",
     description:
-      "Update the active challenge progress after a skill check. Call this after each roll during a challenge. Add successes when player succeeds, failures when they fail. Award 2 points for critical success/failure if narratively appropriate.",
+      "Update the active challenge progress after a skill check. Call this after each roll during a challenge. Add successes when player succeeds, failures when they fail. Challenge auto-resolves when either side reaches majority (best of X).",
     parameters: {
       type: "object",
       properties: {

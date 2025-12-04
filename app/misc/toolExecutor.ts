@@ -1676,11 +1676,15 @@ export function executeTools(
       if (toolCall.function.name === "start_challenge") {
         const name = args.name?.trim();
         const description = args.description?.trim();
-        const requiredSuccesses = args.requiredSuccesses;
-        const maxFailures = args.maxFailures;
+        let rounds = args.rounds ?? 5;
         const points = args.points ?? 25; // Default 25 points
         const initialSuccesses = Math.min(args.initialSuccesses ?? 0, 3);
         const initialFailures = Math.min(args.initialFailures ?? 0, 3);
+
+        // Ensure rounds is odd and within bounds (3, 5, 7, or 9)
+        if (rounds < 3) rounds = 3;
+        if (rounds > 9) rounds = 9;
+        if (rounds % 2 === 0) rounds += 1; // Make odd
 
         if (!name || name.length < 3) {
           const errorMsg = "Challenge name must be at least 3 characters";
@@ -1690,39 +1694,6 @@ export function executeTools(
           });
           responses.push({
             command: `/start_challenge: ${name || ""}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        if (!requiredSuccesses || requiredSuccesses < 2) {
-          const errorMsg =
-            "Challenge requires at least 2 successes to complete";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/start_challenge: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        if (!maxFailures || maxFailures < 1) {
-          const errorMsg = "Challenge must allow at least 1 failure";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/start_challenge: ${name}`,
             success: false,
             message: errorMsg,
             timestamp: Date.now(),
@@ -1748,13 +1719,14 @@ export function executeTools(
           continue;
         }
 
+        const majority = Math.ceil(rounds / 2);
+
         // Create the new challenge
         storyData.activeChallenge = {
           id: crypto.randomUUID(),
           name,
           description,
-          requiredSuccesses,
-          maxFailures,
+          rounds,
           currentSuccesses: initialSuccesses,
           currentFailures: initialFailures,
           active: true,
@@ -1765,8 +1737,8 @@ export function executeTools(
         logger.action("Challenge started via tool", {
           toolCallId: toolId,
           name,
-          requiredSuccesses,
-          maxFailures,
+          rounds,
+          majority,
           points,
           initialSuccesses,
           initialFailures,
@@ -1774,7 +1746,7 @@ export function executeTools(
         responses.push({
           command: `/start_challenge: ${name}`,
           success: true,
-          message: `🎯 CHALLENGE STARTED: ${name} [Progress: ${initialSuccesses}/${requiredSuccesses}] [Danger: ${initialFailures}/${maxFailures}]${
+          message: `🎯 CHALLENGE STARTED: ${name} (Best of ${rounds} - first to ${majority}) [Score: ${initialSuccesses}-${initialFailures}]${
             points > 0 ? ` (${points} points on victory)` : ""
           }`,
           timestamp: Date.now(),
@@ -1827,11 +1799,12 @@ export function executeTools(
         challenge.currentSuccesses += successIncrement;
         challenge.currentFailures += failureIncrement;
 
-        // Check for automatic resolution
+        // Check for automatic resolution (best of X - first to majority wins)
+        const majority = Math.ceil(challenge.rounds / 2);
         let autoResolved = false;
         let autoResult: "won" | "lost" | null = null;
 
-        if (challenge.currentSuccesses >= challenge.requiredSuccesses) {
+        if (challenge.currentSuccesses >= majority) {
           autoResolved = true;
           autoResult = "won";
           challenge.active = false;
@@ -1843,7 +1816,7 @@ export function executeTools(
             storyData.points =
               (storyData.points || 0) + challenge.pointsAwarded;
           }
-        } else if (challenge.currentFailures >= challenge.maxFailures) {
+        } else if (challenge.currentFailures >= majority) {
           autoResolved = true;
           autoResult = "lost";
           challenge.active = false;
@@ -1851,19 +1824,19 @@ export function executeTools(
           challenge.result = "lost";
         }
 
-        const progressStr = `[Progress: ${challenge.currentSuccesses}/${challenge.requiredSuccesses}] [Danger: ${challenge.currentFailures}/${challenge.maxFailures}]`;
+        const scoreStr = `[Score: ${challenge.currentSuccesses}-${challenge.currentFailures}]`;
         let message = "";
 
         if (successIncrement > 0 && failureIncrement > 0) {
-          message = `${challenge.name}: +${successIncrement} success, +${failureIncrement} failure ${progressStr}`;
+          message = `${challenge.name}: +${successIncrement} success, +${failureIncrement} failure ${scoreStr}`;
         } else if (successIncrement > 0) {
           message = `${challenge.name}: +${successIncrement} success${
             successIncrement > 1 ? "es" : ""
-          } ${progressStr}`;
+          } ${scoreStr}`;
         } else {
           message = `${challenge.name}: +${failureIncrement} failure${
             failureIncrement > 1 ? "s" : ""
-          } ${progressStr}`;
+          } ${scoreStr}`;
         }
 
         if (autoResolved) {
@@ -2025,7 +1998,7 @@ export function executeTools(
           toolCallId: toolId,
           name: challengeName,
           reason,
-          progress: `${challenge.currentSuccesses}/${challenge.requiredSuccesses}`,
+          score: `${challenge.currentSuccesses}-${challenge.currentFailures}`,
         });
         responses.push({
           command: `/cancel_challenge: ${reason}`,

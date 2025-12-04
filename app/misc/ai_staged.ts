@@ -345,21 +345,24 @@ ${
 
   // Build active challenge section if one exists
   const activeChallengeSection = storyData.activeChallenge?.active
-    ? `## 🎯 ACTIVE CHALLENGE: ${storyData.activeChallenge.name}
-- **Progress:** ${storyData.activeChallenge.currentSuccesses}/${
-        storyData.activeChallenge.requiredSuccesses
-      } successes
-- **Danger:** ${storyData.activeChallenge.currentFailures}/${
-        storyData.activeChallenge.maxFailures
-      } failures
+    ? (() => {
+        const majority = Math.ceil(storyData.activeChallenge.rounds / 2);
+        return `## 🎯 ACTIVE CHALLENGE: ${storyData.activeChallenge.name}
+- **Format:** Best of ${
+          storyData.activeChallenge.rounds
+        } (first to ${majority} wins)
+- **Score:** ${storyData.activeChallenge.currentSuccesses} - ${
+          storyData.activeChallenge.currentFailures
+        }
 - **Victory Reward:** ${
-        storyData.activeChallenge.pointsAwarded || 0
-      } progression points
+          storyData.activeChallenge.pointsAwarded || 0
+        } progression points
 ${
   storyData.activeChallenge.description
     ? `- **Situation:** ${storyData.activeChallenge.description}`
     : ""
-}`
+}`;
+      })()
     : "";
 
   // Build variables section if any exist - clean, simple format
@@ -514,13 +517,14 @@ The Input will provide the "Action Result" (Success/Failure). You describe the o
 - **Exploration:** Slower, atmospheric. Focus on sensory details and clues.
 - **Dialogue:** Give NPCs distinct voices/mannerisms. Use subtext.
 
-## 6. SCENE CHALLENGES (Progress Clocks)
+## 6. SCENE CHALLENGES (Best of X)
 When an [ACTIVE CHALLENGE] is shown in the game state:
-- **Low Progress (0-1 successes):** Describe the initial clash or the magnitude of the obstacle. Do NOT conclude the scene - the battle/chase/negotiation is just beginning.
-- **Mid Progress (2+ successes):** Describe the tide turning. The enemy is tired, the lock is clicking, the summit is visible. Build tension toward resolution.
+- **Early Game (0-1 on each side):** Describe the initial clash or the magnitude of the obstacle. Do NOT conclude the scene - the battle/chase/negotiation is just beginning.
+- **Tense (close score, e.g., 2-2):** The outcome hangs in the balance. Build maximum tension - either side could win.
+- **Momentum (one side ahead, e.g., 2-1):** Describe the tide turning. The leading side is gaining the upper hand, the trailing side is desperate.
 - **Challenge Won:** Write the triumphant conclusion. The enemies lie defeated, the door swings open, the negotiation succeeds.
 - **Challenge Lost:** Write the disaster/consequence. You are overwhelmed, captured, the enemy escapes, the negotiation collapses.
-- **Keep It Episodic:** Each turn during a challenge should advance ONE step - do not skip ahead. Let the mechanics (success/failure count) pace the resolution.
+- **Keep It Episodic:** Each turn during a challenge should advance ONE step - do not skip ahead. Let the mechanics (the score) pace the resolution.
 
 ## 7. OUTPUT FORMAT
 - **Pure Prose Only:** Write ONLY narrative text. No headers, titles, progress indicators, or meta-commentary.
@@ -702,13 +706,11 @@ Manage complex multi-step tasks using the Challenge Tools.
    - If a Challenge is ACTIVE and this turn involved a skill check:
      - Player succeeded at their action? -> \`update_challenge\` with \`successIncrement: 1\`
      - Player failed at their action? -> \`update_challenge\` with \`failureIncrement: 1\`
-     - **Critical Success/Failure:** Award 2 points for exceptional narrative outcomes.
    - Do NOT update if no skill check was made this turn.
 
-3. **Auto-Resolution:**
-   - Challenges automatically resolve when thresholds are met:
-     - \`currentSuccesses >= requiredSuccesses\` -> Player WINS (points awarded automatically)
-     - \`currentFailures >= maxFailures\` -> Player LOSES
+3. **Auto-Resolution (Best of X):**
+   - Challenges automatically resolve when either side reaches majority:
+     - First to \`Math.ceil(rounds / 2)\` wins. For Best of 5, first to 3.
    - Use \`resolve_challenge\` only for non-standard endings (enemy surrenders, rescue arrives, player retreats).
 
 Think through the narrative sentence-by-sentence, then execute the required Tool Calls.
@@ -1277,7 +1279,7 @@ ITEMS: ${storyData.inventory.map((i) => i.name).join(", ") || "None"}
 ABILITIES: ${storyData.abilities?.map((a) => a.name).join(", ") || "None"}
 ACTIVE CHALLENGE: ${
     storyData.activeChallenge?.active
-      ? `"${storyData.activeChallenge.name}" [${storyData.activeChallenge.currentSuccesses}/${storyData.activeChallenge.requiredSuccesses}]`
+      ? `"${storyData.activeChallenge.name}" (Best of ${storyData.activeChallenge.rounds}: ${storyData.activeChallenge.currentSuccesses}-${storyData.activeChallenge.currentFailures})`
       : "None"
   }
 
