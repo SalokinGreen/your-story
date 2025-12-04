@@ -316,9 +316,21 @@ export async function POST(req: NextRequest) {
         }
 
         // Build request
+        // Check if we have a prefill (trailing assistant message)
+        const hasPrefill =
+          messages.length > 0 &&
+          messages[messages.length - 1].role === "assistant";
+        const hasTools = tools && tools.length > 0;
+
         let endpoint: string;
         if (modelConfig.provider === "deepseek") {
-          endpoint = "https://api.deepseek.com/chat/completions";
+          // Use beta endpoint for prefill support (prefix: true requires beta API)
+          // BUT: DeepSeek beta doesn't support prefix + function calling together
+          // So only use beta for non-tool calls (story generation)
+          endpoint =
+            hasPrefill && !hasTools
+              ? "https://api.deepseek.com/beta/chat/completions"
+              : "https://api.deepseek.com/chat/completions";
         } else if (modelConfig.provider === "mistral") {
           endpoint = "https://api.mistral.ai/v1/chat/completions";
         } else if (modelConfig.provider === "deepinfra") {
@@ -337,9 +349,22 @@ export async function POST(req: NextRequest) {
           headers["X-Title"] = "Your Story";
         }
 
+        // For DeepSeek with tools: strip the prefill since beta API doesn't support prefix + function calling
+        let processedMessages = messages;
+        if (
+          modelConfig.provider === "deepseek" &&
+          hasTools &&
+          hasPrefill
+        ) {
+          processedMessages = messages.slice(0, -1);
+          console.log(
+            `[API] Stripped prefill for DeepSeek tool calling (prefix not supported with functions)`
+          );
+        }
+
         const requestBody: any = {
           model: modelConfig.model,
-          messages: messages.map((m, index) => {
+          messages: processedMessages.map((m, index) => {
             const msg: any = { role: m.role, content: m.content || "" };
             if (m.tool_calls) {
               // Re-serialize tool call arguments to strings if they're objects
@@ -357,10 +382,13 @@ export async function POST(req: NextRequest) {
             }
             if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
             // For Mistral: if the last message is assistant (prefill), add prefix: true
+            // For DeepSeek: only add prefix: true for non-tool calls (story generation)
+            // DeepSeek's beta API doesn't support prefix + function calling together
             if (
-              modelConfig.provider === "mistral" &&
-              index === messages.length - 1 &&
-              m.role === "assistant"
+              index === processedMessages.length - 1 &&
+              m.role === "assistant" &&
+              (modelConfig.provider === "mistral" ||
+                (modelConfig.provider === "deepseek" && !hasTools))
             ) {
               msg.prefix = true;
             }

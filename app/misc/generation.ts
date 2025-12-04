@@ -522,7 +522,7 @@ export async function generateStoryTurn(
     let dividerStripped = false; // Track if we've stripped leading dividers
     let rawContent = ""; // Buffer for finding the marker
     let pendingContent = ""; // Buffer for stripping dividers after marker
-    const STORY_MARKER = "NO meta-text.";
+    const STORY_MARKER = "Here is the narrative:";
 
     for await (const event of parseSSEStream(storyResponse)) {
       if (event.type === "error") {
@@ -537,18 +537,19 @@ export async function generateStoryTurn(
           // Past prefill but still checking for dividers
           pendingContent += event.content;
 
-          // Strip leading whitespace and dividers
-          let cleaned = pendingContent
-            .replace(/^[\s\n]*([-*_]{3,})[\s\n]*/g, "")
-            .trimStart();
+          // Strip ALL leading whitespace and dividers (loop to catch multiple)
+          let cleaned = pendingContent.trimStart();
+          while (/^[-*_]{3,}/.test(cleaned)) {
+            cleaned = cleaned.replace(/^[-*_]{3,}[\s\n]*/, "").trimStart();
+          }
 
           // If we have actual content (not just potential divider chars), we're done stripping
           if (cleaned.length > 0 && !/^[-*_]+$/.test(cleaned)) {
             dividerStripped = true;
             storyContent = cleaned;
             callbacks.onStoryContent?.(cleaned, storyContent);
-          } else if (pendingContent.length > 50) {
-            // After 50 chars, just emit whatever we have
+          } else if (pendingContent.length > 100) {
+            // After 100 chars, just emit whatever we have (increased buffer for multiple dividers)
             dividerStripped = true;
             storyContent = cleaned || pendingContent.trimStart();
             if (storyContent) {
