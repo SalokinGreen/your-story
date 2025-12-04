@@ -30,8 +30,15 @@ export function ClockCategorySelector({
   const [dragStartY, setDragStartY] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [animatedOffset, setAnimatedOffset] = useState(0); // Smooth animation offset
+  const [velocity, setVelocity] = useState(0); // For momentum
+  const lastDragY = useRef(0);
+  const lastDragTime = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const wheelRef = useRef<HTMLDivElement>(null);
+
+  // Wheel configuration
+  const visibleRange = 4; // Items visible above and below center
+  const itemSpacing = 68; // Pixels between items
 
   // Sync local index with prop when closed
   useEffect(() => {
@@ -40,25 +47,46 @@ export function ClockCategorySelector({
     }
   }, [currentIndex, isOpen]);
 
-  // Smoothly animate the offset back to 0
+  // Smoothly animate the offset back to 0 (with momentum support)
   useEffect(() => {
-    if (animatedOffset === 0) return;
+    if (animatedOffset === 0 && velocity === 0) return;
 
     const animate = () => {
       setAnimatedOffset((prev) => {
+        // Apply velocity
+        const withVelocity = prev + velocity;
         // Ease toward 0
-        const next = prev * 0.85;
+        const next = withVelocity * 0.88;
         return Math.abs(next) < 0.5 ? 0 : next;
+      });
+
+      // Decay velocity
+      setVelocity((prev) => {
+        const next = prev * 0.92;
+        return Math.abs(next) < 0.5 ? 0 : next;
+      });
+
+      // Check if we should snap to a new index based on accumulated offset
+      setAnimatedOffset((currentOffset) => {
+        if (Math.abs(currentOffset) >= itemSpacing * 0.6) {
+          const direction = currentOffset > 0 ? 1 : -1;
+          setLocalIndex((prev) => {
+            const newIndex = Math.max(
+              0,
+              Math.min(categories.length - 1, prev + direction)
+            );
+            return newIndex;
+          });
+          // Reduce offset by one item's worth
+          return currentOffset - direction * itemSpacing;
+        }
+        return currentOffset;
       });
     };
 
     const frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
-  }, [animatedOffset]);
-
-  // Wheel configuration
-  const visibleRange = 4; // Items visible above and below center
-  const itemSpacing = 68; // Pixels between items
+  }, [animatedOffset, velocity, categories.length, itemSpacing]);
 
   // Handle wheel scroll
   const handleWheel = useCallback(
@@ -103,30 +131,50 @@ export function ClockCategorySelector({
   );
 
   // Handle touch/mouse drag
-  const handleDragStart = (clientY: number) => {
+  const handleDragStart = useCallback((clientY: number) => {
     setIsDragging(true);
     setHasDragged(false);
     hasDraggedRef.current = false;
     setDragStartY(clientY);
     setDragOffset(0);
     setAnimatedOffset(0);
-  };
+    setVelocity(0);
+    lastDragY.current = clientY;
+    lastDragTime.current = Date.now();
+  }, []);
 
-  const handleDragMove = (clientY: number) => {
+  const handleDragMove = useCallback(
+    (clientY: number) => {
+      if (!isDragging) return;
+      // Just update the visual offset - don't change index during drag
+      const delta = dragStartY - clientY;
+
+      // Mark as dragged if moved more than a small threshold
+      if (Math.abs(delta) > 5) {
+        setHasDragged(true);
+        hasDraggedRef.current = true;
+      }
+
+      // Track velocity for momentum
+      const now = Date.now();
+      const timeDelta = now - lastDragTime.current;
+      if (timeDelta > 0) {
+        const moveDelta = lastDragY.current - clientY;
+        // Velocity in pixels per frame (assuming ~16ms frames)
+        const instantVelocity = (moveDelta / timeDelta) * 16;
+        // Smooth the velocity
+        setVelocity((prev) => prev * 0.5 + instantVelocity * 0.5);
+      }
+      lastDragY.current = clientY;
+      lastDragTime.current = now;
+
+      setDragOffset(delta);
+    },
+    [isDragging, dragStartY]
+  );
+
+  const handleDragEnd = useCallback(() => {
     if (!isDragging) return;
-    // Just update the visual offset - don't change index during drag
-    const delta = dragStartY - clientY;
-
-    // Mark as dragged if moved more than a small threshold
-    if (Math.abs(delta) > 5) {
-      setHasDragged(true);
-      hasDraggedRef.current = true;
-    }
-
-    setDragOffset(delta);
-  };
-
-  const handleDragEnd = () => {
     setIsDragging(false);
 
     // Only process drag selection if user actually dragged
@@ -150,16 +198,26 @@ export function ClockCategorySelector({
       setLocalIndex(newIndex);
 
       // Set animated offset to smoothly settle the remainder
-      // The visual position needs to animate from current position to centered on new item
       const remainderOffset = dragOffset - actualItemsMoved * itemSpacing;
       setAnimatedOffset(remainderOffset);
     } else {
-      // No item change, just animate back to center
+      // No item change, just animate back to center with momentum
       setAnimatedOffset(dragOffset);
     }
 
+    // Keep velocity for momentum (it will be applied in the animation loop)
+    // But cap it to prevent crazy speeds
+    setVelocity((v) => Math.max(-30, Math.min(30, v)));
+
     setDragOffset(0);
-  };
+  }, [
+    isDragging,
+    hasDragged,
+    dragOffset,
+    itemSpacing,
+    categories.length,
+    localIndex,
+  ]);
 
   // Attach event listeners
   useEffect(() => {
@@ -180,23 +238,39 @@ export function ClockCategorySelector({
     const wheel = wheelRef.current;
     if (!wheel || !isOpen) return;
 
+    let touchStartTarget: EventTarget | null = null;
+
     const onTouchStart = (e: TouchEvent) => {
-      e.preventDefault();
+      touchStartTarget = e.target;
       handleDragStart(e.touches[0].clientY);
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
+      // Only prevent default if we've actually started dragging
+      if (hasDraggedRef.current) {
+        e.preventDefault();
+      }
       handleDragMove(e.touches[0].clientY);
     };
 
-    const onTouchEnd = () => {
+    const onTouchEnd = (e: TouchEvent) => {
+      // If it was a tap (not a drag), let it propagate to the button
+      if (!hasDraggedRef.current && touchStartTarget) {
+        // Find if we tapped on a button
+        const target = touchStartTarget as HTMLElement;
+        const button = target.closest("button");
+        if (button) {
+          // Trigger the button click
+          button.click();
+        }
+      }
       handleDragEnd();
+      touchStartTarget = null;
     };
 
-    wheel.addEventListener("touchstart", onTouchStart, { passive: false });
+    wheel.addEventListener("touchstart", onTouchStart, { passive: true });
     wheel.addEventListener("touchmove", onTouchMove, { passive: false });
-    wheel.addEventListener("touchend", onTouchEnd);
+    wheel.addEventListener("touchend", onTouchEnd, { passive: true });
 
     return () => {
       wheel.removeEventListener("touchstart", onTouchStart);
