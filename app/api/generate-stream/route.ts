@@ -349,16 +349,17 @@ export async function POST(req: NextRequest) {
           headers["X-Title"] = "Your Story";
         }
 
-        // For DeepSeek with tools: strip the prefill since beta API doesn't support prefix + function calling
+        // For DeepSeek/DeepInfra with tools: strip the prefill since these providers don't handle prefill well with function calling
         let processedMessages = messages;
         if (
-          modelConfig.provider === "deepseek" &&
+          (modelConfig.provider === "deepseek" ||
+            modelConfig.provider === "deepinfra") &&
           hasTools &&
           hasPrefill
         ) {
           processedMessages = messages.slice(0, -1);
           console.log(
-            `[API] Stripped prefill for DeepSeek tool calling (prefix not supported with functions)`
+            `[API] Stripped prefill for ${modelConfig.provider} tool calling`
           );
         }
 
