@@ -118,8 +118,7 @@ async function streamAIResponse(
 
   // Check if we have a prefill (trailing assistant message)
   const hasPrefill =
-    messages.length > 0 &&
-    messages[messages.length - 1].role === "assistant";
+    messages.length > 0 && messages[messages.length - 1].role === "assistant";
 
   // Determine the correct endpoint based on provider
   let endpoint: string;
@@ -159,7 +158,8 @@ async function streamAIResponse(
     if (
       index === messages.length - 1 &&
       m.role === "assistant" &&
-      (modelConfig.provider === "mistral" || modelConfig.provider === "deepseek")
+      (modelConfig.provider === "mistral" ||
+        modelConfig.provider === "deepseek")
     ) {
       msg.prefix = true;
     }
@@ -413,11 +413,13 @@ async function generateStage(
 
   // Strategy: Try local repair first (free & instant), then AI continuation if needed
   if (incompleteCheck.isIncomplete) {
-    logger.info(`Stage ${stage} JSON incomplete, attempting local repair first`);
-    
+    logger.info(
+      `Stage ${stage} JSON incomplete, attempting local repair first`
+    );
+
     // Try parsing with local repair (parseBigAdventureStageOutput handles repair internally)
     const localRepairResult = parseBigAdventureStageOutput(fullContent, stage);
-    
+
     if (localRepairResult !== null) {
       // Local repair succeeded! No need for AI continuation
       logger.info(`Stage ${stage} local repair successful`);
@@ -430,7 +432,7 @@ async function generateStage(
           })}\n\n`
         )
       );
-      
+
       // Send stage complete event
       controller.enqueue(
         encoder.encode(
@@ -454,16 +456,16 @@ async function generateStage(
         rawContent: fullContent,
       };
     }
-    
+
     // Local repair failed - try AI prefill continuation
-            // All providers support prefill (trailing assistant message)
-            logger.info(`Stage ${stage} local repair failed, trying AI continuation`);
-            
-            const MAX_CONTINUATIONS = 2;
-            let continuationAttempts = 0;
-            // All providers support prefill continuation (OpenRouter, DeepInfra, DeepSeek, Mistral)
-            // NovelAI uses completions API so it doesn't support chat-style prefill
-            const supportsPrefill = modelConfig.provider !== "novelai";
+    // All providers support prefill (trailing assistant message)
+    logger.info(`Stage ${stage} local repair failed, trying AI continuation`);
+
+    const MAX_CONTINUATIONS = 2;
+    let continuationAttempts = 0;
+    // All providers support prefill continuation (OpenRouter, DeepInfra, DeepSeek, Mistral)
+    // NovelAI uses completions API so it doesn't support chat-style prefill
+    const supportsPrefill = modelConfig.provider !== "novelai";
     while (
       incompleteCheck.isIncomplete &&
       supportsPrefill &&

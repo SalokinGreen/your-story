@@ -190,8 +190,7 @@ async function streamAIResponse(
 
   // Check if we have a prefill (trailing assistant message)
   const hasPrefill =
-    messages.length > 0 &&
-    messages[messages.length - 1].role === "assistant";
+    messages.length > 0 && messages[messages.length - 1].role === "assistant";
 
   // Determine the correct endpoint based on provider
   let endpoint: string;
@@ -231,7 +230,8 @@ async function streamAIResponse(
     if (
       index === messages.length - 1 &&
       m.role === "assistant" &&
-      (modelConfig.provider === "mistral" || modelConfig.provider === "deepseek")
+      (modelConfig.provider === "mistral" ||
+        modelConfig.provider === "deepseek")
     ) {
       msg.prefix = true;
     }
@@ -712,11 +712,16 @@ export async function POST(req: NextRequest) {
 
           // Strategy: Try local repair first (free & instant), then AI continuation if needed
           if (incompleteCheck.isIncomplete) {
-            logger.info(`Stage ${stage} JSON incomplete, attempting local repair first`);
-            
+            logger.info(
+              `Stage ${stage} JSON incomplete, attempting local repair first`
+            );
+
             // Try parsing with local repair
-            const localRepairResult = parseBigAdventureStageOutput(fullContent, stage);
-            
+            const localRepairResult = parseBigAdventureStageOutput(
+              fullContent,
+              stage
+            );
+
             if (localRepairResult !== null) {
               // Local repair succeeded! No need for AI continuation
               logger.info(`Stage ${stage} local repair successful`);
@@ -729,7 +734,7 @@ export async function POST(req: NextRequest) {
                   })}\n\n`
                 )
               );
-              
+
               // Send stage complete event
               controller.enqueue(
                 encoder.encode(
@@ -748,7 +753,7 @@ export async function POST(req: NextRequest) {
 
               // Clear heartbeat and send done
               if (heartbeatInterval) clearInterval(heartbeatInterval);
-              
+
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({
@@ -773,11 +778,13 @@ export async function POST(req: NextRequest) {
               controller.close();
               return;
             }
-            
+
             // Local repair failed - try AI prefill continuation
             // All providers support prefill (trailing assistant message)
-            logger.info(`Stage ${stage} local repair failed, trying AI continuation`);
-            
+            logger.info(
+              `Stage ${stage} local repair failed, trying AI continuation`
+            );
+
             const MAX_CONTINUATIONS = 2;
             let continuationAttempts = 0;
             // All providers support prefill continuation (OpenRouter, DeepInfra, DeepSeek, Mistral)

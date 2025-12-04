@@ -754,6 +754,7 @@ export interface IconAssignments {
   abilities?: Record<string, string>;
   achievements?: Record<string, string>;
   relationships?: Record<string, string>;
+  presets?: Record<string, string>;
 }
 
 export interface BigAdventureResult {
@@ -1104,11 +1105,12 @@ TARGET COUNTS:
 - Abilities: ${abilityCount}
 - Variables: 3-6 (mix of number, boolean, and list types)
 
-STAT VALUES:
+STAT VALUES (LEVEL 1 CHARACTER - START WEAK):
 - Range: 1-100 where 50 is human average
-- Player characters typically have 40-70 in most stats
-- One or two standout stats can be 70-85
-- Weaknesses can be 25-40
+- MOST stats should be below 25 (untrained/weak areas)
+- A FEW stats (2-3) can be between 25-45 (developing skills)
+- Only ONE or TWO stats around 60-70 (natural talent/specialty)
+- The player will grow stronger through gameplay - start humble!
 
 ABILITY GRADES (determine skill bonus):
 - novice (+0), apprentice (+1), adept (+2), expert (+3), master (+4), legendary (+5)
@@ -1329,10 +1331,20 @@ CRITICAL - PRESET INTROS:
 The "intro" field is a COMPLETE REPLACEMENT for the default intro (3-5 paragraphs).
 The "playerSummary" is also a COMPLETE REPLACEMENT (2-3 paragraphs).
 
-STAT VALUES FOR PRESETS:
+REQUIRED - "CUSTOM" PRESET:
+You MUST include a preset with id="preset-custom" and name="Custom" as the LAST preset.
+This is for players who want to create their own character (self-insert).
+- Use the same stat guidelines: most below 25, a few between 25-45, one or two around 60-70
+- Generic playerName like "Adventurer" or "Traveler"
+- playerSummary should be vague and open-ended ("A mysterious stranger...")
+- intro should be generic, letting the player define their own backstory
+- Include basic starting gear and no special abilities beyond novice level
+
+STAT VALUES FOR PRESETS (LEVEL 1 CHARACTERS - START WEAK):
 - Range: 1-100 where 50 is human average
-- Player characters typically have 40-70 in most stats
-- One or two standout stats can be 70-85, weaknesses 25-40
+- MOST stats should be below 25 (untrained/weak areas)
+- A FEW stats (2-3) can be between 25-45 (developing skills)
+- Only ONE or TWO stats around 60-70 (natural talent/specialty)
 
 OUTPUT JSON SCHEMA:
 {
@@ -1534,7 +1546,8 @@ OUTPUT JSON SCHEMA:
     "inventory": { "ItemName": "icon-id", ... },
     "abilities": { "AbilityName": "icon-id", ... },
     "achievements": { "AchievementTitle": "icon-id", ... },
-    "relationships": { "NPCName": "icon-id", ... }
+    "relationships": { "NPCName": "icon-id", ... },
+    "presets": { "PresetName": "icon-id", ... }
   }
 }
 
@@ -1711,6 +1724,16 @@ export function buildBigAdventureMessages(
       template.relationships.forEach((r) => {
         elementsMessage += `- "${r.name}": ${
           r.description || "No description"
+        }\n`;
+      });
+      elementsMessage += "\n";
+    }
+
+    if (template.presets && template.presets.length > 0) {
+      elementsMessage += `PRESETS (character builds):\n`;
+      template.presets.forEach((p) => {
+        elementsMessage += `- "${p.name}": ${
+          p.description || "No description"
         }\n`;
       });
       elementsMessage += "\n";
@@ -2244,6 +2267,34 @@ export function mergeBigAdventureResults(
               assignments.relationships![relationship.name] ||
               relationship.symbol,
           }));
+      }
+
+      // Apply to presets (icon field + nested symbol fields)
+      if (assignments.presets && merged.storyTemplate.presets) {
+        merged.storyTemplate.presets = merged.storyTemplate.presets.map(
+          (preset) => ({
+            ...preset,
+            // Preset uses 'icon' field, not 'symbol'
+            icon: assignments.presets![preset.name] || preset.icon,
+            // Also update symbol fields on nested elements within the preset
+            stats: preset.stats?.map((stat) => ({
+              ...stat,
+              symbol: assignments.stats?.[stat.name] || stat.symbol,
+            })),
+            resources: preset.resources?.map((resource) => ({
+              ...resource,
+              symbol: assignments.resources?.[resource.name] || resource.symbol,
+            })),
+            inventory: preset.inventory?.map((item) => ({
+              ...item,
+              symbol: assignments.inventory?.[item.name] || item.symbol,
+            })),
+            abilities: preset.abilities?.map((ability) => ({
+              ...ability,
+              symbol: assignments.abilities?.[ability.name] || ability.symbol,
+            })),
+          })
+        );
       }
     }
   }

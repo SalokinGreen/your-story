@@ -12,7 +12,7 @@ import {
 
 describe("attemptJSONRepair", () => {
   describe("malformed property names", () => {
-    it("should fix space before property name: \" \"name\"", () => {
+    it('should fix space before property name: " "name"', () => {
       const malformed = '{ " "name": "Street Smarts", "value": 55 }';
       const repaired = attemptJSONRepair(malformed);
       const parsed = JSON.parse(repaired);
@@ -38,14 +38,14 @@ describe("attemptJSONRepair", () => {
 
   describe("markdown code blocks", () => {
     it("should remove json code block wrapper", () => {
-      const withMarkdown = "```json\n{\"name\": \"Test\"}\n```";
+      const withMarkdown = '```json\n{"name": "Test"}\n```';
       const repaired = attemptJSONRepair(withMarkdown);
       const parsed = JSON.parse(repaired);
       expect(parsed.name).toBe("Test");
     });
 
     it("should remove code block wrapper without json specifier", () => {
-      const withMarkdown = "```\n{\"name\": \"Test\"}\n```";
+      const withMarkdown = '```\n{"name": "Test"}\n```';
       const repaired = attemptJSONRepair(withMarkdown);
       const parsed = JSON.parse(repaired);
       expect(parsed.name).toBe("Test");
@@ -54,7 +54,7 @@ describe("attemptJSONRepair", () => {
     it("should remove embedded code block in middle of content", () => {
       // Note: This edge case is too malformed - embedded code blocks mid-JSON
       // would require complex AST parsing. Our repair handles wrapper blocks only.
-      const withEmbedded = "{\"stats\": [```json{\"name\": \"Test\"}]}";
+      const withEmbedded = '{"stats": [```json{"name": "Test"}]}';
       const repaired = attemptJSONRepair(withEmbedded);
       // The repair removes markdown markers but can't fix the structural damage
       // This is acceptable - AI shouldn't produce this kind of output
@@ -62,7 +62,7 @@ describe("attemptJSONRepair", () => {
     });
 
     it("should handle unclosed markdown block", () => {
-      const unclosed = "```json\n{\"name\": \"Test\"}";
+      const unclosed = '```json\n{"name": "Test"}';
       const repaired = attemptJSONRepair(unclosed);
       const parsed = JSON.parse(repaired);
       expect(parsed.name).toBe("Test");
@@ -85,7 +85,8 @@ describe("attemptJSONRepair", () => {
     });
 
     it("should close nested unclosed structures", () => {
-      const unclosed = '{"stats": [{"name": "Str", "value": 10}, {"name": "Dex"';
+      const unclosed =
+        '{"stats": [{"name": "Str", "value": 10}, {"name": "Dex"';
       const repaired = attemptJSONRepair(unclosed);
       const parsed = JSON.parse(repaired);
       expect(parsed.stats).toBeDefined();
@@ -139,7 +140,8 @@ describe("attemptJSONRepair", () => {
 
   describe("partial array items", () => {
     it("should remove incomplete last array item", () => {
-      const partial = '{"stats": [{"name": "Str", "value": 10}, {"name": "Dex", "val';
+      const partial =
+        '{"stats": [{"name": "Str", "value": 10}, {"name": "Dex", "val';
       const repaired = attemptJSONRepair(partial);
       const parsed = JSON.parse(repaired);
       expect(parsed.stats).toHaveLength(1);
@@ -233,10 +235,21 @@ describe("parseBigAdventureStageOutput", () => {
     it("should parse valid mechanics stage output", () => {
       const content = JSON.stringify({
         stats: [
-          { name: "Strength", value: 50, description: "Physical power", symbol: "💪" },
+          {
+            name: "Strength",
+            value: 50,
+            description: "Physical power",
+            symbol: "💪",
+          },
         ],
         resources: [
-          { name: "Health", value: 100, maxValue: 100, description: "HP", symbol: "❤️" },
+          {
+            name: "Health",
+            value: 100,
+            maxValue: 100,
+            description: "HP",
+            symbol: "❤️",
+          },
         ],
         abilities: [
           {
@@ -318,7 +331,9 @@ describe("parseBigAdventureStageOutput", () => {
       const result = parseBigAdventureStageOutput(content, "content-lore");
       expect(result).not.toBeNull();
       expect(result?.storyTemplate?.lore).toHaveLength(1);
-      expect(result?.storyTemplate?.lore?.[0].title).toBe("The Ancient Kingdom");
+      expect(result?.storyTemplate?.lore?.[0].title).toBe(
+        "The Ancient Kingdom"
+      );
     });
   });
 
@@ -379,7 +394,7 @@ describe("parseBigAdventureStageOutput", () => {
   });
 
   describe("real-world AI mistakes", () => {
-    it("should handle the \" \"name\" mistake from production", () => {
+    it('should handle the " "name" mistake from production', () => {
       const content = `\`\`\`json
 {
   "stats": [
@@ -429,8 +444,12 @@ describe("parseBigAdventureStageOutput", () => {
       expect(result).not.toBeNull();
       // Should have at least the complete items
       expect(result?.storyTemplate?.stats?.length).toBeGreaterThanOrEqual(3);
-      expect(result?.storyTemplate?.resources?.length).toBeGreaterThanOrEqual(2);
-      expect(result?.storyTemplate?.abilities?.length).toBeGreaterThanOrEqual(1);
+      expect(result?.storyTemplate?.resources?.length).toBeGreaterThanOrEqual(
+        2
+      );
+      expect(result?.storyTemplate?.abilities?.length).toBeGreaterThanOrEqual(
+        1
+      );
     });
 
     it("should handle AI adding explanation text before JSON", () => {
