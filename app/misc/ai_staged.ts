@@ -27,7 +27,7 @@ export const STORY_AFFIRMATION = `Understood. I will write the narrative respons
 - **Perspective:** Strict Second Person ("You"), deep POV.
 - **Style:** "Show, Don't Tell" with visceral sensory details; varying sentence structure; NO banned words.
 - **Agency:** I will respect the Action Result (Success/Failure) and the Active Challenge state.
-- **Format:** Pure prose only - NO titles, headers, progress indicators, or meta-text.
+- **Format:** Pure prose only - NO echoing mechanics, NO titles/headers, NO meta-text.
 
 [Scene]:`;
 
@@ -524,6 +524,7 @@ When an [ACTIVE CHALLENGE] is shown in the game state:
 ## 7. OUTPUT FORMAT
 - **Pure Prose Only:** Write ONLY narrative text. No headers, titles, progress indicators, or meta-commentary.
 - **No UI Elements:** Do NOT write things like "Scene:", "Chapter:", "Progress 2/3", "(Challenge Won)", or any labels.
+- **No Mechanical Summaries:** Do NOT echo back the skill check results, item usage, or resource costs. Those are INPUT context for you - the player already saw the dice roll. Just write the story outcome.
 - **No Stop Markers in Output:** Do not literally write "[STOP]" - just stop writing at the appropriate moment.
 
 WRITE THE NARRATIVE RESPONSE ONLY!
@@ -556,54 +557,39 @@ ${
   ];
 
   // Build story history messages (we'll prune from the front if needed)
+  // Include GM state changes from previous turns so the AI knows what happened
   const historyMessages: ChatMessage[] = [];
   for (let i = 0; i < storyData.scene.parts.length; i++) {
     const part = storyData.scene.parts[i];
     if (part.user) {
-      // Check if the previous part (assistant) had stateChanges to prepend
-      let userContent = part.content;
-      if (i > 0) {
-        const prevPart = storyData.scene.parts[i - 1];
-        if (
-          !prevPart.user &&
-          prevPart.stateChanges &&
-          prevPart.stateChanges.length > 0
-        ) {
-          const stateChangesStr = prevPart.stateChanges.join("\n- ");
-          userContent = `[Game State Updates from previous turn:\n- ${stateChangesStr}]\n\n${userContent}`;
-        }
-      }
       historyMessages.push({
         role: "user",
-        content: cleanString(userContent),
+        content: cleanString(part.content),
       });
     } else {
-      // For story generation, we only need the narrative content, not tool calls/responses
+      // For story generation, include the narrative content
       const assistantContent = part.raw || part.content;
       historyMessages.push({
         role: "assistant",
         content: cleanString(assistantContent),
       });
+
+      // If this assistant part had state changes from tools, include them as a GM note
+      // We use stateChanges (human-readable) rather than raw tool_calls to avoid confusing
+      // the story AI with tool schemas it doesn't have access to
+      if (part.stateChanges && part.stateChanges.length > 0) {
+        const gmNote = `[GM State Update]\n${part.stateChanges.map((s) => `• ${s}`).join("\n")}`;
+        historyMessages.push({
+          role: "assistant",
+          content: cleanString(gmNote),
+        });
+      }
     }
   }
 
   // Add user choice to history if present
   if (userChoice) {
-    // Include state changes from the most recent assistant part (previous turn's tool results)
-    // This gives the AI context about what mechanical changes happened
     let choiceMessage = `Player chose: ${userChoice}`;
-
-    // Find the most recent assistant part to get its stateChanges
-    const lastAssistantPart = [...storyData.scene.parts]
-      .reverse()
-      .find((p) => !p.user);
-    if (
-      lastAssistantPart?.stateChanges &&
-      lastAssistantPart.stateChanges.length > 0
-    ) {
-      const stateChangesStr = lastAssistantPart.stateChanges.join("\n- ");
-      choiceMessage = `[Game State Updates from previous turn:\n- ${stateChangesStr}]\n\n${choiceMessage}`;
-    }
 
     historyMessages.push({
       role: "user",

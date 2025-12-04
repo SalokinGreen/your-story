@@ -33,6 +33,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [prunedParts, setPrunedParts] = useState(0);
   const [embeddingsEnabled, setEmbeddingsEnabled] = useState(false);
   const [embeddingThreshold, setEmbeddingThreshold] = useState(0.25);
+  const [prefillEnabled, setPrefillEnabled] = useState(true);
   const [embeddingStats, setEmbeddingStats] = useState<{
     loreCount: number;
     memoryCount: number;
@@ -72,6 +73,14 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
         : 0.25;
     setEmbeddingThreshold(embThreshold);
+
+    // Check prefill setting (default: true)
+    const prefillSetting =
+      typeof window !== "undefined"
+        ? localStorage.getItem("usePrefill")
+        : null;
+    // If not set, default to true
+    setPrefillEnabled(prefillSetting !== "false");
 
     // Get current preset and custom model overrides from localStorage
     const currentPreset =
@@ -179,6 +188,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           userChoice: undefined,
           modelName: effectiveStoryModel,
           embeddingContext: simulatedEmbeddingContext,
+          usePrefill: prefillSetting !== "false",
         });
         contextMessages = storyPrompt.messages;
         prunedCount = storyPrompt.prunedParts;
@@ -188,6 +198,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           storyData,
           storyContent: "(Story content from previous stage would go here)",
           embeddingContext: simulatedEmbeddingContext,
+          usePrefill: prefillSetting !== "false",
         });
         contextMessages = toolPrompt.messages;
         break;
@@ -196,6 +207,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           storyData,
           storyContent: "(Story content from previous stage would go here)",
           embeddingContext: simulatedEmbeddingContext,
+          usePrefill: prefillSetting !== "false",
         });
         contextMessages = choicesPrompt.messages;
         break;
@@ -482,6 +494,16 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                   ? "⚡ High Usage"
                   : "✓ Normal"}
               </div>
+              <div
+                className={`px-2 sm:px-3 py-1 rounded border text-xs ${
+                  prefillEnabled
+                    ? "bg-cyan-100 dark:bg-cyan-900/30 border-cyan-300 dark:border-cyan-700 text-cyan-700 dark:text-cyan-400"
+                    : "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400"
+                }`}
+                title="Role Affirmation primes the model to follow output rules"
+              >
+                {prefillEnabled ? "🎭 Prefill ON" : "Prefill OFF"}
+              </div>
             </div>
 
             {/* Toggles */}
@@ -640,7 +662,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                   <div className="text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-2 rounded">
                     <div className="font-semibold text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1">
                       <DynamicIcon name="Zap" className="w-3 h-3" />
-                      State Changes (from last turn's tools)
+                      GM State Changes (from last turn)
                     </div>
                     <ul className="list-disc list-inside text-amber-800 dark:text-amber-300 space-y-0.5">
                       {lastAssistantPart.stateChanges.map((change, i) => (
@@ -648,7 +670,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                       ))}
                     </ul>
                     <div className="text-amber-600 dark:text-amber-500 mt-1 italic">
-                      These will be prepended to the next user choice message.
+                      These appear as [GM State Update] assistant messages in story history.
                     </div>
                   </div>
                 );
@@ -672,14 +694,16 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                 <div className="text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-2 rounded">
                   <div className="font-semibold text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1">
                     <DynamicIcon name="Zap" className="w-3 h-3" />
-                    Pending State Changes (
-                    {lastAssistantPart.stateChanges.length})
+                    GM State Changes ({lastAssistantPart.stateChanges.length})
                   </div>
                   <ul className="list-disc list-inside text-amber-800 dark:text-amber-300 space-y-0.5">
                     {lastAssistantPart.stateChanges.map((change, i) => (
                       <li key={i}>{change}</li>
                     ))}
                   </ul>
+                  <div className="text-amber-600 dark:text-amber-500 mt-1 italic text-[10px]">
+                    Shown as [GM State Update] in story history
+                  </div>
                 </div>
               );
             } else if (
