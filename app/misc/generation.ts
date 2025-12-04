@@ -519,7 +519,9 @@ export async function generateStoryTurn(
     // We buffer content until we find the marker, then stream only the actual story
     const usePrefill = options.usePrefill !== false;
     let prefillStripped = !usePrefill; // If prefill disabled, consider it already "stripped"
+    let dividerStripped = false; // Track if we've stripped leading dividers
     let rawContent = ""; // Buffer for finding the marker
+    let pendingContent = ""; // Buffer for stripping dividers after marker
     const STORY_MARKER = "NO meta-text.";
 
     for await (const event of parseSSEStream(storyResponse)) {
@@ -527,10 +529,32 @@ export async function generateStoryTurn(
         throw new Error(event.error || "Story generation failed");
       }
       if (event.type === "content" && event.content) {
-        if (prefillStripped) {
-          // Already past the prefill, stream directly
+        if (prefillStripped && dividerStripped) {
+          // Already past prefill and dividers, stream directly
           storyContent += event.content;
           callbacks.onStoryContent?.(event.content, storyContent);
+        } else if (prefillStripped && !dividerStripped) {
+          // Past prefill but still checking for dividers
+          pendingContent += event.content;
+
+          // Strip leading whitespace and dividers
+          let cleaned = pendingContent
+            .replace(/^[\s\n]*([-*_]{3,})[\s\n]*/g, "")
+            .trimStart();
+
+          // If we have actual content (not just potential divider chars), we're done stripping
+          if (cleaned.length > 0 && !/^[-*_]+$/.test(cleaned)) {
+            dividerStripped = true;
+            storyContent = cleaned;
+            callbacks.onStoryContent?.(cleaned, storyContent);
+          } else if (pendingContent.length > 50) {
+            // After 50 chars, just emit whatever we have
+            dividerStripped = true;
+            storyContent = cleaned || pendingContent.trimStart();
+            if (storyContent) {
+              callbacks.onStoryContent?.(storyContent, storyContent);
+            }
+          }
         } else {
           // Still looking for the marker
           rawContent += event.content;
@@ -542,19 +566,31 @@ export async function generateStoryTurn(
             let contentAfterMarker = rawContent
               .slice(markerIndex + STORY_MARKER.length)
               .trimStart();
-            // Strip leading dividers (---, ***, ___) 
+            // Strip leading dividers (---, ***, ___)
             while (/^[-*_]{3,}/.test(contentAfterMarker)) {
-              contentAfterMarker = contentAfterMarker.replace(/^[-*_]{3,}[\s\n]*/, "").trimStart();
+              contentAfterMarker = contentAfterMarker
+                .replace(/^[-*_]{3,}[\s\n]*/, "")
+                .trimStart();
             }
-            storyContent = contentAfterMarker;
             prefillStripped = true;
-            if (contentAfterMarker) {
+
+            // Check if we have actual content or need to keep buffering for dividers
+            if (
+              contentAfterMarker.length > 0 &&
+              !/^[-*_]+$/.test(contentAfterMarker)
+            ) {
+              storyContent = contentAfterMarker;
+              dividerStripped = true;
               callbacks.onStoryContent?.(contentAfterMarker, storyContent);
+            } else {
+              // Content might be empty or just divider chars, buffer it
+              pendingContent = contentAfterMarker;
             }
           } else if (rawContent.length > 800) {
             // Marker not found after 800 chars - assume no prefill, stream everything
             storyContent = rawContent;
             prefillStripped = true;
+            dividerStripped = true;
             callbacks.onStoryContent?.(rawContent, storyContent);
           }
           // Otherwise keep buffering
@@ -565,6 +601,14 @@ export async function generateStoryTurn(
         totalTokenCost += event.meta.tokenCost;
         finalBalance = event.meta.balance;
       }
+    }
+
+    // Handle any pending content that wasn't emitted
+    if (prefillStripped && !dividerStripped && pendingContent) {
+      let cleaned = pendingContent
+        .replace(/^[\s\n]*([-*_]{3,})[\s\n]*/g, "")
+        .trimStart();
+      storyContent = cleaned || pendingContent.trimStart();
     }
 
     // If we never found the marker but have buffered content, use it as-is
