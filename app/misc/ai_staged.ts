@@ -27,9 +27,9 @@ export const STORY_AFFIRMATION = `Understood. I will write the narrative respons
 - **Perspective:** Strict Second Person ("You"), deep POV.
 - **Style:** "Show, Don't Tell" with visceral sensory details; varying sentence structure; NO banned words.
 - **Agency:** I will respect the Action Result (Success/Failure) and the Active Challenge state.
-- **Stopping Rule:** I will STOP writing immediately before the player must react.
+- **Format:** Pure prose only - NO titles, headers, progress indicators, or meta-text.
 
-[Scene Start]:`;
+[Scene]:`;
 
 export const TOOLS_AFFIRMATION = `Understood. I will audit the narrative for game state changes:
 - **Accuracy:** I will use EXACT string matching for items, stats, and quest names.
@@ -521,6 +521,11 @@ When an [ACTIVE CHALLENGE] is shown in the game state:
 - **Challenge Lost:** Write the disaster/consequence. You are overwhelmed, captured, the enemy escapes, the negotiation collapses.
 - **Keep It Episodic:** Each turn during a challenge should advance ONE step - do not skip ahead. Let the mechanics (success/failure count) pace the resolution.
 
+## 7. OUTPUT FORMAT
+- **Pure Prose Only:** Write ONLY narrative text. No headers, titles, progress indicators, or meta-commentary.
+- **No UI Elements:** Do NOT write things like "Scene:", "Chapter:", "Progress 2/3", "(Challenge Won)", or any labels.
+- **No Stop Markers in Output:** Do not literally write "[STOP]" - just stop writing at the appropriate moment.
+
 WRITE THE NARRATIVE RESPONSE ONLY!
 
 ${
@@ -600,12 +605,6 @@ ${
       choiceMessage = `[Game State Updates from previous turn:\n- ${stateChangesStr}]\n\n${choiceMessage}`;
     }
 
-    // Append role affirmation to the user message if enabled
-    // This primes the model to follow output constraints without requiring provider-specific prefill support
-    if (usePrefill) {
-      choiceMessage += `\n\n---\nNarrator confirms: ${STORY_AFFIRMATION}`;
-    }
-
     historyMessages.push({
       role: "user",
       content: cleanString(choiceMessage),
@@ -642,6 +641,15 @@ ${
     console.log(
       `[buildStoryPrompt] Token budget: ${actualStoryBudget}, Used: ${currentTokens}, Info: ${infoTokens}`
     );
+  }
+
+  // Add role affirmation (prefill) if enabled
+  // This primes the model to follow output constraints by appearing as if it already committed
+  if (usePrefill) {
+    messages.push({
+      role: "assistant",
+      content: STORY_AFFIRMATION,
+    });
   }
 
   return { messages, prunedParts };
@@ -798,16 +806,21 @@ ${
   }
 
   // Add the new story content
-  // Append role affirmation if enabled and this is the first tool round
-  const toolUserContent =
-    usePrefill && (!existingToolCalls || existingToolCalls.length === 0)
-      ? `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.\n\n---\nGame State Manager confirms: ${TOOLS_AFFIRMATION}`
-      : `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.`;
-
   messages.push({
     role: "user",
-    content: cleanString(toolUserContent),
+    content: cleanString(
+      `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.`
+    ),
   });
+
+  // Add role affirmation (prefill) if enabled and no existing tool calls
+  // For multi-round tool calling, we skip the affirmation after the first round
+  if (usePrefill && (!existingToolCalls || existingToolCalls.length === 0)) {
+    messages.push({
+      role: "assistant",
+      content: TOOLS_AFFIRMATION,
+    });
+  }
 
   // If we have existing tool calls, add them to history and prompt for more
   if (existingToolCalls && existingToolCalls.length > 0) {
@@ -1147,15 +1160,20 @@ Example: "Take a risk <table: ${
   }
 
   // Add the new story content
-  // Append role affirmation if enabled
-  const choicesUserContent = usePrefill
-    ? `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?\n\n---\nChoice Generator confirms: ${CHOICES_AFFIRMATION}`
-    : `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?`;
-
   messages.push({
     role: "user",
-    content: cleanString(choicesUserContent),
+    content: cleanString(
+      `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?`
+    ),
   });
+
+  // Add role affirmation (prefill) if enabled
+  if (usePrefill) {
+    messages.push({
+      role: "assistant",
+      content: CHOICES_AFFIRMATION,
+    });
+  }
 
   return { messages };
 }

@@ -339,7 +339,7 @@ export async function POST(req: NextRequest) {
 
         const requestBody: any = {
           model: modelConfig.model,
-          messages: messages.map((m) => {
+          messages: messages.map((m, index) => {
             const msg: any = { role: m.role, content: m.content || "" };
             if (m.tool_calls) {
               // Re-serialize tool call arguments to strings if they're objects
@@ -356,6 +356,14 @@ export async function POST(req: NextRequest) {
               }));
             }
             if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+            // For Mistral: if the last message is assistant (prefill), add prefix: true
+            if (
+              modelConfig.provider === "mistral" &&
+              index === messages.length - 1 &&
+              m.role === "assistant"
+            ) {
+              msg.prefix = true;
+            }
             return msg;
           }),
           temperature,

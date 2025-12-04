@@ -3017,9 +3017,10 @@ function StoryPageContent() {
         itemType = item.type || "normal";
 
         // Track grade label before item might be removed
-        itemGradeLabel = item.grade
-          ? ` [${GRADE_CONFIG[item.grade].label}]`
-          : "";
+        itemGradeLabel =
+          item.grade && GRADE_CONFIG[item.grade]
+            ? ` [${GRADE_CONFIG[item.grade].label}]`
+            : "";
 
         // Track durability info for display
         const durabilityInfo = getDurabilityDisplay(item);
@@ -3138,9 +3139,10 @@ function StoryPageContent() {
           } else {
             // Can afford - ability will be used
             abilityUsed = ability;
-            abilityGradeLabel = ability.grade
-              ? ` [${ABILITY_GRADE_CONFIG[ability.grade].label}]`
-              : "";
+            abilityGradeLabel =
+              ability.grade && ABILITY_GRADE_CONFIG[ability.grade]
+                ? ` [${ABILITY_GRADE_CONFIG[ability.grade].label}]`
+                : "";
             abilityGradeBonus = getAbilityBonus(ability, rpgSystem.id);
 
             // Apply ability advantage

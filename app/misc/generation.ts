@@ -24,6 +24,9 @@ import {
   buildActionAnalysisPrompt,
   ChatMessage,
   EmbeddingContext,
+  STORY_AFFIRMATION,
+  TOOLS_AFFIRMATION,
+  CHOICES_AFFIRMATION,
 } from "@/app/misc/ai_staged";
 import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
@@ -48,6 +51,39 @@ import {
 // ============================================================
 // TYPES
 // ============================================================
+
+/**
+ * Strip affirmation prefill from AI response.
+ * When using prefill, some providers (like Mistral) include the prefill text
+ * in the response. This function removes it.
+ */
+function stripAffirmationPrefill(content: string, affirmation: string): string {
+  if (!content) return content;
+
+  // Check if the content starts with the affirmation (possibly with minor whitespace differences)
+  const trimmedContent = content.trimStart();
+  const trimmedAffirmation = affirmation.trim();
+
+  if (trimmedContent.startsWith(trimmedAffirmation)) {
+    return trimmedContent.slice(trimmedAffirmation.length).trimStart();
+  }
+
+  // Also check for partial matches at the beginning (streaming might have slight variations)
+  // Look for the marker that ends the affirmation
+  const storyMarker = "[Scene]:";
+  const toolsMarker = "Thinking Process:";
+  const choicesMarker = "Generating choices:";
+
+  for (const marker of [storyMarker, toolsMarker, choicesMarker]) {
+    const markerIndex = trimmedContent.indexOf(marker);
+    if (markerIndex !== -1 && markerIndex < 500) {
+      // Only strip if marker is near the beginning
+      return trimmedContent.slice(markerIndex + marker.length).trimStart();
+    }
+  }
+
+  return content;
+}
 
 export interface GenerationOptions {
   storyModel: string;
@@ -479,14 +515,46 @@ export async function generateStoryTurn(
       );
     }
 
-    // Process story stream
+    // Process story stream with real-time prefill stripping
+    // We buffer content until we find the marker, then stream only the actual story
+    const usePrefill = options.usePrefill !== false;
+    let prefillStripped = !usePrefill; // If prefill disabled, consider it already "stripped"
+    let rawContent = ""; // Buffer for finding the marker
+    const STORY_MARKER = "[Scene]:";
+
     for await (const event of parseSSEStream(storyResponse)) {
       if (event.type === "error") {
         throw new Error(event.error || "Story generation failed");
       }
       if (event.type === "content" && event.content) {
-        storyContent += event.content;
-        callbacks.onStoryContent?.(event.content, storyContent);
+        if (prefillStripped) {
+          // Already past the prefill, stream directly
+          storyContent += event.content;
+          callbacks.onStoryContent?.(event.content, storyContent);
+        } else {
+          // Still looking for the marker
+          rawContent += event.content;
+
+          // Check if we've found the marker
+          const markerIndex = rawContent.indexOf(STORY_MARKER);
+          if (markerIndex !== -1) {
+            // Found it! Extract content after the marker
+            const contentAfterMarker = rawContent
+              .slice(markerIndex + STORY_MARKER.length)
+              .trimStart();
+            storyContent = contentAfterMarker;
+            prefillStripped = true;
+            if (contentAfterMarker) {
+              callbacks.onStoryContent?.(contentAfterMarker, storyContent);
+            }
+          } else if (rawContent.length > 800) {
+            // Marker not found after 800 chars - assume no prefill, stream everything
+            storyContent = rawContent;
+            prefillStripped = true;
+            callbacks.onStoryContent?.(rawContent, storyContent);
+          }
+          // Otherwise keep buffering
+        }
       }
       if (event.type === "done" && event.meta) {
         storyMeta = event.meta;
@@ -494,6 +562,14 @@ export async function generateStoryTurn(
         finalBalance = event.meta.balance;
       }
     }
+
+    // If we never found the marker but have buffered content, use it as-is
+    if (!prefillStripped && rawContent) {
+      storyContent = rawContent;
+    }
+
+    // Strip [STOP] marker if the model added it (from following affirmation too literally)
+    storyContent = storyContent.replace(/\s*\[STOP\]\s*$/i, "").trimEnd();
 
     callbacks.onStoryComplete?.(
       storyContent,
@@ -728,6 +804,14 @@ export async function generateStoryTurn(
           totalTokenCost += event.meta.tokenCost;
           finalBalance = event.meta.balance;
         }
+      }
+
+      // Strip affirmation prefill if present (some providers like Mistral include it in response)
+      if (options.usePrefill !== false) {
+        choicesContent = stripAffirmationPrefill(
+          choicesContent,
+          CHOICES_AFFIRMATION
+        );
       }
 
       // Parse choices

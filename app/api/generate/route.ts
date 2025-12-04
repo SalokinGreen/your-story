@@ -111,7 +111,7 @@ async function callAI(
 
   const requestBody: any = {
     model,
-    messages: messages.map((m) => {
+    messages: messages.map((m, index) => {
       const msg: any = { role: m.role, content: m.content || "" };
       if (m.tool_calls) {
         // Re-serialize tool call arguments to strings if they're objects
@@ -128,6 +128,14 @@ async function callAI(
         }));
       }
       if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+      // For Mistral: if the last message is assistant (prefill), add prefix: true
+      if (
+        provider === "mistral" &&
+        index === messages.length - 1 &&
+        m.role === "assistant"
+      ) {
+        msg.prefix = true;
+      }
       return msg;
     }),
     temperature,
