@@ -175,6 +175,36 @@ export function ClockCategorySelector({
     };
   }, [handleWheel, handleKeyDown, isOpen]);
 
+  // Touch event listeners with passive: false to allow preventDefault
+  useEffect(() => {
+    const wheel = wheelRef.current;
+    if (!wheel || !isOpen) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      handleDragStart(e.touches[0].clientY);
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      handleDragMove(e.touches[0].clientY);
+    };
+
+    const onTouchEnd = () => {
+      handleDragEnd();
+    };
+
+    wheel.addEventListener("touchstart", onTouchStart, { passive: false });
+    wheel.addEventListener("touchmove", onTouchMove, { passive: false });
+    wheel.addEventListener("touchend", onTouchEnd);
+
+    return () => {
+      wheel.removeEventListener("touchstart", onTouchStart);
+      wheel.removeEventListener("touchmove", onTouchMove);
+      wheel.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [isOpen, handleDragStart, handleDragMove, handleDragEnd]);
+
   // Click outside to close
   useEffect(() => {
     if (!isOpen) return;
@@ -295,14 +325,11 @@ export function ClockCategorySelector({
           {/* Wheel container */}
           <div
             ref={wheelRef}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 touch-none"
             onMouseDown={(e) => handleDragStart(e.clientY)}
             onMouseMove={(e) => handleDragMove(e.clientY)}
             onMouseUp={handleDragEnd}
             onMouseLeave={handleDragEnd}
-            onTouchStart={(e) => handleDragStart(e.touches[0].clientY)}
-            onTouchMove={(e) => handleDragMove(e.touches[0].clientY)}
-            onTouchEnd={handleDragEnd}
           >
             {/* Header with title */}
             <div className="absolute -top-20 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">

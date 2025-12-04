@@ -11339,7 +11339,7 @@ ${description || ""}`;
               )}
             />
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-3">
               {/* Local/Online Toggle */}
               <div className="flex items-center gap-2">
                 <span
@@ -11487,7 +11487,7 @@ ${description || ""}`;
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap"
+                className="flex items-center justify-center gap-2 px-4 py-2 w-full sm:w-auto bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap"
                 title={isLocal ? "Save to your device" : "Save to the database"}
               >
                 {saving ? (
@@ -11496,12 +11496,12 @@ ${description || ""}`;
                       name="Loader2"
                       className="w-4 h-4 animate-spin"
                     />
-                    <span className="hidden sm:inline">Saving...</span>
+                    <span>Saving...</span>
                   </>
                 ) : (
                   <>
                     <DynamicIcon name="Save" className="w-4 h-4" />
-                    <span className="hidden sm:inline">Save</span>
+                    <span>Save</span>
                   </>
                 )}
               </button>
