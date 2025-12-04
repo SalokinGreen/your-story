@@ -1477,6 +1477,18 @@ const startChallengeTool: ToolSchema = {
           description: "Progression points awarded on victory (default: 25)",
           minimum: 0,
         },
+        initialSuccesses: {
+          type: "number",
+          description: "Starting successes (use when the triggering action already counts as a success)",
+          minimum: 0,
+          maximum: 3,
+        },
+        initialFailures: {
+          type: "number",
+          description: "Starting failures (use when the triggering action already counts as a failure)",
+          minimum: 0,
+          maximum: 3,
+        },
       },
       required: ["name", "requiredSuccesses", "maxFailures"],
     },

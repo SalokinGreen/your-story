@@ -1679,6 +1679,8 @@ export function executeTools(
         const requiredSuccesses = args.requiredSuccesses;
         const maxFailures = args.maxFailures;
         const points = args.points ?? 25; // Default 25 points
+        const initialSuccesses = Math.min(args.initialSuccesses ?? 0, 3);
+        const initialFailures = Math.min(args.initialFailures ?? 0, 3);
 
         if (!name || name.length < 3) {
           const errorMsg = "Challenge name must be at least 3 characters";
@@ -1753,8 +1755,8 @@ export function executeTools(
           description,
           requiredSuccesses,
           maxFailures,
-          currentSuccesses: 0,
-          currentFailures: 0,
+          currentSuccesses: initialSuccesses,
+          currentFailures: initialFailures,
           active: true,
           createdAt: Date.now(),
           pointsAwarded: points,
@@ -1766,11 +1768,13 @@ export function executeTools(
           requiredSuccesses,
           maxFailures,
           points,
+          initialSuccesses,
+          initialFailures,
         });
         responses.push({
           command: `/start_challenge: ${name}`,
           success: true,
-          message: `🎯 CHALLENGE STARTED: ${name} [Progress: 0/${requiredSuccesses}] [Danger: 0/${maxFailures}]${
+          message: `🎯 CHALLENGE STARTED: ${name} [Progress: ${initialSuccesses}/${requiredSuccesses}] [Danger: ${initialFailures}/${maxFailures}]${
             points > 0 ? ` (${points} points on victory)` : ""
           }`,
           timestamp: Date.now(),
