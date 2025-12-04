@@ -246,7 +246,7 @@ test("processes stat modification", () => {
 
 - [ ] Items (normal/consumable/story)
 - [ ] Achievements (`advOn`/`disadvOn` arrays)
-- [ ] Momentum reroll
+- [ ] Momentum advantage
 - [ ] Missing items
 - [ ] Insufficient resources (system-dependent)
 - [ ] Misc items (prevent disadvantage only)

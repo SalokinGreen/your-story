@@ -1424,7 +1424,7 @@ function StoryPageContent() {
     "story" | "tools" | "choices" | null
   >(null);
   const [momentumMode, setMomentumMode] = useState<
-    "none" | "reroll" | "guarantee"
+    "none" | "advantage" | "guarantee"
   >("none");
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [loadingStory, setLoadingStory] = useState(true);
@@ -2761,26 +2761,26 @@ function StoryPageContent() {
     setLoadingStage("story");
 
     //Handlemomentumspending
-    if (momentumMode === "reroll" && storyData.momentum >= 1) {
+    if (momentumMode === "advantage" && storyData.momentum >= 1) {
       storyData.momentum--;
       logger.action("Momentum spent", {
-        mode: "reroll",
+        mode: "advantage",
         cost: 1,
         remaining: storyData.momentum,
       });
       addNotification(
-        `Spent 1 Momentum for Reroll! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
+        `Spent 1 Momentum for Advantage! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
         "info"
       );
-    } else if (momentumMode === "guarantee" && storyData.momentum >= 2) {
-      storyData.momentum -= 2;
+    } else if (momentumMode === "guarantee" && storyData.momentum >= 3) {
+      storyData.momentum -= 3;
       logger.action("Momentum spent", {
         mode: "guarantee",
-        cost: 2,
+        cost: 3,
         remaining: storyData.momentum,
       });
       addNotification(
-        `Spent 2 Momentum for Guaranteed Success! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
+        `Spent 3 Momentum for Guaranteed Success! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
         "success"
       );
     }
@@ -3194,14 +3194,14 @@ function StoryPageContent() {
       }
     }
 
-    // Track momentum reroll as advantage (for all cases: with item, missing item, no item)
+    // Track momentum advantage (for all cases: with item, missing item, no item)
     if (
-      momentumMode === "reroll" &&
+      momentumMode === "advantage" &&
       rpgSystem.id !== "yze" &&
       rpgSystem.id !== "explosive"
     ) {
       advantageCount++;
-      advantageSources.push("momentum reroll");
+      advantageSources.push("momentum advantage");
     }
 
     //Processresourceusage(resourceisautomaticallyatriskonskillcheckfailure)
@@ -3669,8 +3669,8 @@ function StoryPageContent() {
             allDiceDetails.push(diceResult.rolls);
           }
 
-          // Handle momentum reroll for explosive
-          if (momentumMode === "reroll") {
+          // Handle momentum advantage for explosive
+          if (momentumMode === "advantage") {
             const reroll1Result = rollDice(rpgSystem, dieSize);
             const reroll2Result = rollDice(rpgSystem, dieSize);
             const reroll1 = reroll1Result.total;
@@ -3690,7 +3690,7 @@ function StoryPageContent() {
               diceResult = reroll2Result;
             }
 
-            logger.action("Explosive momentum reroll", {
+            logger.action("Explosive momentum advantage", {
               oldRoll,
               reroll1,
               reroll2,
@@ -3699,7 +3699,7 @@ function StoryPageContent() {
             });
 
             addNotification(
-              `Reroll Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} Best: ${dice_roll}`,
+              `Advantage Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} → Best: ${dice_roll}`,
               "success"
             );
           }

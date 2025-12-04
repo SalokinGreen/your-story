@@ -1022,8 +1022,8 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
   byokOpenRouter: {
     id: "byokOpenRouter",
     name: "BYOK OpenRouter",
-    description: "Gemini Flash for all stages - uses your OpenRouter API key",
-    storyModel: "Gemini 2.5 Flash",
+    description: "The best openrouter models - uses your OpenRouter API key",
+    storyModel: "GLM 4.6",
     toolsModel: "Gemini 2.5 Flash",
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 0,

@@ -19,7 +19,7 @@ describe("Advantage/Disadvantage Stacking System", () => {
     });
 
     it("should calculate 2 advantage + 1 disadvantage = 1 net advantage", () => {
-      // Scenario: Player has item + momentum reroll (2 advantage) but missing another item (1 disadvantage)
+      // Scenario: Player has item + momentum advantage (2 advantage) but missing another item (1 disadvantage)
       const advantageCount = 2;
       const disadvantageCount = 1;
       const netAdvantage = advantageCount - disadvantageCount;
@@ -39,7 +39,7 @@ describe("Advantage/Disadvantage Stacking System", () => {
     });
 
     it("should calculate 3 advantage + 0 disadvantage = 3 net advantage", () => {
-      // Scenario: Player has item + momentum reroll + another effect (3 advantage)
+      // Scenario: Player has item + momentum advantage + another effect (3 advantage)
       const advantageCount = 3;
       const disadvantageCount = 0;
       const netAdvantage = advantageCount - disadvantageCount;
@@ -127,14 +127,14 @@ describe("Advantage/Disadvantage Stacking System", () => {
 
       // Item used
       advantageSources.push("Healing Potion");
-      // Momentum reroll
-      advantageSources.push("momentum reroll");
+      // Momentum advantage
+      advantageSources.push("momentum advantage");
 
       expect(advantageSources).toHaveLength(2);
       expect(advantageSources).toContain("Healing Potion");
-      expect(advantageSources).toContain("momentum reroll");
+      expect(advantageSources).toContain("momentum advantage");
       expect(advantageSources.join(", ")).toBe(
-        "Healing Potion, momentum reroll"
+        "Healing Potion, momentum advantage"
       );
     });
 
@@ -155,7 +155,7 @@ describe("Advantage/Disadvantage Stacking System", () => {
     });
 
     it("should correctly identify which sources apply in mixed scenario", () => {
-      const advantageSources: string[] = ["Sword", "momentum reroll"];
+      const advantageSources: string[] = ["Sword", "momentum advantage"];
       const disadvantageSources: string[] = ["insufficient Stamina"];
 
       const advantageCount = advantageSources.length;
@@ -170,14 +170,14 @@ describe("Advantage/Disadvantage Stacking System", () => {
         netAdvantage > 0
           ? advantageSources.join(", ")
           : disadvantageSources.join(", ");
-      expect(displaySources).toBe("Sword, momentum reroll");
+      expect(displaySources).toBe("Sword, momentum advantage");
     });
   });
 
   describe("Stacking Examples", () => {
     it("Example 1: Item + Momentum vs Insufficient Resource", () => {
       // Player has: Sword (adv) + Momentum (adv) but insufficient Stamina (dis)
-      const advantageSources = ["Sword", "momentum reroll"];
+      const advantageSources = ["Sword", "momentum advantage"];
       const disadvantageSources = ["insufficient Stamina"];
 
       const netAdvantage = advantageSources.length - disadvantageSources.length;
@@ -209,7 +209,7 @@ describe("Advantage/Disadvantage Stacking System", () => {
 
     it("Example 4: Triple Advantage Stack", () => {
       // Player has: Item (adv) + Momentum (adv) + Special buff (adv)
-      const advantageSources = ["Sword", "momentum reroll", "blessing buff"];
+      const advantageSources = ["Sword", "momentum advantage", "blessing buff"];
       const disadvantageSources: string[] = [];
 
       const netAdvantage = advantageSources.length - disadvantageSources.length;

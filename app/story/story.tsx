@@ -16,8 +16,8 @@ interface StoryProps {
   input: Record<string, boolean>;
   loading: boolean;
   loadingStage?: "story" | "tools" | "choices" | null;
-  momentumMode: "none" | "reroll" | "guarantee";
-  onMomentumModeChange: (mode: "none" | "reroll" | "guarantee") => void;
+  momentumMode: "none" | "advantage" | "guarantee";
+  onMomentumModeChange: (mode: "none" | "advantage" | "guarantee") => void;
   handleChoice: () => void;
   handleSelect: (index: number) => void;
   onCustomInput?: (text: string) => void;

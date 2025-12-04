@@ -178,16 +178,16 @@ await new Promise((resolve) => {
 - Higher roll selected (crossed out lower)
 - Missing item indicator
 
-**Momentum Reroll** (Yellow badge with Zap icon)
+**Momentum Advantage** (Yellow badge with Zap icon)
 
-- Shows original roll + 2 rerolls
+- Shows original roll + 2 advantage rolls
 - Best of 3 selected
 - Momentum cost displayed
 
 **Guaranteed Success** (Purple badge with Zap icon)
 
 - Shows roll but auto-succeeds
-- 2 momentum cost displayed
+- 3 momentum cost displayed
 - Success badge always shown
 
 ### Result Colors
@@ -328,7 +328,7 @@ To test the dice visualization:
 4. Verify calculations match expected values
 5. Test with advantage (use item)
 6. Test with disadvantage (missing item)
-7. Test with momentum reroll
+7. Test with momentum advantage
 8. Test with momentum guarantee
 9. Test critical success (roll 100)
 10. Test with resource penalties

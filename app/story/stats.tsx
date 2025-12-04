@@ -352,7 +352,7 @@ export default function StatsPage(storyData: StoryData) {
                       </span>
                     </div>
                     <p className="text-xs text-blue-200/40 mb-1.5">
-                      Spend to reroll (1⚡) or guarantee success (2⚡).
+                      Spend for advantage (1⚡) or guarantee success (3⚡).
                     </p>
                     {/* Momentum dots display */}
                     <div className="flex gap-1 mb-1.5 overflow-hidden">

@@ -198,11 +198,11 @@ if (resource.value < resourceReqs.required) {
 **Location**: `handleChoice()` line ~2120
 
 ```typescript
-if (momentumMode === "reroll" && storyData.momentum >= 1) {
+if (momentumMode === "advantage" && storyData.momentum >= 1) {
   storyData.momentum--;
   // Grant advantage on roll
-} else if (momentumMode === "guarantee" && storyData.momentum >= 2) {
-  storyData.momentum -= 2;
+} else if (momentumMode === "guarantee" && storyData.momentum >= 3) {
+  storyData.momentum -= 3;
   // Auto-succeed
 }
 ```
@@ -223,7 +223,7 @@ disadvantageSources: string[] = [];
 // Sources of advantage:
 // - Items (normal/consumable/story)
 // - Achievements (advOn: ["skill_name"])
-// - Momentum reroll
+// - Momentum advantage
 // - Misc items (prevent disadvantage)
 
 // Sources of disadvantage:
@@ -655,7 +655,7 @@ shake uncontrollably and you can't move. [PANIC: Freeze]
 **System Behavior**:
 
 - No dice rolled
-- Player spent 2 momentum for guaranteed success
+- Player spent 3 momentum for guaranteed success
 - No context sent to AI
 
 **AI Should**: Narrate clean success (player earned it).

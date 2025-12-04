@@ -454,7 +454,7 @@ ${
     storyData.momentum !== undefined
       ? `**Momentum:** ${storyData.momentum}/${
           storyData.maxMomentum || 3
-        } (spend for rerolls/guaranteed success)`
+        } (spend for advantage/guaranteed success)`
       : "",
     storyData.points !== undefined
       ? `**Progression Points:** ${storyData.points} (spend on upgrades)`

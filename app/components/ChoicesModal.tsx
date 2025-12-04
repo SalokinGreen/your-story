@@ -24,8 +24,8 @@ interface ChoicesModalProps {
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
   onActionConfirm?: (choice: Choice) => void;
   loading: boolean;
-  momentumMode: "none" | "reroll" | "guarantee";
-  onMomentumModeChange: (mode: "none" | "reroll" | "guarantee") => void;
+  momentumMode: "none" | "advantage" | "guarantee";
+  onMomentumModeChange: (mode: "none" | "advantage" | "guarantee") => void;
   actionMode?: boolean;
   onActionModeChange?: (enabled: boolean) => void;
 }
@@ -123,8 +123,8 @@ export default function ChoicesModal({
   if (!isOpen) return null;
 
   const hasSkillCheck = selectedChoice?.skill_used !== undefined;
-  const canUseReroll = storyData.momentum >= 1 && hasSkillCheck;
-  const canUseGuarantee = storyData.momentum >= 2 && hasSkillCheck;
+  const canUseAdvantage = storyData.momentum >= 1 && hasSkillCheck;
+  const canUseGuarantee = storyData.momentum >= 3 && hasSkillCheck;
 
   const handleSubmitCustom = async () => {
     const text = customInput.trim();
@@ -648,54 +648,50 @@ export default function ChoicesModal({
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
-                  onClick={() =>
-                    onMomentumModeChange(
-                      momentumMode === "reroll" ? "none" : "reroll"
-                    )
-                  }
-                  disabled={actionMode ? storyData.momentum < 1 : !canUseReroll}
-                  title={
-                    actionMode
-                      ? "Reroll if action requires a skill check"
-                      : undefined
-                  }
-                  className={`px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
-                    momentumMode === "reroll"
-                      ? "bg-yellow-500 text-white"
-                      : (actionMode ? storyData.momentum >= 1 : canUseReroll)
-                      ? "bg-blue-900/50 text-blue-200/70 hover:bg-yellow-500/30 active:bg-yellow-500/50"
-                      : "bg-blue-950/50 text-blue-500 cursor-not-allowed"
-                  }`}
-                >
-                  <DynamicIcon name="Dices" className="w-4 h-4 sm:w-3 sm:h-3" />
-                  Reroll (1)
-                </button>
-                <button
-                  onClick={() =>
-                    onMomentumModeChange(
-                      momentumMode === "guarantee" ? "none" : "guarantee"
-                    )
-                  }
-                  disabled={
-                    actionMode ? storyData.momentum < 2 : !canUseGuarantee
-                  }
-                  title={
-                    actionMode
-                      ? "Guarantee success if action requires a skill check"
-                      : undefined
-                  }
-                  className={`px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
-                    momentumMode === "guarantee"
-                      ? "bg-green-500 text-white"
-                      : (actionMode ? storyData.momentum >= 2 : canUseGuarantee)
-                      ? "bg-blue-900/50 text-blue-200/70 hover:bg-green-500/30 active:bg-green-500/50"
-                      : "bg-blue-950/50 text-blue-500 cursor-not-allowed"
-                  }`}
-                >
-                  <DynamicIcon name="Check" className="w-4 h-4 sm:w-3 sm:h-3" />
-                  Guarantee (2)
-                </button>
+                {(actionMode ? storyData.momentum >= 1 : canUseAdvantage) && (
+                  <button
+                    onClick={() =>
+                      onMomentumModeChange(
+                        momentumMode === "advantage" ? "none" : "advantage"
+                      )
+                    }
+                    title={
+                      actionMode
+                        ? "Advantage if action requires a skill check"
+                        : undefined
+                    }
+                    className={`px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
+                      momentumMode === "advantage"
+                        ? "bg-yellow-500 text-white"
+                        : "bg-blue-900/50 text-blue-200/70 hover:bg-yellow-500/30 active:bg-yellow-500/50"
+                    }`}
+                  >
+                    <DynamicIcon name="Dices" className="w-4 h-4 sm:w-3 sm:h-3" />
+                    Advantage (1)
+                  </button>
+                )}
+                {(actionMode ? storyData.momentum >= 3 : canUseGuarantee) && (
+                  <button
+                    onClick={() =>
+                      onMomentumModeChange(
+                        momentumMode === "guarantee" ? "none" : "guarantee"
+                      )
+                    }
+                    title={
+                      actionMode
+                        ? "Guarantee success if action requires a skill check"
+                        : undefined
+                    }
+                    className={`px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
+                      momentumMode === "guarantee"
+                        ? "bg-green-500 text-white"
+                        : "bg-blue-900/50 text-blue-200/70 hover:bg-green-500/30 active:bg-green-500/50"
+                    }`}
+                  >
+                    <DynamicIcon name="Check" className="w-4 h-4 sm:w-3 sm:h-3" />
+                    Guarantee (3)
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -722,10 +718,10 @@ export default function ChoicesModal({
                   />
                   Generating...
                 </>
-              ) : momentumMode === "reroll" ? (
+              ) : momentumMode === "advantage" ? (
                 <>
                   <DynamicIcon name="Dices" className="w-4 h-4" />
-                  Continue with Reroll
+                  Continue with Advantage
                 </>
               ) : momentumMode === "guarantee" ? (
                 <>
