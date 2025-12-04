@@ -666,7 +666,10 @@ export default function ChoicesModal({
                         : "bg-blue-900/50 text-blue-200/70 hover:bg-yellow-500/30 active:bg-yellow-500/50"
                     }`}
                   >
-                    <DynamicIcon name="Dices" className="w-4 h-4 sm:w-3 sm:h-3" />
+                    <DynamicIcon
+                      name="Dices"
+                      className="w-4 h-4 sm:w-3 sm:h-3"
+                    />
                     Advantage (1)
                   </button>
                 )}
@@ -688,7 +691,10 @@ export default function ChoicesModal({
                         : "bg-blue-900/50 text-blue-200/70 hover:bg-green-500/30 active:bg-green-500/50"
                     }`}
                   >
-                    <DynamicIcon name="Check" className="w-4 h-4 sm:w-3 sm:h-3" />
+                    <DynamicIcon
+                      name="Check"
+                      className="w-4 h-4 sm:w-3 sm:h-3"
+                    />
                     Guarantee (3)
                   </button>
                 )}

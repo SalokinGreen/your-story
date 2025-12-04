@@ -135,9 +135,10 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 
 #### Big Adventure Creator
 
-- app/api/creator/generate-adventure/route.ts: SSE streaming endpoint for full adventure generation. Runs 4 stages (core, mechanics, content, advanced) with per-stage output limits. Supports BYOK (OpenRouter, DeepSeek, NovelAI).
+- app/api/creator/generate-adventure/route.ts: SSE streaming endpoint for full adventure generation. Runs 4 stages (core, mechanics, content, advanced) with per-stage output limits. Supports BYOK (OpenRouter, DeepSeek, NovelAI). On incomplete JSON: tries local `attemptJSONRepair()` first (free & instant), then prefill-based AI continuation for DeepSeek/Mistral (up to 2 attempts) if local repair fails.
 - app/api/creator/regenerate-section/route.ts: Regenerate a specific section of an existing adventure.
 - app/api/creator/extend-section/route.ts: Add more content to an existing section (lore, achievements, etc.).
+- app/api/creator/generate-stage/route.ts: Single-stage generation. Uses same repair strategy: local repair first, then prefill AI continuation if needed.
 - app/misc/big_adventure_ai.ts: Big Adventure AI configuration and prompt builders. Key exports:
   - `GenerationStage`: "core" | "mechanics" | "content" | "advanced"
   - `BigAdventureConfig`: Full configuration with complexity, duration, RPG system, feature toggles

@@ -22,6 +22,7 @@ export default function AdventureDetailPage() {
   const [loading, setLoading] = useState(true);
   const [startingAdventure, setStartingAdventure] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [togglingFeatured, setTogglingFeatured] = useState(false);
   const [togglingNsfw, setTogglingNsfw] = useState(false);
@@ -351,6 +352,51 @@ export default function AdventureDetailPage() {
     }
   };
 
+  const handleCopyAdventure = async () => {
+    if (!user) {
+      addNotification("Please sign in to copy adventures", "warning");
+      router.push("/");
+      return;
+    }
+
+    if (!adventure) return;
+
+    try {
+      setCopying(true);
+
+      // Create a copy of the adventure with new author and private visibility
+      const copiedAdventure = {
+        ...adventure,
+        id: undefined, // Will be assigned by the database
+        title: `${adventure.title} (Copy)`,
+        authorId: user.id,
+        author: user.user_metadata?.display_name || "You",
+        visibility: "private" as const,
+        isPublished: false,
+        isFeatured: false,
+        playCount: 0,
+        rating: 0,
+        createdAt: undefined,
+        updatedAt: undefined,
+      };
+
+      // Store the copied adventure data in sessionStorage
+      sessionStorage.setItem(
+        "your-story:copied-adventure",
+        JSON.stringify(copiedAdventure)
+      );
+
+      addNotification("Adventure copied! Redirecting to editor...", "success");
+
+      // Navigate to creator with copy flag
+      router.push("/creator/manual?copy=true");
+    } catch (error: any) {
+      console.error("Error copying adventure:", error);
+      addNotification(`Failed to copy: ${error.message}`, "failure");
+      setCopying(false);
+    }
+  };
+
   const handleDelete = async () => {
     setConfirmDialog({
       isOpen: true,
@@ -460,6 +506,23 @@ export default function AdventureDetailPage() {
             >
               <DynamicIcon name="Share2" className="w-5 h-5" />
             </button>
+            {user && (
+              <button
+                onClick={handleCopyAdventure}
+                disabled={copying}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                title="Copy Adventure"
+              >
+                {copying ? (
+                  <DynamicIcon
+                    name="Loader2"
+                    className="w-5 h-5 animate-spin"
+                  />
+                ) : (
+                  <DynamicIcon name="Copy" className="w-5 h-5" />
+                )}
+              </button>
+            )}
             {isAuthor && (
               <>
                 <button

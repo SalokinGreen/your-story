@@ -12,6 +12,7 @@
 import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
 import { ALL_GAME_ICON_IDS } from "@/app/misc/gameIcons";
+import JSON5 from "json5";
 
 export type RPGSystemType =
   | "3d6"
@@ -1807,28 +1808,41 @@ export function detectIncompleteJSON(content: string): {
 }
 
 /**
- * Build a continuation prompt to complete truncated JSON
+ * Build a repair prompt to close truncated JSON without generating more content.
+ * This is cheaper than continuation - we just want valid parseable JSON.
  */
 export function buildContinuationPrompt(
   truncatedContent: string,
-  stage: GenerationStage
+  _stage: GenerationStage
 ): string {
-  // Get the last ~500 characters to provide context
-  const contextLength = Math.min(500, truncatedContent.length);
+  // Get the last ~800 characters to provide context for closing
+  const contextLength = Math.min(800, truncatedContent.length);
   const lastContent = truncatedContent.slice(-contextLength);
 
-  return `Your previous response was cut off mid-generation. Here's where you stopped:
+  return `Your previous response was cut off. Here's the end of what you generated:
 
 ...${lastContent}
 
-CRITICAL: Continue EXACTLY from where you left off. Do not restart, do not add explanations.
-Just output the remaining JSON content to complete the ${stage} stage response.
-The output must be valid JSON when combined with what came before.`;
+CRITICAL INSTRUCTIONS:
+1. DO NOT generate any new content items
+2. Just close/finish the current JSON object so it's valid
+3. If you're mid-string, close the string with "
+4. Close any open arrays with ]
+5. Close any open objects with }
+6. Output ONLY the closing characters needed - nothing else
+
+Example: if cut off at {"name": "Test, your output should be: "}
+Example: if cut off at [{"a":1},{"b":2, your output should be: }]
+
+Output ONLY the minimal characters to make the JSON valid.`;
 }
 
 /**
- * Attempt to repair incomplete JSON by closing open brackets/braces
- * This is a best-effort fallback when continuation isn't possible
+ * Attempt to repair incomplete or malformed JSON
+ * This is a best-effort fallback that handles:
+ * - Unclosed brackets/braces
+ * - Malformed property names (e.g., `" "name"` instead of `"name"`)
+ * - Markdown code blocks
  */
 export function attemptJSONRepair(content: string): string {
   let jsonContent = content.trim();
@@ -1845,6 +1859,13 @@ export function attemptJSONRepair(content: string): string {
   // This handles cases where AI inserts ```json mid-response
   jsonContent = jsonContent.replace(/```json\s*/gi, "");
   jsonContent = jsonContent.replace(/```\s*/g, "");
+
+  // Fix malformed property names like `" "name"` or `"  "name"` -> `"name"`
+  // This handles AI mistakes where a space appears before the property name
+  jsonContent = jsonContent.replace(/"[ \t]+"([^"]+)"(\s*:)/g, '"$1"$2');
+
+  // Fix cases like `" "name":` (orphaned quote with space before actual name)
+  jsonContent = jsonContent.replace(/"[ \t]+"/g, '"');
 
   const startIndex = jsonContent.indexOf("{");
   if (startIndex === -1) return jsonContent;
@@ -1984,20 +2005,29 @@ export function parseBigAdventureStageOutput(
       jsonContent = jsonContent.slice(startIndex, endIndex + 1);
     }
 
-    // First attempt: try to parse as-is
+    // Parsing chain: JSON -> JSON5 -> repair+JSON -> repair+JSON5
     let parsed;
     try {
       parsed = JSON.parse(jsonContent);
-    } catch (parseError) {
-      // Second attempt: try to repair the JSON
-      console.warn("Initial JSON parse failed, attempting repair...");
-      const repairedContent = attemptJSONRepair(content);
+    } catch (jsonError) {
       try {
-        parsed = JSON.parse(repairedContent);
-        console.log("JSON repair successful!");
-      } catch (repairError) {
-        // Repair failed, throw original error
-        throw parseError;
+        // Lenient JSON5 parse (handles trailing commas, unquoted keys, etc.)
+        parsed = JSON5.parse(jsonContent);
+        console.log("JSON5 parse successful (lenient mode)");
+      } catch (json5Error) {
+        console.warn("Initial parsing failed, attempting repair...");
+        const repairedContent = attemptJSONRepair(content);
+        try {
+          parsed = JSON.parse(repairedContent);
+          console.log("JSON repair successful!");
+        } catch (repairJsonError) {
+          try {
+            parsed = JSON5.parse(repairedContent);
+            console.log("JSON5 parse of repaired content successful!");
+          } catch (repairJson5Error) {
+            throw jsonError;
+          }
+        }
       }
     }
 
@@ -2679,20 +2709,28 @@ export function parseRegenerateSectionOutput(
       jsonContent = jsonContent.slice(startIndex, endIndex + 1);
     }
 
-    // First attempt: try to parse as-is
+    // Parsing chain: JSON -> JSON5 -> repair+JSON -> repair+JSON5
     let parsed;
     try {
       parsed = JSON.parse(jsonContent);
-    } catch (parseError) {
-      // Second attempt: try to repair the JSON
-      console.warn("Initial JSON parse failed, attempting repair...");
-      const repairedContent = attemptJSONRepair(content);
+    } catch (jsonError) {
       try {
-        parsed = JSON.parse(repairedContent);
-        console.log("JSON repair successful!");
-      } catch (repairError) {
-        // Repair failed, throw original error
-        throw parseError;
+        parsed = JSON5.parse(jsonContent);
+        console.log("JSON5 parse successful (lenient mode)");
+      } catch (json5Error) {
+        console.warn("Initial parsing failed, attempting repair...");
+        const repairedContent = attemptJSONRepair(content);
+        try {
+          parsed = JSON.parse(repairedContent);
+          console.log("JSON repair successful!");
+        } catch (repairJsonError) {
+          try {
+            parsed = JSON5.parse(repairedContent);
+            console.log("JSON5 parse of repaired content successful!");
+          } catch (repairJson5Error) {
+            throw jsonError;
+          }
+        }
       }
     }
 
@@ -3074,20 +3112,28 @@ export function parseExtendSectionOutput(
       jsonContent = jsonContent.slice(startIndex, endIndex + 1);
     }
 
-    // First attempt: try to parse as-is
+    // Parsing chain: JSON -> JSON5 -> repair+JSON -> repair+JSON5
     let parsed;
     try {
       parsed = JSON.parse(jsonContent);
-    } catch (parseError) {
-      // Second attempt: try to repair the JSON
-      console.warn("Initial JSON parse failed, attempting repair...");
-      const repairedContent = attemptJSONRepair(content);
+    } catch (jsonError) {
       try {
-        parsed = JSON.parse(repairedContent);
-        console.log("JSON repair successful!");
-      } catch (repairError) {
-        // Repair failed, throw original error
-        throw parseError;
+        parsed = JSON5.parse(jsonContent);
+        console.log("JSON5 parse successful (lenient mode)");
+      } catch (json5Error) {
+        console.warn("Initial parsing failed, attempting repair...");
+        const repairedContent = attemptJSONRepair(content);
+        try {
+          parsed = JSON.parse(repairedContent);
+          console.log("JSON repair successful!");
+        } catch (repairJsonError) {
+          try {
+            parsed = JSON5.parse(repairedContent);
+            console.log("JSON5 parse of repaired content successful!");
+          } catch (repairJson5Error) {
+            throw jsonError;
+          }
+        }
       }
     }
 

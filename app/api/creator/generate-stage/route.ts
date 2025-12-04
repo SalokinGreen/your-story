@@ -22,7 +22,6 @@ import {
   buildBigAdventureMessages,
   parseBigAdventureStageOutput,
   detectIncompleteJSON,
-  buildContinuationPrompt,
 } from "@/app/misc/big_adventure_ai";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
@@ -168,7 +167,8 @@ async function streamAIResponse(
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
   stage: GenerationStage,
-  heartbeatInterval: NodeJS.Timeout | null
+  heartbeatInterval: NodeJS.Timeout | null,
+  streamContent: boolean = true // Set to false to skip streaming events (for continuation)
 ): Promise<{
   content: string;
   promptTokens: number;
@@ -188,11 +188,19 @@ async function streamAIResponse(
     );
   }
 
+  // Check if we have a prefill (trailing assistant message)
+  const hasPrefill =
+    messages.length > 0 &&
+    messages[messages.length - 1].role === "assistant";
+
   // Determine the correct endpoint based on provider
   let endpoint: string;
   switch (modelConfig.provider) {
     case "deepseek":
-      endpoint = "https://api.deepseek.com/v1/chat/completions";
+      // Use beta endpoint for prefill support (prefix: true requires beta API)
+      endpoint = hasPrefill
+        ? "https://api.deepseek.com/beta/chat/completions"
+        : "https://api.deepseek.com/v1/chat/completions";
       break;
     case "mistral":
       endpoint = "https://api.mistral.ai/v1/chat/completions";
@@ -214,9 +222,25 @@ async function streamAIResponse(
     headers["X-Title"] = "Your Story - Big Adventure Creator";
   }
 
+  // Process messages - add prefix: true to last assistant message for providers that need it
+  // Note: OpenRouter and DeepInfra also support prefill, they just continue from the assistant message naturally
+  const processedMessages = messages.map((m, index) => {
+    const msg: any = { role: m.role, content: m.content };
+    // For Mistral/DeepSeek: add prefix: true to tell API this is a prefill
+    // OpenRouter/DeepInfra don't need this flag - they continue naturally
+    if (
+      index === messages.length - 1 &&
+      m.role === "assistant" &&
+      (modelConfig.provider === "mistral" || modelConfig.provider === "deepseek")
+    ) {
+      msg.prefix = true;
+    }
+    return msg;
+  });
+
   const requestBody = {
     model: modelConfig.model,
-    messages,
+    messages: processedMessages,
     temperature,
     max_tokens: maxOutputTokens,
     stream: true,
@@ -268,16 +292,18 @@ async function streamAIResponse(
           const content = extractTextContent(delta.content);
           if (content) {
             fullContent += content;
-            // Send content chunk to client
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "stage_content",
-                  stage,
-                  content,
-                })}\n\n`
-              )
-            );
+            // Send content chunk to client (if streaming is enabled)
+            if (streamContent) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "stage_content",
+                    stage,
+                    content,
+                  })}\n\n`
+                )
+              );
+            }
           }
         }
 
@@ -552,9 +578,6 @@ export async function POST(req: NextRequest) {
           stageConfig.maxOutputTokens || config.maxOutputTokens;
         const temperature = config.temperature ?? 0.8;
 
-        // NovelAI has limited output, needs more continuations
-        const MAX_CONTINUATIONS = modelConfig.provider === "novelai" ? 50 : 5;
-
         // Send stage start event
         controller.enqueue(
           encoder.encode(
@@ -579,7 +602,6 @@ export async function POST(req: NextRequest) {
         let fullContent = "";
         let totalPromptTokens = 0;
         let totalCompletionTokens = 0;
-        let continuationAttempts = 0;
 
         // Handle "Finish Early" request
         if (finishEarly) {
@@ -654,47 +676,17 @@ export async function POST(req: NextRequest) {
             totalCompletionTokens += wrapUpResult.completionTokens;
           }
         } else if (continueFrom && continueFrom.trim()) {
+          // Resume from existing content - just use it as-is
+          // Local JSON repair in parseBigAdventureStageOutput will handle incomplete JSON
           fullContent = continueFrom;
 
-          // Check if the existing content is incomplete
+          // Check if the existing content is incomplete - just log for info
           const incompleteCheck = detectIncompleteJSON(fullContent);
-
           if (incompleteCheck.isIncomplete) {
-            // Build continuation prompt
-            const continuationPrompt = buildContinuationPrompt(
-              incompleteCheck.truncatedContent,
-              stage
-            );
-
-            // Create continuation messages with existing content as assistant response
-            const continuationMessages = [
-              ...messages.map((m) => ({ role: m.role, content: m.content })),
-              { role: "assistant", content: fullContent },
-              { role: "user", content: continuationPrompt },
-            ];
-
             logger.info(
-              `Stage ${stage} continuing from ${fullContent.length} chars of partial content`
+              `Stage ${stage} resuming from ${fullContent.length} chars of incomplete content, will attempt local repair`
             );
-
-            // Stream the continuation
-            const continuationResult = await streamAIResponse(
-              continuationMessages,
-              modelConfig,
-              apiKey,
-              maxOutputTokens,
-              0.3, // Lower temperature for consistent continuation
-              controller,
-              encoder,
-              stage,
-              heartbeatInterval
-            );
-
-            fullContent += continuationResult.content;
-            totalPromptTokens += continuationResult.promptTokens;
-            totalCompletionTokens += continuationResult.completionTokens;
           }
-          // If content is already complete, just use it as-is
         } else {
           // Fresh generation - initial generation
           const initialResult = await streamAIResponse(
@@ -714,85 +706,138 @@ export async function POST(req: NextRequest) {
           totalCompletionTokens += initialResult.completionTokens;
         }
 
-        // Skip normal continuation loop if we already finished early
+        // Check if JSON is incomplete
         if (!finishEarly) {
-          // Check if JSON is incomplete and attempt continuation
           let incompleteCheck = detectIncompleteJSON(fullContent);
 
-          while (
-            incompleteCheck.isIncomplete &&
-            continuationAttempts < MAX_CONTINUATIONS
-          ) {
-            continuationAttempts++;
-
-            // Notify about continuation
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "stage_continuation",
-                  stage,
-                  attempt: continuationAttempts,
-                  maxAttempts: MAX_CONTINUATIONS,
-                  message: `JSON incomplete, continuing generation (attempt ${continuationAttempts}/${MAX_CONTINUATIONS})...`,
-                })}\n\n`
-              )
-            );
-
-            logger.info(
-              `Stage ${stage} JSON incomplete, attempting continuation ${continuationAttempts}/${MAX_CONTINUATIONS}`
-            );
-
-            // Build continuation prompt
-            const continuationPrompt = buildContinuationPrompt(
-              incompleteCheck.truncatedContent,
-              stage
-            );
-
-            // Create continuation messages
-            const continuationMessages = [
-              ...messages.map((m) => ({ role: m.role, content: m.content })),
-              { role: "assistant", content: fullContent },
-              { role: "user", content: continuationPrompt },
-            ];
-
-            // Request continuation
-            const continuationResult = await streamAIResponse(
-              continuationMessages,
-              modelConfig,
-              apiKey,
-              Math.min(maxOutputTokens, 4000),
-              0.3, // Lower temperature for more consistent continuation
-              controller,
-              encoder,
-              stage,
-              heartbeatInterval
-            );
-
-            fullContent += continuationResult.content;
-            totalPromptTokens += continuationResult.promptTokens;
-            totalCompletionTokens += continuationResult.completionTokens;
-
-            // Check again
-            incompleteCheck = detectIncompleteJSON(fullContent);
-          }
-
+          // Strategy: Try local repair first (free & instant), then AI continuation if needed
           if (incompleteCheck.isIncomplete) {
-            logger.warn(
-              `Stage ${stage} still incomplete after ${MAX_CONTINUATIONS} continuation attempts`
-            );
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "stage_warning",
+            logger.info(`Stage ${stage} JSON incomplete, attempting local repair first`);
+            
+            // Try parsing with local repair
+            const localRepairResult = parseBigAdventureStageOutput(fullContent, stage);
+            
+            if (localRepairResult !== null) {
+              // Local repair succeeded! No need for AI continuation
+              logger.info(`Stage ${stage} local repair successful`);
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "stage_warning",
+                    stage,
+                    message: `Response was cut off. Local repair successful.`,
+                  })}\n\n`
+                )
+              );
+              
+              // Send stage complete event
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "stage_complete",
+                    stage,
+                    stageName: stageInfo.name,
+                    success: true,
+                    promptTokens: totalPromptTokens,
+                    completionTokens: totalCompletionTokens,
+                    partialResult: localRepairResult,
+                    rawContent: fullContent,
+                  })}\n\n`
+                )
+              );
+
+              // Clear heartbeat and send done
+              if (heartbeatInterval) clearInterval(heartbeatInterval);
+              
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "done",
+                    stage,
+                    result: localRepairResult,
+                    rawContent: fullContent,
+                    meta: {
+                      model: modelConfig.model,
+                      modelName: model,
+                      provider: modelConfig.provider,
+                      usage: {
+                        promptTokens: totalPromptTokens,
+                        completionTokens: totalCompletionTokens,
+                        totalTokens: totalPromptTokens + totalCompletionTokens,
+                      },
+                    },
+                  })}\n\n`
+                )
+              );
+
+              controller.close();
+              return;
+            }
+            
+            // Local repair failed - try AI prefill continuation
+            // All providers support prefill (trailing assistant message)
+            logger.info(`Stage ${stage} local repair failed, trying AI continuation`);
+            
+            const MAX_CONTINUATIONS = 2;
+            let continuationAttempts = 0;
+            // All providers support prefill continuation (OpenRouter, DeepInfra, DeepSeek, Mistral)
+            // NovelAI uses completions API so it doesn't support chat-style prefill
+            const supportsPrefill = modelConfig.provider !== "novelai";
+
+            while (
+              incompleteCheck.isIncomplete &&
+              supportsPrefill &&
+              continuationAttempts < MAX_CONTINUATIONS
+            ) {
+              continuationAttempts++;
+              logger.info(
+                `Stage ${stage} using prefill continuation (attempt ${continuationAttempts})`
+              );
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "stage_warning",
+                    stage,
+                    message: `Local repair failed. Continuing generation... (${continuationAttempts}/${MAX_CONTINUATIONS})`,
+                  })}\n\n`
+                )
+              );
+
+              const continuationMessages = [
+                ...messages.map((m) => ({ role: m.role, content: m.content })),
+                { role: "assistant", content: fullContent },
+              ];
+
+              const continuationTokens = Math.min(2000, maxOutputTokens);
+
+              try {
+                const continuationResult = await streamAIResponse(
+                  continuationMessages,
+                  modelConfig,
+                  apiKey,
+                  continuationTokens,
+                  temperature,
+                  controller,
+                  encoder,
                   stage,
-                  message: `Stage ${stage} content may be incomplete. JSON repair will be attempted.`,
-                })}\n\n`
-              )
-            );
+                  heartbeatInterval,
+                  true
+                );
+
+                fullContent += continuationResult.content;
+                totalPromptTokens += continuationResult.promptTokens;
+                totalCompletionTokens += continuationResult.completionTokens;
+
+                incompleteCheck = detectIncompleteJSON(fullContent);
+              } catch (error) {
+                logger.error(`Prefill continuation failed: ${error}`);
+                break;
+              }
+            }
           }
         }
 
-        // Parse the stage output
+        // Parse the stage output (local attemptJSONRepair will handle incomplete JSON)
         const result = parseBigAdventureStageOutput(fullContent, stage);
 
         // Send stage complete event
@@ -805,7 +850,6 @@ export async function POST(req: NextRequest) {
               success: result !== null,
               promptTokens: totalPromptTokens,
               completionTokens: totalCompletionTokens,
-              continuationAttempts,
               partialResult: result,
               rawContent: fullContent, // Include raw content for debugging/recovery
             })}\n\n`
@@ -818,7 +862,6 @@ export async function POST(req: NextRequest) {
           stage,
           promptTokens: totalPromptTokens,
           completionTokens: totalCompletionTokens,
-          continuationAttempts,
           success: result !== null,
         });
 

@@ -612,6 +612,7 @@ function AdventureCreatorContent() {
   const { addNotification } = useNotification();
 
   const editAdventureId = searchParams?.get("edit");
+  const isCopyMode = searchParams?.get("copy") === "true";
 
   // Redirect if not authenticated (effect only, keep hook order stable)
   useEffect(() => {
@@ -628,6 +629,7 @@ function AdventureCreatorContent() {
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [isLocal, setIsLocal] = useState(false); // Track if adventure is stored locally
   const hasLoadedAdventureRef = useRef<string | null>(null); // Track loaded adventure ID to prevent re-fetching on tab focus
+  const hasLoadedCopyRef = useRef(false); // Track if copy has been processed to prevent double-loading
   const [selectedPreset, setSelectedPreset] = useState<string>("custom");
   const [presets, setPresets] = useState<Preset[]>([DEFAULT_PRESET]);
   const [showPresetForm, setShowPresetForm] = useState(false);
@@ -1448,6 +1450,110 @@ function AdventureCreatorContent() {
     loadAdventure();
   }, [editAdventureId, user, router, addNotification]);
 
+  // Load copied adventure from sessionStorage
+  useEffect(() => {
+    if (!isCopyMode) return;
+    if (authLoading) return; // Wait for auth to finish loading
+    if (!user) return;
+    if (editAdventureId) return; // Don't load copy if we're editing
+    if (hasLoadedCopyRef.current) return; // Already processed this copy
+
+    const loadCopiedAdventure = async () => {
+      // Mark as processed immediately to prevent double-loading
+      hasLoadedCopyRef.current = true;
+
+      setLoading(true);
+      try {
+        const copiedData = sessionStorage.getItem(
+          "your-story:copied-adventure"
+        );
+        if (!copiedData) {
+          addNotification("No adventure data found to copy", "failure");
+          router.push("/explorer");
+          return;
+        }
+
+        const adventure = JSON.parse(copiedData) as Adventure;
+
+        // Clear the sessionStorage after reading
+        sessionStorage.removeItem("your-story:copied-adventure");
+
+        // Load basic info
+        setTitle(adventure.title || "");
+        setShortDescription(adventure.shortDescription || "");
+        setDescription(adventure.description || "");
+        setDifficulty(adventure.difficulty || "medium");
+        setRpgSystem(adventure.storyTemplate?.rpgSystem || "3d6");
+        setVisibility("private"); // Always private for copies
+        setNsfw(adventure.nsfw || false);
+        setTags(adventure.tags || []);
+        setThumbnailUrl(adventure.thumbnailUrl || "");
+        setBannerUrl(adventure.bannerUrl || "");
+
+        // Load starting choices from adventure
+        setStartingChoices(adventure.startingChoices || []);
+
+        // Load story template data
+        const template = adventure.storyTemplate;
+        if (template) {
+          setPlayerName(template.player_name || "");
+          setPlayerSummary(template.player_summary || "");
+          setPremise(template.premise || "");
+          setIntro(template.intro || "");
+          setMaxChapters(template.max_chapters || 8);
+          setAuthorNotes(template.author_notes || "");
+          setSelectedPreset(
+            template.selected_preset || adventure.selectedPreset || "custom"
+          );
+          setPresets(template.presets || adventure.presets || [DEFAULT_PRESET]);
+
+          // Load stats, resources, inventory, etc.
+          setStats(template.stats || []);
+          setResources(template.resources || []);
+          setInventory(template.inventory || []);
+          setAbilities(template.abilities || []);
+          setLore(template.lore || []);
+          setRelationships(template.relationships || []);
+          setAchievements(template.achievements || []);
+          setQuests(template.quests || []);
+          setCustomTables(template.customTables || []);
+          setVariables(template.variables || []);
+          setUpgradeSettings(
+            template.upgradeSettings || DEFAULT_UPGRADE_SETTINGS
+          );
+
+          // Load points and momentum
+          setPoints(template.points || 0);
+          setMomentum(template.momentum || 0);
+          setMaxMomentum(template.maxMomentum || 5);
+
+          // Load Advanced RPG Tools state
+          if (template.agmtState) {
+            setAGMTEnabled(true);
+            setAGMTState(template.agmtState);
+          }
+        }
+
+        addNotification(
+          "Adventure copied! Make your changes and save.",
+          "success"
+        );
+
+        // Remove the copy param from URL without triggering navigation
+        window.history.replaceState({}, "", "/creator/manual");
+      } catch (error) {
+        console.error("Error loading copied adventure:", error);
+        addNotification("Failed to load copied adventure", "failure");
+        router.push("/explorer");
+      } finally {
+        setLoading(false);
+        setInitialLoadComplete(true);
+      }
+    };
+
+    loadCopiedAdventure();
+  }, [isCopyMode, authLoading, user, editAdventureId, router, addNotification]);
+
   // Story Data
   const [playerName, setPlayerName] = useState("");
   const [playerSummary, setPlayerSummary] = useState("");
@@ -1736,10 +1842,12 @@ function AdventureCreatorContent() {
     { id: "preview", label: "Preview", icon: "Eye" },
   ];
 
-  // Load draft on mount (only for new adventures, not edit mode)
+  // Load draft on mount (only for new adventures, not edit mode or copy mode)
   useEffect(() => {
     // Skip if editing - the edit effect handles draft overlay after API load
     if (editAdventureId) return;
+    // Skip if copying - the copy effect handles loading from sessionStorage
+    if (isCopyMode) return;
     if (!draftKey) return;
 
     try {
