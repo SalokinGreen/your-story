@@ -55,6 +55,7 @@ interface RequestBody {
   temperature?: number;
   openRouterKey?: string;
   deepseekKey?: string;
+  googleKey?: string;
 }
 
 interface AIResponse {
@@ -81,7 +82,7 @@ interface AIResponse {
 
 async function callAI(
   messages: ChatMessage[],
-  provider: "deepseek" | "openrouter" | "mistral" | "deepinfra",
+  provider: "deepseek" | "openrouter" | "mistral" | "deepinfra" | "google",
   model: string,
   apiKey: string,
   maxTokens: number,
@@ -106,6 +107,9 @@ async function callAI(
     endpoint = "https://api.mistral.ai/v1/chat/completions";
   } else if (provider === "deepinfra") {
     endpoint = "https://api.deepinfra.com/v1/openai/chat/completions";
+  } else if (provider === "google") {
+    endpoint =
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
   } else {
     endpoint = "https://openrouter.ai/api/v1/chat/completions";
   }
@@ -188,9 +192,10 @@ async function callAI(
 }
 
 function getApiKey(
-  provider: "deepseek" | "openrouter" | "mistral" | "deepinfra",
+  provider: "deepseek" | "openrouter" | "mistral" | "deepinfra" | "google",
   openRouterKey?: string,
-  deepseekKey?: string
+  deepseekKey?: string,
+  googleKey?: string
 ): string | null {
   if (provider === "deepseek") {
     return deepseekKey || null;
@@ -200,6 +205,8 @@ function getApiKey(
   } else if (provider === "deepinfra") {
     // DeepInfra uses server-side API key - users pay with coins
     return process.env.DEEPINFRA_API_KEY || null;
+  } else if (provider === "google") {
+    return googleKey || null;
   } else {
     return openRouterKey || null;
   }
@@ -290,6 +297,7 @@ export async function POST(req: NextRequest) {
       temperature = 0.7,
       openRouterKey,
       deepseekKey,
+      googleKey,
     } = body;
 
     if (!messages || messages.length === 0) {
@@ -308,9 +316,11 @@ export async function POST(req: NextRequest) {
         | "deepseek"
         | "openrouter"
         | "mistral"
-        | "deepinfra",
+        | "deepinfra"
+        | "google",
       openRouterKey,
-      deepseekKey
+      deepseekKey,
+      googleKey
     );
 
     if (!apiKey) {
@@ -325,6 +335,7 @@ export async function POST(req: NextRequest) {
         const providerNames: Record<string, string> = {
           deepseek: "DeepSeek",
           openrouter: "OpenRouter",
+          google: "Google AI Studio",
         };
         const providerName =
           providerNames[modelConfig.provider] || modelConfig.provider;
@@ -365,7 +376,8 @@ export async function POST(req: NextRequest) {
         | "deepseek"
         | "openrouter"
         | "mistral"
-        | "deepinfra",
+        | "deepinfra"
+        | "google",
       modelConfig.model,
       apiKey,
       maxTokens,

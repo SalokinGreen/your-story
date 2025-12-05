@@ -346,7 +346,11 @@ export default function Comments({
             disabled={submitting || (!newComment.trim() && !rating)}
             className="w-full px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold rounded-lg transition-all shadow-md"
           >
-            {submitting ? "Posting..." : rating && !newComment.trim() ? "Post Rating" : "Post Comment"}
+            {submitting
+              ? "Posting..."
+              : rating && !newComment.trim()
+              ? "Post Rating"
+              : "Post Comment"}
           </button>
         </form>
       ) : (

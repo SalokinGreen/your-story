@@ -74,6 +74,83 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
+  // Google AI Studio (BYOK) - Direct access via Google's OpenAI-compatible API
+  "Google Gemini 2.5 Flash": {
+    name: "Google Gemini 2.5 Flash (BYOK)",
+    original_model: "gemini-2.5-flash",
+    model: "gemini-2.5-flash",
+    maxTokens: 1000000,
+    maxOutputTokens: 65000,
+    provider: "google",
+    supportsToolCalling: true,
+    cost: 0,
+    inputPrice: 0.15,
+    outputPrice: 0.6,
+    finetunes: [],
+    strengths: ["creativity", "long context", "tool calling"],
+    weaknesses: [],
+    description:
+      "Google's Gemini 2.5 Flash via AI Studio. Requires your own Google API key (BYOK). Free tier available with rate limits.",
+    bannerUrl: undefined,
+  },
+
+  "Google Gemini 2.5 Flash Lite": {
+    name: "Google Gemini 2.5 Flash Lite (BYOK)",
+    original_model: "gemini-2.5-flash-lite-preview-06-17",
+    model: "gemini-2.5-flash-lite-preview-06-17",
+    maxTokens: 1000000,
+    maxOutputTokens: 65000,
+    provider: "google",
+    supportsToolCalling: true,
+    cost: 0,
+    inputPrice: 0.075,
+    outputPrice: 0.3,
+    finetunes: [],
+    strengths: ["cost-effective", "long context"],
+    weaknesses: ["preview model"],
+    description:
+      "Google's lightweight Gemini model via AI Studio. Requires your own Google API key (BYOK). Very cost-effective.",
+    bannerUrl: undefined,
+  },
+
+  "Google Gemini 2.5 Pro": {
+    name: "Google Gemini 2.5 Pro (BYOK)",
+    original_model: "gemini-2.5-pro",
+    model: "gemini-2.5-pro",
+    maxTokens: 1000000,
+    maxOutputTokens: 65000,
+    provider: "google",
+    supportsToolCalling: true,
+    cost: 0,
+    inputPrice: 1.25,
+    outputPrice: 10.0,
+    finetunes: [],
+    strengths: ["creativity", "reasoning", "long context", "quality"],
+    weaknesses: ["price"],
+    description:
+      "Google's most capable Gemini 2.5 model via AI Studio. Requires your own Google API key (BYOK). Best for complex tasks.",
+    bannerUrl: undefined,
+  },
+
+  "Google Gemini 3 Pro": {
+    name: "Google Gemini 3 Pro (BYOK)",
+    original_model: "gemini-3-pro-preview",
+    model: "gemini-3-pro-preview",
+    maxTokens: 1000000,
+    maxOutputTokens: 65000,
+    provider: "google",
+    supportsToolCalling: true,
+    cost: 0,
+    inputPrice: 1.25,
+    outputPrice: 10.0,
+    finetunes: [],
+    strengths: ["creativity", "reasoning", "long context", "quality", "latest"],
+    weaknesses: ["price", "preview"],
+    description:
+      "Google's latest Gemini 3 Pro preview via AI Studio. Requires your own Google API key (BYOK). Cutting-edge capabilities.",
+    bannerUrl: undefined,
+  },
+
   "NovelAI GLM-4-6": {
     name: "NovelAI GLM-4-6 (BYOK)",
     original_model: "glm-4-6",
@@ -1072,6 +1149,15 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 0,
   },
+  byokGoogle: {
+    id: "byokGoogle",
+    name: "BYOK Google AI",
+    description: "Google Gemini models direct - uses your Google AI Studio key",
+    storyModel: "Google Gemini 2.5 Flash",
+    toolsModel: "Google Gemini 2.5 Flash",
+    choicesModel: "Google Gemini 2.5 Flash Lite",
+    estimatedCost: 0,
+  },
 };
 
 // ============================================
@@ -1180,7 +1266,13 @@ export interface AIModelConfig {
   model: string;
   maxTokens: number;
   maxOutputTokens: number;
-  provider: "openrouter" | "deepseek" | "novelai" | "mistral" | "deepinfra";
+  provider:
+    | "openrouter"
+    | "deepseek"
+    | "novelai"
+    | "mistral"
+    | "deepinfra"
+    | "google";
   supportsToolCalling?: boolean; // Whether this model supports function calling
   cost: number;
   inputPrice: number;

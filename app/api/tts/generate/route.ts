@@ -329,7 +329,10 @@ export async function POST(req: NextRequest) {
         console.error(`Error processing chunk ${i + 1}:`, chunkError);
         // Re-throw rate limit and auth errors to stop all processing
         if (chunkError instanceof Error) {
-          if (chunkError.message === "RATE_LIMIT" || chunkError.message === "AUTH_FAILED") {
+          if (
+            chunkError.message === "RATE_LIMIT" ||
+            chunkError.message === "AUTH_FAILED"
+          ) {
             throw chunkError;
           }
         }
@@ -338,7 +341,11 @@ export async function POST(req: NextRequest) {
     });
 
     // Wait for all chunks to complete
-    let results: { index: number; buffer: ArrayBuffer | null; error?: unknown }[];
+    let results: {
+      index: number;
+      buffer: ArrayBuffer | null;
+      error?: unknown;
+    }[];
     try {
       results = await Promise.all(chunkPromises);
     } catch (parallelError: unknown) {

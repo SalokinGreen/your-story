@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseUrl =
+  process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 interface ActivityItem {
@@ -25,7 +26,7 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "15", 10);
-    
+
     // Get auth token from header
     const authHeader = request.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -33,12 +34,15 @@ export async function GET(
     }
 
     const token = authHeader.split(" ")[1];
-    
+
     // Use service role client to bypass RLS
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify the requesting user's token
-    const { data: { user: requestingUser }, error: authError } = await supabase.auth.getUser(token);
+    const {
+      data: { user: requestingUser },
+      error: authError,
+    } = await supabase.auth.getUser(token);
     if (authError || !requestingUser) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
@@ -48,7 +52,8 @@ export async function GET(
     // Fetch comments by user (includes ratings)
     const { data: comments, error: commentsError } = await supabase
       .from("comments")
-      .select(`
+      .select(
+        `
         id,
         content,
         rating,
@@ -59,7 +64,8 @@ export async function GET(
           title,
           visibility
         )
-      `)
+      `
+      )
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -67,7 +73,7 @@ export async function GET(
     if (!commentsError && comments) {
       for (const comment of comments) {
         const adventure = comment.adventures as any;
-        
+
         // Only show activities on public adventures (activity feed is public-facing)
         if (adventure?.visibility !== "public") {
           continue;
@@ -75,7 +81,8 @@ export async function GET(
 
         // Determine if this is a rating-only or comment
         const hasContent = comment.content && comment.content.trim().length > 0;
-        const hasRating = comment.rating !== null && comment.rating !== undefined;
+        const hasRating =
+          comment.rating !== null && comment.rating !== undefined;
 
         if (hasRating && !hasContent) {
           // Rating only
@@ -133,7 +140,7 @@ export async function GET(
         if (adventure.updated_at) {
           const createdAt = new Date(adventure.created_at).getTime();
           const updatedAt = new Date(adventure.updated_at).getTime();
-          
+
           // Only show update if it's at least 1 minute after creation
           if (updatedAt - createdAt > 60000) {
             activities.push({
@@ -151,8 +158,9 @@ export async function GET(
     }
 
     // Sort all activities by timestamp (newest first)
-    activities.sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    activities.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
     // Apply pagination
@@ -162,14 +170,14 @@ export async function GET(
     const paginatedActivities = activities.slice(startIndex, endIndex);
     const hasMore = endIndex < totalCount;
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       activities: paginatedActivities,
       pagination: {
         page,
         limit,
         totalCount,
         hasMore,
-      }
+      },
     });
   } catch (error) {
     console.error("Error fetching activity:", error);

@@ -101,6 +101,7 @@ export interface GenerationOptions {
   // BYOK API keys (required for non-NovelAI models)
   openRouterKey?: string;
   deepseekKey?: string;
+  googleKey?: string;
   // Embedding-based context retrieval
   storyId?: string; // Required for embedding search
   enableEmbeddings?: boolean; // Whether to use embedding-based context
@@ -483,6 +484,7 @@ export async function generateStoryTurn(
         temperature: options.samplingSettings?.temperature ?? 0.7,
         openRouterKey: options.openRouterKey,
         deepseekKey: options.deepseekKey,
+        googleKey: options.googleKey,
       };
 
       // Add sampling settings for Coins mode (Mistral/DeepInfra)
@@ -710,6 +712,7 @@ export async function generateStoryTurn(
                 temperature: 0.3,
                 openRouterKey: options.openRouterKey,
                 deepseekKey: options.deepseekKey,
+                googleKey: options.googleKey,
               }),
               signal: toolAbortController.signal,
               cache: "no-store",
@@ -842,6 +845,7 @@ export async function generateStoryTurn(
           temperature: 0.7,
           openRouterKey: options.openRouterKey,
           deepseekKey: options.deepseekKey,
+          googleKey: options.googleKey,
         }),
       });
 
@@ -992,6 +996,7 @@ export async function generateSimple(
     tools?: any[];
     openRouterKey?: string;
     deepseekKey?: string;
+    googleKey?: string;
   }
 ): Promise<{
   content: string;
@@ -1017,6 +1022,7 @@ export async function generateSimple(
       temperature: options.temperature || 0.7,
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
+      googleKey: options.googleKey,
     }),
   });
 
@@ -1046,6 +1052,7 @@ export async function* generateSimpleStream(
     tools?: any[];
     openRouterKey?: string;
     deepseekKey?: string;
+    googleKey?: string;
   }
 ): AsyncGenerator<StreamEvent> {
   const token = await getAuthToken();
@@ -1067,6 +1074,7 @@ export async function* generateSimpleStream(
       temperature: options.temperature || 0.7,
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
+      googleKey: options.googleKey,
     }),
   });
 
@@ -1095,7 +1103,7 @@ export async function analyzeAction(
   storyData: StoryData,
   userAction: string,
   model: string,
-  apiKeys?: { openRouterKey?: string; deepseekKey?: string }
+  apiKeys?: { openRouterKey?: string; deepseekKey?: string; googleKey?: string }
 ): Promise<ActionAnalysisResult> {
   const token = await getAuthToken();
   if (!token) {
@@ -1125,6 +1133,7 @@ export async function analyzeAction(
       temperature: 0.3, // Low temperature for structured output
       openRouterKey: apiKeys?.openRouterKey,
       deepseekKey: apiKeys?.deepseekKey,
+      googleKey: apiKeys?.googleKey,
     }),
   });
 
@@ -1411,6 +1420,7 @@ export async function generateChoicesOnly(
     choicesModel: string;
     openRouterKey?: string;
     deepseekKey?: string;
+    googleKey?: string;
   }
 ): Promise<Choice[]> {
   const token = await getAuthToken();
@@ -1447,6 +1457,7 @@ export async function generateChoicesOnly(
       temperature: 0.7,
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
+      googleKey: options.googleKey,
     }),
   });
 

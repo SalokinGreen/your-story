@@ -27,7 +27,7 @@ export const STORY_AFFIRMATION = `Understood. I will write the narrative respons
 - **Perspective:** Strict Second Person ("You"), deep POV.
 - **Style:** "Show, Don't Tell" with visceral sensory details; varying sentence structure; NO banned words.
 - **Agency:** I will respect the Action Result (Success/Failure) and the Active Challenge state.
-- **Format:** Rich markdown prose with scene headers, emphasis, and structure for readability.
+- **Format:** Prose with emphasis (*italics*, **bold**) and --- breaks. No ## headers unless major scene change.
 
 Here is the narrative:
 `;
@@ -553,10 +553,10 @@ When an [ACTIVE CHALLENGE] is shown in the game state:
 - **Keep It Episodic:** Each turn during a challenge should advance ONE step - do not skip ahead. Let the mechanics (the score) pace the resolution.
 
 ## 7. OUTPUT FORMAT
-- **Rich Markdown:** Use markdown for a better reading experience:
-    - **Headers:** Use ## for scene transitions, location changes, or time skips (e.g., "## The Tavern", "## Later That Night").
+- **Markdown:** Use markdown sparingly for emphasis:
     - **Emphasis:** Use *italics* for internal thoughts, sounds, or whispers. Use **bold** for impactful moments.
     - **Breaks:** Use --- for dramatic pauses or perspective shifts within a scene.
+    - **No Headers:** Do NOT use ## headers in your prose - save them for major scene changes only (rare).
 - **No Meta-Text:** Do NOT write progress indicators, mechanical echoes, or UI labels like "Scene:", "Chapter:", "Progress 2/3".
 - **No Mechanical Summaries:** Do NOT echo back the skill check results, item usage, or resource costs. Those are INPUT context - the player already saw the dice roll.
 - **No Stop Markers in Output:** Do not literally write "[STOP]" - just stop writing at the appropriate moment.

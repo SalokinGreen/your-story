@@ -189,15 +189,19 @@ export default function ProfilePage() {
       } = await supabase.auth.getSession();
       if (!session) return;
 
-      const response = await fetch(`/api/activity/${userId}?page=${page}&limit=15`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+      const response = await fetch(
+        `/api/activity/${userId}?page=${page}&limit=15`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
       if (response.ok) {
-        const { activities: userActivities, pagination } = await response.json();
+        const { activities: userActivities, pagination } =
+          await response.json();
         if (append) {
-          setActivities(prev => [...prev, ...userActivities]);
+          setActivities((prev) => [...prev, ...userActivities]);
         } else {
           setActivities(userActivities);
         }
@@ -219,7 +223,11 @@ export default function ProfilePage() {
 
   // Load activities when switching to activity tab
   useEffect(() => {
-    if (activeTab === "activity" && activities.length === 0 && !loadingActivities) {
+    if (
+      activeTab === "activity" &&
+      activities.length === 0 &&
+      !loadingActivities
+    ) {
       loadActivities(1, false);
     }
   }, [activeTab]);
@@ -286,7 +294,9 @@ export default function ProfilePage() {
           <>
             commented on{" "}
             <button
-              onClick={() => router.push(`/explorer/${activity.data.adventureId}`)}
+              onClick={() =>
+                router.push(`/explorer/${activity.data.adventureId}`)
+              }
               className="font-medium text-blue-400 hover:underline"
             >
               {activity.data.adventureTitle}
@@ -298,12 +308,13 @@ export default function ProfilePage() {
           <>
             rated{" "}
             <button
-              onClick={() => router.push(`/explorer/${activity.data.adventureId}`)}
+              onClick={() =>
+                router.push(`/explorer/${activity.data.adventureId}`)
+              }
               className="font-medium text-blue-400 hover:underline"
             >
               {activity.data.adventureTitle}
-            </button>
-            {" "}
+            </button>{" "}
             <span className="text-yellow-400">
               {"★".repeat(activity.data.rating || 0)}
               {"☆".repeat(5 - (activity.data.rating || 0))}
@@ -315,7 +326,9 @@ export default function ProfilePage() {
           <>
             created{" "}
             <button
-              onClick={() => router.push(`/explorer/${activity.data.adventureId}`)}
+              onClick={() =>
+                router.push(`/explorer/${activity.data.adventureId}`)
+              }
               className="font-medium text-blue-400 hover:underline"
             >
               {activity.data.adventureTitle}
@@ -327,7 +340,9 @@ export default function ProfilePage() {
           <>
             updated{" "}
             <button
-              onClick={() => router.push(`/explorer/${activity.data.adventureId}`)}
+              onClick={() =>
+                router.push(`/explorer/${activity.data.adventureId}`)
+              }
               className="font-medium text-blue-400 hover:underline"
             >
               {activity.data.adventureTitle}

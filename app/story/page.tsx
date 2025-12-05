@@ -1408,7 +1408,7 @@ function StoryPageContent() {
   const { addNotification } = useNotification();
   const { user, getEncryptionPassword } = useAuth();
   const { keys: apiKeys } = useAPIKeys();
-  const { openRouterKey, deepseekKey } = apiKeys;
+  const { openRouterKey, deepseekKey, googleKey } = apiKeys;
   const [currentState, setCurrentState] = useState<StoryState>(
     StoryState.STORY
   );
@@ -2677,6 +2677,7 @@ function StoryPageContent() {
       const result = await analyzeAction(storyData, actionText, choicesModel, {
         openRouterKey,
         deepseekKey,
+        googleKey,
       });
 
       logger.ai_response("Action analysis complete", {
@@ -4374,6 +4375,7 @@ function StoryPageContent() {
           choicesModel,
           openRouterKey,
           deepseekKey,
+          googleKey,
         });
 
         // Update the part with choices
@@ -4432,6 +4434,7 @@ function StoryPageContent() {
             novelaiTemperature,
             openRouterKey,
             deepseekKey,
+            googleKey,
             storyId: storyDbId || undefined,
             enableEmbeddings: embeddingsEnabled,
             embeddingThreshold,
@@ -4738,6 +4741,7 @@ function StoryPageContent() {
           novelaiTemperature,
           openRouterKey,
           deepseekKey,
+          googleKey,
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,

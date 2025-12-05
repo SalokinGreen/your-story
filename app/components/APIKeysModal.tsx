@@ -358,6 +358,41 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                     />
                   </div>
                 </div>
+
+                {/* Google AI Studio */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-blue-500 to-green-500 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">G</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        Google AI Studio
+                      </span>
+                      {hasKey("googleKey") && (
+                        <DynamicIcon
+                          name="CheckCircle"
+                          className="w-3.5 h-3.5 text-green-500"
+                        />
+                      )}
+                      <a
+                        href="https://aistudio.google.com/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-500 hover:underline ml-auto"
+                      >
+                        Get key →
+                      </a>
+                    </div>
+                    <input
+                      type={showKeys ? "text" : "password"}
+                      value={keys.googleKey}
+                      onChange={(e) => setKey("googleKey", e.target.value)}
+                      placeholder="AIza..."
+                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Show/Hide Keys & Privacy Info */}
