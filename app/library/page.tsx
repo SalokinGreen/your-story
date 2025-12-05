@@ -747,9 +747,25 @@ export default function LibraryPage() {
       }
     });
 
-  // Filter local stories
+  // Get set of online story IDs for filtering
+  const onlineStoryIds = new Set(stories.map((s) => s.id));
+
+  // Filter out offline cache copies from localStories for counting purposes
+  // Only include true local-only stories (local_* prefix) or local stories that don't exist online
+  const trueLocalStories = localStories.filter(
+    (s) => s.id.startsWith("local_") || !onlineStoryIds.has(s.id)
+  );
+
+  // Filter local stories - exclude offline cache copies of online stories
+  // Only show true local-only stories (local_* prefix) or local stories that don't exist online
   const filteredLocalStories = localStories
     .filter((story) => {
+      // Skip offline cache copies - these have the same ID as online stories
+      // Only show stories with local_ prefix (true local-only) or that don't exist online
+      if (!story.id.startsWith("local_") && onlineStoryIds.has(story.id)) {
+        return false;
+      }
+
       // Folder filter
       if (selectedFolder !== null) {
         if (selectedFolder === "uncategorized") {
@@ -985,7 +1001,7 @@ export default function LibraryPage() {
                 }`}
               >
                 <DynamicIcon name="Book" className="w-3.5 h-3.5" />
-                All ({stories.length + localStories.length})
+                All ({stories.length + trueLocalStories.length})
               </button>
               <button
                 onClick={() => setSelectedFolder("uncategorized")}
@@ -998,7 +1014,7 @@ export default function LibraryPage() {
                 <DynamicIcon name="FileText" className="w-3.5 h-3.5" />
                 Uncategorized (
                 {stories.filter((s) => !s.folder_id).length +
-                  localStories.filter((s) => !s.folder_id).length}
+                  trueLocalStories.filter((s) => !s.folder_id).length}
                 )
               </button>
               {folders.map((folder) => (
@@ -1015,7 +1031,7 @@ export default function LibraryPage() {
                   <DynamicIcon name={folder.icon} className="w-3.5 h-3.5" />
                   {folder.name} (
                   {stories.filter((s) => s.folder_id === folder.id).length +
-                    localStories.filter((s) => s.folder_id === folder.id)
+                    trueLocalStories.filter((s) => s.folder_id === folder.id)
                       .length}
                   )
                 </button>
@@ -1807,9 +1823,11 @@ export default function LibraryPage() {
               <button
                 onClick={() => {
                   if (!movingStory) return;
-                  // Check if it's a local story (starts with 'local_')
-                  const isLocal = movingStory.startsWith("local_");
-                  if (isLocal) {
+                  // Check if it's a local story by checking filteredLocalStories
+                  const isLocalStory = filteredLocalStories.some(
+                    (s) => s.id === movingStory
+                  );
+                  if (isLocalStory) {
                     handleMoveLocalStory(movingStory, null);
                   } else {
                     handleMoveStory(movingStory, null);
@@ -1827,9 +1845,11 @@ export default function LibraryPage() {
                   key={folder.id}
                   onClick={() => {
                     if (!movingStory) return;
-                    // Check if it's a local story (starts with 'local_')
-                    const isLocal = movingStory.startsWith("local_");
-                    if (isLocal) {
+                    // Check if it's a local story by checking filteredLocalStories
+                    const isLocalStory = filteredLocalStories.some(
+                      (s) => s.id === movingStory
+                    );
+                    if (isLocalStory) {
                       handleMoveLocalStory(movingStory, folder.id);
                     } else {
                       handleMoveStory(movingStory, folder.id);
