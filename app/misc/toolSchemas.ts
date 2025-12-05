@@ -44,9 +44,15 @@ const createQuestTool: ToolSchema = {
           description: "Detailed quest objectives and context",
         },
         points: {
-          type: "number",
-          description: "Point reward for completion (default: 50)",
-          minimum: 1,
+          oneOf: [
+            { type: "number", minimum: 1 },
+            {
+              type: "string",
+              enum: ["trivial", "minor", "moderate", "major", "legendary"],
+            },
+          ],
+          description:
+            "Point reward tier: trivial (5-25), minor (15-60), moderate (30-100), major (60-200), legendary (100-500). Or exact number for legacy.",
         },
       },
       required: ["title", "shortDescription", "description"],
@@ -556,12 +562,31 @@ const adjustResourceTool: ToolSchema = {
             "Resource name (fuzzy matching supported, e.g., Health, Stamina, Mana)",
         },
         currentDelta: {
-          type: "number",
-          description: "Change to current value (can be negative)",
+          oneOf: [
+            { type: "number" },
+            {
+              type: "string",
+              enum: ["tiny", "small", "moderate", "large", "massive"],
+            },
+          ],
+          description:
+            "Change tier for current value: tiny (1-2), small (2-5), moderate (3-10), large (5-15), massive (8-25). Or exact number.",
         },
         maxDelta: {
-          type: "number",
-          description: "Change to max value (optional, can be negative)",
+          oneOf: [
+            { type: "number" },
+            {
+              type: "string",
+              enum: ["tiny", "small", "moderate", "large", "massive"],
+            },
+          ],
+          description:
+            "Change tier for max value (optional). Same tiers as currentDelta.",
+        },
+        isNegative: {
+          type: "boolean",
+          description:
+            "If true and using tiers, both changes are negative (decrease). Ignored if values are already numbers.",
         },
       },
       required: ["name", "currentDelta"],
@@ -664,8 +689,20 @@ const adjustStatTool: ToolSchema = {
             "Stat name (fuzzy matching supported, e.g., Strength, Stealth, Intelligence)",
         },
         valueDelta: {
-          type: "number",
-          description: "Change amount (can be negative)",
+          oneOf: [
+            { type: "number" },
+            {
+              type: "string",
+              enum: ["tiny", "small", "moderate", "large", "massive"],
+            },
+          ],
+          description:
+            "Change tier: tiny (1-2), small (2-5), moderate (3-10), large (5-15), massive (8-25). Use negative number for decrease. Or exact number for legacy.",
+        },
+        isNegative: {
+          type: "boolean",
+          description:
+            "If true and using a tier, the change is negative (decrease). Ignored if valueDelta is already a number.",
         },
       },
       required: ["name", "valueDelta"],
@@ -1444,7 +1481,7 @@ const startChallengeTool: ToolSchema = {
   function: {
     name: "start_challenge",
     description:
-      "Start a new Scene Challenge (Progress Clock) for multi-step tasks like combat, chases, heists, or complex negotiations. Use when a task is too significant to resolve in one roll. Guidelines: Small brawl/locked door = don't use (simple check). Dangerous combat/chase = 3 successes, 3 failures. Boss fight/war = 5+ successes. Only one challenge can be active at a time.",
+      "Start a new Scene Challenge (Best of X) for multi-step tasks like combat, chases, heists, or complex negotiations. Use when a task is too significant to resolve in one roll. Guidelines: Small brawl/locked door = don't use (simple check). Dangerous combat = quick (best of 3). Boss fight = standard/extended (best of 5-7). Epic battle = epic (best of 9). Only one challenge can be active at a time.",
     parameters: {
       type: "object",
       properties: {
@@ -1459,16 +1496,26 @@ const startChallengeTool: ToolSchema = {
             "Brief description of the challenge and win/lose conditions",
         },
         rounds: {
-          type: "number",
+          oneOf: [
+            { type: "number", minimum: 3, maximum: 9 },
+            {
+              type: "string",
+              enum: ["quick", "standard", "extended", "epic"],
+            },
+          ],
           description:
-            "Total rounds in 'best of X' format (odd: 3, 5, 7, 9). First to majority wins. Use 3 for quick encounters, 5 for standard, 7-9 for boss fights.",
-          minimum: 3,
-          maximum: 9,
+            "Challenge tier: quick (best of 3), standard (best of 5), extended (best of 7), epic (best of 9). Or exact odd number 3-9.",
         },
         points: {
-          type: "number",
-          description: "Progression points awarded on victory (default: 25)",
-          minimum: 0,
+          oneOf: [
+            { type: "number", minimum: 0 },
+            {
+              type: "string",
+              enum: ["trivial", "minor", "moderate", "major", "legendary"],
+            },
+          ],
+          description:
+            "Points tier awarded on victory: trivial, minor, moderate (default), major, legendary. Or exact number.",
         },
         initialSuccesses: {
           type: "number",

@@ -25,6 +25,41 @@ export interface Resource {
   custom_symbol_url?: string;
 }
 
+// Adventure difficulty setting (affects all tier conversions)
+export type AdventureDifficulty = "easy" | "medium" | "hard" | "expert";
+
+// DC (Difficulty Class) tier - AI specifies tier, system converts to number
+export type DCTier =
+  | "trivial"
+  | "easy"
+  | "average"
+  | "hard"
+  | "very_hard"
+  | "impossible";
+
+// Points/XP tier for quests, achievements, challenges
+export type PointsTier =
+  | "trivial" // Very minor accomplishment
+  | "minor" // Small task
+  | "moderate" // Standard quest
+  | "major" // Significant achievement
+  | "legendary"; // Epic accomplishment
+
+// Stat/resource change tier
+export type StatChangeTier =
+  | "tiny" // +/- 1-2
+  | "small" // +/- 3-5
+  | "moderate" // +/- 6-10
+  | "large" // +/- 11-15
+  | "massive"; // +/- 16-25
+
+// Challenge rounds tier (best of X)
+export type ChallengeTier =
+  | "quick" // Best of 3
+  | "standard" // Best of 5
+  | "extended" // Best of 7
+  | "epic"; // Best of 9
+
 // Item grade types (rarity tiers)
 export type ItemGrade =
   | "common"
@@ -146,6 +181,7 @@ export interface Choice {
   ability_used?: string; // Name of ability to use (applies bonus, deducts cost)
   skill_used?: string;
   skill_dc?: number;
+  skill_dc_tier?: DCTier; // Tier-based DC (trivial, easy, average, hard, very_hard, impossible) - converted to number by game logic
   resource_used?: string;
   condition_applies?: string; // Name of condition that applies penalty to this roll (AI chooses most relevant)
   agmt_check?: string; // Format: "question (likelihood)" e.g., "Is the door locked? (Likely)"
@@ -333,6 +369,7 @@ export interface StoryData {
     | "yze"
     | "explosive"
     | "narrative"; // RPG dice system
+  difficulty?: AdventureDifficulty; // Adventure difficulty (affects DC/points scaling)
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)
   agmtState?: AGMTState; // Advanced RPG Tools state (chaos factor, threads, characters)

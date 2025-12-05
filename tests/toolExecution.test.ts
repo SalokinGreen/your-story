@@ -728,7 +728,8 @@ describe("Tool Execution", () => {
       expect(storyData.scene.parts[0].revealedLore).toContain(
         "Containment Wards"
       );
-      expect(stateChanges.length).toBeGreaterThan(0);
+      // Note: Lore tools don't generate stateChanges (removed to reduce AI context noise)
+      expect(stateChanges.length).toBe(0);
     });
 
     test("should handle show_lore with fuzzy matching", () => {
@@ -861,7 +862,8 @@ describe("Tool Execution", () => {
       expect(responses[0].success).toBe(true);
       expect(responses[0].message).toContain("Hidden lore");
       expect(storyData.lore[0].on).toBe(false);
-      expect(stateChanges.length).toBeGreaterThan(0);
+      // Note: Lore tools don't generate stateChanges (removed to reduce AI context noise)
+      expect(stateChanges.length).toBe(0);
     });
 
     test("should return partial success if lore already hidden", () => {

@@ -622,9 +622,10 @@ export function outputToScenePart(text: string): ScenePart {
     if (metaMatch) {
       const metadata = metaMatch[1];
 
-      // Parse use_skill: name (DC number) or (X success(es) needed/required)
+      // Parse use_skill: name (DC number/tier) or (X success(es) needed/required)
+      // Supports: "Stealth (DC 25)", "Stealth (hard)", "Stealth (DC hard)", "Stealth (2 successes needed)"
       const skillMatch = metadata.match(
-        /use_skill:\s*([^(;]+?)(?:\s*\((?:DC\s*(\d+)|(?:needs?\s*)?(\d+)\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?)\))?(?:;|$)/i
+        /use_skill:\s*([^(;]+?)(?:\s*\((?:(?:DC\s*)?(\d+|trivial|easy|average|hard|very_hard|impossible)|(?:needs?\s*)?(\d+)\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?)\))?(?:;|$)/i
       );
       if (skillMatch) {
         const skillName = skillMatch[1].trim();
@@ -633,7 +634,14 @@ export function outputToScenePart(text: string): ScenePart {
           // Try DC format first (group 2), then success count format (group 3)
           const dc = skillMatch[2] || skillMatch[3];
           if (dc) {
-            choice.skill_dc = parseInt(dc, 10);
+            // If it's a tier name, store as string; parser will convert later
+            const numericDC = parseInt(dc, 10);
+            if (!isNaN(numericDC)) {
+              choice.skill_dc = numericDC;
+            } else {
+              // Store tier name as string - will be converted to number by game logic
+              choice.skill_dc_tier = dc.toLowerCase() as any;
+            }
           }
         }
       }

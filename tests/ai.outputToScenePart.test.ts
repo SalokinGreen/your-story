@@ -87,4 +87,22 @@ You walk into the cave. It's cold and dripping, the smell of wet stone filling y
     expect(part.choices?.[1].skill_dc).toBe(1);
     expect(part.choices?.[2].skill_dc).toBe(2);
   });
+
+  it("parses tier-based DC formats", () => {
+    const text = `<story>Tier difficulty test.</story>\n<choices>\n- Easy task <use_skill: Athletics (easy); use_resource: none; use_item: none>\n- Hard task <use_skill: Stealth (hard); use_resource: Stamina; use_item: none>\n- Very hard <use_skill: Combat (very_hard); use_resource: Health; use_item: Sword>\n- With DC prefix <use_skill: Magic (DC average); use_resource: Mana; use_item: none>\n</choices>`;
+    const part = outputToScenePart(text);
+    expect(part.choices).toHaveLength(4);
+    // Tier names should be stored in skill_dc_tier, not skill_dc
+    expect(part.choices?.[0].skill_used).toBe("Athletics");
+    expect(part.choices?.[0].skill_dc_tier).toBe("easy");
+    expect(part.choices?.[0].skill_dc).toBeUndefined();
+    expect(part.choices?.[1].skill_used).toBe("Stealth");
+    expect(part.choices?.[1].skill_dc_tier).toBe("hard");
+    expect(part.choices?.[1].resource_used).toBe("Stamina");
+    expect(part.choices?.[2].skill_used).toBe("Combat");
+    expect(part.choices?.[2].skill_dc_tier).toBe("very_hard");
+    expect(part.choices?.[2].item_used).toBe("Sword");
+    expect(part.choices?.[3].skill_used).toBe("Magic");
+    expect(part.choices?.[3].skill_dc_tier).toBe("average");
+  });
 });

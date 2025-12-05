@@ -105,7 +105,8 @@ export default function StoryCreativeAssistant({
         return (
           provider === "openrouter" ||
           provider === "deepseek" ||
-          provider === "novelai"
+          provider === "novelai" ||
+          provider === "google"
         );
       } else {
         return provider === "mistral" || provider === "deepinfra";
@@ -115,7 +116,10 @@ export default function StoryCreativeAssistant({
 
   // Check if user has any BYOK keys configured
   const hasAnyBYOKKey =
-    hasKey("openRouterKey") || hasKey("deepseekKey") || novelaiKey.length > 0;
+    hasKey("openRouterKey") ||
+    hasKey("deepseekKey") ||
+    hasKey("googleKey") ||
+    novelaiKey.length > 0;
 
   // Calculate estimated cost
   const estimatedCost = useCallback(() => {
@@ -157,7 +161,8 @@ export default function StoryCreativeAssistant({
     const isBYOKProvider =
       currentProvider === "openrouter" ||
       currentProvider === "deepseek" ||
-      currentProvider === "novelai";
+      currentProvider === "novelai" ||
+      currentProvider === "google";
     const isCoinsProvider =
       currentProvider === "mistral" || currentProvider === "deepinfra";
 

@@ -55,7 +55,9 @@ export default function CreatorAIChat({
         try {
           const parsed = JSON.parse(saved);
           // Filter out any empty messages that may have been saved
-          return parsed.filter((msg: ChatMessage) => msg.content && msg.content.trim());
+          return parsed.filter(
+            (msg: ChatMessage) => msg.content && msg.content.trim()
+          );
         } catch (e) {
           console.error("Failed to parse saved chat:", e);
         }
@@ -113,11 +115,12 @@ export default function CreatorAIChat({
     return Object.entries(AI_MODELS).filter(([, m]) => {
       const provider = (m as { provider?: string }).provider;
       if (byokMode) {
-        // BYOK mode: show openrouter, deepseek, novelai
+        // BYOK mode: show openrouter, deepseek, novelai, google
         return (
           provider === "openrouter" ||
           provider === "deepseek" ||
-          provider === "novelai"
+          provider === "novelai" ||
+          provider === "google"
         );
       } else {
         // Coins mode: show mistral, deepinfra
@@ -128,7 +131,10 @@ export default function CreatorAIChat({
 
   // Check if user has any BYOK keys configured
   const hasAnyBYOKKey =
-    hasKey("openRouterKey") || hasKey("deepseekKey") || novelaiKey.length > 0;
+    hasKey("openRouterKey") ||
+    hasKey("deepseekKey") ||
+    hasKey("googleKey") ||
+    novelaiKey.length > 0;
 
   // Calculate estimated cost
   const estimatedCost = useCallback(() => {
@@ -187,7 +193,8 @@ export default function CreatorAIChat({
     const isBYOKProvider =
       currentProvider === "openrouter" ||
       currentProvider === "deepseek" ||
-      currentProvider === "novelai";
+      currentProvider === "novelai" ||
+      currentProvider === "google";
     const isCoinsProvider =
       currentProvider === "mistral" || currentProvider === "deepinfra";
 
@@ -336,7 +343,8 @@ export default function CreatorAIChat({
           ...prev,
           {
             role: "assistant",
-            content: "I apologize, but I generated an empty response. Please try again or rephrase your request.",
+            content:
+              "I apologize, but I generated an empty response. Please try again or rephrase your request.",
             meta,
           },
         ]);

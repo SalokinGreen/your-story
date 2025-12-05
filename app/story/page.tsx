@@ -19,6 +19,7 @@ import {
   checkSuccess,
   calculateResourceRequirements,
   getConditionPenalty,
+  parseDCValue,
 } from "../misc/rpgSystems";
 import {
   askFate,
@@ -2830,6 +2831,23 @@ function StoryPageContent() {
 
     // Get RPG system configuration
     const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+
+    // Convert tier-based DC to numeric DC if needed
+    // This handles AI-generated choices that use tier names (e.g., "hard") instead of numbers
+    if (choice.skill_dc_tier && !choice.skill_dc) {
+      const difficulty = storyData.difficulty || "medium";
+      choice.skill_dc = parseDCValue(
+        choice.skill_dc_tier,
+        rpgSystem.id as any,
+        difficulty
+      );
+      logger.action("Converted tier to DC", {
+        tier: choice.skill_dc_tier,
+        system: rpgSystem.id,
+        difficulty,
+        dc: choice.skill_dc,
+      });
+    }
 
     // YZE: If this choice has a skill check, show stress dice selection UI first
     if (

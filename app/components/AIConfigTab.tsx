@@ -936,7 +936,8 @@ export default function AIConfigTab() {
                       const isBYOKProvider =
                         config.provider === "openrouter" ||
                         config.provider === "deepseek" ||
-                        config.provider === "novelai";
+                        config.provider === "novelai" ||
+                        config.provider === "google";
                       return byokMode ? isBYOKProvider : !isBYOKProvider;
                     })
                     .map(([key, config]) => (
@@ -974,7 +975,8 @@ export default function AIConfigTab() {
                       const isBYOKProvider =
                         config.provider === "openrouter" ||
                         config.provider === "deepseek" ||
-                        config.provider === "novelai";
+                        config.provider === "novelai" ||
+                        config.provider === "google";
                       return byokMode ? isBYOKProvider : !isBYOKProvider;
                     })
                     .map(([key, config]) => (
@@ -1012,7 +1014,8 @@ export default function AIConfigTab() {
                       const isBYOKProvider =
                         config.provider === "openrouter" ||
                         config.provider === "deepseek" ||
-                        config.provider === "novelai";
+                        config.provider === "novelai" ||
+                        config.provider === "google";
                       return byokMode ? isBYOKProvider : !isBYOKProvider;
                     })
                     .map(([key, config]) => (

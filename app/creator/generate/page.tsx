@@ -1105,7 +1105,8 @@ function BigAdventureCreatorPage() {
     const isBYOKProvider =
       currentProvider === "openrouter" ||
       currentProvider === "deepseek" ||
-      currentProvider === "novelai";
+      currentProvider === "novelai" ||
+      currentProvider === "google";
     const isCoinsProvider =
       currentProvider === "mistral" || currentProvider === "deepinfra";
 
@@ -1142,11 +1143,12 @@ function BigAdventureCreatorPage() {
   const filteredModels = Object.entries(AI_MODELS).filter(([, model]) => {
     const provider = (model as { provider?: string }).provider;
     if (byokMode) {
-      // BYOK mode: show openrouter, deepseek, novelai
+      // BYOK mode: show openrouter, deepseek, novelai, google
       return (
         provider === "openrouter" ||
         provider === "deepseek" ||
-        provider === "novelai"
+        provider === "novelai" ||
+        provider === "google"
       );
     } else {
       // Coins mode: show mistral, deepinfra
@@ -1156,7 +1158,10 @@ function BigAdventureCreatorPage() {
 
   // Check if user has any BYOK keys configured
   const hasAnyBYOKKey =
-    hasKey("openRouterKey") || hasKey("deepseekKey") || novelaiKey.length > 0;
+    hasKey("openRouterKey") ||
+    hasKey("deepseekKey") ||
+    hasKey("googleKey") ||
+    novelaiKey.length > 0;
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -1217,7 +1222,10 @@ function BigAdventureCreatorPage() {
     )[extensionModel];
     const currentProvider = currentModelConfig?.provider;
     const isBYOKProvider =
-      currentProvider === "openrouter" || currentProvider === "deepseek";
+      currentProvider === "openrouter" ||
+      currentProvider === "deepseek" ||
+      currentProvider === "novelai" ||
+      currentProvider === "google";
     const isCoinsProvider =
       currentProvider === "mistral" || currentProvider === "deepinfra";
 
@@ -1238,7 +1246,8 @@ function BigAdventureCreatorPage() {
         return (
           provider === "openrouter" ||
           provider === "deepseek" ||
-          provider === "novelai"
+          provider === "novelai" ||
+          provider === "google"
         );
       } else {
         return provider === "mistral" || provider === "deepinfra";

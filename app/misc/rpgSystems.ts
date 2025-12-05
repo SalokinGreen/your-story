@@ -176,13 +176,13 @@ export const SYSTEM_3D6: RPGSystem = {
     diceSystem:
       "The game uses a 3d6 system (rolls 3 six-sided dice, result is 3-18). Average roll is 10-11, creating a bell curve where extreme values are rare. This makes outcomes more predictable than 1d20.",
     dcGuidance:
-      "DC system: Roll (3-18) + Stat Value ≥ DC. For average stats (~50): DC 8 is trivial, DC 15 is easy, DC 20 is medium, DC 25 is hard, DC 30 is very hard, DC 35+ requires max roll (18) and exceptional stats.",
+      "Use TIER NAMES for difficulty (trivial, easy, average, hard, very_hard, impossible). The system automatically converts these to appropriate numbers based on adventure difficulty. Example: use_skill: Stealth (hard)",
     challengeGuidance:
-      "⚠️ IMPORTANT: Challenge the player! Use DC 20-25 for normal challenges, DC 25-30 for difficult ones, DC 30-35 for epic moments. Avoid DCs below 15 unless the task is truly trivial. The 3d6 system creates consistent results, so higher DCs are needed to provide real challenge.",
+      "⚠️ IMPORTANT: Challenge the player! Use 'hard' or 'very_hard' for dramatic moments, 'average' for standard challenges. Only use 'trivial' or 'easy' for narrative flavor checks. The 3d6 system creates consistent results, so higher difficulty is needed for real challenge.",
     choiceSyntax:
-      "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 25); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>\n- You approach the mysterious door. <use_skill: none; use_resource: none; use_item: none; agmt_check: Is it locked? (50/50); agmt_table: none; custom_table: none>",
+      "- ...Prose <use_skill: skill name (tier) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\n\nDC TIERS (use these instead of numbers):\n- trivial: Routine task, almost automatic\n- easy: Simple challenge, most succeed\n- average: Standard difficulty, 50/50 chance\n- hard: Significant challenge, skill required\n- very_hard: Extreme difficulty, only skilled succeed\n- impossible: Near-impossible, requires exceptional luck\n\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (hard); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>\n- You approach the mysterious door. <use_skill: none; use_resource: none; use_item: none; agmt_check: Is it locked? (50/50); agmt_table: none; custom_table: none>",
     dcGuidelines:
-      "⚠️ DC GUIDELINES:\n- Use DCs that scale with the adventure's stat range.\n- 3-15: Easy challenge (most characters can succeed)\n- 20: Medium challenge (requires decent stats)\n- 25: Hard challenge (high stats or items needed)\n- 30-35: Very Hard challenge (only the most prepared succeed)",
+      "⚠️ DC TIER GUIDELINES:\n- trivial: Auto-success for skilled, minor obstacle\n- easy: Basic competence needed\n- average: Real challenge for average characters\n- hard: Only skilled characters succeed reliably\n- very_hard: Even experts may fail\n- impossible: Legendary difficulty, dramatic moments only",
   },
 
   conditionPenalties: {
@@ -253,13 +253,13 @@ export const SYSTEM_1D20: RPGSystem = {
     diceSystem:
       "The game uses a 1d20 system (rolls 1 twenty-sided die, result is 1-20). Every number has equal probability (5% each), creating high variance and dramatic swings - you might roll a 1 or 20 at any time!",
     dcGuidance:
-      "DC system: Roll (1-20) + Stat Value ≥ DC. For average stats (~50): DC 5 is trivial, DC 10 is easy, DC 15 is medium, DC 20 is hard, DC 25 is very hard, DC 30+ requires natural 20 and exceptional stats.",
+      "Use TIER NAMES for difficulty (trivial, easy, average, hard, very_hard, impossible). The system automatically converts these to appropriate numbers based on adventure difficulty. Example: use_skill: Stealth (hard)",
     challengeGuidance:
-      "⚠️ IMPORTANT: Challenge the player! Use DC 15-20 for normal challenges, DC 20-25 for difficult ones, DC 25-30 for epic moments. Avoid DCs below 10 unless the task is truly trivial. The 1d20 system is swingy - even with low stats, a natural 20 can succeed, and even high stats can fail on a 1.",
+      "⚠️ IMPORTANT: Challenge the player! Use 'hard' or 'very_hard' for dramatic moments, 'average' for standard challenges. The 1d20 system is swingy - even with low stats, extreme rolls can change outcomes.",
     choiceSyntax:
-      "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 20); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>\n- You approach the mysterious door. <use_skill: none; use_resource: none; use_item: none; agmt_check: Is it locked? (50/50); agmt_table: none; custom_table: none>",
+      "- ...Prose <use_skill: skill name (tier) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\n\nDC TIERS (use these instead of numbers):\n- trivial: Routine task, almost automatic\n- easy: Simple challenge, most succeed\n- average: Standard difficulty, 50/50 chance\n- hard: Significant challenge, skill required\n- very_hard: Extreme difficulty, only skilled succeed\n- impossible: Near-impossible, requires exceptional luck\n\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (hard); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>",
     dcGuidelines:
-      "⚠️ DC GUIDELINES:\n- Use DCs that scale with the adventure's stat range (typically 0-100).\n- 10-15: Easy challenge (most characters can succeed)\n- 15-20: Medium challenge (requires decent stats)\n- 20-25: Hard challenge (high stats or items needed)\n- 25-30: Very Hard challenge (only the most prepared succeed)",
+      "⚠️ DC TIER GUIDELINES:\n- trivial: Auto-success for skilled, minor obstacle\n- easy: Basic competence needed\n- average: Real challenge for average characters\n- hard: Only skilled characters succeed reliably\n- very_hard: Even experts may fail\n- impossible: Legendary difficulty, dramatic moments only",
   },
 
   conditionPenalties: {
@@ -330,13 +330,13 @@ export const SYSTEM_1D100: RPGSystem = {
     diceSystem:
       "The game uses a 1d100 system (rolls 1 hundred-sided die, result is 1-100). Every number has equal probability (1% each), providing maximum granularity for precise difficulty tuning.",
     dcGuidance:
-      "DC system: Roll (1-100) + Stat Value ≥ DC. For average stats (~50): DC 30 is trivial, DC 60 is easy, DC 80 is medium, DC 100 is hard, DC 120 is very hard, DC 140+ requires natural 100 and exceptional stats.",
+      "Use TIER NAMES for difficulty (trivial, easy, average, hard, very_hard, impossible). The system automatically converts these to appropriate numbers based on adventure difficulty. Example: use_skill: Stealth (hard)",
     challengeGuidance:
-      "⚠️ IMPORTANT: Challenge the player! Use DC 80-100 for normal challenges, DC 100-120 for difficult ones, DC 120-140 for epic moments. Avoid DCs below 60 unless the task is truly trivial. The 1d100 system offers granular control - you can fine-tune difficulty in single percentage increments.",
+      "⚠️ IMPORTANT: Challenge the player! Use 'hard' or 'very_hard' for dramatic moments, 'average' for standard challenges. The 1d100 system offers granular control - difficulty is automatically scaled appropriately.",
     choiceSyntax:
-      "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 100); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>\n- You approach the mysterious door. <use_skill: none; use_resource: none; use_item: none; agmt_check: Is it locked? (50/50); agmt_table: none; custom_table: none>",
+      "- ...Prose <use_skill: skill name (tier) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\n\nDC TIERS (use these instead of numbers):\n- trivial: Routine task, almost automatic\n- easy: Simple challenge, most succeed\n- average: Standard difficulty, 50/50 chance\n- hard: Significant challenge, skill required\n- very_hard: Extreme difficulty, only skilled succeed\n- impossible: Near-impossible, requires exceptional luck\n\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (hard); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>",
     dcGuidelines:
-      "⚠️ DC GUIDELINES:\n- Use DCs that scale with the adventure's stat range (typically 0-100).\n- 60-80: Easy challenge (most characters can succeed)\n- 80-100: Medium challenge (requires decent stats)\n- 100-120: Hard challenge (high stats or items needed)\n- 120-140: Very Hard challenge (only the most prepared succeed)",
+      "⚠️ DC TIER GUIDELINES:\n- trivial: Auto-success for skilled, minor obstacle\n- easy: Basic competence needed\n- average: Real challenge for average characters\n- hard: Only skilled characters succeed reliably\n- very_hard: Even experts may fail\n- impossible: Legendary difficulty, dramatic moments only",
   },
 
   conditionPenalties: {
@@ -1116,13 +1116,13 @@ export const SYSTEM_EXPLOSIVE: RPGSystem = {
     diceSystem:
       "The game uses an EXPLODING DICE system. Each stat (0-100) determines die size: 0-16=d4, 17-33=d6, 34-50=d8, 51-66=d10, 67-83=d12, 84-100=d20. Roll the die vs DC. When you roll the MAXIMUM (4 on d4, 20 on d20), the die EXPLODES - roll again and ADD it to the total! Explosions chain infinitely. A lucky d4 roller can beat a d20 through explosions!",
     dcGuidance:
-      "DC system: Roll die (no modifiers) ≥ DC. Explosions add to total. Average d20 roll is 10.5, but explosions make high DCs possible. DC 8 is easy for d8+, DC 12 is medium for d10+, DC 16 is hard (needs d12+ or explosion), DC 20 is very hard (needs d20 or multiple explosions), DC 25+ requires explosive luck.",
+      "Use TIER NAMES for difficulty (trivial, easy, average, hard, very_hard, impossible). The system automatically converts these to appropriate numbers. Example: use_skill: Stealth (hard). Remember: even a d4 can explode for heroic victories!",
     challengeGuidance:
-      "⚠️ IMPORTANT: Challenge the player with DCs that feel risky! Use DC 10-14 for normal challenges, DC 14-18 for difficult ones, DC 18-22 for desperate moments, DC 25+ for impossible odds. Remember: even a d4 can explode multiple times for heroic victories! Explosions are RARE but EXCITING - a d10 has only 10% chance to explode, and only 1% to explode twice. This creates dramatic tension where the underdog can win through luck.",
+      "⚠️ IMPORTANT: Challenge the player! Use 'hard' or 'very_hard' for dramatic moments. Remember: even a d4 can explode multiple times for heroic victories! Explosions are RARE but EXCITING - a d10 has only 10% chance to explode. This creates dramatic tension where the underdog can win through luck.",
     choiceSyntax:
-      "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 14); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>\n- You leap across the chasm. <use_skill: Athletics (DC 18); use_resource: none; use_item: none; agmt_check: none; agmt_table: terrain; custom_table: none>",
+      "- ...Prose <use_skill: skill name (tier) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\n\nDC TIERS (use these instead of numbers):\n- trivial: Routine task, almost automatic\n- easy: Simple challenge, most succeed\n- average: Standard difficulty, 50/50 chance\n- hard: Significant challenge, skill required\n- very_hard: Extreme difficulty, only skilled succeed\n- impossible: Near-impossible, requires explosive luck!\n\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (hard); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>",
     dcGuidelines:
-      "⚠️ EXPLODING DICE DC GUIDELINES:\n- Die sizes: d4 (weak 0-16), d6 (below avg 17-33), d8 (average 34-50), d10 (good 51-66), d12 (great 67-83), d20 (exceptional 84-100)\n- DC 8-12: Easy for most characters (d6+ succeed 50%+)\n- DC 12-16: Medium challenge (needs d10+ or luck)\n- DC 16-20: Hard challenge (needs d12+ or explosion)\n- DC 20-25: Very hard (needs d20 or multiple explosions)\n- DC 25+: Heroic/impossible (requires explosive luck)\n- When narrating explosions, describe the excitement: 'Your die explodes! Roll again...'\n- Remember: A character with 50 stat (d8) can still beat DC 20 through explosions, making every roll exciting!",
+      "⚠️ EXPLODING DICE DC TIER GUIDELINES:\n- Die sizes: d4 (weak 0-16), d6 (below avg 17-33), d8 (average 34-50), d10 (good 51-66), d12 (great 67-83), d20 (exceptional 84-100)\n- trivial: Auto-success for d6+\n- easy: d8+ succeed reliably\n- average: d10+ needed or luck\n- hard: d12+ or explosions\n- very_hard: Needs d20 or multiple explosions\n- impossible: Requires explosive luck!\n- When narrating explosions, describe the excitement: 'Your die explodes! Roll again...'",
   },
 
   conditionPenalties: {
@@ -1570,3 +1570,362 @@ export function getConditionPenalty(
       return { type: "none", value: 0 };
   }
 }
+
+// ============================================================================
+// TIER-BASED DIFFICULTY SYSTEM
+// ============================================================================
+// AI specifies tiers (e.g., "hard", "moderate") instead of raw numbers.
+// Actual values are derived from RPG system + adventure difficulty.
+
+import type {
+  AdventureDifficulty,
+  DCTier,
+  PointsTier,
+  StatChangeTier,
+  ChallengeTier,
+} from "./structs";
+
+/**
+ * DC values by tier for each RPG system and adventure difficulty
+ * Structure: [system][tier][difficulty]
+ */
+const DC_TIER_VALUES: Record<
+  RPGSystemType,
+  Record<DCTier, Record<AdventureDifficulty, number>>
+> = {
+  // 3d6 system: roll range 3-18, average ~10.5
+  "3d6": {
+    trivial: { easy: 5, medium: 8, hard: 10, expert: 12 },
+    easy: { easy: 8, medium: 12, hard: 15, expert: 18 },
+    average: { easy: 12, medium: 18, hard: 22, expert: 25 },
+    hard: { easy: 18, medium: 22, hard: 26, expert: 30 },
+    very_hard: { easy: 22, medium: 26, hard: 30, expert: 34 },
+    impossible: { easy: 26, medium: 30, hard: 34, expert: 38 },
+  },
+  // 1d20 system: roll range 1-20, average 10.5
+  "1d20": {
+    trivial: { easy: 1, medium: 5, hard: 8, expert: 10 },
+    easy: { easy: 5, medium: 10, hard: 12, expert: 15 },
+    average: { easy: 10, medium: 15, hard: 18, expert: 20 },
+    hard: { easy: 15, medium: 18, hard: 22, expert: 25 },
+    very_hard: { easy: 18, medium: 22, hard: 25, expert: 28 },
+    impossible: { easy: 22, medium: 25, hard: 28, expert: 32 },
+  },
+  // 1d100 system: roll range 1-100
+  "1d100": {
+    trivial: { easy: 10, medium: 20, hard: 30, expert: 40 },
+    easy: { easy: 25, medium: 40, hard: 50, expert: 60 },
+    average: { easy: 40, medium: 55, hard: 65, expert: 75 },
+    hard: { easy: 55, medium: 70, hard: 80, expert: 90 },
+    very_hard: { easy: 70, medium: 80, hard: 90, expert: 100 },
+    impossible: { easy: 80, medium: 90, hard: 100, expert: 120 },
+  },
+  // Percentile system: stat-based, roll-under
+  percentile: {
+    trivial: { easy: 90, medium: 80, hard: 70, expert: 60 },
+    easy: { easy: 75, medium: 65, hard: 55, expert: 45 },
+    average: { easy: 60, medium: 50, hard: 40, expert: 30 },
+    hard: { easy: 45, medium: 35, hard: 25, expert: 20 },
+    very_hard: { easy: 30, medium: 20, hard: 15, expert: 10 },
+    impossible: { easy: 20, medium: 10, hard: 5, expert: 1 },
+  },
+  // PbtA system: 2d6+stat, 6- fail, 7-9 partial, 10+ success
+  // DC here is the stat penalty/bonus adjustment
+  pbta: {
+    trivial: { easy: 2, medium: 1, hard: 0, expert: -1 },
+    easy: { easy: 1, medium: 0, hard: -1, expert: -2 },
+    average: { easy: 0, medium: -1, hard: -2, expert: -3 },
+    hard: { easy: -1, medium: -2, hard: -3, expert: -4 },
+    very_hard: { easy: -2, medium: -3, hard: -4, expert: -5 },
+    impossible: { easy: -3, medium: -4, hard: -5, expert: -6 },
+  },
+  // Fate system: 4dF + skill, oppose with difficulty ladder
+  fate: {
+    trivial: { easy: -2, medium: 0, hard: 1, expert: 2 },
+    easy: { easy: 0, medium: 1, hard: 2, expert: 3 },
+    average: { easy: 1, medium: 2, hard: 3, expert: 4 },
+    hard: { easy: 2, medium: 3, hard: 4, expert: 5 },
+    very_hard: { easy: 3, medium: 4, hard: 5, expert: 6 },
+    impossible: { easy: 4, medium: 5, hard: 6, expert: 8 },
+  },
+  // YZE system: dice pool, count 6s as successes
+  // DC = required number of successes
+  yze: {
+    trivial: { easy: 1, medium: 1, hard: 1, expert: 2 },
+    easy: { easy: 1, medium: 1, hard: 2, expert: 2 },
+    average: { easy: 1, medium: 2, hard: 2, expert: 3 },
+    hard: { easy: 2, medium: 2, hard: 3, expert: 3 },
+    very_hard: { easy: 2, medium: 3, hard: 3, expert: 4 },
+    impossible: { easy: 3, medium: 3, hard: 4, expert: 5 },
+  },
+  // Explosive dice system: stat determines die size
+  // DC = target number to beat
+  explosive: {
+    trivial: { easy: 2, medium: 4, hard: 5, expert: 6 },
+    easy: { easy: 4, medium: 6, hard: 8, expert: 10 },
+    average: { easy: 6, medium: 8, hard: 10, expert: 12 },
+    hard: { easy: 8, medium: 10, hard: 12, expert: 15 },
+    very_hard: { easy: 10, medium: 12, hard: 15, expert: 18 },
+    impossible: { easy: 12, medium: 15, hard: 18, expert: 22 },
+  },
+  // Narrative system: no dice, pure storytelling
+  // DCs are just for reference/context
+  narrative: {
+    trivial: { easy: 0, medium: 0, hard: 0, expert: 0 },
+    easy: { easy: 0, medium: 0, hard: 0, expert: 0 },
+    average: { easy: 0, medium: 0, hard: 0, expert: 0 },
+    hard: { easy: 0, medium: 0, hard: 0, expert: 0 },
+    very_hard: { easy: 0, medium: 0, hard: 0, expert: 0 },
+    impossible: { easy: 0, medium: 0, hard: 0, expert: 0 },
+  },
+};
+
+/**
+ * Points values by tier and adventure difficulty
+ * These are universal across RPG systems
+ */
+const POINTS_TIER_VALUES: Record<
+  PointsTier,
+  Record<AdventureDifficulty, number>
+> = {
+  trivial: { easy: 5, medium: 10, hard: 15, expert: 25 },
+  minor: { easy: 15, medium: 25, hard: 40, expert: 60 },
+  moderate: { easy: 30, medium: 50, hard: 75, expert: 100 },
+  major: { easy: 60, medium: 100, hard: 150, expert: 200 },
+  legendary: { easy: 100, medium: 200, hard: 300, expert: 500 },
+};
+
+/**
+ * Stat/resource change values by tier and adventure difficulty
+ * Higher difficulty = smaller changes (harder to grow)
+ */
+const STAT_CHANGE_TIER_VALUES: Record<
+  StatChangeTier,
+  Record<AdventureDifficulty, number>
+> = {
+  tiny: { easy: 2, medium: 1, hard: 1, expert: 1 },
+  small: { easy: 5, medium: 3, hard: 2, expert: 2 },
+  moderate: { easy: 10, medium: 6, hard: 4, expert: 3 },
+  large: { easy: 15, medium: 10, hard: 7, expert: 5 },
+  massive: { easy: 25, medium: 15, hard: 10, expert: 8 },
+};
+
+/**
+ * Challenge rounds (best of X) by tier
+ * Universal across difficulties and systems
+ */
+const CHALLENGE_TIER_VALUES: Record<ChallengeTier, number> = {
+  quick: 3, // Best of 3 - first to 2 wins
+  standard: 5, // Best of 5 - first to 3 wins
+  extended: 7, // Best of 7 - first to 4 wins
+  epic: 9, // Best of 9 - first to 5 wins
+};
+
+/**
+ * Convert a DC tier to an actual number
+ * @param tier - The difficulty tier (e.g., "hard")
+ * @param systemId - The RPG system ID
+ * @param difficulty - The adventure difficulty
+ * @returns The numeric DC value
+ */
+export function getDCFromTier(
+  tier: DCTier,
+  systemId: RPGSystemType = "3d6",
+  difficulty: AdventureDifficulty = "medium"
+): number {
+  return (
+    DC_TIER_VALUES[systemId]?.[tier]?.[difficulty] ??
+    DC_TIER_VALUES["3d6"][tier][difficulty]
+  );
+}
+
+/**
+ * Convert a points tier to an actual number
+ * @param tier - The points tier (e.g., "moderate")
+ * @param difficulty - The adventure difficulty
+ * @returns The numeric points value
+ */
+export function getPointsFromTier(
+  tier: PointsTier,
+  difficulty: AdventureDifficulty = "medium"
+): number {
+  return (
+    POINTS_TIER_VALUES[tier]?.[difficulty] ??
+    POINTS_TIER_VALUES["moderate"][difficulty]
+  );
+}
+
+/**
+ * Convert a stat change tier to an actual number
+ * @param tier - The change tier (e.g., "small")
+ * @param difficulty - The adventure difficulty
+ * @returns The numeric change value (always positive, caller handles sign)
+ */
+export function getStatChangeFromTier(
+  tier: StatChangeTier,
+  difficulty: AdventureDifficulty = "medium"
+): number {
+  return (
+    STAT_CHANGE_TIER_VALUES[tier]?.[difficulty] ??
+    STAT_CHANGE_TIER_VALUES["small"][difficulty]
+  );
+}
+
+/**
+ * Convert a challenge tier to rounds (best of X)
+ * @param tier - The challenge tier (e.g., "standard")
+ * @returns The number of rounds
+ */
+export function getChallengeRoundsFromTier(tier: ChallengeTier): number {
+  return CHALLENGE_TIER_VALUES[tier] ?? 5;
+}
+
+/**
+ * Check if a value is a valid DC tier string
+ */
+export function isDCTier(value: unknown): value is DCTier {
+  return (
+    typeof value === "string" &&
+    ["trivial", "easy", "average", "hard", "very_hard", "impossible"].includes(
+      value
+    )
+  );
+}
+
+/**
+ * Check if a value is a valid points tier string
+ */
+export function isPointsTier(value: unknown): value is PointsTier {
+  return (
+    typeof value === "string" &&
+    ["trivial", "minor", "moderate", "major", "legendary"].includes(value)
+  );
+}
+
+/**
+ * Check if a value is a valid stat change tier string
+ */
+export function isStatChangeTier(value: unknown): value is StatChangeTier {
+  return (
+    typeof value === "string" &&
+    ["tiny", "small", "moderate", "large", "massive"].includes(value)
+  );
+}
+
+/**
+ * Check if a value is a valid challenge tier string
+ */
+export function isChallengeTier(value: unknown): value is ChallengeTier {
+  return (
+    typeof value === "string" &&
+    ["quick", "standard", "extended", "epic"].includes(value)
+  );
+}
+
+/**
+ * Parse a DC value that could be either a number or a tier string
+ * Returns the numeric DC value
+ */
+export function parseDCValue(
+  value: number | string,
+  systemId: RPGSystemType = "3d6",
+  difficulty: AdventureDifficulty = "medium"
+): number {
+  if (typeof value === "number") {
+    return value;
+  }
+  if (isDCTier(value)) {
+    return getDCFromTier(value, systemId, difficulty);
+  }
+  // Try parsing as number
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed)
+    ? getDCFromTier("average", systemId, difficulty)
+    : parsed;
+}
+
+/**
+ * Parse a points value that could be either a number or a tier string
+ * Returns the numeric points value
+ */
+export function parsePointsValue(
+  value: number | string,
+  difficulty: AdventureDifficulty = "medium"
+): number {
+  if (typeof value === "number") {
+    return value;
+  }
+  if (isPointsTier(value)) {
+    return getPointsFromTier(value, difficulty);
+  }
+  // Try parsing as number
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? getPointsFromTier("moderate", difficulty) : parsed;
+}
+
+/**
+ * Parse a stat change value that could be either a number or a tier string
+ * Returns the numeric change value (preserves sign for numbers)
+ */
+export function parseStatChangeValue(
+  value: number | string,
+  difficulty: AdventureDifficulty = "medium",
+  isNegative: boolean = false
+): number {
+  if (typeof value === "number") {
+    return value;
+  }
+  if (isStatChangeTier(value)) {
+    const base = getStatChangeFromTier(value, difficulty);
+    return isNegative ? -base : base;
+  }
+  // Try parsing as number
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? getStatChangeFromTier("small", difficulty) : parsed;
+}
+
+/**
+ * Parse a challenge rounds value that could be either a number or a tier string
+ * Returns the numeric rounds value
+ */
+export function parseChallengeRoundsValue(value: number | string): number {
+  if (typeof value === "number") {
+    return value;
+  }
+  if (isChallengeTier(value)) {
+    return getChallengeRoundsFromTier(value);
+  }
+  // Try parsing as number
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? 5 : parsed;
+}
+
+// Export tier constants for use in tool schemas
+export const DC_TIERS: DCTier[] = [
+  "trivial",
+  "easy",
+  "average",
+  "hard",
+  "very_hard",
+  "impossible",
+];
+export const POINTS_TIERS: PointsTier[] = [
+  "trivial",
+  "minor",
+  "moderate",
+  "major",
+  "legendary",
+];
+export const STAT_CHANGE_TIERS: StatChangeTier[] = [
+  "tiny",
+  "small",
+  "moderate",
+  "large",
+  "massive",
+];
+export const CHALLENGE_TIERS: ChallengeTier[] = [
+  "quick",
+  "standard",
+  "extended",
+  "epic",
+];

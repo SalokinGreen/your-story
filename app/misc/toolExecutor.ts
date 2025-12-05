@@ -16,6 +16,7 @@ import {
   BooleanVariable,
   StringVariable,
   ListVariable,
+  AdventureDifficulty,
 } from "@/app/misc/structs";
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
@@ -25,6 +26,13 @@ import {
   getChaosAdjustmentReason,
 } from "@/app/misc/mythicChaos";
 import { findBestMatch } from "@/app/misc/fuzzyMatch";
+import {
+  parseDCValue,
+  parsePointsValue,
+  parseStatChangeValue,
+  parseChallengeRoundsValue,
+  RPGSystemType,
+} from "@/app/misc/rpgSystems";
 
 export interface ToolCall {
   id?: string;
@@ -205,6 +213,9 @@ export function executeTools(
       return "<unserializable args>";
     }
   }
+
+  // Extract difficulty for tier conversion (used by challenge and other tools)
+  const difficulty: AdventureDifficulty = storyData.difficulty || "medium";
 
   for (const toolCall of toolCalls) {
     const toolName = toolCall.function.name;
@@ -1672,8 +1683,10 @@ export function executeTools(
       if (toolCall.function.name === "start_challenge") {
         const name = args.name?.trim();
         const description = args.description?.trim();
-        let rounds = args.rounds ?? 5;
-        const points = args.points ?? 25; // Default 25 points
+        // Rounds can be a tier string or number - convert using tier system
+        let rounds = parseChallengeRoundsValue(args.rounds ?? "standard");
+        // Points can be a tier string or number - convert using tier system
+        const points = parsePointsValue(args.points ?? "moderate", difficulty);
         const initialSuccesses = Math.min(args.initialSuccesses ?? 0, 3);
         const initialFailures = Math.min(args.initialFailures ?? 0, 3);
 
@@ -2007,7 +2020,11 @@ export function executeTools(
       }
 
       // Convert tool call to XML command format and execute
-      const command = convertToolToCommand(toolCall.function.name, args);
+      const command = convertToolToCommand(
+        toolCall.function.name,
+        args,
+        storyData
+      );
       if (command === null) {
         const errorMsg = `Tool cannot be converted to command (tool ${
           toolCall.function.name
@@ -2130,18 +2147,28 @@ export function executeTools(
  * Convert tool call to XML command format for existing commandResponses.ts
  * This allows us to reuse all existing validation and fuzzy matching logic
  * Returns null for tools that need special handling (e.g., add_memory)
+ *
+ * Tier Conversion: Some tools accept tier strings (e.g., "moderate", "hard") instead of numbers.
+ * These are converted to actual numbers based on RPG system and adventure difficulty.
  */
 function convertToolToCommand(
   toolName: string,
-  args: Record<string, any>
+  args: Record<string, any>,
+  storyData: StoryData
 ): string | null {
+  // Extract system and difficulty for tier conversion
+  const rpgSystem: RPGSystemType =
+    (storyData.rpgSystem as RPGSystemType) || "3d6";
+  const difficulty: AdventureDifficulty = storyData.difficulty || "medium";
+
   switch (toolName) {
     // Quest Management
-    case "create_quest":
-      // Points defaults to 50 if not provided (per schema)
-      return `/create_quest: ${args.title} | ${args.shortDescription} | ${
-        args.description
-      } | ${args.points || 50}`;
+    case "create_quest": {
+      // Points can be a tier string or number
+      const rawPoints = args.points ?? "moderate";
+      const points = parsePointsValue(rawPoints, difficulty);
+      return `/create_quest: ${args.title} | ${args.shortDescription} | ${args.description} | ${points}`;
+    }
 
     case "complete_quest":
       return `/complete_quest: ${args.title}`;
@@ -2210,12 +2237,30 @@ function convertToolToCommand(
       return `/upgrade_item: ${args.name} | ${args.newGrade}`;
 
     // Resource Management
-    case "adjust_resource":
-      // Use /adjust_resource for current value only, /modify_resource for both
-      if (args.maxDelta !== undefined && args.maxDelta !== 0) {
-        return `/modify_resource: ${args.name} | ${args.currentDelta} | ${args.maxDelta}`;
+    case "adjust_resource": {
+      // currentDelta and maxDelta can be tier strings or numbers
+      // isNegative flag determines if the change is a loss/penalty
+      let currentDelta = parseStatChangeValue(
+        args.currentDelta ?? 0,
+        difficulty
+      );
+      let maxDelta =
+        args.maxDelta !== undefined
+          ? parseStatChangeValue(args.maxDelta, difficulty)
+          : 0;
+
+      // Apply isNegative flag if present
+      if (args.isNegative) {
+        currentDelta = -Math.abs(currentDelta);
+        maxDelta = -Math.abs(maxDelta);
       }
-      return `/adjust_resource: ${args.name} | ${args.currentDelta}`;
+
+      // Use /adjust_resource for current value only, /modify_resource for both
+      if (maxDelta !== 0) {
+        return `/modify_resource: ${args.name} | ${currentDelta} | ${maxDelta}`;
+      }
+      return `/adjust_resource: ${args.name} | ${currentDelta}`;
+    }
 
     case "set_resource":
       // Set resource values - use /modify_resource with deltas calculated from current values
@@ -2240,8 +2285,18 @@ function convertToolToCommand(
       return `/remove_resource: ${args.name}`;
 
     // Stat Management
-    case "adjust_stat":
-      return `/modify_stat: ${args.name} | ${args.valueDelta}`;
+    case "adjust_stat": {
+      // valueDelta can be a tier string or number
+      // isNegative flag determines if the change is a penalty
+      let valueDelta = parseStatChangeValue(args.valueDelta ?? 0, difficulty);
+
+      // Apply isNegative flag if present
+      if (args.isNegative) {
+        valueDelta = -Math.abs(valueDelta);
+      }
+
+      return `/modify_stat: ${args.name} | ${valueDelta}`;
+    }
 
     case "set_stat":
       return `/set_stat: ${args.name} ${args.value}`;
