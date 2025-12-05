@@ -80,6 +80,71 @@ interface AIResponse {
   };
 }
 
+/**
+ * Normalize tool call IDs for Mistral API compatibility.
+ * Mistral requires tool_call_id to be exactly 9 alphanumeric characters (a-z, A-Z, 0-9).
+ * Other providers (DeepSeek, OpenRouter) may use formats like "call_36383327".
+ * This function creates a consistent mapping for the request.
+ */
+function normalizeMistralToolCallIds(messages: ChatMessage[]): ChatMessage[] {
+  // Build a mapping of original IDs to normalized IDs
+  const idMap = new Map<string, string>();
+  let counter = 0;
+
+  // Generate a Mistral-compatible ID (9 alphanumeric chars)
+  const generateId = () => {
+    const chars =
+      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const prefix = "tc"; // 2 chars
+    const num = (counter++).toString().padStart(7, "0"); // 7 chars = 9 total
+    // If counter exceeds 7 digits, use random chars
+    if (num.length > 7) {
+      let result = "";
+      for (let i = 0; i < 9; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+    return prefix + num;
+  };
+
+  // First pass: collect all tool_call_ids from tool_calls arrays
+  for (const msg of messages) {
+    if (msg.tool_calls) {
+      for (const tc of msg.tool_calls) {
+        if (tc.id && !idMap.has(tc.id)) {
+          // Check if already Mistral-compatible (9 alphanumeric chars)
+          if (/^[a-zA-Z0-9]{9}$/.test(tc.id)) {
+            idMap.set(tc.id, tc.id);
+          } else {
+            idMap.set(tc.id, generateId());
+          }
+        }
+      }
+    }
+  }
+
+  // Second pass: apply the mapping
+  return messages.map((msg) => {
+    const newMsg = { ...msg };
+
+    // Normalize tool_calls array
+    if (newMsg.tool_calls) {
+      newMsg.tool_calls = newMsg.tool_calls.map((tc: any) => ({
+        ...tc,
+        id: idMap.get(tc.id) || tc.id,
+      }));
+    }
+
+    // Normalize tool_call_id reference
+    if (newMsg.tool_call_id) {
+      newMsg.tool_call_id = idMap.get(newMsg.tool_call_id) || newMsg.tool_call_id;
+    }
+
+    return newMsg;
+  });
+}
+
 async function callAI(
   messages: ChatMessage[],
   provider: "deepseek" | "openrouter" | "mistral" | "deepinfra" | "google",
@@ -133,6 +198,12 @@ async function callAI(
   ) {
     processedMessages = messages.slice(0, -1);
     console.log(`[API] Stripped prefill for ${provider} tool calling`);
+  }
+
+  // For Mistral: normalize tool call IDs to match their strict format requirement
+  // Mistral requires exactly 9 alphanumeric characters (a-z, A-Z, 0-9)
+  if (provider === "mistral") {
+    processedMessages = normalizeMistralToolCallIds(processedMessages);
   }
 
   const requestBody: any = {

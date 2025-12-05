@@ -715,7 +715,12 @@ Your role is to read the latest narrative output and ensure the Game Database ma
 
 User will not see your output. Use your message content to "Think Step-by-Step" before calling tools.
 
-## ANALYSIS STEPS
+## CRITICAL: Already-Processed Actions
+Player messages may contain bracketed annotations like [Ability: Fireball], [Mana: -10], [Item: Health Potion], [Stealth: success].
+**These indicate actions the GAME SYSTEM already processed** (dice rolled, resources deducted, items consumed).
+DO NOT duplicate these changes. Only process NEW events from the STORY TEXT.
+
+## ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 1. **Inventory Audit:** Did the narrative imply an item was consumed (e.g., "quaffed the potion"), broken, given away, or picked up? -> \`add_item\` / \`remove_item\`
 2. **Physiological Audit:** Did the player exert themselves, get hurt, or cast a spell in the text? -> \`update_resource\` (Health/Stamina/Mana).
 3. **Condition Check:**
@@ -1282,8 +1287,9 @@ OUTPUT: A single valid JSON object.
 CONTEXTUAL ANALYSIS RULES:
 1.  **Implicit Item Usage:** If the player implies using an item they have (e.g., "I shoot him" -> implies Bow/Gun), assign that item.
 2.  **Implicit Resource Usage:** If an action is physically taxing (sprinting, climbing, magic), assign the relevant Resource (Stamina/Mana) even if not explicitly stated.
-3.  **Skill Continuity:** If the player *just* succeeded at a check (see history), do NOT call for a new check for the same continuous action. Set \`is_plain_action: true\`.
-4.  **No God-Moding:** If the player attempts an impossible action (flying without wings), set \`is_plain_action: false\` but \`skill_used: null\` (The story engine will handle the narrative failure).
+3.  **Implicit Ability Usage:** If the player describes using a skill/spell/technique they have (e.g., "I cast fireball", "I use my lockpicking expertise"), assign that ability. Only assign abilities that are READY (not on cooldown).
+4.  **Skill Continuity:** If the player *just* succeeded at a check (see history), do NOT call for a new check for the same continuous action. Set \`is_plain_action: true\`.
+5.  **No God-Moding:** If the player attempts an impossible action (flying without wings), set \`is_plain_action: false\` but \`skill_used: null\` (The story engine will handle the narrative failure).
 
 JSON STRUCTURE:
 {
@@ -1326,7 +1332,22 @@ AVAILABLE DATA:
 STATS: ${storyData.stats.map((s) => s.name).join(", ") || "None"}
 RESOURCES: ${storyData.resources.map((r) => r.name).join(", ") || "None"}
 ITEMS: ${storyData.inventory.map((i) => i.name).join(", ") || "None"}
-ABILITIES: ${storyData.abilities?.map((a) => a.name).join(", ") || "None"}
+ABILITIES: ${
+    storyData.abilities?.length
+      ? storyData.abilities
+          .map((a) => {
+            const readyStatus =
+              (a.currentCooldown || 0) > 0
+                ? `(on cooldown ${a.currentCooldown}/${a.cooldown})`
+                : "(ready)";
+            const costInfo = a.cost?.length
+              ? ` [costs: ${a.cost.map((c) => `${c.amount} ${c.name}`).join(", ")}]`
+              : "";
+            return `${a.name} ${readyStatus}${costInfo}`;
+          })
+          .join(", ")
+      : "None"
+  }
 ACTIVE CHALLENGE: ${
     storyData.activeChallenge?.active
       ? `"${storyData.activeChallenge.name}" (Best of ${storyData.activeChallenge.rounds}: ${storyData.activeChallenge.currentSuccesses}-${storyData.activeChallenge.currentFailures})`

@@ -2218,20 +2218,29 @@ function StoryPageContent() {
 
     // Determine starting choices - use custom ones if available, otherwise default
     const startingChoices = updatedStoryData.starting_choices?.length
-      ? updatedStoryData.starting_choices.map((sc) => ({
-          text: sc.text,
-          item_used: sc.item_used,
-          item_loss: sc.item_loss,
-          skill_used: sc.skill_used,
-          skill_dc: sc.skill_dc,
-          resource_used: sc.resource_used,
-          agmt_check: sc.agmt_check,
-          agmt_context_only: sc.agmt_context_only,
-          // Use unified table field, with fallback to legacy fields
-          table: sc.table || sc.agmt_table || sc.custom_table,
-          // Include intro_override so it can be used when this choice is selected
-          intro_override: sc.intro_override,
-        }))
+      ? updatedStoryData.starting_choices.map((sc) => {
+          const choice: Choice = {
+            text: sc.text,
+            item_used: sc.item_used,
+            item_loss: sc.item_loss,
+            skill_used: sc.skill_used,
+            resource_used: sc.resource_used,
+            agmt_check: sc.agmt_check,
+            agmt_context_only: sc.agmt_context_only,
+            // Use unified table field, with fallback to legacy fields
+            table: sc.table || sc.agmt_table || sc.custom_table,
+            // Include intro_override so it can be used when this choice is selected
+            intro_override: sc.intro_override,
+          };
+
+          if (typeof sc.skill_dc === "number") {
+            choice.skill_dc = sc.skill_dc;
+          } else if (sc.skill_dc) {
+            choice.skill_dc_tier = sc.skill_dc as Choice["skill_dc_tier"];
+          }
+
+          return choice;
+        })
       : [{ text: "Start Story" }];
 
     // Determine intro content - priority order:
@@ -2616,6 +2625,11 @@ function StoryPageContent() {
             setLoading(false); // Let player read while tools/choices generate
           },
           onStoryComplete: (content: string, usage: any) => {
+            // Update the partial part with the cleaned content (strips [GM State Update] etc)
+            partialPart.content = content;
+            setStoryText(content);
+            setStoryData({ ...storyData });
+
             setLoadingStage("tools");
             logger.ai_response("Story narration complete (custom input)", {
               length: content.length,
@@ -4563,6 +4577,11 @@ function StoryPageContent() {
               setLoading(false); // Let player read while tools/choices generate
             },
             onStoryComplete: (content: string, usage: any) => {
+              // Update the partial part with the cleaned content (strips [GM State Update] etc)
+              partialPart.content = content;
+              setStoryText(content);
+              setStoryData({ ...storyData });
+
               setLoadingStage("tools");
               logger.ai_response("Story narration complete", {
                 length: content.length,
@@ -4873,6 +4892,11 @@ function StoryPageContent() {
             setLoading(false); // Let player read while tools/choices generate
           },
           onStoryComplete: (content: string, usage: any) => {
+            // Update the partial part with the cleaned content (strips [GM State Update] etc)
+            partialPart.content = content;
+            setStoryText(content);
+            setStoryData({ ...storyData });
+
             setLoadingStage("tools");
             logger.ai_response("Story narration complete (retry)", {
               length: content.length,
