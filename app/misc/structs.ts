@@ -278,6 +278,79 @@ export interface Preset {
   authorNotes: string;
 }
 
+// ============================================
+// REST SYSTEM
+// ============================================
+
+// Rest types - from quick breaks to extended downtime
+export type RestType = "quick" | "short" | "long";
+
+// Rest state tracking
+export interface RestState {
+  quickRestsUsed: number; // Quick rests used since last long rest
+  shortRestsUsed: number; // Short rests used since last long rest
+  lastRestType?: RestType; // Type of last rest taken
+  lastRestTimestamp?: number; // When last rest was taken
+}
+
+// Rest configuration per difficulty level
+export interface RestConfig {
+  // Recovery percentages (% of max)
+  resourceRecovery: { quick: number; short: number; long: number };
+  // Cooldown reduction (turns)
+  cooldownReduction: { quick: number; short: number; long: number };
+  // Condition downgrade (tiers) - only affects non-permanent conditions
+  conditionDowngrade: { quick: number; short: number; long: number };
+  // Item durability repair (% of max)
+  itemRepair: { quick: number; short: number; long: number };
+  // Stress reduction (YZE only)
+  stressReduction: { quick: number; short: number; long: number };
+  // Max uses before long rest required
+  maxQuickRests: number;
+  maxShortRests: number;
+}
+
+// Default rest configuration scaled by difficulty
+// Harder difficulties = less effective rests, fewer uses
+export const REST_CONFIG: Record<AdventureDifficulty, RestConfig> = {
+  easy: {
+    resourceRecovery: { quick: 15, short: 60, long: 100 },
+    cooldownReduction: { quick: 2, short: 999, long: 999 }, // 999 = full reset
+    conditionDowngrade: { quick: 0, short: 1, long: 2 },
+    itemRepair: { quick: 0, short: 25, long: 100 },
+    stressReduction: { quick: 2, short: 5, long: 10 },
+    maxQuickRests: 4,
+    maxShortRests: 3,
+  },
+  medium: {
+    resourceRecovery: { quick: 10, short: 50, long: 100 },
+    cooldownReduction: { quick: 1, short: 3, long: 999 },
+    conditionDowngrade: { quick: 0, short: 1, long: 2 },
+    itemRepair: { quick: 0, short: 15, long: 100 },
+    stressReduction: { quick: 1, short: 3, long: 10 },
+    maxQuickRests: 3,
+    maxShortRests: 2,
+  },
+  hard: {
+    resourceRecovery: { quick: 8, short: 40, long: 100 },
+    cooldownReduction: { quick: 1, short: 2, long: 999 },
+    conditionDowngrade: { quick: 0, short: 1, long: 1 },
+    itemRepair: { quick: 0, short: 10, long: 75 },
+    stressReduction: { quick: 1, short: 2, long: 8 },
+    maxQuickRests: 2,
+    maxShortRests: 2,
+  },
+  expert: {
+    resourceRecovery: { quick: 5, short: 30, long: 100 },
+    cooldownReduction: { quick: 1, short: 2, long: 999 },
+    conditionDowngrade: { quick: 0, short: 0, long: 1 },
+    itemRepair: { quick: 0, short: 5, long: 50 },
+    stressReduction: { quick: 0, short: 1, long: 5 },
+    maxQuickRests: 2,
+    maxShortRests: 1,
+  },
+};
+
 // Custom random tables
 export interface CustomTableEntry {
   text: string; // The result text
@@ -393,6 +466,9 @@ export interface StoryData {
 
   // Player action tracking (cleared after AI sees them)
   pendingPlayerActions?: string[]; // Human-readable actions taken between turns (level ups, skill purchases, etc.)
+
+  // Rest System
+  restState?: RestState; // Tracks rest usage and cooldowns
 }
 
 // Advanced RPG Tools state tracking

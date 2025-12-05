@@ -1681,6 +1681,37 @@ const cancelChallengeTool: ToolSchema = {
   },
 };
 
+// Rest System Tool
+const takeRestTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "take_rest",
+    description: `Allow the player to rest and recover. Three types available:
+- QUICK (30 min): Brief break. Recovers 5-15% resources, reduces cooldowns by 1-2. Limited uses before long rest.
+- SHORT (4-8 hours): Sleep/extended rest. Recovers 30-60% resources, resets most cooldowns, downgrades minor conditions by 1 tier, repairs items slightly. Limited uses before long rest.
+- LONG (several days): Extended downtime/time skip. Full resource recovery, all cooldowns reset, conditions improve 1-2 tiers, items fully repaired. Resets quick/short rest counts.
+
+Long rests require player confirmation as they involve a time skip. Use when narratively appropriate (safe haven, end of chapter, travel montage). Cannot rest during active danger/combat.`,
+    parameters: {
+      type: "object",
+      properties: {
+        type: {
+          type: "string",
+          enum: ["quick", "short", "long"],
+          description:
+            "Type of rest: quick (30 min), short (4-8 hours sleep), long (several days)",
+        },
+        narrative_summary: {
+          type: "string",
+          description:
+            "Brief description of how the rest happens narratively (e.g., 'You find a quiet corner to catch your breath', 'The party makes camp for the night', 'Several peaceful days pass at the inn')",
+        },
+      },
+      required: ["type", "narrative_summary"],
+    },
+  },
+};
+
 // Export all tools as array
 export const TOOL_SCHEMAS: ToolSchema[] = [
   // Quest Management (5 tools)
@@ -1769,6 +1800,9 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   updateChallengeTool,
   resolveChallengeTool,
   cancelChallengeTool,
+
+  // Rest System (1 tool)
+  takeRestTool,
 
   // Advanced RPG Tools (9 tools)
   ...MYTHIC_TOOLS,

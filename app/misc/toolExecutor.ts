@@ -17,6 +17,8 @@ import {
   StringVariable,
   ListVariable,
   AdventureDifficulty,
+  RestType,
+  REST_CONFIG,
 } from "@/app/misc/structs";
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
@@ -120,6 +122,8 @@ const STATE_CHANGE_TOOLS = new Set([
   "update_challenge",
   "resolve_challenge",
   "cancel_challenge",
+  // Rest System
+  "take_rest",
 ]);
 
 /**
@@ -2055,6 +2059,16 @@ export function executeTools(
         continue;
       }
 
+      // === REST SYSTEM TOOL HANDLER ===
+      if (toolCall.function.name === "take_rest") {
+        const restResult = executeRestTool(args, storyData, toolId);
+        responses.push({
+          ...restResult,
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
       // Convert tool call to XML command format and execute
       const command = convertToolToCommand(
         toolCall.function.name,
@@ -3002,6 +3016,279 @@ function executeVariableTool(
         timestamp: Date.now(),
       };
   }
+}
+
+/**
+ * Execute rest tool - handles resource recovery, cooldown reduction, condition healing, item repair
+ * Returns CommandResponse for the operation
+ */
+function executeRestTool(
+  args: Record<string, any>,
+  storyData: StoryData,
+  toolId: string
+): Omit<CommandResponse, "toolCallId"> {
+  const restType = args.type as RestType;
+  const narrativeSummary = args.narrative_summary?.trim() || "";
+  const difficulty = storyData.difficulty || "medium";
+  const config = REST_CONFIG[difficulty];
+
+  // Initialize rest state if not present
+  if (!storyData.restState) {
+    storyData.restState = {
+      quickRestsUsed: 0,
+      shortRestsUsed: 0,
+    };
+  }
+
+  // Check if rest is available
+  if (
+    restType === "quick" &&
+    storyData.restState.quickRestsUsed >= config.maxQuickRests
+  ) {
+    return {
+      command: "take_rest",
+      success: false,
+      message: `Cannot quick rest: ${config.maxQuickRests} quick rests already used (long rest required to recharge)`,
+      timestamp: Date.now(),
+    };
+  }
+
+  if (
+    restType === "short" &&
+    storyData.restState.shortRestsUsed >= config.maxShortRests
+  ) {
+    return {
+      command: "take_rest",
+      success: false,
+      message: `Cannot short rest: ${config.maxShortRests} short rests already used (long rest required to recharge)`,
+      timestamp: Date.now(),
+    };
+  }
+
+  // Check for active challenge - cannot rest during challenges
+  if (storyData.activeChallenge?.active) {
+    return {
+      command: "take_rest",
+      success: false,
+      message: `Cannot rest while "${storyData.activeChallenge.name}" challenge is active`,
+      timestamp: Date.now(),
+    };
+  }
+
+  // Track effects for summary message
+  const effects: string[] = [];
+
+  // 1. Resource Recovery (% of max)
+  const resourceRecovery = config.resourceRecovery[restType];
+  if (resourceRecovery > 0 && storyData.resources?.length) {
+    for (const resource of storyData.resources) {
+      if (resource.value < resource.maxValue) {
+        const recoveryAmount = Math.ceil(
+          (resource.maxValue * resourceRecovery) / 100
+        );
+        const oldValue = resource.value;
+        resource.value = Math.min(
+          resource.maxValue,
+          resource.value + recoveryAmount
+        );
+        const actualRecovery = resource.value - oldValue;
+        if (actualRecovery > 0) {
+          effects.push(`${resource.name} +${actualRecovery}`);
+        }
+      }
+    }
+  }
+
+  // 2. Stress Reduction (YZE system)
+  const stressReduction = config.stressReduction[restType];
+  if (
+    stressReduction > 0 &&
+    storyData.rpgSystem === "yze" &&
+    (storyData.stress ?? 0) > 0
+  ) {
+    const oldStress = storyData.stress ?? 0;
+    storyData.stress = Math.max(0, oldStress - stressReduction);
+    const actualReduction = oldStress - (storyData.stress ?? 0);
+    if (actualReduction > 0) {
+      effects.push(`Stress -${actualReduction}`);
+    }
+  }
+
+  // 3. Cooldown Reduction
+  const cooldownReduction = config.cooldownReduction[restType];
+  if (cooldownReduction > 0 && storyData.abilities?.length) {
+    let cooldownsReset = 0;
+    for (const ability of storyData.abilities) {
+      if ((ability.currentCooldown ?? 0) > 0) {
+        if (cooldownReduction >= 999) {
+          // Full reset
+          ability.currentCooldown = 0;
+          cooldownsReset++;
+        } else {
+          const oldCooldown = ability.currentCooldown ?? 0;
+          ability.currentCooldown = Math.max(
+            0,
+            oldCooldown - cooldownReduction
+          );
+          if (ability.currentCooldown < oldCooldown) {
+            cooldownsReset++;
+          }
+        }
+      }
+    }
+    if (cooldownsReset > 0) {
+      if (cooldownReduction >= 999) {
+        effects.push(
+          `${cooldownsReset} ability cooldown${
+            cooldownsReset > 1 ? "s" : ""
+          } reset`
+        );
+      } else {
+        effects.push(
+          `${cooldownsReset} ability cooldown${
+            cooldownsReset > 1 ? "s" : ""
+          } reduced`
+        );
+      }
+    }
+  }
+
+  // 4. Condition Downgrade (non-permanent only)
+  const conditionDowngrade = config.conditionDowngrade[restType];
+  if (conditionDowngrade > 0 && storyData.conditions?.length) {
+    const conditionsHealed: string[] = [];
+    const conditionsToRemove: number[] = [];
+
+    for (let i = 0; i < storyData.conditions.length; i++) {
+      const condition = storyData.conditions[i];
+      // Skip permanent conditions (tier 6) and explicitly permanent ones
+      if (condition.permanent || condition.tier >= 6) continue;
+
+      const newTier = condition.tier - conditionDowngrade;
+      if (newTier < 1) {
+        // Condition fully healed - mark for removal
+        conditionsToRemove.push(i);
+        conditionsHealed.push(`${condition.name} healed`);
+      } else {
+        // Downgrade tier
+        condition.tier = newTier as 1 | 2 | 3 | 4 | 5;
+        conditionsHealed.push(`${condition.name} improved`);
+      }
+    }
+
+    // Remove fully healed conditions (reverse order to preserve indices)
+    for (let i = conditionsToRemove.length - 1; i >= 0; i--) {
+      storyData.conditions.splice(conditionsToRemove[i], 1);
+    }
+
+    if (conditionsHealed.length > 0) {
+      effects.push(conditionsHealed.join(", "));
+    }
+  }
+
+  // 5. Item Repair (% of max durability)
+  const itemRepair = config.itemRepair[restType];
+  if (itemRepair > 0 && storyData.inventory?.length) {
+    let itemsRepaired = 0;
+    for (const item of storyData.inventory) {
+      // Skip items without durability tracking or already at max
+      if (
+        item.durability === undefined ||
+        item.maxDurability === undefined ||
+        item.grade === "agmt" || // Infinite durability items
+        item.durability >= item.maxDurability
+      ) {
+        continue;
+      }
+
+      const repairAmount =
+        itemRepair >= 100
+          ? item.maxDurability // Full repair
+          : Math.ceil((item.maxDurability * itemRepair) / 100);
+
+      const oldDurability = item.durability;
+      item.durability = Math.min(
+        item.maxDurability,
+        item.durability + repairAmount
+      );
+      if (item.durability > oldDurability) {
+        itemsRepaired++;
+      }
+    }
+    if (itemsRepaired > 0) {
+      effects.push(
+        `${itemsRepaired} item${itemsRepaired > 1 ? "s" : ""} repaired`
+      );
+    }
+  }
+
+  // 6. Update rest state tracking
+  if (restType === "long") {
+    // Long rest resets quick/short rest counts
+    storyData.restState.quickRestsUsed = 0;
+    storyData.restState.shortRestsUsed = 0;
+  } else if (restType === "short") {
+    storyData.restState.shortRestsUsed++;
+    // Short rest also resets quick rest count
+    storyData.restState.quickRestsUsed = 0;
+  } else {
+    storyData.restState.quickRestsUsed++;
+  }
+
+  storyData.restState.lastRestType = restType;
+  storyData.restState.lastRestTimestamp = Date.now();
+
+  // Build summary message
+  const restTypeLabel =
+    restType === "quick"
+      ? "Quick Rest"
+      : restType === "short"
+      ? "Short Rest"
+      : "Long Rest";
+  const durationLabel =
+    restType === "quick"
+      ? "~30 minutes"
+      : restType === "short"
+      ? "4-8 hours"
+      : "several days";
+
+  let summary = `🛏️ ${restTypeLabel} (${durationLabel})`;
+  if (narrativeSummary) {
+    summary += `: ${narrativeSummary}`;
+  }
+
+  if (effects.length > 0) {
+    summary += `\nEffects: ${effects.join(" | ")}`;
+  } else {
+    summary += "\nNo recovery needed - already at full capacity";
+  }
+
+  // Add remaining rest counts
+  if (restType !== "long") {
+    const remainingQuick =
+      config.maxQuickRests - storyData.restState.quickRestsUsed;
+    const remainingShort =
+      config.maxShortRests - storyData.restState.shortRestsUsed;
+    summary += `\n[Rests remaining: ${remainingQuick} quick, ${remainingShort} short]`;
+  }
+
+  logger.action(`Rest executed: ${restType}`, {
+    toolId,
+    restType,
+    difficulty,
+    effects: effects.length,
+    quickRestsRemaining:
+      config.maxQuickRests - storyData.restState.quickRestsUsed,
+    shortRestsRemaining:
+      config.maxShortRests - storyData.restState.shortRestsUsed,
+  });
+
+  return {
+    command: `take_rest: ${restType}`,
+    success: true,
+    message: summary,
+    timestamp: Date.now(),
+  };
 }
 
 /**

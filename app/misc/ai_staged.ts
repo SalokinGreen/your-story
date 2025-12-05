@@ -4,6 +4,7 @@ import {
   CommandResponse,
   AbilityGrade,
   StoryLore,
+  REST_CONFIG,
 } from "@/app/misc/structs";
 import { getRPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
@@ -399,6 +400,29 @@ ${
       })()
     : "";
 
+  // Build rest state section - show available rests
+  const difficulty = storyData.difficulty || "medium";
+  const restConfig = REST_CONFIG[difficulty];
+  const restState = storyData.restState || {
+    quickRestsUsed: 0,
+    shortRestsUsed: 0,
+  };
+  const remainingQuick = restConfig.maxQuickRests - restState.quickRestsUsed;
+  const remainingShort = restConfig.maxShortRests - restState.shortRestsUsed;
+
+  // Only show rest section if rests are limited (not all available)
+  const restStateSection =
+    restState.quickRestsUsed > 0 || restState.shortRestsUsed > 0
+      ? `## Rest Availability
+- Quick Rests: ${remainingQuick}/${restConfig.maxQuickRests} remaining
+- Short Rests: ${remainingShort}/${restConfig.maxShortRests} remaining
+${
+  remainingQuick === 0 && remainingShort === 0
+    ? "⚠️ Long rest required to restore rest uses"
+    : ""
+}`
+      : "";
+
   // Build variables section if any exist - clean, simple format
   const variablesSection =
     storyData.variables && storyData.variables.length > 0
@@ -452,6 +476,7 @@ ${
     questsSection,
     variablesSection,
     activeChallengeSection,
+    restStateSection,
     agmtSection,
     customTablesSection,
     storyData.author_notes
@@ -785,6 +810,27 @@ Manage complex multi-step tasks using the Challenge Tools.
    - Challenges automatically resolve when either side reaches majority:
      - First to \`Math.ceil(rounds / 2)\` wins. For Best of 5, first to 3.
    - Use \`resolve_challenge\` only for non-standard endings (enemy surrenders, rescue arrives, player retreats).
+
+## REST SYSTEM
+Allow players to rest and recover when narratively appropriate.
+
+**Rest Types:**
+- **Quick Rest (~30 min):** Brief break to catch breath. Recovers 5-15% resources, reduces cooldowns slightly. Use between encounters.
+- **Short Rest (4-8 hours):** Sleep or extended rest. Recovers 30-60% resources, resets most cooldowns, heals minor conditions, repairs items slightly. Use at safe camps or inns.
+- **Long Rest (several days):** Extended downtime/time skip. Full recovery, all cooldowns reset, conditions improve significantly, items fully repaired. Resets quick/short rest counters.
+
+**When to Call \`take_rest\`:**
+- Player explicitly requests rest, sleep, or recovery time
+- Narrative reaches a natural pause (safe haven, end of major event, travel montage)
+- Player is injured/exhausted and seeks shelter
+
+**When NOT to Rest:**
+- During active combat or challenges
+- In immediate danger
+- When quick/short rest limits are exhausted (player needs long rest)
+
+**Long Rest Confirmation:**
+Long rests involve a time skip of several days. The AI should narratively describe the passage of time and what happens during the rest period.
 
 Think through the narrative sentence-by-sentence, then execute the required Tool Calls.
 

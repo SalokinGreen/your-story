@@ -384,6 +384,22 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - Guidelines: Simple tasks = regular skill check, dangerous combat/chase = 3/3, boss fight = 5+ successes
   - Story prompt adapts based on challenge progress: low (initial clash), mid (tide turning), completed (conclusion)
   - ActionAnalysis includes challenge_handling field: { is_complex_event, challenge_name } for detecting when to start challenges
+- **Rest System**:
+  - Three rest types: quick (~30 min), short (4-8 hours sleep), long (several days time skip)
+  - RestState interface: quickRestsUsed, shortRestsUsed, lastRestType, lastRestTimestamp
+  - REST_CONFIG in structs.ts: Difficulty-scaled recovery amounts and rest limits
+  - Recovery effects by rest type:
+    - Resources: quick 5-15%, short 30-60%, long 100% of max
+    - Cooldowns: quick -1, short -3 or full reset, long full reset
+    - Conditions: short downgrades tier 1-2 by 1, long downgrades all non-permanent by 1-2
+    - Items: short repairs 5-25%, long repairs 50-100%
+    - Stress (YZE): quick -0-2, short -1-5, long -5-10
+  - Rest limits per difficulty (recharge on long rest):
+    - Easy: 4 quick, 3 short
+    - Medium: 3 quick, 2 short
+    - Hard: 2 quick, 2 short
+    - Expert: 2 quick, 1 short
+  - AI tool: take_rest({ type, narrative_summary }) - Cannot rest during active challenges
 - **Custom input**: handleCustomInput function allows free-form text submission to AI without predefined choices.
 - **Retry system**: handleRetry removes last AI response and regenerates with same context.
 - **TTS Integration**: Auto-generate narration clears old audio on text change, triggers handlePlay after 500ms delay when enabled.

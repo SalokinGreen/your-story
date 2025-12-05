@@ -3105,8 +3105,6 @@ function StoryPageContent() {
     let itemGradeBonus = 0;
     let itemGradeLabel = ""; // Track grade label before item might be removed
     let itemType = "normal"; // Track item type before removal
-    let resourceUsedBefore = 0;
-    let resourceUsedAfter = 0;
     let insufficientResource = false;
     let skillCheckResult = "";
 
@@ -3397,8 +3395,6 @@ function StoryPageContent() {
         const dc = choice.skill_dc || 0;
         const resourceReqs = calculateResourceRequirements(rpgSystem, dc);
         const requiredAmount = resourceReqs.required;
-
-        resourceUsedBefore = matchedResource.value;
 
         //Check if player has enough resource
         if (matchedResource.value < requiredAmount) {
@@ -4360,15 +4356,6 @@ function StoryPageContent() {
           : "";
       choiceDetails.push(
         `[Ability Used: ${abilityUsed.name}${abilityGradeLabel}${bonusText}${costsText}${cooldownText}]`
-      );
-    }
-
-    //Buildresourceusageline(includesanyadditionallossfromfailure)
-    if (choice.resource_used && resourceUsedBefore > 0 && matchedResource) {
-      const maxValue = matchedResource.maxValue || 100;
-      const currentValue = matchedResource.value || 0;
-      choiceDetails.push(
-        `[Resource: ${matchedResource.name} used; ${resourceUsedBefore} -> ${currentValue}/${maxValue}]`
       );
     }
 
