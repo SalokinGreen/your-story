@@ -1289,7 +1289,7 @@ JSON STRUCTURE:
 {
   "action_summary": "Objective description of intent (e.g., 'Attack guard with Longsword')",
   "skill_used": "Exact Stat Name" OR null,
-  "skill_dc": Number (10=Easy, 15=Med, 20=Hard, 25=Very Hard) OR null,
+  "skill_dc": Tier name ("trivial" | "easy" | "average" | "hard" | "very_hard" | "impossible") OR null,
   "item_used": "Exact Item Name" OR null,
   "ability_used": "Exact Ability Name" OR null,
   "resource_used": "Exact Resource Name" OR null,
@@ -1301,6 +1301,14 @@ JSON STRUCTURE:
     "challenge_name": "Descriptive name" OR null (e.g., "Battle with the Bandits", "Escape the Collapsing Mine")
   }
 }
+
+DC TIER GUIDELINES:
+- "trivial": Routine task, almost automatic
+- "easy": Simple challenge, most succeed
+- "average": Standard difficulty, 50/50 chance  
+- "hard": Significant challenge, skill required
+- "very_hard": Extreme difficulty, only skilled succeed
+- "impossible": Near-impossible, requires exceptional luck
 
 COMPLEX EVENTS VS SIMPLE ACTIONS:
 - If the player attempts something HUGE that cannot resolve in one roll (e.g., "Fight the whole bandit camp", "Climb the infinite tower", "Convince the King to abdicate"), do NOT resolve it in one roll.

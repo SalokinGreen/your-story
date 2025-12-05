@@ -842,13 +842,13 @@ const DURATION_MULTIPLIERS: Record<"short" | "medium" | "long", number> = {
 // RPG System descriptions for context
 const RPG_SYSTEM_DESCRIPTIONS: Record<RPGSystemType, string> = {
   "3d6":
-    "3d6 system (3-18 range, bell curve, 10-11 average). DCs: Easy 8, Medium 11, Hard 14, Expert 17.",
+    "3d6 system (3-18 range, bell curve). Use tier names for difficulty: trivial, easy, average, hard, very_hard, impossible.",
   "1d20":
-    "D20 system (1-20 flat probability). DCs: Easy 10, Medium 15, Hard 20, Expert 25.",
+    "D20 system (1-20 flat probability). Use tier names for difficulty: trivial, easy, average, hard, very_hard, impossible.",
   "1d100":
-    "Percentile system (1-100, roll under stat). Easy +20, Medium +0, Hard -20, Expert -40 modifiers.",
+    "Percentile system (1-100). Use tier names for difficulty: trivial, easy, average, hard, very_hard, impossible.",
   percentile:
-    "Percentile system (1-100, roll under stat). Easy +20, Medium +0, Hard -20, Expert -40 modifiers.",
+    "Percentile system (1-100). Use tier names for difficulty: trivial, easy, average, hard, very_hard, impossible.",
   pbta: "Powered by the Apocalypse (2d6+mod). 6-: fail, 7-9: partial, 10+: success, 12+: critical.",
   fate: "Fate system (4dF, -4 to +4). Ladder: -2 Terrible, 0 Mediocre, +2 Fair, +4 Great, +6 Fantastic.",
   yze: "Year Zero Engine (d6 dice pool, 6s = successes). Includes stress dice and panic mechanics.",
@@ -1491,7 +1491,7 @@ Custom starting choices instead of "Start Story".
       "text": "string",
       "intro_override": "string (optional alternate intro)",
       "skill_used": "string (optional)",
-      "skill_dc": number (optional),
+      "skill_dc": "tier name: trivial|easy|average|hard|very_hard|impossible (optional)",
       "resource_used": "string (optional)",
       "item_used": "string (optional)"
     }

@@ -278,7 +278,7 @@ You can control how items in arrays are applied using the **_command** field:
   - text: The choice text displayed to player (required)
   - intro_override: Optional alternate intro text for this path (if empty, uses main intro)
   - skill_used: Optional skill name for skill check on this choice
-  - skill_dc: DC (difficulty) for the skill check (required if skill_used is set)
+  - skill_dc: Difficulty tier ("trivial" | "easy" | "average" | "hard" | "very_hard" | "impossible") for the skill check (required if skill_used is set)
   - resource_used: Optional resource name for resource cost
   - item_used: Optional item name that this choice requires
   - item_loss: Boolean - whether the item is consumed when used (default false)
@@ -614,13 +614,13 @@ Assistant:
     {
       "text": "Sneak through the shadows",
       "skill_used": "Stealth",
-      "skill_dc": 60,
+      "skill_dc": "hard",
       "intro_override": "You slip into the darkness, your footsteps silent on the cold stone floor..."
     },
     {
       "text": "Fight your way through",
       "skill_used": "Strength",
-      "skill_dc": 55
+      "skill_dc": "average"
     },
     {
       "text": "Use your disguise to blend in",
