@@ -27,6 +27,18 @@ interface ProfileData {
   bio?: string;
 }
 
+interface ActivityItem {
+  id: string;
+  type: "comment" | "rating" | "adventure_created" | "adventure_updated";
+  timestamp: string;
+  data: {
+    adventureId?: string;
+    adventureTitle?: string;
+    content?: string;
+    rating?: number;
+  };
+}
+
 export default function ProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -43,6 +55,10 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<"adventures" | "activity">(
     "adventures"
   );
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [activityPage, setActivityPage] = useState(1);
+  const [hasMoreActivities, setHasMoreActivities] = useState(false);
 
   const userId = params?.userId as string;
   const isOwnProfile = currentUser?.id === userId;
@@ -165,9 +181,162 @@ export default function ProfilePage() {
     }
   };
 
+  const loadActivities = async (page: number = 1, append: boolean = false) => {
+    setLoadingActivities(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`/api/activity/${userId}?page=${page}&limit=15`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      if (response.ok) {
+        const { activities: userActivities, pagination } = await response.json();
+        if (append) {
+          setActivities(prev => [...prev, ...userActivities]);
+        } else {
+          setActivities(userActivities);
+        }
+        setActivityPage(page);
+        setHasMoreActivities(pagination.hasMore);
+      }
+    } catch (error) {
+      console.error("Error loading activities:", error);
+    } finally {
+      setLoadingActivities(false);
+    }
+  };
+
+  const loadMoreActivities = () => {
+    if (!loadingActivities && hasMoreActivities) {
+      loadActivities(activityPage + 1, true);
+    }
+  };
+
+  // Load activities when switching to activity tab
+  useEffect(() => {
+    if (activeTab === "activity" && activities.length === 0 && !loadingActivities) {
+      loadActivities(1, false);
+    }
+  }, [activeTab]);
+
   const handleRefresh = () => {
     loadProfile();
     loadAdventures();
+    if (activeTab === "activity") {
+      setActivities([]);
+      setActivityPage(1);
+      loadActivities(1, false);
+    }
+  };
+
+  const formatActivityTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getActivityIcon = (type: ActivityItem["type"]) => {
+    switch (type) {
+      case "comment":
+        return "MessageCircle";
+      case "rating":
+        return "Star";
+      case "adventure_created":
+        return "Plus";
+      case "adventure_updated":
+        return "Edit";
+      default:
+        return "Activity";
+    }
+  };
+
+  const getActivityColor = (type: ActivityItem["type"]) => {
+    switch (type) {
+      case "comment":
+        return "text-blue-400";
+      case "rating":
+        return "text-yellow-400";
+      case "adventure_created":
+        return "text-green-400";
+      case "adventure_updated":
+        return "text-purple-400";
+      default:
+        return "text-blue-200";
+    }
+  };
+
+  const getActivityText = (activity: ActivityItem) => {
+    switch (activity.type) {
+      case "comment":
+        return (
+          <>
+            commented on{" "}
+            <button
+              onClick={() => router.push(`/explorer/${activity.data.adventureId}`)}
+              className="font-medium text-blue-400 hover:underline"
+            >
+              {activity.data.adventureTitle}
+            </button>
+          </>
+        );
+      case "rating":
+        return (
+          <>
+            rated{" "}
+            <button
+              onClick={() => router.push(`/explorer/${activity.data.adventureId}`)}
+              className="font-medium text-blue-400 hover:underline"
+            >
+              {activity.data.adventureTitle}
+            </button>
+            {" "}
+            <span className="text-yellow-400">
+              {"★".repeat(activity.data.rating || 0)}
+              {"☆".repeat(5 - (activity.data.rating || 0))}
+            </span>
+          </>
+        );
+      case "adventure_created":
+        return (
+          <>
+            created{" "}
+            <button
+              onClick={() => router.push(`/explorer/${activity.data.adventureId}`)}
+              className="font-medium text-blue-400 hover:underline"
+            >
+              {activity.data.adventureTitle}
+            </button>
+          </>
+        );
+      case "adventure_updated":
+        return (
+          <>
+            updated{" "}
+            <button
+              onClick={() => router.push(`/explorer/${activity.data.adventureId}`)}
+              className="font-medium text-blue-400 hover:underline"
+            >
+              {activity.data.adventureTitle}
+            </button>
+          </>
+        );
+      default:
+        return "did something";
+    }
   };
 
   if (authLoading || loading) {
@@ -456,13 +625,74 @@ export default function ProfilePage() {
 
         {activeTab === "activity" && (
           <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
-            <div className="text-center py-8">
-              <DynamicIcon
-                name="Activity"
-                className="w-12 h-12 text-blue-200/20 mx-auto mb-3"
-              />
-              <p className="text-blue-200/40">Activity feed coming soon</p>
-            </div>
+            {loadingActivities ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-400 border-t-transparent"></div>
+              </div>
+            ) : activities.length === 0 ? (
+              <div className="text-center py-8">
+                <DynamicIcon
+                  name="Activity"
+                  className="w-12 h-12 text-blue-200/20 mx-auto mb-3"
+                />
+                <p className="text-blue-200/40">
+                  {isOwnProfile
+                    ? "No activity yet. Create an adventure or leave a comment to get started!"
+                    : "This user hasn't had any public activity yet."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {activities.map((activity) => (
+                  <div
+                    key={activity.id}
+                    className="flex items-start gap-3 p-3 bg-blue-900/30 rounded-lg border border-blue-800/20"
+                  >
+                    <div
+                      className={`p-2 rounded-lg bg-blue-950/50 ${getActivityColor(
+                        activity.type
+                      )}`}
+                    >
+                      <DynamicIcon
+                        name={getActivityIcon(activity.type)}
+                        className="w-4 h-4"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-blue-100">
+                        {getActivityText(activity)}
+                      </p>
+                      {activity.type === "comment" && activity.data.content && (
+                        <p className="text-xs text-blue-200/50 mt-1 line-clamp-2">
+                          &ldquo;{activity.data.content}&rdquo;
+                        </p>
+                      )}
+                      <p className="text-xs text-blue-200/30 mt-1">
+                        {formatActivityTime(activity.timestamp)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Load More Button */}
+                {hasMoreActivities && (
+                  <button
+                    onClick={loadMoreActivities}
+                    disabled={loadingActivities}
+                    className="w-full py-2 mt-2 text-sm font-medium text-blue-300 hover:text-blue-100 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-800/30 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {loadingActivities ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-400 border-t-transparent"></div>
+                        Loading...
+                      </span>
+                    ) : (
+                      "Load More"
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 

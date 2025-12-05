@@ -182,6 +182,16 @@ export default function StoryCreativeAssistant({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Scroll to bottom when modal opens (for existing chat history)
+  useEffect(() => {
+    if (isOpen && messages.length > 0) {
+      // Small delay to ensure DOM is rendered
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      }, 50);
+    }
+  }, [isOpen]);
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 

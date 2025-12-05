@@ -235,13 +235,11 @@ export async function POST(req: NextRequest) {
         cleanText.substring(0, 100) + (cleanText.length > 100 ? "..." : ""),
     });
 
-    // Generate speech for each chunk
-    const audioBuffers: ArrayBuffer[] = [];
+    // Generate speech for each chunk in parallel
     const endpoint = isOrpheus ? ORPHEUS_ENDPOINT : KOKORO_ENDPOINT;
 
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-
+    // Process chunks in parallel for faster generation
+    const chunkPromises = chunks.map(async (chunk, i) => {
       try {
         // Build request body based on model
         // Orpheus: uses "response_format", "max_tokens" (default 2000, max 4096)
@@ -276,20 +274,11 @@ export async function POST(req: NextRequest) {
           });
 
           if (response.status === 429) {
-            return NextResponse.json(
-              {
-                error:
-                  "TTS rate limit reached. Please wait a moment before trying again.",
-              },
-              { status: 429 }
-            );
+            throw new Error("RATE_LIMIT");
           }
 
           if (response.status === 401 || response.status === 403) {
-            return NextResponse.json(
-              { error: "TTS authentication failed." },
-              { status: response.status }
-            );
+            throw new Error("AUTH_FAILED");
           }
 
           throw new Error(
@@ -304,7 +293,6 @@ export async function POST(req: NextRequest) {
           hasAudio: !!data.audio,
           audioLength: data.audio?.length,
           output_format: data.output_format,
-          first20CharsOfAudio: data.audio?.substring(0, 20),
         });
 
         // DeepInfra returns audio as a data URL (data:audio/mp3;base64,...)
@@ -317,48 +305,68 @@ export async function POST(req: NextRequest) {
 
           const audioBuffer = Buffer.from(base64Data, "base64");
 
-          // Log first bytes to verify format
-          const headerBytes = Array.from(
-            new Uint8Array(
-              audioBuffer.buffer.slice(
-                audioBuffer.byteOffset,
-                audioBuffer.byteOffset + 8
-              )
-            )
-          )
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join(" ");
-          console.log(`TTS chunk ${i + 1} header bytes: ${headerBytes}`);
-
-          audioBuffers.push(
-            audioBuffer.buffer.slice(
-              audioBuffer.byteOffset,
-              audioBuffer.byteOffset + audioBuffer.byteLength
-            )
-          );
           console.log(
             `TTS chunk ${i + 1}/${chunks.length} complete (${
               chunk.length
-            } chars, format: ${data.output_format || "unknown"}, size: ${
-              audioBuffer.byteLength
-            })`
+            } chars, size: ${audioBuffer.byteLength})`
           );
+
+          return {
+            index: i,
+            buffer: audioBuffer.buffer.slice(
+              audioBuffer.byteOffset,
+              audioBuffer.byteOffset + audioBuffer.byteLength
+            ),
+          };
         } else {
           console.error(`No audio data for chunk ${i + 1}/${chunks.length}`, {
             output_format: data.output_format,
             inference_status: data.inference_status,
-            hasAudio: !!data.audio,
           });
+          return { index: i, buffer: null };
         }
       } catch (chunkError: unknown) {
         console.error(`Error processing chunk ${i + 1}:`, chunkError);
-        // If first chunk fails, abort
-        if (i === 0) {
-          throw chunkError;
+        // Re-throw rate limit and auth errors to stop all processing
+        if (chunkError instanceof Error) {
+          if (chunkError.message === "RATE_LIMIT" || chunkError.message === "AUTH_FAILED") {
+            throw chunkError;
+          }
         }
-        // Continue with other chunks if one fails
+        return { index: i, buffer: null, error: chunkError };
       }
+    });
+
+    // Wait for all chunks to complete
+    let results: { index: number; buffer: ArrayBuffer | null; error?: unknown }[];
+    try {
+      results = await Promise.all(chunkPromises);
+    } catch (parallelError: unknown) {
+      if (parallelError instanceof Error) {
+        if (parallelError.message === "RATE_LIMIT") {
+          return NextResponse.json(
+            {
+              error:
+                "TTS rate limit reached. Please wait a moment before trying again.",
+            },
+            { status: 429 }
+          );
+        }
+        if (parallelError.message === "AUTH_FAILED") {
+          return NextResponse.json(
+            { error: "TTS authentication failed." },
+            { status: 403 }
+          );
+        }
+      }
+      throw parallelError;
     }
+
+    // Sort results by index and extract buffers (maintaining order)
+    const audioBuffers: ArrayBuffer[] = results
+      .sort((a, b) => a.index - b.index)
+      .filter((r) => r.buffer !== null)
+      .map((r) => r.buffer as ArrayBuffer);
 
     // Check if we got any audio
     if (audioBuffers.length === 0) {

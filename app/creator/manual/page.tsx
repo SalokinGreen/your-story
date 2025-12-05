@@ -1295,7 +1295,7 @@ function AdventureCreatorContent() {
         setDescription(adventure.description || "");
         setDifficulty(adventure.difficulty || "medium");
         setRpgSystem(adventure.storyTemplate?.rpgSystem || "3d6");
-        setVisibility(adventure.visibility || "public");
+        setVisibility(adventure.visibility || "private");
         setNsfw(adventure.nsfw || false);
         setTags(adventure.tags || []);
         setThumbnailUrl(adventure.thumbnailUrl || "");
@@ -3025,9 +3025,6 @@ ${description || ""}`;
           window.localStorage.removeItem(draftKey);
         }
       }
-
-      // Navigate to library to see the saved adventure
-      router.push("/library");
     } catch (error: any) {
       console.error("Error saving locally:", error);
       addNotification(`Failed to save locally: ${error.message}`, "failure");
@@ -3220,8 +3217,12 @@ ${description || ""}`;
 
       addNotification("Adventure saved to database successfully!", "success");
 
-      // Navigate to the database version
-      router.push(`/creator/manual?edit=${adventure.id}`);
+      // Update URL to the database version (stay on page for quicksaves)
+      window.history.replaceState(
+        null,
+        "",
+        `/creator/manual?edit=${adventure.id}`
+      );
     } catch (error) {
       console.error("Error uploading adventure:", error);
       addNotification(
@@ -3410,8 +3411,16 @@ ${description || ""}`;
         console.error("Failed to clear creator draft", err);
       }
 
+      // If this was a new adventure, update URL to edit mode (stay on page for quicksaves)
+      if (!isEditing) {
+        window.history.replaceState(
+          null,
+          "",
+          `/creator/manual?edit=${adventure.id}`
+        );
+      }
+
       setSaving(false);
-      router.push(`/explorer/${adventure.id}`);
     } catch (error: any) {
       console.error("Error saving adventure:", error);
       addNotification(`Failed to save: ${error.message}`, "failure");
