@@ -17,6 +17,7 @@ import {
   getUserSettings,
   updateUserSettings,
   CustomModel,
+  AIConfig,
 } from "@/app/misc/user_settings";
 import { supabase } from "@/app/misc/supabase";
 import SamplingSettingsTab from "./SamplingSettingsTab";
@@ -171,7 +172,7 @@ export default function AIConfigTab() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
 
-  // Load settings from Supabase
+  // Load settings from Supabase (custom models + AI config)
   useEffect(() => {
     if (user && !hasLoadedSettings) {
       setIsLoadingSettings(true);
@@ -179,6 +180,41 @@ export default function AIConfigTab() {
         .then((settings) => {
           if (settings) {
             setCustomModels(settings.custom_models || []);
+
+            // Load AI config from cloud (overrides localStorage)
+            if (settings.ai_config) {
+              const config = settings.ai_config;
+              if (config.currentPreset) {
+                setCurrentPreset(config.currentPreset);
+                localStorage.setItem("aiPreset", config.currentPreset);
+              }
+              if (config.storyModel !== undefined) {
+                setStoryModel(config.storyModel);
+                localStorage.setItem("aiModelStory", config.storyModel);
+              }
+              if (config.toolsModel !== undefined) {
+                setToolsModel(config.toolsModel);
+                localStorage.setItem("aiModelTools", config.toolsModel);
+              }
+              if (config.choicesModel !== undefined) {
+                setChoicesModel(config.choicesModel);
+                localStorage.setItem("aiModelChoices", config.choicesModel);
+              }
+              if (config.customMaxContext !== undefined) {
+                setCustomMaxContext(config.customMaxContext);
+                localStorage.setItem(
+                  "customMaxContext",
+                  config.customMaxContext.toString()
+                );
+              }
+              if (config.customMaxOutput !== undefined) {
+                setCustomMaxOutput(config.customMaxOutput);
+                localStorage.setItem(
+                  "customMaxOutput",
+                  config.customMaxOutput.toString()
+                );
+              }
+            }
           }
           setHasLoadedSettings(true);
         })
@@ -276,6 +312,26 @@ export default function AIConfigTab() {
 
   const estimatedCost = Math.max(0, baseEstimatedCost - novelaiSavings);
 
+  // Auto-sync AI config to cloud when preset changes
+  const syncAIConfig = async (presetToSync?: string) => {
+    if (!user) return;
+
+    const aiConfig: AIConfig = {
+      currentPreset: presetToSync || currentPreset,
+      storyModel: storyModel || undefined,
+      toolsModel: toolsModel || undefined,
+      choicesModel: choicesModel || undefined,
+      customMaxContext:
+        customMaxContext !== 36000 ? customMaxContext : undefined,
+      customMaxOutput: customMaxOutput !== 4000 ? customMaxOutput : undefined,
+    };
+
+    // Fire and forget - don't block UI
+    updateUserSettings(user.id, { ai_config: aiConfig }, supabase).catch(
+      (err) => console.error("Failed to sync AI config:", err)
+    );
+  };
+
   const handlePresetChange = (newPreset: string) => {
     if (typeof window !== "undefined") {
       localStorage.setItem("aiPreset", newPreset);
@@ -284,6 +340,8 @@ export default function AIConfigTab() {
         `Preset changed to ${MODEL_PRESETS[newPreset].name}`,
         "success"
       );
+      // Auto-sync to cloud
+      syncAIConfig(newPreset);
     }
   };
 
@@ -382,9 +440,20 @@ export default function AIConfigTab() {
     if (!user) return;
     setIsSaving(true);
 
+    // Build AI config object
+    const aiConfig: AIConfig = {
+      currentPreset,
+      storyModel: storyModel || undefined,
+      toolsModel: toolsModel || undefined,
+      choicesModel: choicesModel || undefined,
+      customMaxContext:
+        customMaxContext !== 36000 ? customMaxContext : undefined,
+      customMaxOutput: customMaxOutput !== 4000 ? customMaxOutput : undefined,
+    };
+
     const { error } = await updateUserSettings(
       user.id,
-      { custom_models: customModels },
+      { custom_models: customModels, ai_config: aiConfig },
       supabase
     );
 
@@ -393,7 +462,7 @@ export default function AIConfigTab() {
     if (error) {
       addNotification("Failed to save settings", "failure");
     } else {
-      addNotification("Settings saved successfully!", "success");
+      addNotification("AI presets synced to your account!", "success");
     }
   };
 

@@ -71,7 +71,7 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
   // Also check for partial matches at the beginning (streaming might have slight variations)
   // Look for the marker that ends the affirmation
   const storyMarker = "NO meta-text.";
-  const toolsMarker = "Thinking Process:";
+  const toolsMarker = "step-by-step.";
   const choicesMarker = "Generating choices:";
 
   for (const marker of [storyMarker, toolsMarker, choicesMarker]) {
@@ -622,12 +622,27 @@ export async function generateStoryTurn(
     // Strip [STOP] marker if the model added it (from following affirmation too literally)
     storyContent = storyContent.replace(/\s*\[STOP\]\s*$/i, "").trimEnd();
 
+    // Strip trailing meta-blocks that start with dividers (---, ***) followed by bracketed content
+    // Patterns like: "--- [GM State Update] ..." or "--- *[STOP – Player must choose...]*"
+    storyContent = storyContent
+      .replace(
+        /\n*[-*_]{3,}\s*\*?\[(?:GM State Update|STOP)[^\]]*\][\s\S]*$/i,
+        ""
+      )
+      .trimEnd();
+
     // Strip leading dividers (---, ***, ___) that the model might add
     // Loop to handle multiple dividers or whitespace-separated dividers
     while (/^[\s\n]*([-*_]{3,})/.test(storyContent)) {
       storyContent = storyContent.replace(/^[\s\n]*([-*_]{3,})[\s\n]*/, "");
     }
     storyContent = storyContent.trimStart();
+
+    // Strip trailing dividers (---, ***, ___) that the model might add
+    while (/[-*_]{3,}[\s\n]*$/.test(storyContent)) {
+      storyContent = storyContent.replace(/[\s\n]*([-*_]{3,})[\s\n]*$/, "");
+    }
+    storyContent = storyContent.trimEnd();
 
     // Strip [GM State Update] blocks that the model might echo from history
     // These appear as "[GM State Update]" followed by bullet points until a double newline or end
@@ -708,7 +723,7 @@ export async function generateStoryTurn(
                 messages: toolPrompt.messages,
                 tools: TOOL_SCHEMAS,
                 model: currentModel,
-                maxTokens: Math.min(options.customMaxOutput || 4000, 4000), // Cap tools at 4K
+                maxTokens: Math.min(options.customMaxOutput || 6000, 6000), // Cap tools at 6K
                 temperature: 0.3,
                 openRouterKey: options.openRouterKey,
                 deepseekKey: options.deepseekKey,

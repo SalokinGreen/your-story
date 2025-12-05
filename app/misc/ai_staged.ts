@@ -36,9 +36,7 @@ export const TOOLS_AFFIRMATION = `Understood. I will audit the narrative for gam
 - **Accuracy:** I will use EXACT string matching for items, stats, and quest names.
 - **Challenges:** I will detect new conflicts to \`start_challenge\` and update existing ones based on the Action Result.
 - **Consequences:** I will apply \`add_condition\` or \`update_resource\` if the story implies injury or exertion.
-- **Syntax:** I will call the necessary tools step-by-step.
-
-Thinking Process:`;
+- **Syntax:** I will call the necessary tools step-by-step.`;
 
 export const CHOICES_AFFIRMATION = `Understood. I will generate player choices following these rules:
 - **Format:** Plain list with dashes, one choice per line.

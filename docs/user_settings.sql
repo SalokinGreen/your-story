@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
     is_subscriber BOOLEAN DEFAULT false,
     save_stories_locally BOOLEAN DEFAULT false,
     custom_models JSONB DEFAULT '[]',
+    ai_config JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -38,6 +39,13 @@ BEGIN
                    AND table_name = 'user_settings' 
                    AND column_name = 'custom_models') THEN
         ALTER TABLE public.user_settings ADD COLUMN custom_models JSONB DEFAULT '[]';
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_schema = 'public' 
+                   AND table_name = 'user_settings' 
+                   AND column_name = 'ai_config') THEN
+        ALTER TABLE public.user_settings ADD COLUMN ai_config JSONB DEFAULT '{}';
     END IF;
     
     -- Migrate old custom_model_config to custom_models array if column exists

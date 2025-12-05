@@ -10,12 +10,22 @@ export interface CustomModel {
   outputPrice?: number; // Price per million output tokens (optional, defaults to 0 for BYOK)
 }
 
+export interface AIConfig {
+  currentPreset: string; // The currently selected preset (e.g., "main", "fast", "custom")
+  storyModel?: string; // Custom story model (used when preset is "custom")
+  toolsModel?: string; // Custom tools model
+  choicesModel?: string; // Custom choices model
+  customMaxContext?: number; // Custom max context size
+  customMaxOutput?: number; // Custom max output tokens
+}
+
 export interface UserSettings {
   user_id: string;
   byok_enabled: boolean;
   is_subscriber: boolean;
   save_stories_locally?: boolean;
   custom_models?: CustomModel[]; // Array of custom models
+  ai_config?: AIConfig; // AI preset configuration
 }
 
 export async function getUserSettings(
@@ -100,6 +110,9 @@ export async function updateUserSettings(
   if (settings.custom_models !== undefined) {
     // Convert undefined to empty array for JSONB field
     updateData.custom_models = settings.custom_models || [];
+  }
+  if (settings.ai_config !== undefined) {
+    updateData.ai_config = settings.ai_config || {};
   }
 
   let error;
