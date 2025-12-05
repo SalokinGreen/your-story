@@ -328,6 +328,9 @@ function CreateCharacterContent() {
         resources: finalResources,
         inventory: finalInventory,
         selected_preset: "custom",
+        points: 0, // Reset XP to 0 (character creation points were used for allocation)
+        level: 1,
+        upgradesSpent: 0,
         scene: {
           parts: [
             {

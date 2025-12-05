@@ -8,6 +8,8 @@ import {
   Stat,
   Resource,
   Ability,
+  AbilityGrade,
+  AbilityCost,
 } from "../misc/structs";
 import {
   createEmptyTree,
@@ -16,6 +18,7 @@ import {
 } from "../misc/skillTree";
 import { DynamicIcon } from "./DynamicIcon";
 import { IconPicker } from "./IconPicker";
+import { ABILITY_GRADE_CONFIG } from "../misc/abilitySystem";
 
 interface SkillTreeEditorProps {
   tree: SkillTree;
@@ -760,6 +763,17 @@ export default function SkillTreeEditor({
                           editingNode.type === "resource"
                             ? 5
                             : undefined,
+                        // Initialize abilityData for grant_ability effects
+                        abilityData:
+                          editingNode.type === "ability"
+                            ? {
+                                name: "",
+                                description: "",
+                                grade: "novice" as AbilityGrade,
+                                cost: [] as AbilityCost[],
+                                symbol: "Sparkles",
+                              }
+                            : undefined,
                       };
                       setEditingNode({
                         ...editingNode,
@@ -782,9 +796,22 @@ export default function SkillTreeEditor({
                         value={effect.type}
                         onChange={(e) => {
                           const newEffects = [...editingNode.effects];
+                          const newType = e.target
+                            .value as SkillNodeEffect["type"];
                           newEffects[idx] = {
                             ...effect,
-                            type: e.target.value as SkillNodeEffect["type"],
+                            type: newType,
+                            // Initialize abilityData when switching to grant_ability
+                            abilityData:
+                              newType === "grant_ability" && !effect.abilityData
+                                ? {
+                                    name: effect.target || "",
+                                    description: "",
+                                    grade: "novice" as AbilityGrade,
+                                    cost: [] as AbilityCost[],
+                                    symbol: "Sparkles",
+                                  }
+                                : effect.abilityData,
                           };
                           setEditingNode({
                             ...editingNode,
@@ -852,28 +879,379 @@ export default function SkillTreeEditor({
                       )}
 
                       {effect.type === "grant_ability" && (
-                        <select
-                          value={effect.target}
-                          onChange={(e) => {
-                            const newEffects = [...editingNode.effects];
-                            newEffects[idx] = {
-                              ...effect,
-                              target: e.target.value,
-                            };
-                            setEditingNode({
-                              ...editingNode,
-                              effects: newEffects,
-                            });
-                          }}
-                          className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm flex-1"
-                        >
-                          <option value="">Select Ability</option>
-                          {availableAbilities.map((ability) => (
-                            <option key={ability.name} value={ability.name}>
-                              {ability.name}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="w-full mt-2 p-3 bg-gray-800 rounded-lg border border-purple-700/50 space-y-3">
+                          <div className="text-xs text-purple-400 font-medium mb-2">
+                            Define Ability to Grant
+                          </div>
+
+                          {/* Name and Symbol Row */}
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={
+                                effect.abilityData?.name || effect.target || ""
+                              }
+                              onChange={(e) => {
+                                const newEffects = [...editingNode.effects];
+                                const currentAbility = effect.abilityData || {
+                                  name: "",
+                                  description: "",
+                                  grade: "novice" as AbilityGrade,
+                                  cost: [] as AbilityCost[],
+                                  symbol: "Sparkles",
+                                };
+                                newEffects[idx] = {
+                                  ...effect,
+                                  target: e.target.value,
+                                  abilityData: {
+                                    ...currentAbility,
+                                    name: e.target.value,
+                                  },
+                                };
+                                setEditingNode({
+                                  ...editingNode,
+                                  effects: newEffects,
+                                });
+                              }}
+                              className="flex-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                              placeholder="Ability name"
+                            />
+                            <IconPicker
+                              value={effect.abilityData?.symbol || "Sparkles"}
+                              onChange={(icon) => {
+                                const newEffects = [...editingNode.effects];
+                                const currentAbility = effect.abilityData || {
+                                  name: effect.target || "",
+                                  description: "",
+                                  grade: "novice" as AbilityGrade,
+                                  cost: [] as AbilityCost[],
+                                  symbol: "Sparkles",
+                                };
+                                newEffects[idx] = {
+                                  ...effect,
+                                  abilityData: {
+                                    ...currentAbility,
+                                    symbol: icon,
+                                  },
+                                };
+                                setEditingNode({
+                                  ...editingNode,
+                                  effects: newEffects,
+                                });
+                              }}
+                            />
+                          </div>
+
+                          {/* Description */}
+                          <textarea
+                            value={effect.abilityData?.description || ""}
+                            onChange={(e) => {
+                              const newEffects = [...editingNode.effects];
+                              const currentAbility = effect.abilityData || {
+                                name: effect.target || "",
+                                description: "",
+                                grade: "novice" as AbilityGrade,
+                                cost: [] as AbilityCost[],
+                                symbol: "Sparkles",
+                              };
+                              newEffects[idx] = {
+                                ...effect,
+                                abilityData: {
+                                  ...currentAbility,
+                                  description: e.target.value,
+                                },
+                              };
+                              setEditingNode({
+                                ...editingNode,
+                                effects: newEffects,
+                              });
+                            }}
+                            className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                            placeholder="Ability description"
+                            rows={2}
+                          />
+
+                          {/* Grade and Associated Stat */}
+                          <div className="flex gap-2">
+                            <select
+                              value={effect.abilityData?.grade || "novice"}
+                              onChange={(e) => {
+                                const newEffects = [...editingNode.effects];
+                                const currentAbility = effect.abilityData || {
+                                  name: effect.target || "",
+                                  description: "",
+                                  grade: "novice" as AbilityGrade,
+                                  cost: [] as AbilityCost[],
+                                  symbol: "Sparkles",
+                                };
+                                newEffects[idx] = {
+                                  ...effect,
+                                  abilityData: {
+                                    ...currentAbility,
+                                    grade: e.target.value as AbilityGrade,
+                                  },
+                                };
+                                setEditingNode({
+                                  ...editingNode,
+                                  effects: newEffects,
+                                });
+                              }}
+                              className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                            >
+                              {Object.entries(ABILITY_GRADE_CONFIG).map(
+                                ([key, config]) => (
+                                  <option
+                                    key={key}
+                                    value={key}
+                                    style={{ color: config.color }}
+                                  >
+                                    {config.label}
+                                  </option>
+                                )
+                              )}
+                            </select>
+                            <select
+                              value={effect.abilityData?.stat || ""}
+                              onChange={(e) => {
+                                const newEffects = [...editingNode.effects];
+                                const currentAbility = effect.abilityData || {
+                                  name: effect.target || "",
+                                  description: "",
+                                  grade: "novice" as AbilityGrade,
+                                  cost: [] as AbilityCost[],
+                                  symbol: "Sparkles",
+                                };
+                                newEffects[idx] = {
+                                  ...effect,
+                                  abilityData: {
+                                    ...currentAbility,
+                                    stat: e.target.value || undefined,
+                                  },
+                                };
+                                setEditingNode({
+                                  ...editingNode,
+                                  effects: newEffects,
+                                });
+                              }}
+                              className="flex-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                            >
+                              <option value="">No associated stat</option>
+                              {availableStats.map((stat) => (
+                                <option key={stat.name} value={stat.name}>
+                                  {stat.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Cooldown */}
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-400">
+                              Cooldown (turns):
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={effect.abilityData?.cooldown || 0}
+                              onChange={(e) => {
+                                const newEffects = [...editingNode.effects];
+                                const currentAbility = effect.abilityData || {
+                                  name: effect.target || "",
+                                  description: "",
+                                  grade: "novice" as AbilityGrade,
+                                  cost: [] as AbilityCost[],
+                                  symbol: "Sparkles",
+                                };
+                                newEffects[idx] = {
+                                  ...effect,
+                                  abilityData: {
+                                    ...currentAbility,
+                                    cooldown: parseInt(e.target.value) || 0,
+                                  },
+                                };
+                                setEditingNode({
+                                  ...editingNode,
+                                  effects: newEffects,
+                                });
+                              }}
+                              className="w-16 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                            />
+                          </div>
+
+                          {/* Ability Cost */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs text-gray-400">
+                                Usage Costs:
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newEffects = [...editingNode.effects];
+                                  const currentAbility = effect.abilityData || {
+                                    name: effect.target || "",
+                                    description: "",
+                                    grade: "novice" as AbilityGrade,
+                                    cost: [] as AbilityCost[],
+                                    symbol: "Sparkles",
+                                  };
+                                  newEffects[idx] = {
+                                    ...effect,
+                                    abilityData: {
+                                      ...currentAbility,
+                                      cost: [
+                                        ...(currentAbility.cost || []),
+                                        {
+                                          type: "resource",
+                                          name: "",
+                                          amount: 1,
+                                        },
+                                      ],
+                                    },
+                                  };
+                                  setEditingNode({
+                                    ...editingNode,
+                                    effects: newEffects,
+                                  });
+                                }}
+                                className="px-2 py-0.5 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded"
+                              >
+                                + Add Cost
+                              </button>
+                            </div>
+                            {(effect.abilityData?.cost || []).map(
+                              (costItem, costIdx) => (
+                                <div
+                                  key={costIdx}
+                                  className="flex gap-2 items-center"
+                                >
+                                  <select
+                                    value={costItem.type}
+                                    onChange={(e) => {
+                                      const newEffects = [
+                                        ...editingNode.effects,
+                                      ];
+                                      const currentAbility =
+                                        effect.abilityData!;
+                                      const newCosts = [...currentAbility.cost];
+                                      newCosts[costIdx] = {
+                                        ...costItem,
+                                        type: e.target.value as
+                                          | "resource"
+                                          | "variable",
+                                      };
+                                      newEffects[idx] = {
+                                        ...effect,
+                                        abilityData: {
+                                          ...currentAbility,
+                                          cost: newCosts,
+                                        },
+                                      };
+                                      setEditingNode({
+                                        ...editingNode,
+                                        effects: newEffects,
+                                      });
+                                    }}
+                                    className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs"
+                                  >
+                                    <option value="resource">Resource</option>
+                                    <option value="variable">Variable</option>
+                                  </select>
+                                  <input
+                                    type="text"
+                                    value={costItem.name}
+                                    onChange={(e) => {
+                                      const newEffects = [
+                                        ...editingNode.effects,
+                                      ];
+                                      const currentAbility =
+                                        effect.abilityData!;
+                                      const newCosts = [...currentAbility.cost];
+                                      newCosts[costIdx] = {
+                                        ...costItem,
+                                        name: e.target.value,
+                                      };
+                                      newEffects[idx] = {
+                                        ...effect,
+                                        abilityData: {
+                                          ...currentAbility,
+                                          cost: newCosts,
+                                        },
+                                      };
+                                      setEditingNode({
+                                        ...editingNode,
+                                        effects: newEffects,
+                                      });
+                                    }}
+                                    className="flex-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs"
+                                    placeholder={
+                                      costItem.type === "resource"
+                                        ? "Resource name"
+                                        : "Variable name"
+                                    }
+                                  />
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={costItem.amount}
+                                    onChange={(e) => {
+                                      const newEffects = [
+                                        ...editingNode.effects,
+                                      ];
+                                      const currentAbility =
+                                        effect.abilityData!;
+                                      const newCosts = [...currentAbility.cost];
+                                      newCosts[costIdx] = {
+                                        ...costItem,
+                                        amount: parseInt(e.target.value) || 1,
+                                      };
+                                      newEffects[idx] = {
+                                        ...effect,
+                                        abilityData: {
+                                          ...currentAbility,
+                                          cost: newCosts,
+                                        },
+                                      };
+                                      setEditingNode({
+                                        ...editingNode,
+                                        effects: newEffects,
+                                      });
+                                    }}
+                                    className="w-14 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newEffects = [
+                                        ...editingNode.effects,
+                                      ];
+                                      const currentAbility =
+                                        effect.abilityData!;
+                                      const newCosts =
+                                        currentAbility.cost.filter(
+                                          (_, i) => i !== costIdx
+                                        );
+                                      newEffects[idx] = {
+                                        ...effect,
+                                        abilityData: {
+                                          ...currentAbility,
+                                          cost: newCosts,
+                                        },
+                                      };
+                                      setEditingNode({
+                                        ...editingNode,
+                                        effects: newEffects,
+                                      });
+                                    }}
+                                    className="p-1 text-red-400 hover:text-red-300"
+                                  >
+                                    <DynamicIcon name="X" className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
                       )}
 
                       {(effect.type === "grant_item" ||

@@ -299,6 +299,9 @@ export default function AdventureDetailPage() {
           story_name: `${adventure.title} - ${new Date().toLocaleDateString()}`,
           player_name: user.user_metadata?.display_name || "Player",
           starting_choices: adventure.startingChoices,
+          points: 0, // Reset XP to 0 (character creation points are separate)
+          level: 1,
+          upgradesSpent: 0,
         } as unknown as StoryData; // Cast to StoryData as template should be valid
 
         await saveLocalStory(localId, newStoryData);
@@ -330,6 +333,9 @@ export default function AdventureDetailPage() {
           storyData: {
             ...adventure.storyTemplate,
             starting_choices: adventure.startingChoices,
+            points: 0, // Reset XP to 0 (character creation points are separate)
+            level: 1,
+            upgradesSpent: 0,
           },
           isPublic: false,
         }),

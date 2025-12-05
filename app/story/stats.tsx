@@ -94,7 +94,8 @@ export default function StatsPage(storyData: StoryData) {
                   const available = getAvailableUpgrades(
                     storyData.level || 1,
                     storyData.upgradesSpent || 0,
-                    storyData.difficulty
+                    storyData.difficulty,
+                    storyData.levelingSettings
                   );
                   return available > 0 ? (
                     <div className="px-2 py-1 rounded-lg bg-green-500/20 border border-green-400/50">
@@ -108,7 +109,10 @@ export default function StatsPage(storyData: StoryData) {
 
               {/* XP Progress Bar */}
               {(() => {
-                const progress = getXPProgress(storyData.points || 0);
+                const progress = getXPProgress(
+                  storyData.points || 0,
+                  storyData.levelingSettings
+                );
                 return (
                   <div className="space-y-1">
                     <div className="h-2 bg-yellow-950/50 rounded-full overflow-hidden">
@@ -122,7 +126,11 @@ export default function StatsPage(storyData: StoryData) {
                         {formatXP(progress.xpIntoLevel)}/
                         {formatXP(progress.xpNeededForNext)} XP
                       </span>
-                      <span>Level {progress.currentLevel + 1}</span>
+                      <span>
+                        {progress.xpNeededForNext === 0
+                          ? "Max level reached"
+                          : `Level ${progress.currentLevel + 1}`}
+                      </span>
                     </div>
                   </div>
                 );

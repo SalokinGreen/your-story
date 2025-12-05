@@ -35,6 +35,7 @@ import {
   parseChallengeRoundsValue,
   RPGSystemType,
 } from "@/app/misc/rpgSystems";
+import { calculateLevel } from "@/app/misc/leveling";
 
 export interface ToolCall {
   id?: string;
@@ -1835,14 +1836,10 @@ export function executeTools(
             const oldLevel = storyData.level || 1;
             storyData.points =
               (storyData.points || 0) + challenge.pointsAwarded;
-            // Recalculate level (import-free calculation, starting at Level 1)
-            const xp = storyData.points;
-            let level = 1; // Start at Level 1
-            let cumulative = 0;
-            while (cumulative + 100 * level * level <= xp) {
-              cumulative += 100 * level * level;
-              level++;
-            }
+            const level = calculateLevel(
+              storyData.points || 0,
+              storyData.levelingSettings
+            );
             storyData.level = level;
             newLevel = level;
             leveledUp = level > oldLevel;
@@ -1955,14 +1952,10 @@ export function executeTools(
             const oldLevel = storyData.level || 1;
             storyData.points =
               (storyData.points || 0) + challenge.pointsAwarded;
-            // Recalculate level (import-free calculation, starting at Level 1)
-            const xp = storyData.points;
-            let level = 1; // Start at Level 1
-            let cumulative = 0;
-            while (cumulative + 100 * level * level <= xp) {
-              cumulative += 100 * level * level;
-              level++;
-            }
+            const level = calculateLevel(
+              storyData.points || 0,
+              storyData.levelingSettings
+            );
             storyData.level = level;
             newLevel = level;
             leveledUp = level > oldLevel;

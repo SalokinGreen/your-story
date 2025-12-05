@@ -269,6 +269,7 @@ export default function StoryCreativeAssistant({
             temperature: 0.7,
             openRouterKey: byokMode ? apiKeys.openRouterKey : undefined,
             deepseekKey: byokMode ? apiKeys.deepseekKey : undefined,
+            googleKey: byokMode ? apiKeys.googleKey : undefined,
           }),
         });
       }

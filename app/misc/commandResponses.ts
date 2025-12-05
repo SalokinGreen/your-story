@@ -24,6 +24,7 @@ import {
 } from "./fuzzyMatch";
 import { logger } from "./logger";
 import { ABILITY_GRADE_ORDER, initializeAbility } from "./abilitySystem";
+import { calculateLevel } from "./leveling";
 
 /**
  * Execute a single command and generate a response.
@@ -167,14 +168,10 @@ export function executeCommandWithResponse(
       storyData.earnedPointsFromQuests.push(quest.id);
       storyData.points = (storyData.points || 0) + quest.points;
       const oldLevel = storyData.level || 1;
-      // Recalculate level (import-free calculation, starting at Level 1)
-      const xp = storyData.points;
-      let level = 1; // Start at Level 1
-      let cumulative = 0;
-      while (cumulative + 100 * level * level <= xp) {
-        cumulative += 100 * level * level;
-        level++;
-      }
+      const level = calculateLevel(
+        storyData.points || 0,
+        storyData.levelingSettings
+      );
       storyData.level = level;
       newLevel = level;
       leveledUp = level > oldLevel;
@@ -2157,15 +2154,11 @@ export function executeCommandWithResponse(
     existing.dateAchieved = new Date();
     storyData.points = (storyData.points || 0) + existing.points;
 
-    // Recalculate level (import-free calculation, starting at Level 1)
     const oldLevel = storyData.level || 1;
-    const xp = storyData.points;
-    let level = 1; // Start at Level 1
-    let cumulative = 0;
-    while (cumulative + 100 * level * level <= xp) {
-      cumulative += 100 * level * level;
-      level++;
-    }
+    const level = calculateLevel(
+      storyData.points || 0,
+      storyData.levelingSettings
+    );
     storyData.level = level;
     const leveledUp = level > oldLevel;
 

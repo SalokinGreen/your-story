@@ -1,35 +1,23 @@
 /**
- * XP-based leveling system
+ * XP-based leveling system with adventure-specific customization.
  *
- * Uses a quadratic formula for XP thresholds:
- * - XP needed for level N = base * N²
- * - This creates a smooth curve where early levels are quick, later levels take more
- * - Players START at Level 1 with 0 XP
- *
- * Example with base 100:
- * - Level 1: 0 XP (starting level)
- * - Level 2: 100 XP (cumulative: 100)
- * - Level 3: 400 XP (cumulative: 500)
- * - Level 4: 900 XP (cumulative: 1400)
- * - Level 5: 1600 XP (cumulative: 3000)
- * - Level 6: 2500 XP (cumulative: 5500)
+ * Authors can override:
+ * - The XP curve (base quadratic or fully custom per-level thresholds)
+ * - Level cap
+ * - Upgrade points granted per level
+ * - Starting upgrades per difficulty
  */
 
-import { AdventureDifficulty } from "./structs";
-
-// Base XP constant - determines overall XP curve steepness
-export const XP_BASE = 100;
-
-// Starting upgrades based on difficulty (easy = more help, expert = challenge)
-export const STARTING_UPGRADES_BY_DIFFICULTY: Record<
+import {
   AdventureDifficulty,
-  number
-> = {
-  easy: 3,
-  medium: 2,
-  hard: 1,
-  expert: 0,
-} as const;
+  LevelCurvePoint,
+  LevelingSettings,
+  LevelUpgradeOverride,
+  STARTING_UPGRADES_BY_DIFFICULTY,
+} from "./structs";
+
+export const XP_BASE = 100;
+const DEFAULT_LEVEL_CAP = 100;
 
 // XP rewards for different actions
 export const XP_REWARDS = {
@@ -40,72 +28,280 @@ export const XP_REWARDS = {
   ACHIEVEMENT: 25, // Unlocking an achievement (varies by achievement)
 } as const;
 
-/**
- * Calculate the XP required to reach a specific level
- * Formula: XP_BASE * level²
- */
-export function getXPForLevel(level: number): number {
-  if (level <= 0) return 0;
-  return XP_BASE * level * level;
+export const DEFAULT_LEVELING_SETTINGS: LevelingSettings = {
+  xpBase: XP_BASE,
+  levelCap: DEFAULT_LEVEL_CAP,
+  useCustomCurve: false,
+  customCurve: [],
+  defaultUpgradesPerLevel: 1,
+  upgradeOverrides: [],
+  startingUpgrades: { ...STARTING_UPGRADES_BY_DIFFICULTY },
+};
+
+type ResolvedLevelingSettings = {
+  xpBase: number;
+  levelCap: number;
+  useCustomCurve: boolean;
+  customCurve: LevelCurvePoint[];
+  customCurveMap: Map<number, number>;
+  defaultUpgradesPerLevel: number;
+  upgradeOverrides: LevelUpgradeOverride[];
+  upgradeOverrideMap: Map<number, number>;
+  startingUpgrades: Record<AdventureDifficulty, number>;
+};
+
+function sanitizeLevel(value: number, minimum = 1): number {
+  if (!Number.isFinite(value)) return minimum;
+  return Math.max(minimum, Math.floor(value));
 }
 
-/**
- * Calculate cumulative XP needed to reach a level (sum of all previous levels)
- * Formula: XP_BASE * (level * (level + 1) * (2*level + 1)) / 6
- * This is the sum of squares: 1² + 2² + 3² + ... + n² = n(n+1)(2n+1)/6
- */
-export function getCumulativeXPForLevel(level: number): number {
-  if (level <= 0) return 0;
-  // Sum of squares formula: n(n+1)(2n+1)/6
-  return (XP_BASE * (level * (level + 1) * (2 * level + 1))) / 6;
+function sanitizePositive(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(1, Math.floor(value));
 }
 
-/**
- * Calculate the player's current level from their total XP
- * Players start at Level 1 with 0 XP.
- * Uses cumulative XP formula inverted.
- */
-export function calculateLevel(xp: number): number {
-  // Level 1 is the starting level (0 XP)
+function sanitizeNonNegative(value: number, fallback = 0): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.floor(value));
+}
+
+function resolveLevelingSettings(
+  settings?: LevelingSettings
+): ResolvedLevelingSettings {
+  const source = settings || {};
+  const defaultSource = DEFAULT_LEVELING_SETTINGS || {};
+
+  const xpBase = sanitizePositive(
+    source.xpBase ?? defaultSource.xpBase ?? XP_BASE,
+    XP_BASE
+  );
+
+  const providedCurve = source.customCurve ?? defaultSource.customCurve ?? [];
+  const curveEntries = providedCurve
+    .filter(
+      (point): point is LevelCurvePoint =>
+        !!point &&
+        typeof point.level === "number" &&
+        typeof point.cumulativeXP === "number" &&
+        point.level >= 2
+    )
+    .map((point) => ({
+      level: sanitizeLevel(point.level, 2),
+      cumulativeXP: sanitizeNonNegative(point.cumulativeXP, 0),
+    }));
+
+  const customCurveMap = new Map<number, number>();
+  curveEntries.forEach((entry) => {
+    customCurveMap.set(entry.level, entry.cumulativeXP);
+  });
+
+  const sortedCurveEntries = Array.from(customCurveMap.entries()).sort(
+    (a, b) => a[0] - b[0]
+  );
+
+  const customCurve: LevelCurvePoint[] = [];
+  let lastXP = 0;
+  const normalizedCurveMap = new Map<number, number>();
+  for (const [level, xpValue] of sortedCurveEntries) {
+    const sanitizedXP = Math.max(lastXP, xpValue);
+    customCurve.push({ level, cumulativeXP: sanitizedXP });
+    normalizedCurveMap.set(level, sanitizedXP);
+    lastXP = sanitizedXP;
+  }
+
+  const providedOverrides =
+    source.upgradeOverrides ?? defaultSource.upgradeOverrides ?? [];
+  const overrideMap = new Map<number, number>();
+  providedOverrides.forEach((override) => {
+    if (
+      override &&
+      typeof override.level === "number" &&
+      typeof override.upgrades === "number"
+    ) {
+      const level = sanitizeLevel(override.level, 1);
+      const upgrades = sanitizeNonNegative(override.upgrades, 0);
+      overrideMap.set(level, upgrades);
+    }
+  });
+  const upgradeOverrides: LevelUpgradeOverride[] = Array.from(
+    overrideMap.entries()
+  )
+    .sort((a, b) => a[0] - b[0])
+    .map(([level, upgrades]) => ({ level, upgrades }));
+
+  const highestCustomLevel =
+    customCurve.length > 0 ? customCurve[customCurve.length - 1].level : null;
+  const levelCapCandidate =
+    source.levelCap ??
+    (source.useCustomCurve && highestCustomLevel
+      ? highestCustomLevel
+      : defaultSource.levelCap ?? DEFAULT_LEVEL_CAP);
+  const levelCap = sanitizeLevel(levelCapCandidate, 1);
+
+  const defaultUpgradesPerLevel = Math.max(
+    0,
+    source.defaultUpgradesPerLevel ??
+      defaultSource.defaultUpgradesPerLevel ??
+      1
+  );
+
+  const startingUpgrades = {
+    easy: sanitizeNonNegative(
+      source.startingUpgrades?.easy ??
+        defaultSource.startingUpgrades?.easy ??
+        STARTING_UPGRADES_BY_DIFFICULTY.easy,
+      STARTING_UPGRADES_BY_DIFFICULTY.easy
+    ),
+    medium: sanitizeNonNegative(
+      source.startingUpgrades?.medium ??
+        defaultSource.startingUpgrades?.medium ??
+        STARTING_UPGRADES_BY_DIFFICULTY.medium,
+      STARTING_UPGRADES_BY_DIFFICULTY.medium
+    ),
+    hard: sanitizeNonNegative(
+      source.startingUpgrades?.hard ??
+        defaultSource.startingUpgrades?.hard ??
+        STARTING_UPGRADES_BY_DIFFICULTY.hard,
+      STARTING_UPGRADES_BY_DIFFICULTY.hard
+    ),
+    expert: sanitizeNonNegative(
+      source.startingUpgrades?.expert ??
+        defaultSource.startingUpgrades?.expert ??
+        STARTING_UPGRADES_BY_DIFFICULTY.expert,
+      STARTING_UPGRADES_BY_DIFFICULTY.expert
+    ),
+  };
+
+  return {
+    xpBase,
+    levelCap,
+    useCustomCurve: source.useCustomCurve ?? false,
+    customCurve,
+    customCurveMap: normalizedCurveMap,
+    defaultUpgradesPerLevel,
+    upgradeOverrides,
+    upgradeOverrideMap: overrideMap,
+    startingUpgrades,
+  };
+}
+
+function calculateLevelInternal(
+  xp: number,
+  settings: ResolvedLevelingSettings
+): number {
   if (xp <= 0) return 1;
 
-  // Binary search for the level since inverting the cubic is complex
-  // We search for levels 2+ since level 1 is handled above
   let low = 1;
-  let high = 100; // Max level cap
+  let high = settings.levelCap;
 
   while (low < high) {
     const mid = Math.floor((low + high + 1) / 2);
-    if (getCumulativeXPForLevel(mid - 1) <= xp) {
+    if (getCumulativeXPForLevelInternal(mid - 1, settings) <= xp) {
       low = mid;
     } else {
       high = mid - 1;
     }
   }
 
-  return low;
+  return Math.min(low, settings.levelCap);
+}
+
+function getCumulativeXPForLevelInternal(
+  level: number,
+  settings: ResolvedLevelingSettings
+): number {
+  if (level <= 1) return 0;
+
+  if (settings.useCustomCurve) {
+    const customXP = settings.customCurveMap.get(level);
+    if (customXP !== undefined) {
+      return customXP;
+    }
+  }
+
+  const lvl = sanitizeLevel(level, 1);
+  return (
+    (settings.xpBase * (lvl * (lvl + 1) * (2 * lvl + 1))) / 6
+  );
+}
+
+function getUpgradesForLevel(
+  level: number,
+  settings: ResolvedLevelingSettings
+): number {
+  if (level <= 1) return 0;
+  const override = settings.upgradeOverrideMap.get(level);
+  if (override !== undefined) {
+    return override;
+  }
+  return settings.defaultUpgradesPerLevel;
 }
 
 /**
- * Get XP progress towards the next level
- * Returns { current, needed, percentage }
- * Note: Level 1 starts at 0 XP, Level 2 requires getCumulativeXPForLevel(1) = 100 XP, etc.
+ * Calculate the XP required to reach a specific level.
+ * When custom curves are enabled, this will prefer author-defined thresholds.
  */
-export function getXPProgress(xp: number): {
+export function getXPForLevel(
+  level: number,
+  levelingSettings?: LevelingSettings
+): number {
+  if (level <= 0) return 0;
+  const resolved = resolveLevelingSettings(levelingSettings);
+  const cumulative = getCumulativeXPForLevelInternal(level, resolved);
+  const previous = getCumulativeXPForLevelInternal(level - 1, resolved);
+  return Math.max(0, cumulative - previous);
+}
+
+/**
+ * Calculate cumulative XP needed to reach a level (sum of all previous levels)
+ */
+export function getCumulativeXPForLevel(
+  level: number,
+  levelingSettings?: LevelingSettings
+): number {
+  const resolved = resolveLevelingSettings(levelingSettings);
+  return getCumulativeXPForLevelInternal(level, resolved);
+}
+
+/**
+ * Calculate the player's current level from their total XP.
+ * Supports both quadratic and custom curves.
+ */
+export function calculateLevel(
+  xp: number,
+  levelingSettings?: LevelingSettings
+): number {
+  const resolved = resolveLevelingSettings(levelingSettings);
+  return calculateLevelInternal(xp, resolved);
+}
+
+/**
+ * Get XP progress towards the next level.
+ */
+export function getXPProgress(
+  xp: number,
+  levelingSettings?: LevelingSettings
+): {
   currentLevel: number;
   xpIntoLevel: number;
   xpNeededForNext: number;
   percentage: number;
   totalXP: number;
 } {
-  const currentLevel = calculateLevel(xp);
-  // XP threshold for current level (Level 1 = 0, Level 2 = 100, Level 3 = 500, etc.)
-  const xpForCurrentLevel =
-    currentLevel <= 1 ? 0 : getCumulativeXPForLevel(currentLevel - 1);
-  const xpForNextLevel = getCumulativeXPForLevel(currentLevel);
+  const resolved = resolveLevelingSettings(levelingSettings);
+  const currentLevel = calculateLevelInternal(xp, resolved);
+  const previousThreshold =
+    currentLevel <= 1
+      ? 0
+      : getCumulativeXPForLevelInternal(currentLevel - 1, resolved);
+  const isAtCap = currentLevel >= resolved.levelCap;
+  const nextLevel = isAtCap ? currentLevel : currentLevel + 1;
+  const nextThreshold = isAtCap
+    ? previousThreshold
+    : getCumulativeXPForLevelInternal(nextLevel, resolved);
 
-  const xpIntoLevel = Math.max(0, xp - xpForCurrentLevel);
-  const xpNeededForNext = xpForNextLevel - xpForCurrentLevel;
+  const xpIntoLevel = Math.max(0, xp - previousThreshold);
+  const xpNeededForNext = Math.max(0, nextThreshold - previousThreshold);
   const percentage =
     xpNeededForNext > 0
       ? Math.min(100, Math.floor((xpIntoLevel / xpNeededForNext) * 100))
@@ -121,35 +317,51 @@ export function getXPProgress(xp: number): {
 }
 
 /**
- * Calculate how many upgrades are available
- * Formula: (level - 1) + startingUpgrades - upgradesSpent
- * - Each level-up grants one upgrade choice (so level 1 = 0, level 2 = 1, etc.)
- * - Starting upgrades vary by difficulty (easy=3, medium=2, hard=1, expert=0)
+ * Calculate how many upgrades are available.
+ * Starting upgrades are based on difficulty (overridable per adventure).
+ * Level-up upgrades respect author-defined per-level overrides.
  */
 export function getAvailableUpgrades(
   level: number,
   upgradesSpent: number,
-  difficulty?: AdventureDifficulty
+  difficulty?: AdventureDifficulty,
+  levelingSettings?: LevelingSettings
 ): number {
-  const startingUpgrades =
-    STARTING_UPGRADES_BY_DIFFICULTY[difficulty || "medium"];
-  const levelUpgrades = Math.max(0, (level || 1) - 1); // level 1 = 0 upgrades from leveling
-  return Math.max(0, levelUpgrades + startingUpgrades - (upgradesSpent || 0));
+  const resolved = resolveLevelingSettings(levelingSettings);
+  const starting =
+    resolved.startingUpgrades[difficulty || "medium"] ?? 0;
+
+  const normalizedLevel = sanitizeLevel(level || 1, 1);
+  let earned = 0;
+  for (let lvl = 2; lvl <= normalizedLevel; lvl++) {
+    earned += getUpgradesForLevel(lvl, resolved);
+  }
+
+  const available = starting + earned - Math.max(0, upgradesSpent || 0);
+  return Math.max(0, available);
 }
 
 /**
- * Check if player has pending level-up rewards to claim
+ * Check if player has pending level-up rewards to claim.
  */
 export function hasPendingLevelUp(
   level: number,
   upgradesSpent: number,
-  difficulty?: AdventureDifficulty
+  difficulty?: AdventureDifficulty,
+  levelingSettings?: LevelingSettings
 ): boolean {
-  return getAvailableUpgrades(level, upgradesSpent, difficulty) > 0;
+  return (
+    getAvailableUpgrades(
+      level,
+      upgradesSpent,
+      difficulty,
+      levelingSettings
+    ) > 0
+  );
 }
 
 /**
- * Format XP for display
+ * Format XP for display.
  */
 export function formatXP(xp: number): string {
   if (xp >= 10000) {
@@ -159,26 +371,37 @@ export function formatXP(xp: number): string {
 }
 
 /**
- * Get a readable description of XP progress
+ * Get a readable description of XP progress.
  */
-export function getProgressDescription(xp: number): string {
-  const progress = getXPProgress(xp);
+export function getProgressDescription(
+  xp: number,
+  levelingSettings?: LevelingSettings
+): string {
+  const progress = getXPProgress(xp, levelingSettings);
   return `Level ${progress.currentLevel} (${formatXP(
     progress.xpIntoLevel
   )}/${formatXP(progress.xpNeededForNext)} XP)`;
 }
 
 /**
- * Add XP to story data and update level
- * Returns the new level and whether a level-up occurred
+ * Add XP to story data and update level.
+ * Returns the new level and whether a level-up occurred.
  */
 export function addXP(
-  storyData: { points: number; level: number },
-  xpAmount: number
+  storyData: {
+    points: number;
+    level: number;
+    levelingSettings?: LevelingSettings;
+  },
+  xpAmount: number,
+  levelingSettingsOverride?: LevelingSettings
 ): { newLevel: number; leveledUp: boolean; levelsGained: number } {
+  const appliedSettings: LevelingSettings | undefined =
+    levelingSettingsOverride ?? storyData.levelingSettings;
   const oldLevel = storyData.level || 1;
   storyData.points = (storyData.points || 0) + xpAmount;
-  const newLevel = calculateLevel(storyData.points);
+  const resolved = resolveLevelingSettings(appliedSettings);
+  const newLevel = calculateLevelInternal(storyData.points, resolved);
   storyData.level = newLevel;
 
   return {
@@ -189,18 +412,22 @@ export function addXP(
 }
 
 /**
- * Initialize level from existing XP (for backward compatibility)
- * Call this when loading a story that might not have level set
+ * Initialize level from existing XP (for backward compatibility).
+ * Call this when loading a story that might not have level set.
  */
 export function initializeLevel(storyData: {
   points: number;
   level?: number;
   upgradesSpent?: number;
   difficulty?: AdventureDifficulty;
+  levelingSettings?: LevelingSettings;
 }): void {
-  const calculatedLevel = calculateLevel(storyData.points || 0);
+  const resolved = resolveLevelingSettings(storyData.levelingSettings);
+  const calculatedLevel = calculateLevelInternal(
+    storyData.points || 0,
+    resolved
+  );
 
-  // If level isn't set, calculate it (minimum Level 1)
   if (
     storyData.level === undefined ||
     storyData.level === null ||
@@ -209,7 +436,6 @@ export function initializeLevel(storyData: {
     storyData.level = Math.max(1, calculatedLevel);
   }
 
-  // If upgradesSpent isn't set, default to 0
   if (
     storyData.upgradesSpent === undefined ||
     storyData.upgradesSpent === null
@@ -219,11 +445,12 @@ export function initializeLevel(storyData: {
 }
 
 /**
- * Get starting upgrades based on difficulty
- * Easy gives more upgrades to help new players, Expert gives none for challenge
+ * Get starting upgrades based on difficulty, honoring adventure overrides.
  */
 export function getStartingUpgrades(
-  difficulty: AdventureDifficulty | undefined
+  difficulty: AdventureDifficulty | undefined,
+  levelingSettings?: LevelingSettings
 ): number {
-  return STARTING_UPGRADES_BY_DIFFICULTY[difficulty || "medium"];
+  const resolved = resolveLevelingSettings(levelingSettings);
+  return resolved.startingUpgrades[difficulty || "medium"] ?? 0;
 }

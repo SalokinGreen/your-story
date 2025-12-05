@@ -791,22 +791,22 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
-  "DeepInfra GPT-OSS 20B": {
-    name: "DeepInfra GPT-OSS 20B",
-    original_model: "openai/gpt-oss-20b",
-    model: "openai/gpt-oss-20b",
+  "DeepInfra GPT-OSS 120B": {
+    name: "DeepInfra GPT-OSS 120B",
+    original_model: "openai/gpt-oss-120b",
+    model: "openai/gpt-oss-120b",
     maxTokens: 128000,
     maxOutputTokens: 16000,
     provider: "deepinfra",
     supportsToolCalling: true,
     cost: 1,
-    inputPrice: 0.03,
-    outputPrice: 0.14,
+    inputPrice: 0.039,
+    outputPrice: 0.19,
     finetunes: [],
     strengths: ["ultra cheap", "fast", "long context", "tool calling"],
     weaknesses: [],
     description:
-      "OpenAI's open-weight GPT-OSS 20B MoE model via DeepInfra. Extremely cheap with 131k context. Uses Coins.",
+      "GPT-OSS 120B via DeepInfra. Extremely cost-effective with great capabilities. Uses Coins.",
     bannerUrl: undefined,
   },
 
@@ -1089,9 +1089,9 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
   ultraBudget: {
     id: "ultraBudget",
     name: "Ultra Budget",
-    description: "Maximum savings with GPT-OSS 20B - uses Coins",
-    storyModel: "DeepInfra GPT-OSS 20B",
-    toolsModel: "DeepInfra GPT-OSS 20B",
+    description: "Maximum savings with GPT-OSS 120B - uses Coins",
+    storyModel: "DeepInfra GPT-OSS 120B",
+    toolsModel: "DeepInfra GPT-OSS 120B",
     choicesModel: "DeepInfra Phi 4",
     estimatedCost: 1,
   },

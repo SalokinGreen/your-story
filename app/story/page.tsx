@@ -5236,7 +5236,8 @@ function StoryPageContent() {
     const availableUpgrades = getAvailableUpgrades(
       storyData.level || 1,
       storyData.upgradesSpent || 0,
-      storyData.difficulty
+      storyData.difficulty,
+      storyData.levelingSettings
     );
 
     if (availableUpgrades > 0) {
@@ -5245,7 +5246,8 @@ function StoryPageContent() {
       const remainingUpgrades = getAvailableUpgrades(
         storyData.level || 1,
         storyData.upgradesSpent || 0,
-        storyData.difficulty
+        storyData.difficulty,
+        storyData.levelingSettings
       );
       addNotification(
         `Upgrade applied! (${remainingUpgrades} upgrade${
@@ -5256,7 +5258,7 @@ function StoryPageContent() {
       await saveProgress(storyData);
     } else {
       addNotification(
-        `No upgrades available! Earn more XP to level up.`,
+        `No upgrades available! Earn more XP to gain additional upgrade points.`,
         "failure"
       );
     }

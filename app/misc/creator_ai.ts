@@ -321,6 +321,14 @@ You can control how items in arrays are applied using the **_command** field:
   - agmt_context_only: Boolean - when true with skill_used, agmt provides context only (doesn't override skill check result)
   - agmt_table: Optional AGMT table to roll on (e.g., "action", "subject", "character_descriptors", "locations", "plot_twists")
   - custom_table: Optional custom table name to roll on
+- levelingSettings (Object with leveling curve and upgrade point configuration)
+  - xpBase: Number (default 100) - Base multiplier for XP requirements. Higher = slower leveling.
+  - levelCap: Number (default 100) - Maximum level players can reach.
+  - defaultUpgradesPerLevel: Number (default 1) - Upgrade points granted per level up.
+  - useCustomCurve: Boolean - When true, use customCurve instead of quadratic formula.
+  - customCurve: Array of { level, xp } - Custom XP thresholds for each level when useCustomCurve is true.
+  - upgradeOverrides: Array of { level, upgrades } - Override upgrade points for specific levels (e.g., milestone bonus points).
+  - startingUpgrades: Object { easy?: number, medium?: number, hard?: number, expert?: number } - Override starting upgrade points per difficulty.
 
 Notes:
 - All characters should share the same stats and resources, but they may have different values.

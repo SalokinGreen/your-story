@@ -64,6 +64,7 @@ export function buildStoryCreatorMessages({
     customTables: storyData.customTables,
     agmtState: storyData.agmtState,
     upgradeSettings: storyData.upgradeSettings,
+    levelingSettings: storyData.levelingSettings,
     skillTrees: storyData.skillTrees,
     rpgSystem: storyData.rpgSystem,
     momentum: storyData.momentum,
@@ -301,6 +302,34 @@ export function applyCreatorChangesToStoryData(
       };
     } else {
       updates.agmtState = changes.agmtState;
+    }
+  }
+
+  // Leveling settings - merge with existing
+  if (changes.levelingSettings !== undefined) {
+    if (storyData.levelingSettings && changes.levelingSettings) {
+      updates.levelingSettings = {
+        ...storyData.levelingSettings,
+        ...changes.levelingSettings,
+        // Handle nested objects/arrays carefully
+        customCurve:
+          changes.levelingSettings.customCurve !== undefined
+            ? changes.levelingSettings.customCurve
+            : storyData.levelingSettings.customCurve,
+        upgradeOverrides:
+          changes.levelingSettings.upgradeOverrides !== undefined
+            ? changes.levelingSettings.upgradeOverrides
+            : storyData.levelingSettings.upgradeOverrides,
+        startingUpgrades:
+          changes.levelingSettings.startingUpgrades !== undefined
+            ? {
+                ...storyData.levelingSettings.startingUpgrades,
+                ...changes.levelingSettings.startingUpgrades,
+              }
+            : storyData.levelingSettings.startingUpgrades,
+      };
+    } else {
+      updates.levelingSettings = changes.levelingSettings;
     }
   }
 

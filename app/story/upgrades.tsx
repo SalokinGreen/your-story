@@ -52,11 +52,19 @@ export default function UpgradesPage({
     systemDefaults.resourceUpgradeAmount;
 
   // Calculate XP progress and available upgrades
-  const xpProgress = getXPProgress(storyData.points || 0);
+  const xpProgress = getXPProgress(
+    storyData.points || 0,
+    storyData.levelingSettings
+  );
+  const xpRemaining = Math.max(
+    0,
+    xpProgress.xpNeededForNext - xpProgress.xpIntoLevel
+  );
   const availableUpgrades = getAvailableUpgrades(
     storyData.level || 1,
     storyData.upgradesSpent || 0,
-    storyData.difficulty
+    storyData.difficulty,
+    storyData.levelingSettings
   );
 
   // If upgrade system is disabled, show message
@@ -341,7 +349,9 @@ export default function UpgradesPage({
                 />
               </div>
               <p className="text-xs text-yellow-300/50 text-center">
-                {xpProgress.percentage}% to next level
+                {xpProgress.xpNeededForNext === 0
+                  ? "Max level reached"
+                  : `${xpProgress.percentage}% to next level`}
               </p>
             </div>
           </div>
@@ -370,8 +380,8 @@ export default function UpgradesPage({
               </li>
             </ul>
             <p className="text-xs text-blue-400/70 mt-2 italic">
-              Each level up grants you one upgrade choice from the options
-              below.
+              Level ups award upgrade points configured by this adventure's
+              author—spend them on the options below.
             </p>
           </div>
 
@@ -487,12 +497,16 @@ export default function UpgradesPage({
                 className="w-8 h-8 mx-auto mb-2 text-blue-400/60"
               />
               <p className="text-blue-200/70">
-                Earn more XP to level up and unlock your next upgrade!
+                {xpProgress.xpNeededForNext === 0
+                  ? "You've reached the max level for this adventure."
+                  : "Earn more XP to unlock additional upgrade points!"}
               </p>
-              <p className="text-sm text-blue-300/50 mt-1">
-                {formatXP(xpProgress.xpNeededForNext - xpProgress.xpIntoLevel)}{" "}
-                XP until Level {xpProgress.currentLevel + 1}
-              </p>
+              {xpProgress.xpNeededForNext > 0 && (
+                <p className="text-sm text-blue-300/50 mt-1">
+                  {formatXP(xpRemaining)} XP until Level{" "}
+                  {xpProgress.currentLevel + 1}
+                </p>
+              )}
             </div>
           )}
 

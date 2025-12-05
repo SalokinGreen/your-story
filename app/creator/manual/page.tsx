@@ -17,6 +17,7 @@ import {
   Preset,
   UpgradeSettings,
   DEFAULT_UPGRADE_SETTINGS,
+  LevelingSettings,
   Adventure,
   AGMTState,
   AGMTThread,
@@ -33,6 +34,8 @@ import {
   AbilityGrade,
   DCTier,
   SkillTree,
+  STARTING_UPGRADES_BY_DIFFICULTY,
+  AdventureDifficulty,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
@@ -77,6 +80,7 @@ import {
 import { getAuthToken } from "@/app/misc/getAuthToken";
 import SkillTreeEditor from "@/app/components/SkillTreeEditor";
 import { createEmptyTree } from "@/app/misc/skillTree";
+import { DEFAULT_LEVELING_SETTINGS } from "@/app/misc/leveling";
 
 type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
 type DeepInfraImageModelKey = keyof typeof DEEPINFRA_IMAGE_MODELS;
@@ -133,15 +137,76 @@ function getChaosDescription(chaos: number): string {
   return "Anything can happen!";
 }
 
+function cloneLevelingSettings(value?: LevelingSettings): LevelingSettings {
+  const defaults = DEFAULT_LEVELING_SETTINGS;
+  const customCurveSource = value?.customCurve ?? defaults.customCurve ?? [];
+  const upgradeOverrideSource =
+    value?.upgradeOverrides ?? defaults.upgradeOverrides ?? [];
+  const startingDefaults =
+    defaults.startingUpgrades || STARTING_UPGRADES_BY_DIFFICULTY;
+
+  return {
+    xpBase: value?.xpBase ?? defaults.xpBase ?? 100,
+    levelCap: value?.levelCap ?? defaults.levelCap ?? 100,
+    useCustomCurve: value?.useCustomCurve ?? defaults.useCustomCurve ?? false,
+    customCurve: customCurveSource
+      .map((entry) => ({
+        level: entry.level,
+        cumulativeXP: entry.cumulativeXP,
+      }))
+      .sort((a, b) => a.level - b.level),
+    defaultUpgradesPerLevel:
+      value?.defaultUpgradesPerLevel ?? defaults.defaultUpgradesPerLevel ?? 1,
+    upgradeOverrides: upgradeOverrideSource
+      .map((entry) => ({
+        level: entry.level,
+        upgrades: entry.upgrades,
+      }))
+      .sort((a, b) => a.level - b.level),
+    startingUpgrades: {
+      easy:
+        value?.startingUpgrades?.easy ??
+        startingDefaults.easy ??
+        STARTING_UPGRADES_BY_DIFFICULTY.easy,
+      medium:
+        value?.startingUpgrades?.medium ??
+        startingDefaults.medium ??
+        STARTING_UPGRADES_BY_DIFFICULTY.medium,
+      hard:
+        value?.startingUpgrades?.hard ??
+        startingDefaults.hard ??
+        STARTING_UPGRADES_BY_DIFFICULTY.hard,
+      expert:
+        value?.startingUpgrades?.expert ??
+        startingDefaults.expert ??
+        STARTING_UPGRADES_BY_DIFFICULTY.expert,
+    },
+  };
+}
+
 // Variable Editor Card Component
 function VariableEditorCard({
   variable,
   onChange,
   onDelete,
+  index,
+  onMoveUp,
+  onMoveDown,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  isDragging,
 }: {
   variable: Variable;
   onChange: (variable: Variable) => void;
   onDelete: () => void;
+  index?: number;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onDragStart?: () => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragEnd?: () => void;
+  isDragging?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Variable>({ ...variable });
@@ -500,8 +565,40 @@ function VariableEditorCard({
   // Display mode
   return (
     <div
-      className={`flex items-start gap-3 p-4 rounded-lg ${colors.bg} border ${colors.border}`}
+      draggable={!!onDragStart}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+      className={`flex items-start gap-3 p-4 rounded-lg ${colors.bg} border ${
+        colors.border
+      } ${isDragging ? "opacity-50" : ""} ${
+        onDragStart ? "cursor-grab active:cursor-grabbing" : ""
+      }`}
     >
+      {/* Drag Handle and Reorder Arrows */}
+      {(onMoveUp || onMoveDown || onDragStart) && (
+        <div className="flex flex-col items-center gap-1 shrink-0">
+          <button
+            onClick={onMoveUp}
+            disabled={!onMoveUp}
+            className="p-1 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Move up"
+          >
+            <DynamicIcon name="ChevronUp" className="w-4 h-4" />
+          </button>
+          <div className="p-1 text-gray-500" title="Drag to reorder">
+            <DynamicIcon name="GripVertical" className="w-4 h-4" />
+          </div>
+          <button
+            onClick={onMoveDown}
+            disabled={!onMoveDown}
+            className="p-1 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Move down"
+          >
+            <DynamicIcon name="ChevronDown" className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       <div className="shrink-0">
         <DynamicIcon name={getIcon()} className={`w-8 h-8 ${colors.text}`} />
       </div>
@@ -657,12 +754,111 @@ function AdventureCreatorContent() {
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
 
   // Upgrade Settings
+  const [levelingSettings, setLevelingSettings] = useState<LevelingSettings>(
+    () => cloneLevelingSettings()
+  );
   const [upgradeSettings, setUpgradeSettings] = useState<UpgradeSettings>(
     DEFAULT_UPGRADE_SETTINGS
   );
 
   // Skill Trees
   const [skillTrees, setSkillTrees] = useState<SkillTree[]>([]);
+
+  const handleAddCustomCurveEntry = () => {
+    setLevelingSettings((prev) => {
+      const existing = [...(prev.customCurve || [])];
+      const nextLevel =
+        existing.length > 0 ? existing[existing.length - 1].level + 1 : 2;
+      const xpIncrement =
+        prev.xpBase ?? DEFAULT_LEVELING_SETTINGS.xpBase ?? 100;
+      const nextXP =
+        existing.length > 0
+          ? existing[existing.length - 1].cumulativeXP + xpIncrement
+          : xpIncrement;
+      const updated = [...existing, { level: nextLevel, cumulativeXP: nextXP }];
+      updated.sort((a, b) => a.level - b.level);
+      return { ...prev, customCurve: updated };
+    });
+  };
+
+  const handleCustomCurveChange = (
+    index: number,
+    field: "level" | "cumulativeXP",
+    value: number
+  ) => {
+    setLevelingSettings((prev) => {
+      const existing = [...(prev.customCurve || [])];
+      if (!existing[index]) return prev;
+      const clamped =
+        field === "level" ? Math.max(2, value) : Math.max(0, value);
+      existing[index] = { ...existing[index], [field]: clamped };
+      existing.sort((a, b) => a.level - b.level);
+      return { ...prev, customCurve: existing };
+    });
+  };
+
+  const handleRemoveCustomCurveEntry = (index: number) => {
+    setLevelingSettings((prev) => {
+      const existing = [...(prev.customCurve || [])];
+      existing.splice(index, 1);
+      return { ...prev, customCurve: existing };
+    });
+  };
+
+  const handleAddUpgradeOverride = () => {
+    setLevelingSettings((prev) => {
+      const existing = [...(prev.upgradeOverrides || [])];
+      const nextLevel =
+        existing.length > 0 ? existing[existing.length - 1].level + 1 : 2;
+      const defaultUpgrade =
+        prev.defaultUpgradesPerLevel ??
+        DEFAULT_LEVELING_SETTINGS.defaultUpgradesPerLevel ??
+        1;
+      const updated = [
+        ...existing,
+        { level: nextLevel, upgrades: defaultUpgrade },
+      ];
+      updated.sort((a, b) => a.level - b.level);
+      return { ...prev, upgradeOverrides: updated };
+    });
+  };
+
+  const handleUpgradeOverrideChange = (
+    index: number,
+    field: "level" | "upgrades",
+    value: number
+  ) => {
+    setLevelingSettings((prev) => {
+      const existing = [...(prev.upgradeOverrides || [])];
+      if (!existing[index]) return prev;
+      const clamped =
+        field === "level" ? Math.max(1, value) : Math.max(0, value);
+      existing[index] = { ...existing[index], [field]: clamped };
+      existing.sort((a, b) => a.level - b.level);
+      return { ...prev, upgradeOverrides: existing };
+    });
+  };
+
+  const handleRemoveUpgradeOverride = (index: number) => {
+    setLevelingSettings((prev) => {
+      const existing = [...(prev.upgradeOverrides || [])];
+      existing.splice(index, 1);
+      return { ...prev, upgradeOverrides: existing };
+    });
+  };
+
+  const handleStartingUpgradeChange = (
+    difficulty: AdventureDifficulty,
+    value: number
+  ) => {
+    setLevelingSettings((prev) => ({
+      ...prev,
+      startingUpgrades: {
+        ...(prev.startingUpgrades || {}),
+        [difficulty]: Math.max(0, value),
+      },
+    }));
+  };
 
   // Basic Info
   const [title, setTitle] = useState("");
@@ -1396,6 +1592,7 @@ function AdventureCreatorContent() {
         setUpgradeSettings(
           template.upgradeSettings || DEFAULT_UPGRADE_SETTINGS
         );
+        setLevelingSettings(cloneLevelingSettings(template.levelingSettings));
         setSkillTrees(template.skillTrees || []);
 
         // Load points and momentum
@@ -1944,6 +2141,9 @@ function AdventureCreatorContent() {
 
   // Variables
   const [variables, setVariables] = useState<Variable[]>([]);
+  const [draggedVariableIndex, setDraggedVariableIndex] = useState<
+    number | null
+  >(null);
 
   // Local draft persistence (separate keys for new vs edit mode)
   const draftKey = editAdventureId
@@ -2052,6 +2252,8 @@ function AdventureCreatorContent() {
         setCustomTables(saved.customTables);
       if (Array.isArray(saved.variables)) setVariables(saved.variables);
       if (saved.upgradeSettings) setUpgradeSettings(saved.upgradeSettings);
+      if (saved.levelingSettings)
+        setLevelingSettings(cloneLevelingSettings(saved.levelingSettings));
       if (Array.isArray(saved.skillTrees)) setSkillTrees(saved.skillTrees);
       if (saved.agmtEnabled !== undefined) setAGMTEnabled(saved.agmtEnabled);
       if (saved.agmtState) setAGMTState(saved.agmtState);
@@ -2126,6 +2328,7 @@ function AdventureCreatorContent() {
       quests,
       customTables,
       variables,
+      levelingSettings,
       upgradeSettings,
       skillTrees,
       agmtEnabled,
@@ -2176,6 +2379,7 @@ function AdventureCreatorContent() {
     quests,
     customTables,
     variables,
+    levelingSettings,
     agmtEnabled,
     agmtState,
     upgradeSettings,
@@ -2845,6 +3049,48 @@ ${description || ""}`;
     setAchievements(newAchievements);
   };
 
+  // Variable drag-and-drop and reorder functions
+  const handleVariableDragStart = (index: number) => {
+    setDraggedVariableIndex(index);
+  };
+
+  const handleVariableDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedVariableIndex === null || draggedVariableIndex === index) return;
+
+    const newVariables = [...variables];
+    const draggedItem = newVariables[draggedVariableIndex];
+    newVariables.splice(draggedVariableIndex, 1);
+    newVariables.splice(index, 0, draggedItem);
+
+    setVariables(newVariables);
+    setDraggedVariableIndex(index);
+  };
+
+  const handleVariableDragEnd = () => {
+    setDraggedVariableIndex(null);
+  };
+
+  const moveVariableUp = (index: number) => {
+    if (index === 0) return;
+    const newVariables = [...variables];
+    [newVariables[index - 1], newVariables[index]] = [
+      newVariables[index],
+      newVariables[index - 1],
+    ];
+    setVariables(newVariables);
+  };
+
+  const moveVariableDown = (index: number) => {
+    if (index === variables.length - 1) return;
+    const newVariables = [...variables];
+    [newVariables[index], newVariables[index + 1]] = [
+      newVariables[index + 1],
+      newVariables[index],
+    ];
+    setVariables(newVariables);
+  };
+
   const startEditAchievement = (index: number) => {
     setEditingAchievementIndex(index);
     setEditAchievement({ ...achievements[index] });
@@ -3127,6 +3373,7 @@ ${description || ""}`;
       selected_preset: selectedPreset,
       presets: presets,
       upgradeSettings: upgradeSettings,
+      levelingSettings,
       rpgSystem: rpgSystem,
       agmtState: agmtEnabled ? agmtState : undefined,
       skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
@@ -3301,6 +3548,7 @@ ${description || ""}`;
         selected_preset: selectedPreset,
         presets: presets,
         upgradeSettings: upgradeSettings,
+        levelingSettings,
         rpgSystem: rpgSystem,
         agmtState: agmtEnabled ? agmtState : undefined,
         skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
@@ -3450,6 +3698,7 @@ ${description || ""}`;
       selected_preset: selectedPreset,
       presets: presets,
       upgradeSettings: upgradeSettings,
+      levelingSettings,
       rpgSystem: rpgSystem,
       agmtState: agmtEnabled ? agmtState : undefined,
       skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
@@ -10444,6 +10693,7 @@ ${description || ""}`;
                 <VariableEditorCard
                   key={variable.id}
                   variable={variable}
+                  index={index}
                   onChange={(updated) => {
                     const newVars = [...variables];
                     newVars[index] = updated;
@@ -10452,6 +10702,16 @@ ${description || ""}`;
                   onDelete={() => {
                     setVariables(variables.filter((_, i) => i !== index));
                   }}
+                  onMoveUp={index > 0 ? () => moveVariableUp(index) : undefined}
+                  onMoveDown={
+                    index < variables.length - 1
+                      ? () => moveVariableDown(index)
+                      : undefined
+                  }
+                  onDragStart={() => handleVariableDragStart(index)}
+                  onDragOver={(e) => handleVariableDragOver(e, index)}
+                  onDragEnd={handleVariableDragEnd}
+                  isDragging={draggedVariableIndex === index}
                 />
               ))}
 
@@ -10977,815 +11237,399 @@ ${description || ""}`;
               </p>
             </div>
 
-            {/* Master Toggle */}
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <div className="flex items-center justify-between">
+            {/* Leveling Curve */}
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6 space-y-4">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-lg font-bold text-white mb-1">
-                    Enable Upgrade System
+                  <h3 className="text-lg font-bold text-white">
+                    Leveling Curve & Upgrade Points
                   </h3>
                   <p className="text-sm text-blue-300/60">
-                    Allow players to spend points on upgrades
+                    Tune XP thresholds, level caps, and how many upgrade points
+                    each level awards.
                   </p>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    XP Base (quadratic curve)
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={upgradeSettings.enabled}
+                    type="number"
+                    min={1}
+                    value={levelingSettings.xpBase ?? 100}
                     onChange={(e) =>
-                      setUpgradeSettings({
-                        ...upgradeSettings,
-                        enabled: e.target.checked,
-                      })
+                      setLevelingSettings((prev) => ({
+                        ...prev,
+                        xpBase: Math.max(1, parseInt(e.target.value, 10) || 1),
+                      }))
                     }
-                    className="sr-only peer"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
-                  <div className="w-14 h-7 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-4 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
-                </label>
+                  <p className="text-xs text-blue-300/60 mt-1">
+                    Controls how quickly XP requirements scale when not using a
+                    custom curve.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Level Cap
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={levelingSettings.levelCap ?? 100}
+                    onChange={(e) =>
+                      setLevelingSettings((prev) => ({
+                        ...prev,
+                        levelCap: Math.max(
+                          1,
+                          parseInt(e.target.value, 10) || 1
+                        ),
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  />
+                  <p className="text-xs text-blue-300/60 mt-1">
+                    Players stop gaining levels (and upgrade points) after
+                    hitting this cap.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Default Upgrade Points per Level
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={levelingSettings.defaultUpgradesPerLevel ?? 1}
+                    onChange={(e) =>
+                      setLevelingSettings((prev) => ({
+                        ...prev,
+                        defaultUpgradesPerLevel: Math.max(
+                          0,
+                          parseInt(e.target.value, 10) || 0
+                        ),
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  />
+                  <p className="text-xs text-blue-300/60 mt-1">
+                    Applied to every level unless you create an override below.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Starting Upgrades (by difficulty)
+                  </label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {(
+                      [
+                        "easy",
+                        "medium",
+                        "hard",
+                        "expert",
+                      ] as AdventureDifficulty[]
+                    ).map((difficulty) => (
+                      <div key={difficulty}>
+                        <span className="block text-xs uppercase tracking-wide text-blue-300/70 mb-1">
+                          {difficulty.charAt(0).toUpperCase() +
+                            difficulty.slice(1)}
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={
+                            levelingSettings.startingUpgrades?.[difficulty] ??
+                            STARTING_UPGRADES_BY_DIFFICULTY[difficulty]
+                          }
+                          onChange={(e) =>
+                            handleStartingUpgradeChange(
+                              difficulty,
+                              Math.max(0, parseInt(e.target.value, 10) || 0)
+                            )
+                          }
+                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-3 text-sm text-blue-200">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-purple-500 rounded border-blue-700/40 bg-blue-900/40"
+                  checked={levelingSettings.useCustomCurve ?? false}
+                  onChange={(e) =>
+                    setLevelingSettings((prev) => ({
+                      ...prev,
+                      useCustomCurve: e.target.checked,
+                    }))
+                  }
+                />
+                Use a custom XP curve (define exact XP for each level)
+              </label>
+
+              {levelingSettings.useCustomCurve && (
+                <div className="rounded-lg border border-blue-800/40 bg-blue-950/40 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-blue-200">
+                      Custom XP Thresholds
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={handleAddCustomCurveEntry}
+                      className="px-3 py-1.5 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors"
+                    >
+                      <DynamicIcon
+                        name="Plus"
+                        className="inline w-4 h-4 mr-1"
+                      />
+                      Add Level
+                    </button>
+                  </div>
+                  {(levelingSettings.customCurve || []).length === 0 && (
+                    <p className="text-sm text-blue-300/70">
+                      Add entries for each level you want to customize. XP is
+                      the total required to reach that level.
+                    </p>
+                  )}
+                  <div className="space-y-3">
+                    {(levelingSettings.customCurve || []).map(
+                      (entry, index) => (
+                        <div
+                          key={`${entry.level}-${index}`}
+                          className="grid gap-3 sm:grid-cols-[1fr,1fr,auto]"
+                        >
+                          <div>
+                            <label className="block text-xs font-semibold text-blue-200 mb-1">
+                              Level
+                            </label>
+                            <input
+                              type="number"
+                              min={2}
+                              value={entry.level}
+                              onChange={(e) =>
+                                handleCustomCurveChange(
+                                  index,
+                                  "level",
+                                  Math.max(2, parseInt(e.target.value, 10) || 2)
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-blue-200 mb-1">
+                              Total XP Required
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={entry.cumulativeXP}
+                              onChange={(e) =>
+                                handleCustomCurveChange(
+                                  index,
+                                  "cumulativeXP",
+                                  Math.max(0, parseInt(e.target.value, 10) || 0)
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRemoveCustomCurveEntry(index)
+                              }
+                              className="w-full sm:w-auto px-3 py-2 text-sm font-medium rounded-lg bg-red-900/40 text-red-200 hover:bg-red-800/40 transition-colors"
+                            >
+                              <DynamicIcon
+                                name="Trash2"
+                                className="inline w-4 h-4 mr-1"
+                              />
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-blue-800/40 bg-blue-950/30 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-blue-200">
+                    Upgrade Point Overrides
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleAddUpgradeOverride}
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors"
+                  >
+                    <DynamicIcon name="Plus" className="inline w-4 h-4 mr-1" />
+                    Add Override
+                  </button>
+                </div>
+                {(levelingSettings.upgradeOverrides || []).length === 0 ? (
+                  <p className="text-sm text-blue-300/70">
+                    Override the default upgrade points for specific levels (for
+                    example, award 3 points at milestone levels).
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {(levelingSettings.upgradeOverrides || []).map(
+                      (override, index) => (
+                        <div
+                          key={`${override.level}-${index}`}
+                          className="grid gap-3 sm:grid-cols-[1fr,1fr,auto]"
+                        >
+                          <div>
+                            <label className="block text-xs font-semibold text-blue-200 mb-1">
+                              Level
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={override.level}
+                              onChange={(e) =>
+                                handleUpgradeOverrideChange(
+                                  index,
+                                  "level",
+                                  Math.max(1, parseInt(e.target.value, 10) || 1)
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-blue-200 mb-1">
+                              Upgrade Points
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={override.upgrades}
+                              onChange={(e) =>
+                                handleUpgradeOverrideChange(
+                                  index,
+                                  "upgrades",
+                                  Math.max(0, parseInt(e.target.value, 10) || 0)
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveUpgradeOverride(index)}
+                              className="w-full sm:w-auto px-3 py-2 text-sm font-medium rounded-lg bg-red-900/40 text-red-200 hover:bg-red-800/40 transition-colors"
+                            >
+                              <DynamicIcon
+                                name="Trash2"
+                                className="inline w-4 h-4 mr-1"
+                              />
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            {upgradeSettings.enabled && (
-              <>
-                {/* Stat Upgrades */}
-                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white">
-                      ?? Stat Upgrades
-                    </h3>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={upgradeSettings.allowStatUpgrade}
-                        onChange={(e) =>
-                          setUpgradeSettings({
-                            ...upgradeSettings,
-                            allowStatUpgrade: e.target.checked,
-                          })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-
-                  {upgradeSettings.allowStatUpgrade && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-blue-200 mb-2">
-                          Cost (points)
-                        </label>
-                        <input
-                          type="number"
-                          value={upgradeSettings.statUpgradeCost}
-                          onChange={(e) =>
-                            setUpgradeSettings({
-                              ...upgradeSettings,
-                              statUpgradeCost: Math.max(
-                                1,
-                                parseInt(e.target.value) || 1
-                              ),
-                            })
-                          }
-                          min="1"
-                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-blue-200 mb-2">
-                          Increase Amount
-                        </label>
-                        <input
-                          type="number"
-                          value={upgradeSettings.statUpgradeAmount}
-                          onChange={(e) =>
-                            setUpgradeSettings({
-                              ...upgradeSettings,
-                              statUpgradeAmount: Math.max(
-                                1,
-                                parseInt(e.target.value) || 1
-                              ),
-                            })
-                          }
-                          min="1"
-                          max="10"
-                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Resource Upgrades */}
-                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white">
-                      ? Resource Upgrades
-                    </h3>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={upgradeSettings.allowResourceUpgrade}
-                        onChange={(e) =>
-                          setUpgradeSettings({
-                            ...upgradeSettings,
-                            allowResourceUpgrade: e.target.checked,
-                          })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                    </label>
-                  </div>
-
-                  {upgradeSettings.allowResourceUpgrade && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-blue-200 mb-2">
-                          Cost (points)
-                        </label>
-                        <input
-                          type="number"
-                          value={upgradeSettings.resourceUpgradeCost}
-                          onChange={(e) =>
-                            setUpgradeSettings({
-                              ...upgradeSettings,
-                              resourceUpgradeCost: Math.max(
-                                1,
-                                parseInt(e.target.value) || 1
-                              ),
-                            })
-                          }
-                          min="1"
-                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-blue-200 mb-2">
-                          Max Value Increase
-                        </label>
-                        <input
-                          type="number"
-                          value={upgradeSettings.resourceUpgradeAmount}
-                          onChange={(e) =>
-                            setUpgradeSettings({
-                              ...upgradeSettings,
-                              resourceUpgradeAmount: Math.max(
-                                1,
-                                parseInt(e.target.value) || 1
-                              ),
-                            })
-                          }
-                          min="1"
-                          max="50"
-                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Add Item */}
-                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white">
-                      ?? Add Custom Items
-                    </h3>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={upgradeSettings.allowAddItem}
-                        onChange={(e) =>
-                          setUpgradeSettings({
-                            ...upgradeSettings,
-                            allowAddItem: e.target.checked,
-                          })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
-                  </div>
-
-                  {upgradeSettings.allowAddItem && (
-                    <div>
-                      <label className="block text-sm font-semibold text-blue-200 mb-2">
-                        Cost (points per item)
-                      </label>
-                      <input
-                        type="number"
-                        value={upgradeSettings.addItemCost}
-                        onChange={(e) =>
-                          setUpgradeSettings({
-                            ...upgradeSettings,
-                            addItemCost: Math.max(
-                              1,
-                              parseInt(e.target.value) || 1
-                            ),
-                          })
-                        }
-                        min="1"
-                        className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Stat Shop */}
-                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <DynamicIcon name="Store" className="w-5 h-5" /> Stat Shop
-                    </h3>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={upgradeSettings.statShopEnabled}
-                        onChange={(e) =>
-                          setUpgradeSettings({
-                            ...upgradeSettings,
-                            statShopEnabled: e.target.checked,
-                          })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
-                    </label>
-                  </div>
-                  <p className="text-xs text-blue-300/60 mb-4">
-                    Allow players to unlock new stats with points
+            {/* Legacy Upgrade Shop Notice */}
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <div className="flex items-start gap-3">
+                <DynamicIcon name="Info" className="w-5 h-5 text-blue-300" />
+                <div>
+                  <h3 className="text-lg font-bold text-white">
+                    Upgrade Shop Removed
+                  </h3>
+                  <p className="text-sm text-blue-200/70">
+                    Point-based stat/resource/item purchases have been retired
+                    in favor of skill trees and custom level-up rewards.
+                    Existing adventures keep their stored values, but new
+                    adventures rely on the leveling curve above plus your skill
+                    tree design.
                   </p>
-
-                  {upgradeSettings.statShopEnabled && (
-                    <div className="space-y-3">
-                      <button
-                        onClick={() => {
-                          const newStat = {
-                            name: "New Stat",
-                            description: "Description...",
-                            symbol: "Star",
-                            startingValue: 1,
-                            cost: 50,
-                          };
-                          setUpgradeSettings({
-                            ...upgradeSettings,
-                            statShop: [...upgradeSettings.statShop, newStat],
-                          });
-                        }}
-                        className="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-lg flex items-center justify-center gap-2"
-                      >
-                        <DynamicIcon name="Plus" className="w-4 h-4" /> Add Shop
-                        Stat
-                      </button>
-
-                      {upgradeSettings.statShop.map((stat, index) => (
-                        <div
-                          key={index}
-                          className="p-3 bg-cyan-900/20 rounded-lg border border-cyan-800/50"
-                        >
-                          <div className="grid grid-cols-2 gap-2 mb-2">
-                            <input
-                              type="text"
-                              value={stat.name}
-                              onChange={(e) => {
-                                const updated = [...upgradeSettings.statShop];
-                                updated[index].name = e.target.value;
-                                setUpgradeSettings({
-                                  ...upgradeSettings,
-                                  statShop: updated,
-                                });
-                              }}
-                              placeholder="Name"
-                              className="px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
-                            />
-                            <IconPicker
-                              value={stat.symbol}
-                              onChange={(icon) => {
-                                const updated = [...upgradeSettings.statShop];
-                                updated[index].symbol = icon;
-                                setUpgradeSettings({
-                                  ...upgradeSettings,
-                                  statShop: updated,
-                                });
-                              }}
-                            />
-                          </div>
-                          <input
-                            type="text"
-                            value={stat.description}
-                            onChange={(e) => {
-                              const updated = [...upgradeSettings.statShop];
-                              updated[index].description = e.target.value;
-                              setUpgradeSettings({
-                                ...upgradeSettings,
-                                statShop: updated,
-                              });
-                            }}
-                            placeholder="Description"
-                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-blue-900/20 text-white"
-                          />
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-xs text-blue-300/60">
-                                Starting Value
-                              </label>
-                              <input
-                                type="number"
-                                value={stat.startingValue}
-                                onChange={(e) => {
-                                  const updated = [...upgradeSettings.statShop];
-                                  updated[index].startingValue = parseInt(
-                                    e.target.value
-                                  );
-                                  setUpgradeSettings({
-                                    ...upgradeSettings,
-                                    statShop: updated,
-                                  });
-                                }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
-                                min="1"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-blue-300/60">
-                                Cost (points)
-                              </label>
-                              <input
-                                type="number"
-                                value={stat.cost}
-                                onChange={(e) => {
-                                  const updated = [...upgradeSettings.statShop];
-                                  updated[index].cost = parseInt(
-                                    e.target.value
-                                  );
-                                  setUpgradeSettings({
-                                    ...upgradeSettings,
-                                    statShop: updated,
-                                  });
-                                }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
-                                min="1"
-                              />
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              const updated = upgradeSettings.statShop.filter(
-                                (_, i) => i !== index
-                              );
-                              setUpgradeSettings({
-                                ...upgradeSettings,
-                                statShop: updated,
-                              });
-                            }}
-                            className="w-full mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
+              </div>
+            </div>
 
-                {/* Resource Shop */}
-                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <DynamicIcon name="ShoppingCart" className="w-5 h-5" />{" "}
-                      Resource Shop
-                    </h3>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={upgradeSettings.resourceShopEnabled}
-                        onChange={(e) =>
-                          setUpgradeSettings({
-                            ...upgradeSettings,
-                            resourceShopEnabled: e.target.checked,
-                          })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                    </label>
-                  </div>
-                  <p className="text-xs text-blue-300/60 mb-4">
-                    Allow players to unlock new resources with points
+            {/* Skill Trees Section */}
+            <div className="bg-purple-900/20 rounded-lg border border-purple-700/40 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <DynamicIcon name="GitBranch" className="w-5 h-5" /> Skill
+                  Trees
+                </h3>
+                <button
+                  onClick={() => {
+                    const newTree = createEmptyTree();
+                    setSkillTrees([...skillTrees, newTree]);
+                  }}
+                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg flex items-center gap-1"
+                >
+                  <DynamicIcon name="Plus" className="w-4 h-4" /> Add Tree
+                </button>
+              </div>
+              <p className="text-xs text-purple-300/60 mb-4">
+                Create skill trees with prerequisite-based unlocks. When skill
+                trees are defined, simple stat/resource upgrades are hidden.
+              </p>
+
+              {skillTrees.length === 0 ? (
+                <div className="text-center py-8 text-purple-300/50">
+                  <DynamicIcon
+                    name="GitBranch"
+                    className="w-12 h-12 mx-auto mb-2 opacity-50"
+                  />
+                  <p>No skill trees defined</p>
+                  <p className="text-xs mt-1">
+                    Players will see simple stat/resource upgrades
                   </p>
-
-                  {upgradeSettings.resourceShopEnabled && (
-                    <div className="space-y-3">
-                      <button
-                        onClick={() => {
-                          const newResource = {
-                            name: "New Resource",
-                            description: "Description...",
-                            symbol: "Gem",
-                            startingValue: 10,
-                            startingMaxValue: 100,
-                            cost: 75,
-                          };
-                          setUpgradeSettings({
-                            ...upgradeSettings,
-                            resourceShop: [
-                              ...upgradeSettings.resourceShop,
-                              newResource,
-                            ],
-                          });
-                        }}
-                        className="w-full px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg flex items-center justify-center gap-2"
-                      >
-                        <DynamicIcon name="Plus" className="w-4 h-4" /> Add Shop
-                        Resource
-                      </button>
-
-                      {upgradeSettings.resourceShop.map((resource, index) => (
-                        <div
-                          key={index}
-                          className="p-3 bg-teal-900/20 rounded-lg border border-teal-800/50"
-                        >
-                          <div className="grid grid-cols-2 gap-2 mb-2">
-                            <input
-                              type="text"
-                              value={resource.name}
-                              onChange={(e) => {
-                                const updated = [
-                                  ...upgradeSettings.resourceShop,
-                                ];
-                                updated[index].name = e.target.value;
-                                setUpgradeSettings({
-                                  ...upgradeSettings,
-                                  resourceShop: updated,
-                                });
-                              }}
-                              placeholder="Name"
-                              className="px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
-                            />
-                            <IconPicker
-                              value={resource.symbol}
-                              onChange={(icon) => {
-                                const updated = [
-                                  ...upgradeSettings.resourceShop,
-                                ];
-                                updated[index].symbol = icon;
-                                setUpgradeSettings({
-                                  ...upgradeSettings,
-                                  resourceShop: updated,
-                                });
-                              }}
-                            />
-                          </div>
-                          <input
-                            type="text"
-                            value={resource.description}
-                            onChange={(e) => {
-                              const updated = [...upgradeSettings.resourceShop];
-                              updated[index].description = e.target.value;
-                              setUpgradeSettings({
-                                ...upgradeSettings,
-                                resourceShop: updated,
-                              });
-                            }}
-                            placeholder="Description"
-                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-blue-900/20 text-white"
-                          />
-                          <div className="grid grid-cols-3 gap-2">
-                            <div>
-                              <label className="text-xs text-blue-300/60">
-                                Start Value
-                              </label>
-                              <input
-                                type="number"
-                                value={resource.startingValue}
-                                onChange={(e) => {
-                                  const updated = [
-                                    ...upgradeSettings.resourceShop,
-                                  ];
-                                  updated[index].startingValue = parseInt(
-                                    e.target.value
-                                  );
-                                  setUpgradeSettings({
-                                    ...upgradeSettings,
-                                    resourceShop: updated,
-                                  });
-                                }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
-                                min="0"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-blue-300/60">
-                                Max Value
-                              </label>
-                              <input
-                                type="number"
-                                value={resource.startingMaxValue}
-                                onChange={(e) => {
-                                  const updated = [
-                                    ...upgradeSettings.resourceShop,
-                                  ];
-                                  updated[index].startingMaxValue = parseInt(
-                                    e.target.value
-                                  );
-                                  setUpgradeSettings({
-                                    ...upgradeSettings,
-                                    resourceShop: updated,
-                                  });
-                                }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
-                                min="1"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-blue-300/60">
-                                Cost (points)
-                              </label>
-                              <input
-                                type="number"
-                                value={resource.cost}
-                                onChange={(e) => {
-                                  const updated = [
-                                    ...upgradeSettings.resourceShop,
-                                  ];
-                                  updated[index].cost = parseInt(
-                                    e.target.value
-                                  );
-                                  setUpgradeSettings({
-                                    ...upgradeSettings,
-                                    resourceShop: updated,
-                                  });
-                                }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
-                                min="1"
-                              />
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              const updated =
-                                upgradeSettings.resourceShop.filter(
-                                  (_, i) => i !== index
-                                );
-                              setUpgradeSettings({
-                                ...upgradeSettings,
-                                resourceShop: updated,
-                              });
-                            }}
-                            className="w-full mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
-
-                {/* Item Shop */}
-                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <DynamicIcon name="Store" className="w-5 h-5" /> Item Shop
-                    </h3>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={upgradeSettings.itemShopEnabled}
-                        onChange={(e) =>
-                          setUpgradeSettings({
-                            ...upgradeSettings,
-                            itemShopEnabled: e.target.checked,
-                          })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
-                    </label>
-                  </div>
-                  <p className="text-xs text-blue-300/60 mb-4">
-                    Provide curated items players can purchase
-                  </p>
-
-                  {upgradeSettings.itemShopEnabled && (
-                    <div className="space-y-3">
-                      <button
-                        onClick={() => {
-                          const newItem = {
-                            name: "New Item",
-                            description: "Description...",
-                            symbol: "Package",
-                            type: "normal" as const,
-                            quantity: 1,
-                            cost: 30,
-                          };
-                          setUpgradeSettings({
-                            ...upgradeSettings,
-                            itemShop: [...upgradeSettings.itemShop, newItem],
-                          });
-                        }}
-                        className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg flex items-center justify-center gap-2"
-                      >
-                        <DynamicIcon name="Plus" className="w-4 h-4" /> Add Shop
-                        Item
-                      </button>
-
-                      {upgradeSettings.itemShop.map((item, index) => (
-                        <div
-                          key={index}
-                          className="p-3 bg-amber-900/20 rounded-lg border border-amber-800/50"
-                        >
-                          <div className="grid grid-cols-2 gap-2 mb-2">
-                            <input
-                              type="text"
-                              value={item.name}
-                              onChange={(e) => {
-                                const updated = [...upgradeSettings.itemShop];
-                                updated[index].name = e.target.value;
-                                setUpgradeSettings({
-                                  ...upgradeSettings,
-                                  itemShop: updated,
-                                });
-                              }}
-                              placeholder="Name"
-                              className="px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
-                            />
-                            <IconPicker
-                              value={item.symbol}
-                              onChange={(icon) => {
-                                const updated = [...upgradeSettings.itemShop];
-                                updated[index].symbol = icon;
-                                setUpgradeSettings({
-                                  ...upgradeSettings,
-                                  itemShop: updated,
-                                });
-                              }}
-                            />
-                          </div>
-                          <input
-                            type="text"
-                            value={item.description}
-                            onChange={(e) => {
-                              const updated = [...upgradeSettings.itemShop];
-                              updated[index].description = e.target.value;
-                              setUpgradeSettings({
-                                ...upgradeSettings,
-                                itemShop: updated,
-                              });
-                            }}
-                            placeholder="Description"
-                            className="w-full px-2 py-1 text-sm border rounded mb-2 bg-blue-900/20 text-white"
-                          />
-                          <div className="grid grid-cols-3 gap-2">
-                            <div>
-                              <label className="text-xs text-blue-300/60">
-                                Type
-                              </label>
-                              <select
-                                value={item.type}
-                                onChange={(e) => {
-                                  const updated = [...upgradeSettings.itemShop];
-                                  updated[index].type = e.target.value as any;
-                                  setUpgradeSettings({
-                                    ...upgradeSettings,
-                                    itemShop: updated,
-                                  });
-                                }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
-                              >
-                                <option value="normal">Normal</option>
-                                <option value="consumable">Consumable</option>
-                                <option value="story">Story</option>
-                                <option value="misc">Misc</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-xs text-blue-300/60">
-                                Quantity
-                              </label>
-                              <input
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) => {
-                                  const updated = [...upgradeSettings.itemShop];
-                                  updated[index].quantity = parseInt(
-                                    e.target.value
-                                  );
-                                  setUpgradeSettings({
-                                    ...upgradeSettings,
-                                    itemShop: updated,
-                                  });
-                                }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
-                                min="1"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-blue-300/60">
-                                Cost (points)
-                              </label>
-                              <input
-                                type="number"
-                                value={item.cost}
-                                onChange={(e) => {
-                                  const updated = [...upgradeSettings.itemShop];
-                                  updated[index].cost = parseInt(
-                                    e.target.value
-                                  );
-                                  setUpgradeSettings({
-                                    ...upgradeSettings,
-                                    itemShop: updated,
-                                  });
-                                }}
-                                className="w-full px-2 py-1 text-sm border rounded bg-blue-900/20 text-white"
-                                min="1"
-                              />
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              const updated = upgradeSettings.itemShop.filter(
-                                (_, i) => i !== index
-                              );
-                              setUpgradeSettings({
-                                ...upgradeSettings,
-                                itemShop: updated,
-                              });
-                            }}
-                            className="w-full mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Skill Trees Section */}
-                <div className="bg-purple-900/20 rounded-lg border border-purple-700/40 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <DynamicIcon name="GitBranch" className="w-5 h-5" /> Skill
-                      Trees
-                    </h3>
-                    <button
-                      onClick={() => {
-                        const newTree = createEmptyTree();
-                        setSkillTrees([...skillTrees, newTree]);
-                      }}
-                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg flex items-center gap-1"
+              ) : (
+                <div className="space-y-6">
+                  {skillTrees.map((tree, index) => (
+                    <div
+                      key={tree.id}
+                      className="border border-purple-700/30 rounded-lg p-4"
                     >
-                      <DynamicIcon name="Plus" className="w-4 h-4" /> Add Tree
-                    </button>
-                  </div>
-                  <p className="text-xs text-purple-300/60 mb-4">
-                    Create skill trees with prerequisite-based unlocks. When
-                    skill trees are defined, simple stat/resource upgrades are
-                    hidden.
-                  </p>
-
-                  {skillTrees.length === 0 ? (
-                    <div className="text-center py-8 text-purple-300/50">
-                      <DynamicIcon
-                        name="GitBranch"
-                        className="w-12 h-12 mx-auto mb-2 opacity-50"
+                      <SkillTreeEditor
+                        tree={tree}
+                        onChange={(updatedTree) => {
+                          const newTrees = [...skillTrees];
+                          newTrees[index] = updatedTree;
+                          setSkillTrees(newTrees);
+                        }}
+                        availableStats={stats}
+                        availableResources={resources}
+                        availableAbilities={abilities}
+                        onDelete={() => {
+                          setSkillTrees(
+                            skillTrees.filter((_, i) => i !== index)
+                          );
+                        }}
                       />
-                      <p>No skill trees defined</p>
-                      <p className="text-xs mt-1">
-                        Players will see simple stat/resource upgrades
-                      </p>
                     </div>
-                  ) : (
-                    <div className="space-y-6">
-                      {skillTrees.map((tree, index) => (
-                        <div
-                          key={tree.id}
-                          className="border border-purple-700/30 rounded-lg p-4"
-                        >
-                          <SkillTreeEditor
-                            tree={tree}
-                            onChange={(updatedTree) => {
-                              const newTrees = [...skillTrees];
-                              newTrees[index] = updatedTree;
-                              setSkillTrees(newTrees);
-                            }}
-                            availableStats={stats}
-                            availableResources={resources}
-                            availableAbilities={abilities}
-                            onDelete={() => {
-                              setSkillTrees(
-                                skillTrees.filter((_, i) => i !== index)
-                              );
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  ))}
                 </div>
-              </>
-            )}
+              )}
+            </div>
           </div>
         );
 
@@ -12098,6 +11942,7 @@ ${description || ""}`;
                               selected_preset: selectedPreset,
                               presets: presets,
                               upgradeSettings: upgradeSettings,
+                              levelingSettings,
                               rpgSystem: rpgSystem,
                               agmtState: agmtEnabled ? agmtState : undefined,
                               skillTrees:

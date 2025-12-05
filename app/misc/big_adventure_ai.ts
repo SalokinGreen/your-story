@@ -515,6 +515,7 @@ export type RegenerateSection =
   | "agmt" // Regenerate agmt state
   | "customTables" // Regenerate custom tables
   | "upgradeShop" // Regenerate upgrade shop
+  | "levelingSettings" // Regenerate leveling curve settings
   | "startingChoices" // Regenerate starting choices
   | "icons"; // Regenerate icon assignments
 
@@ -616,6 +617,12 @@ export const REGENERATE_SECTIONS: Record<
     name: "Upgrade Shop",
     description: "Progression shop items",
     emoji: "🛒",
+    stage: "advanced",
+  },
+  levelingSettings: {
+    name: "Leveling Curve",
+    description: "XP curve and upgrade points per level",
+    emoji: "📈",
     stage: "advanced",
   },
   startingChoices: {
@@ -1547,6 +1554,24 @@ Remember: Output ONLY the JSON object, nothing else.`;
     const schemaFields: string[] = [];
     let instructions = "";
 
+    // Always include leveling settings
+    instructions += `
+LEVELING CURVE & UPGRADES:
+Configure how quickly players level up and how many upgrade points they receive.
+- xpBase: Higher = slower leveling (default 100)
+- levelCap: Maximum level (default 100)  
+- defaultUpgradesPerLevel: Upgrade points per level (default 1)
+- upgradeOverrides: Bonus points at milestone levels (e.g., level 5, 10, etc.)
+- startingUpgrades: Override starting upgrade points per difficulty (easy=3, medium=2, hard=1, expert=0)
+`;
+    schemaFields.push(`"levelingSettings": {
+    "xpBase": number,
+    "levelCap": number,
+    "defaultUpgradesPerLevel": number,
+    "upgradeOverrides": [{ "level": number, "upgrades": number }],
+    "startingUpgrades": { "easy": number, "medium": number, "hard": number, "expert": number }
+  }`);
+
     if (config.includeUpgradeShop && shopItemCount > 0) {
       instructions += `
 UPGRADE SHOP (${shopItemCount} total items):
@@ -2261,6 +2286,7 @@ export function parseBigAdventureStageOutput(
       return {
         storyTemplate: {
           upgradeSettings: parsed.upgradeSettings,
+          levelingSettings: parsed.levelingSettings,
         },
         startingChoices: parsed.startingChoices,
       };
@@ -2845,6 +2871,10 @@ Write full, standalone content - not fragments!`,
       schema: `{ "upgradeSettings": { "enabled": true, "allowStatUpgrade": true, "allowResourceUpgrade": true, "allowAddItem": true, "statUpgradeCost": 10, "statUpgradeAmount": 1, "resourceUpgradeCost": 15, "resourceUpgradeAmount": 10, "addItemCost": 20, "statShopEnabled": boolean, "resourceShopEnabled": boolean, "itemShopEnabled": boolean, "abilityShopEnabled": boolean, "statShop": [...], "resourceShop": [...], "itemShop": [...], "abilityShop": [...] } }`,
       count: Math.round(counts.shopItems * durationMultiplier),
     },
+    levelingSettings: {
+      instruction: `Configure leveling curve and upgrade points per level. xpBase controls how quickly players level (higher = slower), levelCap sets max level, defaultUpgradesPerLevel is standard upgrade points, upgradeOverrides gives bonus points at milestones, startingUpgrades overrides starting points per difficulty.`,
+      schema: `{ "levelingSettings": { "xpBase": number (default 100), "levelCap": number (default 100), "defaultUpgradesPerLevel": number (default 1), "upgradeOverrides": [{ "level": number, "upgrades": number }], "startingUpgrades": { "easy": number, "medium": number, "hard": number, "expert": number } } }`,
+    },
     startingChoices: {
       instruction: "Generate 2-4 starting choices for the adventure beginning.",
       schema: `{ "startingChoices": [{ "text": "string", "intro_override": "string (optional)", "skill_used": "string (optional)", "skill_dc": number (optional), "resource_used": "string (optional)", "item_used": "string (optional)" }] }`,
@@ -2997,6 +3027,8 @@ export function parseRegenerateSectionOutput(
         return { storyTemplate: { customTables: parsed.customTables } };
       case "upgradeShop":
         return { storyTemplate: { upgradeSettings: parsed.upgradeSettings } };
+      case "levelingSettings":
+        return { storyTemplate: { levelingSettings: parsed.levelingSettings } };
       case "startingChoices":
         return { startingChoices: parsed.startingChoices };
       case "icons":
@@ -3253,6 +3285,10 @@ Each table MUST have 20-50 entries for proper variety. Use weights 1-10 (higher 
       schema: `{ "customTables": [{ "id": "table_xxx", "name": "string", "description": "string", "entries": [{ "text": "string (20-50 entries per table!)", "weight": number (1-10) }] }] }`,
     },
     upgradeShop: {
+      instruction: "",
+      schema: "",
+    },
+    levelingSettings: {
       instruction: "",
       schema: "",
     },

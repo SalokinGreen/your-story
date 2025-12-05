@@ -28,6 +28,16 @@ export interface Resource {
 // Adventure difficulty setting (affects all tier conversions)
 export type AdventureDifficulty = "easy" | "medium" | "hard" | "expert";
 
+export const STARTING_UPGRADES_BY_DIFFICULTY: Record<
+  AdventureDifficulty,
+  number
+> = {
+  easy: 3,
+  medium: 2,
+  hard: 1,
+  expert: 0,
+} as const;
+
 // DC (Difficulty Class) tier - AI specifies tier, system converts to number
 export type DCTier =
   | "trivial"
@@ -437,6 +447,7 @@ export interface StoryData {
   selected_preset?: string; // ID of the preset used
   presets?: Preset[]; // Adventure-specific character presets
   upgradeSettings?: UpgradeSettings; // Customizable upgrade system
+  levelingSettings?: LevelingSettings; // Customizable leveling curve
   newGamePlusCount?: number; // Number of NG+ runs completed
   newGamePlusMode?: boolean; // Whether current run is NG+
   nsfw?: boolean; // Whether the story contains NSFW content
@@ -507,6 +518,27 @@ export interface AGMTCharacter {
 }
 
 // Upgrade system configuration
+
+export interface LevelCurvePoint {
+  level: number; // Target level (2+)
+  cumulativeXP: number; // Total XP required to reach this level
+}
+
+export interface LevelUpgradeOverride {
+  level: number; // Target level (2+)
+  upgrades: number; // Upgrade points awarded at this level
+}
+
+export interface LevelingSettings {
+  xpBase?: number; // Base multiplier for quadratic curve
+  levelCap?: number; // Max level attainable
+  useCustomCurve?: boolean; // When true, use customCurve thresholds instead of quadratic
+  customCurve?: LevelCurvePoint[]; // Custom XP requirements per level
+  defaultUpgradesPerLevel?: number; // Default upgrades granted on level up
+  upgradeOverrides?: LevelUpgradeOverride[]; // Per-level overrides for upgrade points
+  startingUpgrades?: Partial<Record<AdventureDifficulty, number>>; // Difficulty-based starting upgrades override
+}
+
 export interface UpgradeSettings {
   enabled: boolean; // Master toggle for upgrade system
   allowStatUpgrade: boolean;
