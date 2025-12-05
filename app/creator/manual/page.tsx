@@ -4369,9 +4369,12 @@ ${description || ""}`;
                   >
                     <button
                       onClick={() => {
+                        // Skip if already selected - don't re-apply preset
+                        if (isSelected) return;
+
                         setSelectedPreset(preset.id);
 
-                        // Apply preset immediately
+                        // Apply preset immediately (only when switching to a new preset)
                         if (preset.id !== "custom") {
                           applyPreset(
                             preset,
@@ -4492,18 +4495,66 @@ ${description || ""}`;
 
             {selectedPreset && selectedPreset !== "custom" && (
               <div className="bg-green-900/20 border border-green-800/50 rounded-lg p-4">
-                <h4 className="text-sm font-bold text-green-300 mb-2 flex items-center gap-2">
-                  <DynamicIcon
-                    name="Sparkles"
-                    className="w-4 h-4 text-green-400"
-                  />{" "}
-                  Preset Applied
-                </h4>
-                <p className="text-xs text-green-400/80">
-                  Your character&apos;s stats, items, and resources have been
-                  pre-configured. You can review and customize them in the
-                  following steps.
-                </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h4 className="text-sm font-bold text-green-300 mb-2 flex items-center gap-2">
+                      <DynamicIcon
+                        name="Sparkles"
+                        className="w-4 h-4 text-green-400"
+                      />{" "}
+                      Preset Selected:{" "}
+                      {presets.find((p) => p.id === selectedPreset)?.name}
+                    </h4>
+                    <p className="text-xs text-green-400/80">
+                      You can customize stats, items, and resources in the
+                      following steps. Click &quot;Reset to Preset&quot; to
+                      restore original values.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const preset = presets.find(
+                        (p) => p.id === selectedPreset
+                      );
+                      if (preset) {
+                        setConfirmDialog({
+                          isOpen: true,
+                          title: "Reset to Preset?",
+                          message: `This will overwrite your current stats, resources, inventory, and other character data with the original "${preset.name}" preset values.`,
+                          icon: "RefreshCw",
+                          confirmText: "Reset",
+                          confirmButtonClass:
+                            "bg-orange-600 hover:bg-orange-700",
+                          onConfirm: () => {
+                            setConfirmDialog({
+                              ...confirmDialog,
+                              isOpen: false,
+                            });
+                            applyPreset(
+                              preset,
+                              setPlayerName,
+                              setPlayerSummary,
+                              setIntro,
+                              setStats,
+                              setResources,
+                              setInventory,
+                              setRelationships,
+                              setAuthorNotes
+                            );
+                            addNotification(
+                              `Reset to ${preset.name} preset!`,
+                              "success"
+                            );
+                          },
+                        });
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded transition-colors flex items-center gap-1 shrink-0"
+                  >
+                    <DynamicIcon name="RefreshCw" className="w-3 h-3" /> Reset
+                    to Preset
+                  </button>
+                </div>
               </div>
             )}
           </div>
