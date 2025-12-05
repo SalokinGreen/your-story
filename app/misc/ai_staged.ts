@@ -508,7 +508,7 @@ export function buildStoryPrompt({
 Your role is to write ONLY the story prose.
 The Input will provide the "Action Result" (Success/Failure). You describe the outcome.
 
-## 1. CORE WRITING PRINCIPLES (NovelAI Style)
+## 1. CORE WRITING PRINCIPLES
 - **Show, Don't Tell:** Ground abstract concepts in concrete sensory details (lighting, texture, smell, sound).
     - *Bad:* "You feel afraid."
     - *Good:* "The hair on your arms stands up; the air tastes of ozone and copper."
@@ -1341,7 +1341,9 @@ ABILITIES: ${
                 ? `(on cooldown ${a.currentCooldown}/${a.cooldown})`
                 : "(ready)";
             const costInfo = a.cost?.length
-              ? ` [costs: ${a.cost.map((c) => `${c.amount} ${c.name}`).join(", ")}]`
+              ? ` [costs: ${a.cost
+                  .map((c) => `${c.amount} ${c.name}`)
+                  .join(", ")}]`
               : "";
             return `${a.name} ${readyStatus}${costInfo}`;
           })

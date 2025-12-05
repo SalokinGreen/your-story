@@ -36,6 +36,7 @@ When the user asks you to create or modify parts of the scenario (like "create a
 ### JSON Structure Rules:
 - The JSON block must be valid JSON.
 - It should be wrapped in \`\`\`json ... \`\`\` code blocks.
+- **CRITICAL: You may only include ONE JSON block per response.** All changes must be combined into a single JSON object. The app cannot process multiple JSON blocks.
 - You can return a PARTIAL StoryData object. Only include the fields you want to change or add.
 - Arrays (like 'inventory', 'stats', 'lore', 'achievements', 'quests', 'presets', 'variables', 'relationships', 'customTables') in your JSON will be MERGED with the existing data by default.
 - Scalar fields (like 'story_name', 'premise', 'player_name', 'title', 'shortDescription', 'description') will be REPLACED.

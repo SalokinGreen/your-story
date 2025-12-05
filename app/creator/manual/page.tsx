@@ -634,6 +634,16 @@ function AdventureCreatorContent() {
   const [isLocal, setIsLocal] = useState(false); // Track if adventure is stored locally
   const hasLoadedAdventureRef = useRef<string | null>(null); // Track loaded adventure ID to prevent re-fetching on tab focus
   const hasLoadedCopyRef = useRef(false); // Track if copy has been processed to prevent double-loading
+  
+  // Conflict resolution state
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictData, setConflictData] = useState<{
+    localDraft: any;
+    onlineAdventure: Adventure;
+    localUpdatedAt: number;
+    onlineUpdatedAt: number;
+  } | null>(null);
+  
   const [selectedPreset, setSelectedPreset] = useState<string>("custom");
   const [presets, setPresets] = useState<Preset[]>([DEFAULT_PRESET]);
   const [showPresetForm, setShowPresetForm] = useState(false);
@@ -1354,78 +1364,62 @@ function AdventureCreatorContent() {
           });
         }
 
-        // After loading from API, overlay any unsaved draft changes
+        // Check for local draft and compare timestamps for conflict resolution
         try {
           const draftKey = `your-story:creator-draft:${editAdventureId}`;
           const raw =
             typeof window !== "undefined"
               ? window.localStorage.getItem(draftKey)
               : null;
-          if (raw) {
+          if (raw && !isFromLocal) {
             const saved = JSON.parse(raw) as any;
+            const localUpdatedAt = saved.updatedAt || 0;
+            const onlineUpdatedAt = adventure!.updatedAt
+              ? new Date(adventure!.updatedAt).getTime()
+              : 0;
 
-            if (saved.title) setTitle(saved.title);
-            if (saved.shortDescription)
-              setShortDescription(saved.shortDescription);
-            if (saved.description) setDescription(saved.description);
-            if (saved.difficulty) setDifficulty(saved.difficulty);
-            if (saved.rpgSystem) setRpgSystem(saved.rpgSystem);
-            if (saved.visibility) setVisibility(saved.visibility);
-            if (saved.nsfw !== undefined) setNsfw(saved.nsfw);
-            if (Array.isArray(saved.tags)) setTags(saved.tags);
-            if (saved.thumbnailUrl) setThumbnailUrl(saved.thumbnailUrl);
-            if (saved.bannerUrl) setBannerUrl(saved.bannerUrl);
+            // If local draft exists and is different from online, show conflict modal
+            // Only show if local draft has a meaningful timestamp (not 0)
+            if (localUpdatedAt > 0 && onlineUpdatedAt > 0) {
+              // Check if there are actual differences by comparing key fields
+              const hasChanges =
+                saved.title !== adventure!.title ||
+                saved.premise !== adventure!.storyTemplate?.premise ||
+                saved.intro !== adventure!.storyTemplate?.intro ||
+                JSON.stringify(saved.stats || []) !==
+                  JSON.stringify(adventure!.storyTemplate?.stats || []) ||
+                JSON.stringify(saved.inventory || []) !==
+                  JSON.stringify(adventure!.storyTemplate?.inventory || []) ||
+                JSON.stringify(saved.lore || []) !==
+                  JSON.stringify(adventure!.storyTemplate?.lore || []);
 
-            if (saved.selectedPreset !== undefined)
-              setSelectedPreset(saved.selectedPreset);
-            if (Array.isArray(saved.presets)) setPresets(saved.presets);
-            if (saved.playerName !== undefined) setPlayerName(saved.playerName);
-            if (saved.playerSummary !== undefined)
-              setPlayerSummary(saved.playerSummary);
-            if (saved.premise !== undefined) setPremise(saved.premise);
-            if (saved.intro !== undefined) setIntro(saved.intro);
-            if (typeof saved.maxChapters === "number")
-              setMaxChapters(saved.maxChapters);
-            if (saved.authorNotes !== undefined)
-              setAuthorNotes(saved.authorNotes);
-
-            if (typeof saved.points === "number") setPoints(saved.points);
-            if (typeof saved.momentum === "number") setMomentum(saved.momentum);
-            if (typeof saved.maxMomentum === "number")
-              setMaxMomentum(saved.maxMomentum);
-
-            if (Array.isArray(saved.stats)) setStats(saved.stats);
-            if (Array.isArray(saved.resources)) setResources(saved.resources);
-            if (Array.isArray(saved.inventory)) setInventory(saved.inventory);
-            if (Array.isArray(saved.abilities)) setAbilities(saved.abilities);
-            if (Array.isArray(saved.lore)) setLore(saved.lore);
-            if (Array.isArray(saved.relationships))
-              setRelationships(saved.relationships);
-            if (Array.isArray(saved.achievements))
-              setAchievements(saved.achievements);
-            if (Array.isArray(saved.quests)) setQuests(saved.quests);
-            if (Array.isArray(saved.customTables))
-              setCustomTables(saved.customTables);
-            if (Array.isArray(saved.variables)) setVariables(saved.variables);
-            if (saved.upgradeSettings)
-              setUpgradeSettings(saved.upgradeSettings);
-            if (saved.agmtEnabled !== undefined)
-              setAGMTEnabled(saved.agmtEnabled);
-            if (saved.agmtState) setAGMTState(saved.agmtState);
-            if (Array.isArray(saved.startingChoices))
-              setStartingChoices(saved.startingChoices);
-
-            if (
-              typeof saved.currentStep === "string" &&
-              steps.some((s) => s.id === saved.currentStep)
-            ) {
-              setCurrentStep(saved.currentStep as CreatorStep);
+              if (hasChanges) {
+                // Show conflict resolution modal
+                setConflictData({
+                  localDraft: saved,
+                  onlineAdventure: adventure!,
+                  localUpdatedAt,
+                  onlineUpdatedAt,
+                });
+                setShowConflictModal(true);
+                // Don't apply anything yet - wait for user choice
+                addNotification(
+                  "Conflict detected between local and online versions",
+                  "warning"
+                );
+              } else {
+                // No meaningful changes, just clear the draft
+                window.localStorage.removeItem(draftKey);
+                addNotification("Adventure loaded for editing", "success");
+              }
+            } else {
+              // No valid timestamps to compare, apply local draft (legacy behavior)
+              applyLocalDraft(saved);
+              addNotification(
+                "Adventure loaded with local changes from this device",
+                "success"
+              );
             }
-
-            addNotification(
-              "Adventure loaded with unsaved changes from this device",
-              "success"
-            );
           } else {
             addNotification(
               isFromLocal
@@ -1435,7 +1429,7 @@ function AdventureCreatorContent() {
             );
           }
         } catch (err) {
-          console.error("Failed to restore draft overlay", err);
+          console.error("Failed to check draft conflict", err);
           addNotification(
             isFromLocal
               ? "Local adventure loaded for editing"
@@ -1458,6 +1452,77 @@ function AdventureCreatorContent() {
 
     loadAdventure();
   }, [editAdventureId, user, router, addNotification]);
+
+  // Helper function to apply local draft to state
+  const applyLocalDraft = (saved: any) => {
+    if (saved.title) setTitle(saved.title);
+    if (saved.shortDescription) setShortDescription(saved.shortDescription);
+    if (saved.description) setDescription(saved.description);
+    if (saved.difficulty) setDifficulty(saved.difficulty);
+    if (saved.rpgSystem) setRpgSystem(saved.rpgSystem);
+    if (saved.visibility) setVisibility(saved.visibility);
+    if (saved.nsfw !== undefined) setNsfw(saved.nsfw);
+    if (Array.isArray(saved.tags)) setTags(saved.tags);
+    if (saved.thumbnailUrl) setThumbnailUrl(saved.thumbnailUrl);
+    if (saved.bannerUrl) setBannerUrl(saved.bannerUrl);
+
+    if (saved.selectedPreset !== undefined) setSelectedPreset(saved.selectedPreset);
+    if (Array.isArray(saved.presets)) setPresets(saved.presets);
+    if (saved.playerName !== undefined) setPlayerName(saved.playerName);
+    if (saved.playerSummary !== undefined) setPlayerSummary(saved.playerSummary);
+    if (saved.premise !== undefined) setPremise(saved.premise);
+    if (saved.intro !== undefined) setIntro(saved.intro);
+    if (typeof saved.maxChapters === "number") setMaxChapters(saved.maxChapters);
+    if (saved.authorNotes !== undefined) setAuthorNotes(saved.authorNotes);
+
+    if (typeof saved.points === "number") setPoints(saved.points);
+    if (typeof saved.momentum === "number") setMomentum(saved.momentum);
+    if (typeof saved.maxMomentum === "number") setMaxMomentum(saved.maxMomentum);
+
+    if (Array.isArray(saved.stats)) setStats(saved.stats);
+    if (Array.isArray(saved.resources)) setResources(saved.resources);
+    if (Array.isArray(saved.inventory)) setInventory(saved.inventory);
+    if (Array.isArray(saved.abilities)) setAbilities(saved.abilities);
+    if (Array.isArray(saved.lore)) setLore(saved.lore);
+    if (Array.isArray(saved.relationships)) setRelationships(saved.relationships);
+    if (Array.isArray(saved.achievements)) setAchievements(saved.achievements);
+    if (Array.isArray(saved.quests)) setQuests(saved.quests);
+    if (Array.isArray(saved.customTables)) setCustomTables(saved.customTables);
+    if (Array.isArray(saved.variables)) setVariables(saved.variables);
+    if (saved.upgradeSettings) setUpgradeSettings(saved.upgradeSettings);
+    if (saved.agmtEnabled !== undefined) setAGMTEnabled(saved.agmtEnabled);
+    if (saved.agmtState) setAGMTState(saved.agmtState);
+    if (Array.isArray(saved.startingChoices)) setStartingChoices(saved.startingChoices);
+
+    if (typeof saved.currentStep === "string" && steps.some((s) => s.id === saved.currentStep)) {
+      setCurrentStep(saved.currentStep as CreatorStep);
+    }
+  };
+
+  // Conflict resolution handlers
+  const handleUseLocalVersion = () => {
+    if (!conflictData || !editAdventureId) return;
+    
+    applyLocalDraft(conflictData.localDraft);
+    setShowConflictModal(false);
+    setConflictData(null);
+    addNotification("Using local version (from this device)", "success");
+  };
+
+  const handleUseOnlineVersion = () => {
+    if (!conflictData || !editAdventureId) return;
+    
+    // Clear the local draft since user chose online version
+    const draftKey = `your-story:creator-draft:${editAdventureId}`;
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(draftKey);
+    }
+    
+    // Online version is already loaded, just close the modal
+    setShowConflictModal(false);
+    setConflictData(null);
+    addNotification("Using online version (from cloud)", "success");
+  };
 
   // Load copied adventure from sessionStorage
   useEffect(() => {
@@ -11803,6 +11868,81 @@ ${description || ""}`;
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
       />
+
+      {/* Conflict Resolution Modal */}
+      {showConflictModal && conflictData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-blue-950 border border-amber-500/50 rounded-xl p-6 max-w-2xl w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
+                <DynamicIcon name="AlertTriangle" className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Version Conflict Detected</h3>
+                <p className="text-sm text-blue-300/70">Choose which version to keep</p>
+              </div>
+            </div>
+
+            <p className="text-blue-200/80 mb-6">
+              This adventure has been edited on another device. You have unsaved changes from this device that conflict with the online version.
+            </p>
+
+            <div className="grid md:grid-cols-2 gap-4 mb-6">
+              {/* Local Version */}
+              <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <DynamicIcon name="Laptop" className="w-4 h-4 text-blue-400" />
+                  <span className="font-semibold text-blue-300">This Device</span>
+                </div>
+                <p className="text-xs text-blue-400/70 mb-3">
+                  Last saved: {new Date(conflictData.localUpdatedAt).toLocaleString()}
+                </p>
+                <div className="text-sm text-blue-200/70 space-y-1">
+                  <p><strong>Title:</strong> {conflictData.localDraft.title || "(empty)"}</p>
+                  <p><strong>Stats:</strong> {conflictData.localDraft.stats?.length || 0} items</p>
+                  <p><strong>Inventory:</strong> {conflictData.localDraft.inventory?.length || 0} items</p>
+                  <p><strong>Lore:</strong> {conflictData.localDraft.lore?.length || 0} entries</p>
+                </div>
+                <button
+                  onClick={handleUseLocalVersion}
+                  className="w-full mt-4 py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <DynamicIcon name="Laptop" className="w-4 h-4" />
+                  Use Local Version
+                </button>
+              </div>
+
+              {/* Online Version */}
+              <div className="bg-green-900/30 border border-green-500/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <DynamicIcon name="Cloud" className="w-4 h-4 text-green-400" />
+                  <span className="font-semibold text-green-300">Cloud (Online)</span>
+                </div>
+                <p className="text-xs text-green-400/70 mb-3">
+                  Last saved: {new Date(conflictData.onlineUpdatedAt).toLocaleString()}
+                </p>
+                <div className="text-sm text-green-200/70 space-y-1">
+                  <p><strong>Title:</strong> {conflictData.onlineAdventure.title || "(empty)"}</p>
+                  <p><strong>Stats:</strong> {conflictData.onlineAdventure.storyTemplate?.stats?.length || 0} items</p>
+                  <p><strong>Inventory:</strong> {conflictData.onlineAdventure.storyTemplate?.inventory?.length || 0} items</p>
+                  <p><strong>Lore:</strong> {conflictData.onlineAdventure.storyTemplate?.lore?.length || 0} entries</p>
+                </div>
+                <button
+                  onClick={handleUseOnlineVersion}
+                  className="w-full mt-4 py-2 px-4 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <DynamicIcon name="Cloud" className="w-4 h-4" />
+                  Use Online Version
+                </button>
+              </div>
+            </div>
+
+            <div className="text-xs text-amber-400/70 text-center">
+              ⚠️ The version you don&apos;t choose will be discarded
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AI Image Generation Modal */}
       {showAIImageModal && (

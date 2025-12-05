@@ -54,6 +54,8 @@ interface RequestBody {
   googleKey?: string;
   // Sampling settings (for Coins mode: Mistral/DeepInfra)
   samplingSettings?: SamplingSettings;
+  // Stop sequences to halt generation
+  stop?: string[];
 }
 
 /**
@@ -105,7 +107,8 @@ function normalizeMistralToolCallIds(messages: ChatMessage[]): ChatMessage[] {
 
   // Generate a Mistral-compatible ID (9 alphanumeric chars)
   const generateId = () => {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const chars =
+      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     const prefix = "tc"; // 2 chars
     const num = (counter++).toString().padStart(7, "0"); // 7 chars = 9 total
     // If counter exceeds 7 digits, use random chars
@@ -138,7 +141,7 @@ function normalizeMistralToolCallIds(messages: ChatMessage[]): ChatMessage[] {
   // Second pass: apply the mapping
   return messages.map((msg) => {
     const newMsg = { ...msg };
-    
+
     // Normalize tool_calls array
     if (newMsg.tool_calls) {
       newMsg.tool_calls = newMsg.tool_calls.map((tc: any) => ({
@@ -146,12 +149,13 @@ function normalizeMistralToolCallIds(messages: ChatMessage[]): ChatMessage[] {
         id: idMap.get(tc.id) || tc.id,
       }));
     }
-    
+
     // Normalize tool_call_id reference
     if (newMsg.tool_call_id) {
-      newMsg.tool_call_id = idMap.get(newMsg.tool_call_id) || newMsg.tool_call_id;
+      newMsg.tool_call_id =
+        idMap.get(newMsg.tool_call_id) || newMsg.tool_call_id;
     }
-    
+
     return newMsg;
   });
 }
@@ -289,6 +293,7 @@ export async function POST(req: NextRequest) {
           deepseekKey,
           googleKey,
           samplingSettings,
+          stop,
         } = body;
 
         if (!messages || messages.length === 0) {
@@ -548,6 +553,11 @@ export async function POST(req: NextRequest) {
         if (tools && tools.length > 0) {
           requestBody.tools = tools;
           requestBody.tool_choice = "auto";
+        }
+
+        // Add stop sequences if provided (supported by all providers)
+        if (stop && stop.length > 0) {
+          requestBody.stop = stop;
         }
 
         // Debug: Log the max_tokens being sent to provider

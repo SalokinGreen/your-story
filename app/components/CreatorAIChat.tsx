@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import ReactMarkdown from "react-markdown";
 import { ChatMessage } from "@/app/misc/ai";
 import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
@@ -769,7 +770,83 @@ function MessageItem({
             : "rounded-tl-sm bg-white dark:bg-blue-950 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700"
         }`}
       >
-        <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
+        <div className="leading-relaxed max-w-none">
+          <ReactMarkdown
+            components={{
+              p: ({ children }) => (
+                <p className={`mb-2 last:mb-0 ${isUser ? "text-white" : "text-gray-800 dark:text-gray-200"}`}>
+                  {children}
+                </p>
+              ),
+              h1: ({ children }) => (
+                <h1 className={`text-xl font-bold mb-2 mt-3 first:mt-0 ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                  {children}
+                </h1>
+              ),
+              h2: ({ children }) => (
+                <h2 className={`text-lg font-bold mb-2 mt-3 first:mt-0 ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                  {children}
+                </h2>
+              ),
+              h3: ({ children }) => (
+                <h3 className={`text-base font-bold mb-1.5 mt-2 first:mt-0 ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                  {children}
+                </h3>
+              ),
+              strong: ({ children }) => (
+                <strong className={`font-bold ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                  {children}
+                </strong>
+              ),
+              em: ({ children }) => (
+                <em className={`italic ${isUser ? "text-white/90" : "text-gray-700 dark:text-gray-300"}`}>
+                  {children}
+                </em>
+              ),
+              ul: ({ children }) => (
+                <ul className={`list-disc ml-4 mb-2 space-y-0.5 last:mb-0 ${isUser ? "text-white" : "text-gray-800 dark:text-gray-200"}`}>
+                  {children}
+                </ul>
+              ),
+              ol: ({ children }) => (
+                <ol className={`list-decimal ml-4 mb-2 space-y-0.5 last:mb-0 ${isUser ? "text-white" : "text-gray-800 dark:text-gray-200"}`}>
+                  {children}
+                </ol>
+              ),
+              li: ({ children }) => (
+                <li className="leading-relaxed">{children}</li>
+              ),
+              blockquote: ({ children }) => (
+                <blockquote className={`border-l-2 pl-3 italic my-2 ${isUser ? "border-white/50 text-white/80" : "border-purple-500 text-gray-600 dark:text-gray-400"}`}>
+                  {children}
+                </blockquote>
+              ),
+              code: ({ children, className }) => {
+                const isBlock = className?.includes("language-");
+                if (isBlock) {
+                  return (
+                    <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 overflow-x-auto my-2">
+                      <code className="text-xs font-mono text-gray-800 dark:text-gray-200">
+                        {children}
+                      </code>
+                    </pre>
+                  );
+                }
+                return (
+                  <code className={`px-1 py-0.5 rounded text-xs font-mono ${isUser ? "bg-white/20 text-blue-200" : "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300"}`}>
+                    {children}
+                  </code>
+                );
+              },
+              pre: ({ children }) => <>{children}</>,
+              hr: () => (
+                <hr className={`my-3 border-t ${isUser ? "border-white/30" : "border-gray-300 dark:border-gray-600"}`} />
+              ),
+            }}
+          >
+            {text}
+          </ReactMarkdown>
+        </div>
         {!isUser && (meta?.tokenCost !== undefined || meta?.isByok) && (
           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50 flex items-center justify-between text-xs">
             <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1.5">

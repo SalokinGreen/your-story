@@ -138,7 +138,8 @@ function normalizeMistralToolCallIds(messages: ChatMessage[]): ChatMessage[] {
 
     // Normalize tool_call_id reference
     if (newMsg.tool_call_id) {
-      newMsg.tool_call_id = idMap.get(newMsg.tool_call_id) || newMsg.tool_call_id;
+      newMsg.tool_call_id =
+        idMap.get(newMsg.tool_call_id) || newMsg.tool_call_id;
     }
 
     return newMsg;

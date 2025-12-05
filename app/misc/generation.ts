@@ -485,6 +485,8 @@ export async function generateStoryTurn(
         openRouterKey: options.openRouterKey,
         deepseekKey: options.deepseekKey,
         googleKey: options.googleKey,
+        // Stop the AI before it generates GM state updates (handled by tools stage)
+        stop: ["[GM State Update]", "[GM State"],
       };
 
       // Add sampling settings for Coins mode (Mistral/DeepInfra)
@@ -649,19 +651,13 @@ export async function generateStoryTurn(
     // These blocks contain bullet-pointed stat changes like "• Health: 95 → 85/100 (-10)"
     // Match the header and all following lines that are bullet points or indented content
     storyContent = storyContent
-      .replace(
-        /\n*\[GM State Update\]\n(?:• [^\n]+\n?)*/gi,
-        ""
-      )
+      .replace(/\n*\[GM State Update\]\n(?:• [^\n]+\n?)*/gi, "")
       .trim();
 
     // Also strip if there's no header but just the bullet-style state changes at the end
     // Pattern: lines starting with • containing arrows (→) indicating stat changes
     storyContent = storyContent
-      .replace(
-        /\n+(?:• [^\n]*→[^\n]*\n?)+$/,
-        ""
-      )
+      .replace(/\n+(?:• [^\n]*→[^\n]*\n?)+$/, "")
       .trim();
 
     callbacks.onStoryComplete?.(

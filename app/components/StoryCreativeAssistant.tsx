@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import { ChatMessage } from "@/app/misc/ai";
 import { StoryData } from "@/app/misc/structs";
@@ -182,12 +182,8 @@ export default function StoryCreativeAssistant({
     }
   }, [model, modelConfig.maxOutputTokens, maxOutputTokens]);
 
-  // Scroll to bottom on new message
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   // Scroll to bottom when modal opens (for existing chat history)
+  // Don't auto-scroll on new messages - user wants to read from top
   useEffect(() => {
     if (isOpen && messages.length > 0) {
       // Small delay to ensure DOM is rendered
@@ -734,13 +730,87 @@ function MessageItem({
         }`}
       >
         <div
-          className={`leading-relaxed prose prose-sm max-w-none ${
+          className={`leading-relaxed max-w-none ${
             isUser
-              ? "prose-invert prose-p:text-white prose-headings:text-white prose-strong:text-white prose-li:text-white prose-code:text-purple-200 prose-code:bg-white/20"
-              : "dark:prose-invert prose-p:text-gray-800 dark:prose-p:text-gray-200 prose-headings:text-gray-900 dark:prose-headings:text-white prose-strong:text-gray-900 dark:prose-strong:text-white prose-li:text-gray-800 dark:prose-li:text-gray-200 prose-code:text-purple-600 dark:prose-code:text-purple-300 prose-code:bg-purple-100 dark:prose-code:bg-purple-900/30"
-          } prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:rounded-lg prose-pre:p-3`}
+              ? "text-white"
+              : "text-gray-800 dark:text-gray-200"
+          }`}
         >
-          <ReactMarkdown>{text}</ReactMarkdown>
+          <ReactMarkdown
+            components={{
+              p: ({ children }) => (
+                <p className={`mb-2 last:mb-0 ${isUser ? "text-white" : "text-gray-800 dark:text-gray-200"}`}>
+                  {children}
+                </p>
+              ),
+              h1: ({ children }) => (
+                <h1 className={`text-xl font-bold mb-2 mt-3 first:mt-0 ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                  {children}
+                </h1>
+              ),
+              h2: ({ children }) => (
+                <h2 className={`text-lg font-bold mb-2 mt-3 first:mt-0 ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                  {children}
+                </h2>
+              ),
+              h3: ({ children }) => (
+                <h3 className={`text-base font-bold mb-1.5 mt-2 first:mt-0 ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                  {children}
+                </h3>
+              ),
+              strong: ({ children }) => (
+                <strong className={`font-bold ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                  {children}
+                </strong>
+              ),
+              em: ({ children }) => (
+                <em className={`italic ${isUser ? "text-white/90" : "text-gray-700 dark:text-gray-300"}`}>
+                  {children}
+                </em>
+              ),
+              ul: ({ children }) => (
+                <ul className={`list-disc ml-4 mb-2 space-y-0.5 last:mb-0 ${isUser ? "text-white" : "text-gray-800 dark:text-gray-200"}`}>
+                  {children}
+                </ul>
+              ),
+              ol: ({ children }) => (
+                <ol className={`list-decimal ml-4 mb-2 space-y-0.5 last:mb-0 ${isUser ? "text-white" : "text-gray-800 dark:text-gray-200"}`}>
+                  {children}
+                </ol>
+              ),
+              li: ({ children }) => (
+                <li className="leading-relaxed">{children}</li>
+              ),
+              blockquote: ({ children }) => (
+                <blockquote className={`border-l-2 pl-3 italic my-2 ${isUser ? "border-white/50 text-white/80" : "border-purple-500 text-gray-600 dark:text-gray-400"}`}>
+                  {children}
+                </blockquote>
+              ),
+              code: ({ children, className }) => {
+                const isBlock = className?.includes("language-");
+                if (isBlock) {
+                  return (
+                    <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 overflow-x-auto my-2">
+                      <code className="text-xs font-mono text-gray-800 dark:text-gray-200">
+                        {children}
+                      </code>
+                    </pre>
+                  );
+                }
+                return (
+                  <code className={`px-1 py-0.5 rounded text-xs font-mono ${isUser ? "bg-white/20 text-purple-200" : "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300"}`}>
+                    {children}
+                  </code>
+                );
+              },
+              pre: ({ children }) => <>{children}</>,
+              hr: () => (
+                <hr className={`my-3 border-t ${isUser ? "border-white/30" : "border-gray-300 dark:border-gray-600"}`} />
+              ),
+            }}
+          >
+            {text}
+          </ReactMarkdown>
         </div>
         {!isUser &&
           (meta?.tokenCost !== undefined || (meta?.isByok as boolean)) && (

@@ -30,6 +30,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   );
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showStateChanges, setShowStateChanges] = useState(false);
   const [prunedParts, setPrunedParts] = useState(0);
   const [embeddingsEnabled, setEmbeddingsEnabled] = useState(false);
   const [embeddingThreshold, setEmbeddingThreshold] = useState(0.25);
@@ -679,7 +680,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           </>
         )}
 
-        {/* State Changes - Always visible when present (outside showInfo) */}
+        {/* State Changes - Always visible when present (outside showInfo) - Collapsible on mobile */}
         {!showInfo &&
           (() => {
             const lastAssistantPart = [...storyData.scene.parts]
@@ -690,19 +691,32 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
               lastAssistantPart.stateChanges.length > 0
             ) {
               return (
-                <div className="text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-2 rounded">
-                  <div className="font-semibold text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1">
-                    <DynamicIcon name="Zap" className="w-3 h-3" />
-                    GM State Changes ({lastAssistantPart.stateChanges.length})
-                  </div>
-                  <ul className="list-disc list-inside text-amber-800 dark:text-amber-300 space-y-0.5">
-                    {lastAssistantPart.stateChanges.map((change, i) => (
-                      <li key={i}>{change}</li>
-                    ))}
-                  </ul>
-                  <div className="text-amber-600 dark:text-amber-500 mt-1 italic text-[10px]">
-                    Shown as [GM State Update] in story history
-                  </div>
+                <div className="text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded overflow-hidden">
+                  <button
+                    onClick={() => setShowStateChanges(!showStateChanges)}
+                    className="w-full font-semibold text-amber-700 dark:text-amber-400 p-2 flex items-center justify-between gap-1 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                  >
+                    <span className="flex items-center gap-1">
+                      <DynamicIcon name="Zap" className="w-3 h-3" />
+                      GM State Changes ({lastAssistantPart.stateChanges.length})
+                    </span>
+                    <DynamicIcon
+                      name={showStateChanges ? "ChevronUp" : "ChevronDown"}
+                      className="w-3 h-3"
+                    />
+                  </button>
+                  {showStateChanges && (
+                    <div className="px-2 pb-2">
+                      <ul className="list-disc list-inside text-amber-800 dark:text-amber-300 space-y-0.5">
+                        {lastAssistantPart.stateChanges.map((change, i) => (
+                          <li key={i}>{change}</li>
+                        ))}
+                      </ul>
+                      <div className="text-amber-600 dark:text-amber-500 mt-1 italic text-[10px]">
+                        Shown as [GM State Update] in story history
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             } else if (

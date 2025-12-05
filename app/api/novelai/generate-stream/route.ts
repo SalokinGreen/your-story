@@ -136,6 +136,8 @@ export async function POST(req: NextRequest) {
           top_p: 0.95,
           top_k: 40,
           stream: true,
+          // Stop before GM state updates (handled by tools stage)
+          stop: ["[GM State Update]", "[GM State"],
         };
 
         logger.action("NovelAI request body", {
