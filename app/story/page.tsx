@@ -35,6 +35,7 @@ import {
   GRADE_CONFIG,
   ItemGrade,
 } from "../misc/itemSystem";
+import { addXP, initializeLevel, getAvailableUpgrades } from "../misc/leveling";
 import { MODEL_PRESETS } from "../misc/ai_prices";
 import Story from "./story";
 import StatsPage from "./stats";
@@ -164,6 +165,14 @@ function getSecureRandomInt(min: number, max: number): number {
   } while (randomNumber >= maxValue - (maxValue % range));
 
   return min + (randomNumber % range);
+}
+
+// Helper to track player actions between turns (shown to AI on next generation)
+function trackPlayerAction(storyData: StoryData, action: string) {
+  if (!storyData.pendingPlayerActions) {
+    storyData.pendingPlayerActions = [];
+  }
+  storyData.pendingPlayerActions.push(action);
 }
 
 // Helper to trigger notifications for quest-related tool responses
@@ -428,16 +437,27 @@ export function processCommands(
 
       if (existing && !existing.dateAchieved) {
         existing.dateAchieved = new Date();
-        storyData.points += existing.points;
+        const xpResult = addXP(storyData, existing.points);
         logger.action("Achievement unlocked via command", {
           title: existing.title,
           points: existing.points,
         });
         addNotification(`Achievement Unlocked: ${existing.title}`, "success");
         addNotification(
-          `Earned ${existing.points} points! Total: ${storyData.points}`,
+          `+${existing.points} XP!${
+            xpResult.leveledUp
+              ? ` 🎉 Level Up! Level ${xpResult.newLevel}!`
+              : ""
+          }`,
           "success"
         );
+        // Track level up for AI context
+        if (xpResult.leveledUp) {
+          trackPlayerAction(
+            storyData,
+            `Leveled up to Level ${xpResult.newLevel} (from achievement: ${existing.title})`
+          );
+        }
       } else if (!existing) {
         logger.warn("Achievement not found - exact match required", {
           achievement: achievementTitle,
@@ -555,19 +575,30 @@ export function processCommands(
         quest.fulfilled = true;
         logger.action("Quest completed via command", { title: quest.title });
 
-        // Award points if not already awarded
+        // Award XP if not already awarded
         if (!storyData.earnedPointsFromQuests.includes(quest.id)) {
           storyData.earnedPointsFromQuests.push(quest.id);
-          storyData.points += quest.points;
-          logger.action("Points awarded for quest", {
-            points: quest.points,
-            totalPoints: storyData.points,
+          const xpResult = addXP(storyData, quest.points);
+          logger.action("XP awarded for quest", {
+            xp: quest.points,
+            totalXP: storyData.points,
           });
           addNotification(`Quest completed: ${quest.title}`, "success");
           addNotification(
-            `Earned ${quest.points} points! Total: ${storyData.points}`,
+            `+${quest.points} XP!${
+              xpResult.leveledUp
+                ? ` 🎉 Level Up! Level ${xpResult.newLevel}!`
+                : ""
+            }`,
             "success"
           );
+          // Track level up for AI context
+          if (xpResult.leveledUp) {
+            trackPlayerAction(
+              storyData,
+              `Leveled up to Level ${xpResult.newLevel} (from quest: ${quest.title})`
+            );
+          }
         } else {
           addNotification(`Quest completed: ${quest.title}`, "success");
         }
@@ -1892,6 +1923,9 @@ function StoryPageContent() {
       if (!loadedStoryData.quests) loadedStoryData.quests = [];
       if (!loadedStoryData.earnedPointsFromQuests)
         loadedStoryData.earnedPointsFromQuests = [];
+
+      // Initialize level from XP if not set (backward compatibility)
+      initializeLevel(loadedStoryData);
 
       //ProcessLoretriggersonloadtoinitializeLorevisibility
       processLoreTriggers(loadedStoryData, addNotification, true);
@@ -4662,11 +4696,27 @@ function StoryPageContent() {
                   !storyData.earnedPointsFromChapters.includes(currentChapter)
                 ) {
                   storyData.earnedPointsFromChapters.push(currentChapter);
-                  storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
+                  const xpResult = addXP(
+                    storyData,
+                    UPGRADE_COSTS.CHAPTER_REWARD
+                  );
                   addNotification(
-                    `Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                    `Chapter ${currentChapter} Complete! +${
+                      UPGRADE_COSTS.CHAPTER_REWARD
+                    } XP${
+                      xpResult.leveledUp
+                        ? ` 🎉 Level Up! You are now Level ${xpResult.newLevel}!`
+                        : ""
+                    }`,
                     "success"
                   );
+                  // Track level up for AI context
+                  if (xpResult.leveledUp) {
+                    trackPlayerAction(
+                      storyData,
+                      `Leveled up to Level ${xpResult.newLevel} (from completing Chapter ${currentChapter})`
+                    );
+                  }
                 }
               }
 
@@ -4972,11 +5022,24 @@ function StoryPageContent() {
                 !storyData.earnedPointsFromChapters.includes(currentChapter)
               ) {
                 storyData.earnedPointsFromChapters.push(currentChapter);
-                storyData.points += UPGRADE_COSTS.CHAPTER_REWARD;
+                const xpResult = addXP(storyData, UPGRADE_COSTS.CHAPTER_REWARD);
                 addNotification(
-                  `Chapter ${currentChapter} Complete! Earned ${UPGRADE_COSTS.CHAPTER_REWARD} points! Total: ${storyData.points}`,
+                  `Chapter ${currentChapter} Complete! +${
+                    UPGRADE_COSTS.CHAPTER_REWARD
+                  } XP${
+                    xpResult.leveledUp
+                      ? ` 🎉 Level Up! You are now Level ${xpResult.newLevel}!`
+                      : ""
+                  }`,
                   "success"
                 );
+                // Track level up for AI context
+                if (xpResult.leveledUp) {
+                  trackPlayerAction(
+                    storyData,
+                    `Leveled up to Level ${xpResult.newLevel} (from completing Chapter ${currentChapter})`
+                  );
+                }
               }
             }
 
@@ -5118,21 +5181,34 @@ function StoryPageContent() {
     await saveProgress(storyData);
   }
 
-  async function handlePurchase(cost: number, callback: () => void) {
+  // Handle level-up upgrades (no longer costs points - limited by level)
+  async function handleUpgrade(callback: () => void) {
     if (!storyData) return;
 
-    if (storyData.points >= cost) {
-      storyData.points -= cost;
-      callback(); //Execute the upgrade
+    const availableUpgrades = getAvailableUpgrades(
+      storyData.level || 1,
+      storyData.upgradesSpent || 0,
+      storyData.difficulty
+    );
+
+    if (availableUpgrades > 0) {
+      callback(); // Execute the upgrade (will increment upgradesSpent)
       setStoryData({ ...storyData });
+      const remainingUpgrades = getAvailableUpgrades(
+        storyData.level || 1,
+        storyData.upgradesSpent || 0,
+        storyData.difficulty
+      );
       addNotification(
-        `Upgrade purchased! (${storyData.points} points remaining)`,
+        `Upgrade applied! (${remainingUpgrades} upgrade${
+          remainingUpgrades !== 1 ? "s" : ""
+        } remaining)`,
         "success"
       );
       await saveProgress(storyData);
     } else {
       addNotification(
-        `Not enough points! Need ${cost}, have ${storyData.points}`,
+        `No upgrades available! Earn more XP to level up.`,
         "failure"
       );
     }
@@ -5798,7 +5874,7 @@ function StoryPageContent() {
         {currentState === StoryState.LORE && <LorePage {...storyData} />}
         {currentState === StoryState.QUESTS && <QuestsPage {...storyData} />}
         {currentState === StoryState.UPGRADES && (
-          <UpgradesPage storyData={storyData} onPurchase={handlePurchase} />
+          <UpgradesPage storyData={storyData} onUpgrade={handleUpgrade} />
         )}
         {currentState === StoryState.MENU && (
           <MenuPage

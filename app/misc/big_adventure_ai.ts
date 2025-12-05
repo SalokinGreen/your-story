@@ -36,6 +36,7 @@ export type GenerationStage =
   | "content-items"
   | "advanced-presets"
   | "advanced-tables"
+  | "advanced-skilltrees"
   | "advanced-other"
   | "icons";
 
@@ -128,6 +129,7 @@ export interface BigAdventureConfig {
   nsfw: boolean;
   includeAGMT: boolean;
   includeUpgradeShop: boolean;
+  includeSkillTrees: boolean;
   includeCustomTables: boolean;
   includePresets: boolean;
   includeStartingChoices: boolean;
@@ -762,6 +764,8 @@ export interface IconAssignments {
   achievements?: Record<string, string>;
   relationships?: Record<string, string>;
   presets?: Record<string, string>;
+  skillTrees?: Record<string, string>; // Tree name -> icon
+  skillTreeNodes?: Record<string, string>; // "TreeName:NodeName" -> icon
 }
 
 export interface BigAdventureResult {
@@ -987,6 +991,22 @@ export function getStageInfo(stage: GenerationStage): {
       number: 7,
       emoji: "🎲",
     },
+    "advanced-skilltrees": {
+      name: "Skill Trees",
+      description: "Character progression trees",
+      detailedDescription:
+        "Creates graphical skill trees for character advancement, allowing players to unlock abilities, stat bonuses, items, and passive effects as they progress.",
+      generates: [
+        "Skill tree structures",
+        "Unlockable abilities",
+        "Stat and resource bonuses",
+        "Passive effects",
+      ],
+      instructionHint:
+        "Shape progression paths, build archetypes, or power scaling",
+      number: 8,
+      emoji: "🌳",
+    },
     "advanced-other": {
       name: "Upgrades & Choices",
       description: "Progression shop and starting options",
@@ -999,7 +1019,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "Shape upgrade paths, starting variations, or progression balance",
-      number: 8,
+      number: 9,
       emoji: "🛒",
     },
     icons: {
@@ -1014,7 +1034,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "The AI will automatically choose thematic icons for each element",
-      number: 9,
+      number: 10,
       emoji: "🎨",
     },
   };
@@ -1445,6 +1465,80 @@ OUTPUT JSON SCHEMA:
 Remember: Output ONLY the JSON object, nothing else.`;
   }
 
+  if (stage === "advanced-skilltrees") {
+    // Determine number of trees based on complexity
+    const treeCount =
+      config.complexity === "complex"
+        ? 3
+        : config.complexity === "moderate"
+        ? 2
+        : 1;
+    const nodesPerTree =
+      config.complexity === "complex"
+        ? 12
+        : config.complexity === "moderate"
+        ? 8
+        : 5;
+
+    return `${basePrompt}
+
+STAGE 4B: SKILL TREES
+Create ${treeCount} thematic skill tree(s) for character progression.
+
+SKILL TREE DESIGN:
+- Each tree should have ${nodesPerTree} nodes arranged in a tree structure
+- Root nodes (prerequisites: []) should be at y: 10-20
+- Child nodes should flow downward (higher y values)
+- Space nodes horizontally (x: 0-100) to prevent overlap
+- Create meaningful progression paths with prerequisites
+- Trees should be thematic (e.g., Combat, Magic, Stealth, Social)
+
+NODE TYPES AND EFFECTS:
+- stat: Grants permanent stat bonuses (e.g., +5 Strength)
+- resource: Increases max resource capacity (e.g., +20 Health max)
+- ability: Unlocks new abilities with full abilityData
+- item: Grants items with full itemData
+- passive: Provides persistent bonuses described in the target field
+
+IMPORTANT:
+- When skill trees are enabled, they REPLACE simple stat/resource upgrades
+- Each node costs 1 upgrade point to unlock
+- Players can respec (reset) their tree to try different paths
+- Design for player choice and build diversity
+
+OUTPUT JSON SCHEMA:
+{
+  "skillTrees": [
+    {
+      "id": "tree_xxx",
+      "name": "Tree Name",
+      "description": "What this tree represents",
+      "symbol": "emoji",
+      "nodes": [
+        {
+          "id": "node_xxx",
+          "name": "Node Name",
+          "description": "What this node grants",
+          "symbol": "emoji",
+          "type": "stat|ability|item|passive|resource",
+          "position": { "x": 0-100, "y": 0-100 },
+          "prerequisites": ["node_id"] or [],
+          "effects": [
+            { "type": "stat_bonus", "target": "StatName", "value": number },
+            { "type": "resource_bonus", "target": "ResourceName", "value": number },
+            { "type": "grant_ability", "target": "AbilityName", "abilityData": { "name": "string", "description": "string", "grade": "string", "cost": [], "cooldown": number, "currentCooldown": 0, "symbol": "emoji" } },
+            { "type": "grant_item", "target": "ItemName", "quantity": number, "itemData": { "name": "string", "description": "string", "type": "string", "symbol": "emoji", "quantity": number, "grade": "string" } },
+            { "type": "passive", "target": "Passive Name: Description of the passive effect" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+Remember: Output ONLY the JSON object, nothing else.`;
+  }
+
   if (stage === "advanced-other") {
     const shopItemCount = config.includeUpgradeShop
       ? Math.round(counts.shopItems * durationMultiplier)
@@ -1555,7 +1649,9 @@ OUTPUT JSON SCHEMA:
     "abilities": { "AbilityName": "icon-id", ... },
     "achievements": { "AchievementTitle": "icon-id", ... },
     "relationships": { "NPCName": "icon-id", ... },
-    "presets": { "PresetName": "icon-id", ... }
+    "presets": { "PresetName": "icon-id", ... },
+    "skillTrees": { "TreeName": "icon-id", ... },
+    "skillTreeNodes": { "TreeName:NodeName": "icon-id", ... }
   }
 }
 
@@ -1743,6 +1839,24 @@ export function buildBigAdventureMessages(
         elementsMessage += `- "${p.name}": ${
           p.description || "No description"
         }\n`;
+      });
+      elementsMessage += "\n";
+    }
+
+    if (template.skillTrees && template.skillTrees.length > 0) {
+      elementsMessage += `SKILL TREES:\n`;
+      template.skillTrees.forEach((tree) => {
+        elementsMessage += `- "${tree.name}": ${
+          tree.description || "No description"
+        }\n`;
+        if (tree.nodes && tree.nodes.length > 0) {
+          elementsMessage += `  NODES:\n`;
+          tree.nodes.forEach((node) => {
+            elementsMessage += `  - "${tree.name}:${node.name}": ${
+              node.description || "No description"
+            } (${node.type})\n`;
+          });
+        }
       });
       elementsMessage += "\n";
     }
@@ -2135,6 +2249,14 @@ export function parseBigAdventureStageOutput(
       };
     }
 
+    if (stage === "advanced-skilltrees") {
+      return {
+        storyTemplate: {
+          skillTrees: parsed.skillTrees,
+        },
+      };
+    }
+
     if (stage === "advanced-other") {
       return {
         storyTemplate: {
@@ -2304,6 +2426,25 @@ export function mergeBigAdventureResults(
           })
         );
       }
+
+      // Apply to skill trees
+      if (
+        (assignments.skillTrees || assignments.skillTreeNodes) &&
+        merged.storyTemplate.skillTrees
+      ) {
+        merged.storyTemplate.skillTrees = merged.storyTemplate.skillTrees.map(
+          (tree) => ({
+            ...tree,
+            symbol: assignments.skillTrees?.[tree.name] || tree.symbol,
+            nodes: tree.nodes.map((node) => ({
+              ...node,
+              symbol:
+                assignments.skillTreeNodes?.[`${tree.name}:${node.name}`] ||
+                node.symbol,
+            })),
+          })
+        );
+      }
     }
   }
 
@@ -2346,6 +2487,9 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
   }
   if (advancedEnabled && (config.includeAGMT || config.includeCustomTables)) {
     stages.push("advanced-tables");
+  }
+  if (advancedEnabled && config.includeSkillTrees) {
+    stages.push("advanced-skilltrees");
   }
   if (
     advancedEnabled &&
@@ -2397,6 +2541,7 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
     "content-items": 2500,
     "advanced-presets": 4000,
     "advanced-tables": 3000,
+    "advanced-skilltrees": 4000,
     "advanced-other": 3000,
     icons: 50000, // Large because we include the full icon list
   };

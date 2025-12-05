@@ -21,6 +21,7 @@ import {
   CustomTable,
   AGMTThread,
   AGMTCharacter,
+  SkillTree,
 } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
 import { buildCreatorMessages, CreatorOutputData } from "@/app/misc/creator_ai";
@@ -63,6 +64,7 @@ export function buildStoryCreatorMessages({
     customTables: storyData.customTables,
     agmtState: storyData.agmtState,
     upgradeSettings: storyData.upgradeSettings,
+    skillTrees: storyData.skillTrees,
     rpgSystem: storyData.rpgSystem,
     momentum: storyData.momentum,
     maxMomentum: storyData.maxMomentum,
@@ -263,6 +265,14 @@ export function applyCreatorChangesToStoryData(
     );
   }
 
+  // Skill trees - merge by id, with special handling for nodes
+  if (changes.skillTrees) {
+    updates.skillTrees = mergeSkillTrees(
+      storyData.skillTrees || [],
+      changes.skillTrees
+    );
+  }
+
   // Complex objects - direct replacement
   if (changes.upgradeSettings !== undefined) {
     updates.upgradeSettings = changes.upgradeSettings;
@@ -358,6 +368,107 @@ function mergeArrayWithCommands<T>(
 }
 
 /**
+ * Merge skill trees with special handling for nodes array
+ * Each tree is identified by id, nodes within trees are identified by their id
+ */
+function mergeSkillTrees(
+  existing: SkillTree[],
+  incoming: (SkillTree & { _command?: string })[]
+): SkillTree[] {
+  const result = [...existing];
+
+  for (const tree of incoming) {
+    const command = (tree as { _command?: string })._command || "merge";
+    const cleanTree = { ...tree } as SkillTree & { _command?: string };
+    delete cleanTree._command;
+
+    const existingIndex = result.findIndex((t) => t.id === tree.id);
+
+    switch (command) {
+      case "delete":
+        if (existingIndex !== -1) {
+          result.splice(existingIndex, 1);
+        }
+        break;
+
+      case "replace":
+        if (existingIndex !== -1) {
+          result[existingIndex] = cleanTree;
+        } else {
+          result.push(cleanTree);
+        }
+        break;
+
+      case "add":
+        result.push(cleanTree);
+        break;
+
+      case "merge":
+      default:
+        if (existingIndex !== -1) {
+          // Merge tree properties, but handle nodes specially
+          const existingTree = result[existingIndex];
+          const mergedTree = { ...existingTree, ...cleanTree };
+
+          // If incoming has nodes, merge them with existing nodes
+          if (cleanTree.nodes && cleanTree.nodes.length > 0) {
+            const mergedNodes = [...(existingTree.nodes || [])];
+
+            for (const node of cleanTree.nodes) {
+              const nodeCommand =
+                (node as { _command?: string })._command || "merge";
+              const cleanNode = { ...node } as typeof node & {
+                _command?: string;
+              };
+              delete cleanNode._command;
+
+              const nodeIndex = mergedNodes.findIndex((n) => n.id === node.id);
+
+              switch (nodeCommand) {
+                case "delete":
+                  if (nodeIndex !== -1) {
+                    mergedNodes.splice(nodeIndex, 1);
+                  }
+                  break;
+                case "replace":
+                  if (nodeIndex !== -1) {
+                    mergedNodes[nodeIndex] = cleanNode;
+                  } else {
+                    mergedNodes.push(cleanNode);
+                  }
+                  break;
+                case "add":
+                  mergedNodes.push(cleanNode);
+                  break;
+                case "merge":
+                default:
+                  if (nodeIndex !== -1) {
+                    mergedNodes[nodeIndex] = {
+                      ...mergedNodes[nodeIndex],
+                      ...cleanNode,
+                    };
+                  } else {
+                    mergedNodes.push(cleanNode);
+                  }
+                  break;
+              }
+            }
+
+            mergedTree.nodes = mergedNodes;
+          }
+
+          result[existingIndex] = mergedTree;
+        } else {
+          result.push(cleanTree);
+        }
+        break;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Get a summary of changes for display
  */
 export function summarizeChanges(changes: CreatorOutputData): string[] {
@@ -420,9 +531,52 @@ export function summarizeChanges(changes: CreatorOutputData): string[] {
   describeArrayChanges(changes.variables, "Variables", "id");
   describeArrayChanges(changes.presets, "Presets", "id");
   describeArrayChanges(changes.customTables, "Custom Tables", "name");
+  describeArrayChanges(changes.skillTrees, "Skill Trees", "id");
 
   if (changes.upgradeSettings) summaries.push("Updated upgrade settings");
   if (changes.agmtState) summaries.push("Updated AGMT state");
 
   return summaries;
+}
+
+/**
+ * Default icons for skill node types
+ */
+const NODE_TYPE_ICONS: Record<string, string> = {
+  stat: "BarChart2",
+  ability: "Sparkles",
+  item: "Package",
+  passive: "Shield",
+  resource: "Zap",
+};
+
+/**
+ * Check if a symbol is a valid icon name (not an emoji)
+ * Valid icons are alphanumeric with dashes (e.g., "sword", "magic-swirl")
+ */
+function isValidIconName(symbol: string | undefined): boolean {
+  if (!symbol) return false;
+  // Emojis contain non-ASCII characters or specific Unicode ranges
+  // Valid icon names are simple alphanumeric strings with dashes
+  return /^[a-zA-Z][a-zA-Z0-9-]*$/.test(symbol);
+}
+
+/**
+ * Sanitize skill trees from AI output
+ * - Converts emoji symbols to valid icon names
+ * - Ensures all required fields exist
+ */
+export function sanitizeSkillTrees(trees: SkillTree[]): SkillTree[] {
+  return trees.map((tree) => ({
+    ...tree,
+    // If tree symbol is invalid (emoji), use default
+    symbol: isValidIconName(tree.symbol) ? tree.symbol : "GitBranch",
+    nodes: tree.nodes.map((node) => ({
+      ...node,
+      // If node symbol is invalid (emoji), use type-based default
+      symbol: isValidIconName(node.symbol)
+        ? node.symbol
+        : NODE_TYPE_ICONS[node.type] || "Circle",
+    })),
+  }));
 }

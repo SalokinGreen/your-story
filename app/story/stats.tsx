@@ -15,11 +15,21 @@ import { useState } from "react";
 import { getRPGSystem } from "../misc/rpgSystems";
 import { GRADE_CONFIG, getMaxDurability, ItemGrade } from "../misc/itemSystem";
 import {
+  getXPProgress,
+  getAvailableUpgrades,
+  formatXP,
+} from "../misc/leveling";
+import {
   ABILITY_GRADE_CONFIG,
   formatAbilityCost,
   formatCooldown,
   getAbilityBonus,
 } from "../misc/abilitySystem";
+import {
+  getStatBonusFromNodes,
+  getResourceBonusFromNodes,
+  getActivePassives,
+} from "../misc/skillTree";
 
 type StatsTab =
   | "stats"
@@ -62,25 +72,61 @@ export default function StatsPage(storyData: StoryData) {
               </p>
             </div>
 
-            {/* Points Display - Prominent at top */}
-            <div className="flex flex-row items-center gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-              <div className="shrink-0">
-                <DynamicIcon name="Coins" className="w-6 h-6 text-yellow-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-row items-baseline justify-between mb-0.5">
-                  <span className="font-medium text-sm text-white">
-                    Upgrade Points
-                  </span>
-                  <span className="font-bold text-lg text-yellow-400">
-                    {storyData.points}
-                  </span>
+            {/* Level & XP Display */}
+            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-full bg-yellow-500/20 border-2 border-yellow-400 flex items-center justify-center">
+                    <span className="text-lg font-bold text-yellow-400">
+                      {storyData.level || 1}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-sm text-white">
+                      Level {storyData.level || 1}
+                    </span>
+                    <p className="text-xs text-blue-200/40">
+                      {formatXP(storyData.points || 0)} XP total
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-blue-200/40">
-                  Earn {UPGRADE_COSTS.BEAT_REWARD} points per story beat,{" "}
-                  {UPGRADE_COSTS.CHAPTER_REWARD} per chapter.
-                </p>
+                {(() => {
+                  const available = getAvailableUpgrades(
+                    storyData.level || 1,
+                    storyData.upgradesSpent || 0,
+                    storyData.difficulty
+                  );
+                  return available > 0 ? (
+                    <div className="px-2 py-1 rounded-lg bg-green-500/20 border border-green-400/50">
+                      <span className="text-sm font-bold text-green-400">
+                        {available} ↑
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
+
+              {/* XP Progress Bar */}
+              {(() => {
+                const progress = getXPProgress(storyData.points || 0);
+                return (
+                  <div className="space-y-1">
+                    <div className="h-2 bg-yellow-950/50 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-linear-to-r from-yellow-500 to-amber-400 rounded-full transition-all duration-500"
+                        style={{ width: `${progress.percentage}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-yellow-300/50">
+                      <span>
+                        {formatXP(progress.xpIntoLevel)}/
+                        {formatXP(progress.xpNeededForNext)} XP
+                      </span>
+                      <span>Level {progress.currentLevel + 1}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -140,6 +186,10 @@ export default function StatsPage(storyData: StoryData) {
                   const system = getRPGSystem(storyData.rpgSystem || "3d6");
                   const modifier = system.statToModifier(stat.value);
 
+                  // Calculate skill tree bonus for this stat
+                  const nodeBonus = getStatBonusFromNodes(storyData, stat.name);
+                  const baseValue = stat.value - nodeBonus;
+
                   // Format modifier display based on system type
                   const getModifierDisplay = () => {
                     if (system.noDice) {
@@ -190,18 +240,49 @@ export default function StatsPage(storyData: StoryData) {
                                 {modifierDisplay}
                               </span>
                             )}
-                            <span
-                              className={`font-bold text-sm ${
-                                stat.value > 0
-                                  ? "text-green-400"
-                                  : stat.value < 0
-                                  ? "text-red-400"
-                                  : "text-blue-200/60"
-                              }`}
-                            >
-                              {stat.value >= 0 ? "+" : ""}
-                              {stat.value}
-                            </span>
+                            {/* Show bonus breakdown if there's a node bonus */}
+                            {nodeBonus !== 0 ? (
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-xs text-blue-200/40">
+                                  {baseValue >= 0 ? "+" : ""}
+                                  {baseValue}
+                                </span>
+                                <span
+                                  className="text-xs font-medium px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400"
+                                  title="From skill tree"
+                                >
+                                  +{nodeBonus}
+                                </span>
+                                <span className="text-xs text-blue-200/40">
+                                  =
+                                </span>
+                                <span
+                                  className={`font-bold text-sm ${
+                                    stat.value > 0
+                                      ? "text-green-400"
+                                      : stat.value < 0
+                                      ? "text-red-400"
+                                      : "text-blue-200/60"
+                                  }`}
+                                >
+                                  {stat.value >= 0 ? "+" : ""}
+                                  {stat.value}
+                                </span>
+                              </div>
+                            ) : (
+                              <span
+                                className={`font-bold text-sm ${
+                                  stat.value > 0
+                                    ? "text-green-400"
+                                    : stat.value < 0
+                                    ? "text-red-400"
+                                    : "text-blue-200/60"
+                                }`}
+                              >
+                                {stat.value >= 0 ? "+" : ""}
+                                {stat.value}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
@@ -323,6 +404,45 @@ export default function StatsPage(storyData: StoryData) {
                   </div>
                 </div>
               )}
+
+              {/* Skill Tree Passives Section */}
+              {(() => {
+                const passives = getActivePassives(storyData);
+                return passives.length > 0 ? (
+                  <div className="mt-6">
+                    <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
+                      <DynamicIcon
+                        name="Sparkles"
+                        className="w-5 h-5 text-emerald-400"
+                      />
+                      Skill Tree Passives
+                    </h3>
+                    <div className="space-y-2">
+                      {passives.map((passive, index) => (
+                        <div
+                          key={index}
+                          className="flex flex-row items-start gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30"
+                        >
+                          <div className="shrink-0">
+                            <DynamicIcon
+                              name="Shield"
+                              className="w-5 h-5 text-emerald-400"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium text-sm text-white">
+                              {passive.name}
+                            </span>
+                            <p className="text-xs text-blue-200/60 mt-0.5">
+                              {passive.description}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
             </div>
           )}
 
@@ -389,51 +509,79 @@ export default function StatsPage(storyData: StoryData) {
                 </div>
 
                 {/* Regular Resources */}
-                {storyData.resources.map((resource, index) => (
-                  <div
-                    key={index}
-                    className="flex flex-row items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/30"
-                  >
-                    <div className="shrink-0">
-                      <DynamicIcon
-                        name={resource.symbol}
-                        className="w-6 h-6 text-green-400"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-row items-baseline justify-between mb-1">
-                        <span className="font-medium text-sm text-white">
-                          {resource.name}
-                        </span>
-                        <span className="font-bold text-sm text-green-400">
-                          {resource.value}/{resource.maxValue}
-                        </span>
-                      </div>
-                      <p className="text-xs text-blue-200/40 mb-1.5">
-                        {resource.description}
-                      </p>
-                      {/* Progress bar */}
-                      <div className="w-full bg-blue-900/50 rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full transition-all duration-300 ${
-                            resource.value / resource.maxValue > 0.5
-                              ? "bg-linear-to-r from-green-500 to-green-600"
-                              : resource.value / resource.maxValue > 0.25
-                              ? "bg-linear-to-r from-yellow-500 to-yellow-600"
-                              : "bg-linear-to-r from-red-500 to-red-600"
-                          }`}
-                          style={{
-                            width: `${
-                              (resource.value / resource.maxValue) * 100 <= 100
-                                ? (resource.value / resource.maxValue) * 100
-                                : 100
-                            }%`,
-                          }}
+                {storyData.resources.map((resource, index) => {
+                  // Calculate skill tree bonus for this resource
+                  const nodeBonus = getResourceBonusFromNodes(
+                    storyData,
+                    resource.name
+                  );
+                  const baseMax = resource.maxValue - nodeBonus;
+
+                  return (
+                    <div
+                      key={index}
+                      className="flex flex-row items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/30"
+                    >
+                      <div className="shrink-0">
+                        <DynamicIcon
+                          name={resource.symbol}
+                          className="w-6 h-6 text-green-400"
                         />
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-row items-baseline justify-between mb-1">
+                          <span className="font-medium text-sm text-white">
+                            {resource.name}
+                          </span>
+                          {/* Show bonus breakdown if there's a node bonus */}
+                          {nodeBonus !== 0 ? (
+                            <div className="flex items-baseline gap-1">
+                              <span className="font-bold text-sm text-green-400">
+                                {resource.value}/
+                              </span>
+                              <span className="text-xs text-blue-200/40">
+                                {baseMax}
+                              </span>
+                              <span
+                                className="text-xs font-medium px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400"
+                                title="Max bonus from skill tree"
+                              >
+                                +{nodeBonus}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="font-bold text-sm text-green-400">
+                              {resource.value}/{resource.maxValue}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-blue-200/40 mb-1.5">
+                          {resource.description}
+                        </p>
+                        {/* Progress bar */}
+                        <div className="w-full bg-blue-900/50 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full transition-all duration-300 ${
+                              resource.value / resource.maxValue > 0.5
+                                ? "bg-linear-to-r from-green-500 to-green-600"
+                                : resource.value / resource.maxValue > 0.25
+                                ? "bg-linear-to-r from-yellow-500 to-yellow-600"
+                                : "bg-linear-to-r from-red-500 to-red-600"
+                            }`}
+                            style={{
+                              width: `${
+                                (resource.value / resource.maxValue) * 100 <=
+                                100
+                                  ? (resource.value / resource.maxValue) * 100
+                                  : 100
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

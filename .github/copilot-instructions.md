@@ -15,10 +15,11 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/story/story.tsx: Presentational story component. Receives full StoryData via spread props, renders scenes with choices. Includes custom input toggle, retry button, and momentum mode selection.
 - app/story/stats.tsx: Stats display component showing character stats, resources, inventory, achievements.
 - app/story/lore.tsx: Lore display component, filters by `on` state (only shows active lore).
-- app/story/menu.tsx: In-game editor for story state (stats, resources, inventory, achievements, lore). Feature parity with creator for all systems. Includes AI Config tab with model selection and TTS settings.
+- app/story/menu.tsx: In-game editor for story state (stats, resources, inventory, abilities, passives, achievements, lore). Feature parity with creator for all systems. Includes AI Config tab with model selection and TTS settings. PassivesEditor component distinguishes manual vs skill-tree-sourced passives.
 - app/story/upgrades.tsx: Character upgrade shop for spending progression points.
 - app/library/page.tsx: Library page showing user's stories and adventures with authenticated fetch.
-- app/creator/page.tsx: Adventure creation interface with full editing capabilities for all story elements.
+- app/creator/page.tsx: Adventure creation interface with full editing capabilities for all story elements including passives.
+- app/creator/manual/page.tsx: Manual adventure creation with all story elements including passives (stored in nodeEffects.passives with nodeId="manual").
 - app/profile/[userId]/page.tsx: User profile page with token balance, adventures, public stories, and admin controls (always at bottom).
 
 ### Data Models
@@ -346,6 +347,12 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - Key functions in abilitySystem.ts: canAffordAbility(), deductAbilityCost(), startCooldown(), getAbilityBonus()
   - findAbilityMatch() in fuzzyMatch.ts for name matching
   - AI tools: add_ability, remove_ability, modify_ability, upgrade_ability, reduce_cooldown, refresh_ability
+- **Passive Effect System**:
+  - Passives are story/RP traits that influence narrative, difficulty, and NPC reactions - NOT direct mechanical bonuses
+  - Example: "Wolf Slayer" makes wolves easier to fight, "Noble Blood" makes nobles treat you with respect
+  - Each passive has: name, description, nodeId (source: "manual", "ai", or skill tree node ID)
+  - AI tools: add_passive, remove_passive, modify_passive
+  - Passives granted by AI use nodeId="ai" to distinguish from skill tree or manually added passives
 - **Resource System**:
   - Required amount: DC ÷ 10 (minimum 5)
   - Insufficient resource penalty: -DC÷10 to dice roll (minimum -5)

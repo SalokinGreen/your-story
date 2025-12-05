@@ -9,6 +9,7 @@ import { getRPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import { ABILITY_GRADE_CONFIG } from "@/app/misc/abilitySystem";
+import { getActivePassives } from "@/app/misc/skillTree";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -182,6 +183,15 @@ export function buildInfoMessage(
             (a.currentCooldown || 0) > 0 ? " (on cooldown)" : " (ready)";
           return `- ${a.name}${gradeLabel}${statInfo}${cooldownInfo}${costInfo}${readyStatus}${desc}`;
         })
+        .join("\n")}`
+    : "";
+
+  // Build passive effects section from skill trees and other sources
+  // Passives are story/RP traits that influence narrative and difficulty, not direct mechanical bonuses
+  const passives = getActivePassives(storyData);
+  const passivesSection = passives.length
+    ? `## Passive Traits\nThese are story/RP traits that influence narrative, difficulty, and NPC reactions - consider them when setting DCs and describing outcomes:\n${passives
+        .map((p) => `- ${p.name}: ${p.description}`)
         .join("\n")}`
     : "";
 
@@ -433,6 +443,7 @@ ${
     resourcesSection,
     inventorySection,
     abilitiesSection,
+    passivesSection,
     achievementsSection,
     loreSection,
     memorySection,
@@ -625,6 +636,17 @@ ${
   if (userChoice) {
     let choiceMessage = `Player chose: ${userChoice}`;
 
+    // Include pending player actions (level ups, skill tree purchases, etc.)
+    if (
+      storyData.pendingPlayerActions &&
+      storyData.pendingPlayerActions.length > 0
+    ) {
+      const actionsNote = `[Player Actions Between Turns]\n${storyData.pendingPlayerActions
+        .map((a) => `• ${a}`)
+        .join("\n")}`;
+      choiceMessage = `${actionsNote}\n\n${choiceMessage}`;
+    }
+
     historyMessages.push({
       role: "user",
       content: cleanString(choiceMessage),
@@ -729,6 +751,10 @@ DO NOT duplicate these changes. Only process NEW events from the STORY TEXT.
     - *Note:* Do not add conditions for "flavor" pain. Only for tactical disadvantages described in the story.
 4. **Knowledge & Quests:** Did the player learn a name, a secret, or a location? -> \`add_memory\` / \`update_quest\`.
 5. **Relationship Delta:** Did an NPC react positively or negatively? -> \`update_relationship\` (Small increments: +1/-1 for chat, +5/-5 for major deeds).
+6. **Passive Traits:** Did the player gain or lose a defining trait through story events? -> \`add_passive\` / \`remove_passive\` / \`modify_passive\`.
+    - Passives are story/RP traits that influence narrative (NOT mechanical bonuses)
+    - Examples: "Wolf Slayer" (gained after defeating many wolves), "Cursed Blood" (gained through dark ritual), "Friend of the Forest" (earned trust of woodland creatures)
+    - Only add passives for SIGNIFICANT character developments, not minor events
 
 ## TOOL USAGE GUIDELINES
 - **Exact Matching:** You must use exact string matching for Item/Stat/Quest names.
@@ -998,6 +1024,14 @@ ${
         .join("\n")
     : "• (No abilities available)"
 }
+
+🌟 PASSIVE TRAITS (influence difficulty and narrative):
+${(() => {
+  const passivesList = getActivePassives(storyData);
+  return passivesList.length > 0
+    ? passivesList.map((p) => `• ${p.name}: ${p.description}`).join("\n")
+    : "• (No passive traits)";
+})()}
 
 ⚠️ ACTIVE CONDITIONS (penalize skill checks):
 ${
@@ -1285,11 +1319,16 @@ INPUT: Player's raw text + Current Game State.
 OUTPUT: A single valid JSON object.
 
 CONTEXTUAL ANALYSIS RULES:
-1.  **Implicit Item Usage:** If the player implies using an item they have (e.g., "I shoot him" -> implies Bow/Gun), assign that item.
-2.  **Implicit Resource Usage:** If an action is physically taxing (sprinting, climbing, magic), assign the relevant Resource (Stamina/Mana) even if not explicitly stated.
-3.  **Implicit Ability Usage:** If the player describes using a skill/spell/technique they have (e.g., "I cast fireball", "I use my lockpicking expertise"), assign that ability. Only assign abilities that are READY (not on cooldown).
-4.  **Skill Continuity:** If the player *just* succeeded at a check (see history), do NOT call for a new check for the same continuous action. Set \`is_plain_action: true\`.
-5.  **No God-Moding:** If the player attempts an impossible action (flying without wings), set \`is_plain_action: false\` but \`skill_used: null\` (The story engine will handle the narrative failure).
+1.  **Stat Selection (skill_used):** Stats are character ATTRIBUTES for skill checks (e.g., Strength, Intelligence, Charisma). Pick the stat that best matches the action type.
+2.  **Resource Consumption (resource_used):** Resources are EXPENDABLE POOLS like Stamina, Mana, Health, Sanity. If the action is physically/mentally taxing (sprinting, climbing, spellcasting), assign the relevant resource to be consumed.
+3.  **Implicit Item Usage:** If the player implies using an item they have (e.g., "I shoot him" -> implies Bow/Gun), assign that item.
+4.  **Implicit Ability Usage:** If the player describes using a skill/spell/technique they have (e.g., "I cast fireball", "I use my lockpicking expertise"), assign that ability. Only assign abilities that are READY (not on cooldown).
+5.  **Skill Continuity:** If the player *just* succeeded at a check (see history), do NOT call for a new check for the same continuous action. Set \`is_plain_action: true\`.
+6.  **No God-Moding:** If the player attempts an impossible action (flying without wings), set \`is_plain_action: false\` but \`skill_used: null\` (The story engine will handle the narrative failure).
+
+KEY DISTINCTION - STATS vs RESOURCES:
+- STATS = Character attributes used for SKILL CHECKS. They do NOT get consumed. (e.g., Strength, Dexterity, Intelligence, Charisma, Perception)
+- RESOURCES = Expendable pools that get SPENT when doing actions. (e.g., Stamina, Mana, Health, Energy, Sanity, Gold)
 
 JSON STRUCTURE:
 {
@@ -1329,10 +1368,18 @@ DECISION PRIORITY:
 5. Is it a BIG multi-step task? -> Set \`challenge_handling.is_complex_event: true\`.
 
 AVAILABLE DATA:
-STATS: ${storyData.stats.map((s) => s.name).join(", ") || "None"}
-RESOURCES: ${storyData.resources.map((r) => r.name).join(", ") || "None"}
-ITEMS: ${storyData.inventory.map((i) => i.name).join(", ") || "None"}
-ABILITIES: ${
+STATS (for skill_used - pick one for skill checks): ${
+    storyData.stats.map((s) => s.name).join(", ") || "None"
+  }
+RESOURCES (for resource_used - expendable pools): ${
+    storyData.resources
+      .map((r) => `${r.name} (${r.value}/${r.maxValue})`)
+      .join(", ") || "None"
+  }
+ITEMS (for item_used): ${
+    storyData.inventory.map((i) => i.name).join(", ") || "None"
+  }
+ABILITIES (for ability_used): ${
     storyData.abilities?.length
       ? storyData.abilities
           .map((a) => {
@@ -1350,6 +1397,12 @@ ABILITIES: ${
           .join(", ")
       : "None"
   }
+PASSIVE TRAITS (influence DC): ${(() => {
+    const passivesList = getActivePassives(storyData);
+    return passivesList.length > 0
+      ? passivesList.map((p) => `${p.name} (${p.description})`).join(", ")
+      : "None";
+  })()}
 ACTIVE CHALLENGE: ${
     storyData.activeChallenge?.active
       ? `"${storyData.activeChallenge.name}" (Best of ${storyData.activeChallenge.rounds}: ${storyData.activeChallenge.currentSuccesses}-${storyData.activeChallenge.currentFailures})`

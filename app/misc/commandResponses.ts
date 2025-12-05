@@ -20,6 +20,7 @@ import {
   findRelationshipMatch,
   findLoreMatch,
   findAbilityMatch,
+  findBestMatch,
 } from "./fuzzyMatch";
 import { logger } from "./logger";
 import { ABILITY_GRADE_ORDER, initializeAbility } from "./abilitySystem";
@@ -158,16 +159,30 @@ export function executeCommandWithResponse(
 
     quest.fulfilled = true;
 
-    // Award points if not already awarded
+    // Award XP if not already awarded
     const alreadyAwarded = storyData.earnedPointsFromQuests.includes(quest.id);
+    let leveledUp = false;
+    let newLevel = storyData.level || 1;
     if (!alreadyAwarded) {
       storyData.earnedPointsFromQuests.push(quest.id);
-      storyData.points += quest.points;
+      storyData.points = (storyData.points || 0) + quest.points;
+      const oldLevel = storyData.level || 1;
+      // Recalculate level (import-free calculation, starting at Level 1)
+      const xp = storyData.points;
+      let level = 1; // Start at Level 1
+      let cumulative = 0;
+      while (cumulative + 100 * level * level <= xp) {
+        cumulative += 100 * level * level;
+        level++;
+      }
+      storyData.level = level;
+      newLevel = level;
+      leveledUp = level > oldLevel;
     }
 
     logger.action("Quest completed via command response", {
       title: quest.title,
-      pointsAwarded: alreadyAwarded ? 0 : quest.points,
+      xpAwarded: alreadyAwarded ? 0 : quest.points,
     });
 
     const fuzzyNote =
@@ -181,7 +196,11 @@ export function executeCommandWithResponse(
       command: trimmed,
       success: true,
       message: `Completed quest "${quest.title}"${
-        alreadyAwarded ? "" : ` (+${quest.points} points)`
+        alreadyAwarded
+          ? ""
+          : ` (+${quest.points} XP${
+              leveledUp ? `, Level Up to ${newLevel}!` : ""
+            })`
       }${fuzzyNote}`,
       timestamp,
     };
@@ -1654,6 +1673,201 @@ export function executeCommandWithResponse(
     };
   }
 
+  // === PASSIVE EFFECT COMMANDS ===
+
+  // /add_passive: name | description
+  const addPassiveMatch = trimmed.match(
+    /^\/add_passive:\s*(.+?)\s*\|\s*(.+)$/i
+  );
+  if (addPassiveMatch) {
+    const name = addPassiveMatch[1].trim();
+    const description = addPassiveMatch[2].trim();
+
+    // Initialize nodeEffects if needed
+    if (!storyData.nodeEffects) {
+      storyData.nodeEffects = {
+        statBonuses: [],
+        resourceBonuses: [],
+        passives: [],
+      };
+    }
+    if (!storyData.nodeEffects.passives) {
+      storyData.nodeEffects.passives = [];
+    }
+
+    // Check for existing passive with same name
+    const existing = storyData.nodeEffects.passives.find(
+      (p) => p.name.toLowerCase() === name.toLowerCase()
+    );
+    if (existing) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Passive "${name}" already exists`,
+        timestamp,
+      };
+    }
+
+    storyData.nodeEffects.passives.push({
+      name,
+      description,
+      nodeId: "ai", // Mark as AI-granted, not from skill tree or manual
+    });
+
+    logger.action("Passive added via command response", { name, description });
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Added passive "${name}": ${description}`,
+      timestamp,
+    };
+  }
+
+  // /remove_passive: name
+  const removePassiveMatch = trimmed.match(/^\/remove_passive:\s*(.+)$/i);
+  if (removePassiveMatch) {
+    const name = removePassiveMatch[1].trim();
+
+    if (
+      !storyData.nodeEffects?.passives ||
+      storyData.nodeEffects.passives.length === 0
+    ) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `No passives exist to remove`,
+        timestamp,
+      };
+    }
+
+    // Find passive with fuzzy matching
+    const matchResult = findBestMatch(
+      name,
+      storyData.nodeEffects.passives,
+      (p) => p.name,
+      0.6
+    );
+
+    if (!matchResult) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Passive "${name}" not found`,
+        timestamp,
+      };
+    }
+
+    const passive = matchResult.item;
+    const index = storyData.nodeEffects.passives.findIndex(
+      (p) => p.name === passive.name
+    );
+    if (index !== -1) {
+      storyData.nodeEffects.passives.splice(index, 1);
+    }
+
+    logger.action("Passive removed via command response", {
+      name: passive.name,
+    });
+
+    const fuzzyNote = !matchResult.isExact
+      ? ` (matched "${name}" → "${passive.name}")`
+      : "";
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Removed passive "${passive.name}"${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
+  // /modify_passive: name | name:newName | desc:newDescription
+  const modifyPassiveMatch = trimmed.match(
+    /^\/modify_passive:\s*(.+?)(?:\s*\|\s*(.+))?$/i
+  );
+  if (modifyPassiveMatch) {
+    const currentName = modifyPassiveMatch[1].trim();
+    const modifications = modifyPassiveMatch[2]?.trim() || "";
+
+    if (
+      !storyData.nodeEffects?.passives ||
+      storyData.nodeEffects.passives.length === 0
+    ) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `No passives exist to modify`,
+        timestamp,
+      };
+    }
+
+    // Find passive with fuzzy matching
+    const matchResult = findBestMatch(
+      currentName,
+      storyData.nodeEffects.passives,
+      (p) => p.name,
+      0.6
+    );
+
+    if (!matchResult) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Passive "${currentName}" not found`,
+        timestamp,
+      };
+    }
+
+    const passive = matchResult.item;
+    const changes: string[] = [];
+
+    // Parse modifications (name:newName, desc:newDescription)
+    const parts = modifications.split("|").map((p) => p.trim());
+    for (const part of parts) {
+      if (part.toLowerCase().startsWith("name:")) {
+        const newName = part.substring(5).trim();
+        if (newName) {
+          passive.name = newName;
+          changes.push(`name → "${newName}"`);
+        }
+      } else if (part.toLowerCase().startsWith("desc:")) {
+        const newDesc = part.substring(5).trim();
+        if (newDesc) {
+          passive.description = newDesc;
+          changes.push(`description updated`);
+        }
+      }
+    }
+
+    if (changes.length === 0) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `No valid modifications specified for passive "${passive.name}"`,
+        timestamp,
+      };
+    }
+
+    logger.action("Passive modified via command response", {
+      originalName: currentName,
+      changes,
+    });
+
+    const fuzzyNote = !matchResult.isExact
+      ? ` (matched "${currentName}" → "${passive.name}")`
+      : "";
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Modified passive "${passive.name}": ${changes.join(
+        ", "
+      )}${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
   // === RESOURCE COMMANDS ===
 
   // /add_resource: name | description | current | max
@@ -1941,11 +2155,23 @@ export function executeCommandWithResponse(
     }
 
     existing.dateAchieved = new Date();
-    storyData.points += existing.points;
+    storyData.points = (storyData.points || 0) + existing.points;
+
+    // Recalculate level (import-free calculation, starting at Level 1)
+    const oldLevel = storyData.level || 1;
+    const xp = storyData.points;
+    let level = 1; // Start at Level 1
+    let cumulative = 0;
+    while (cumulative + 100 * level * level <= xp) {
+      cumulative += 100 * level * level;
+      level++;
+    }
+    storyData.level = level;
+    const leveledUp = level > oldLevel;
 
     logger.action("Achievement unlocked via command response", {
       title: existing.title,
-      points: existing.points,
+      xp: existing.points,
     });
 
     const fuzzyNote =
@@ -1958,7 +2184,9 @@ export function executeCommandWithResponse(
     return {
       command: trimmed,
       success: true,
-      message: `Unlocked achievement "${existing.title}" (+${existing.points} points)${fuzzyNote}`,
+      message: `Unlocked achievement "${existing.title}" (+${
+        existing.points
+      } XP${leveledUp ? `, Level Up to ${level}!` : ""})${fuzzyNote}`,
       timestamp,
     };
   }

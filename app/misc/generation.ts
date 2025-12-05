@@ -448,6 +448,18 @@ export async function generateStoryTurn(
       usePrefill: options.usePrefill !== false, // Default to true
     });
 
+    // Clear pending player actions after they've been included in the prompt
+    // (they were shown to the AI in the user choice message)
+    if (
+      storyData.pendingPlayerActions &&
+      storyData.pendingPlayerActions.length > 0
+    ) {
+      logger.action(
+        `Included ${storyData.pendingPlayerActions.length} pending player actions in prompt`
+      );
+      storyData.pendingPlayerActions = [];
+    }
+
     if (storyPrompt.prunedParts > 0) {
       logger.action(
         `Pruned ${storyPrompt.prunedParts} oldest scene parts to fit context`

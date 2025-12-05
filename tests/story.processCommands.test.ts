@@ -204,7 +204,7 @@ describe("processCommands", () => {
   });
 
   describe("/trigger_achievement command", () => {
-    it("should unlock achievement and award points", () => {
+    it("should unlock achievement and award XP", () => {
       processCommands(
         ["/trigger_achievement: First Victory"],
         mockStoryData,
@@ -214,13 +214,10 @@ describe("processCommands", () => {
       expect(mockStoryData.achievements[0].dateAchieved).toBeInstanceOf(Date);
       expect(mockStoryData.points).toBe(25);
       expect(mockNotification).toHaveBeenCalledWith(
-        "🏆 Achievement Unlocked: First Victory",
+        "Achievement Unlocked: First Victory",
         "success"
       );
-      expect(mockNotification).toHaveBeenCalledWith(
-        "✨ Earned 25 points! Total: 25",
-        "success"
-      );
+      expect(mockNotification).toHaveBeenCalledWith("+25 XP!", "success");
     });
 
     it("should not unlock achievement twice", () => {
@@ -310,7 +307,7 @@ describe("processCommands", () => {
         fulfilled: false,
       });
       expect(mockNotification).toHaveBeenCalledWith(
-        "✨ New quest: Find the Amulet",
+        "New quest: Find the Amulet",
         "success"
       );
     });
@@ -385,7 +382,7 @@ describe("processCommands", () => {
       mockStoryData.earnedPointsFromQuests = [];
     });
 
-    it("should complete quest and award points", () => {
+    it("should complete quest and award XP", () => {
       processCommands(
         ["/complete_quest: Test Quest"],
         mockStoryData,
@@ -396,13 +393,10 @@ describe("processCommands", () => {
       expect(mockStoryData.points).toBe(50);
       expect(mockStoryData.earnedPointsFromQuests).toContain("quest_1");
       expect(mockNotification).toHaveBeenCalledWith(
-        "✅ Quest completed: Test Quest",
+        "Quest completed: Test Quest",
         "success"
       );
-      expect(mockNotification).toHaveBeenCalledWith(
-        "✨ Earned 50 points! Total: 50",
-        "success"
-      );
+      expect(mockNotification).toHaveBeenCalledWith("+50 XP!", "success");
     });
 
     it("should not award points twice for same quest", () => {
@@ -551,7 +545,7 @@ describe("processCommands", () => {
 
       expect(mockStoryData.lore).toHaveLength(1); // Only one entry added
       expect(mockNotification).toHaveBeenCalledWith(
-        '⚠️ Lore "Test Lore" already exists',
+        'Lore "Test Lore" already exists',
         "warning"
       );
     });

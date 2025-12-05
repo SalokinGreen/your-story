@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import { ChatMessage } from "@/app/misc/ai";
 import { StoryData } from "@/app/misc/structs";
@@ -9,6 +15,7 @@ import { parseCreatorOutput } from "@/app/misc/creator_ai";
 import {
   buildStoryCreatorMessages,
   applyCreatorChangesToStoryData,
+  sanitizeSkillTrees,
 } from "@/app/misc/story_creator_ai";
 import { DynamicIcon } from "./DynamicIcon";
 import {
@@ -77,9 +84,9 @@ export default function StoryCreativeAssistant({
   const [maxOutputTokens, setMaxOutputTokens] = useState<number>(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("storyCreatorAiMaxOutput");
-      return stored ? parseInt(stored, 10) : 4000;
+      return stored ? parseInt(stored, 10) : 8000;
     }
-    return 4000;
+    return 8000;
   });
 
   const [novelaiKey, setNovelaiKey] = useState<string>(() => {
@@ -499,7 +506,7 @@ export default function StoryCreativeAssistant({
               <input
                 type="range"
                 min={500}
-                max={Math.min(modelConfig.maxOutputTokens || 8000, 16000)}
+                max={modelConfig.maxOutputTokens || 8000}
                 step={500}
                 value={maxOutputTokens}
                 onChange={(e) =>
@@ -699,8 +706,18 @@ function MessageItem({
   storyData: StoryData;
 }) {
   const isUser = message.role === "user";
-  const { text, data } = parseCreatorOutput(message.content);
+  const { text, data: rawData } = parseCreatorOutput(message.content);
   const meta = message.meta;
+
+  // Sanitize skill trees if present
+  const data = rawData
+    ? {
+        ...rawData,
+        skillTrees: rawData.skillTrees
+          ? sanitizeSkillTrees(rawData.skillTrees)
+          : undefined,
+      }
+    : null;
 
   // Calculate dollar cost from usage if available
   const dollarCost = useMemo(() => {
@@ -731,50 +748,82 @@ function MessageItem({
       >
         <div
           className={`leading-relaxed max-w-none ${
-            isUser
-              ? "text-white"
-              : "text-gray-800 dark:text-gray-200"
+            isUser ? "text-white" : "text-gray-800 dark:text-gray-200"
           }`}
         >
           <ReactMarkdown
             components={{
               p: ({ children }) => (
-                <p className={`mb-2 last:mb-0 ${isUser ? "text-white" : "text-gray-800 dark:text-gray-200"}`}>
+                <p
+                  className={`mb-2 last:mb-0 ${
+                    isUser ? "text-white" : "text-gray-800 dark:text-gray-200"
+                  }`}
+                >
                   {children}
                 </p>
               ),
               h1: ({ children }) => (
-                <h1 className={`text-xl font-bold mb-2 mt-3 first:mt-0 ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                <h1
+                  className={`text-xl font-bold mb-2 mt-3 first:mt-0 ${
+                    isUser ? "text-white" : "text-gray-900 dark:text-white"
+                  }`}
+                >
                   {children}
                 </h1>
               ),
               h2: ({ children }) => (
-                <h2 className={`text-lg font-bold mb-2 mt-3 first:mt-0 ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                <h2
+                  className={`text-lg font-bold mb-2 mt-3 first:mt-0 ${
+                    isUser ? "text-white" : "text-gray-900 dark:text-white"
+                  }`}
+                >
                   {children}
                 </h2>
               ),
               h3: ({ children }) => (
-                <h3 className={`text-base font-bold mb-1.5 mt-2 first:mt-0 ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                <h3
+                  className={`text-base font-bold mb-1.5 mt-2 first:mt-0 ${
+                    isUser ? "text-white" : "text-gray-900 dark:text-white"
+                  }`}
+                >
                   {children}
                 </h3>
               ),
               strong: ({ children }) => (
-                <strong className={`font-bold ${isUser ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                <strong
+                  className={`font-bold ${
+                    isUser ? "text-white" : "text-gray-900 dark:text-white"
+                  }`}
+                >
                   {children}
                 </strong>
               ),
               em: ({ children }) => (
-                <em className={`italic ${isUser ? "text-white/90" : "text-gray-700 dark:text-gray-300"}`}>
+                <em
+                  className={`italic ${
+                    isUser
+                      ? "text-white/90"
+                      : "text-gray-700 dark:text-gray-300"
+                  }`}
+                >
                   {children}
                 </em>
               ),
               ul: ({ children }) => (
-                <ul className={`list-disc ml-4 mb-2 space-y-0.5 last:mb-0 ${isUser ? "text-white" : "text-gray-800 dark:text-gray-200"}`}>
+                <ul
+                  className={`list-disc ml-4 mb-2 space-y-0.5 last:mb-0 ${
+                    isUser ? "text-white" : "text-gray-800 dark:text-gray-200"
+                  }`}
+                >
                   {children}
                 </ul>
               ),
               ol: ({ children }) => (
-                <ol className={`list-decimal ml-4 mb-2 space-y-0.5 last:mb-0 ${isUser ? "text-white" : "text-gray-800 dark:text-gray-200"}`}>
+                <ol
+                  className={`list-decimal ml-4 mb-2 space-y-0.5 last:mb-0 ${
+                    isUser ? "text-white" : "text-gray-800 dark:text-gray-200"
+                  }`}
+                >
                   {children}
                 </ol>
               ),
@@ -782,7 +831,13 @@ function MessageItem({
                 <li className="leading-relaxed">{children}</li>
               ),
               blockquote: ({ children }) => (
-                <blockquote className={`border-l-2 pl-3 italic my-2 ${isUser ? "border-white/50 text-white/80" : "border-purple-500 text-gray-600 dark:text-gray-400"}`}>
+                <blockquote
+                  className={`border-l-2 pl-3 italic my-2 ${
+                    isUser
+                      ? "border-white/50 text-white/80"
+                      : "border-purple-500 text-gray-600 dark:text-gray-400"
+                  }`}
+                >
                   {children}
                 </blockquote>
               ),
@@ -798,14 +853,26 @@ function MessageItem({
                   );
                 }
                 return (
-                  <code className={`px-1 py-0.5 rounded text-xs font-mono ${isUser ? "bg-white/20 text-purple-200" : "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300"}`}>
+                  <code
+                    className={`px-1 py-0.5 rounded text-xs font-mono ${
+                      isUser
+                        ? "bg-white/20 text-purple-200"
+                        : "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300"
+                    }`}
+                  >
                     {children}
                   </code>
                 );
               },
               pre: ({ children }) => <>{children}</>,
               hr: () => (
-                <hr className={`my-3 border-t ${isUser ? "border-white/30" : "border-gray-300 dark:border-gray-600"}`} />
+                <hr
+                  className={`my-3 border-t ${
+                    isUser
+                      ? "border-white/30"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
+                />
               ),
             }}
           >
@@ -1042,6 +1109,17 @@ function ChangeSummary({
       }`,
       details: data.variables,
       icon: "Variable",
+    });
+  }
+  if (data.skillTrees?.length) {
+    changes.push({
+      type: "Add/Update",
+      label: "Skill Trees",
+      value: `${data.skillTrees.length} tree${
+        data.skillTrees.length > 1 ? "s" : ""
+      }`,
+      details: data.skillTrees,
+      icon: "GitBranch",
     });
   }
   if (data.upgradeSettings) {

@@ -32,6 +32,7 @@ import {
   AbilityCost,
   AbilityGrade,
   DCTier,
+  SkillTree,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
@@ -74,6 +75,8 @@ import {
   calculateDeepInfraImageCost,
 } from "@/app/misc/ai_prices";
 import { getAuthToken } from "@/app/misc/getAuthToken";
+import SkillTreeEditor from "@/app/components/SkillTreeEditor";
+import { createEmptyTree } from "@/app/misc/skillTree";
 
 type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
 type DeepInfraImageModelKey = keyof typeof DEEPINFRA_IMAGE_MODELS;
@@ -86,6 +89,7 @@ type CreatorStep =
   | "resources"
   | "inventory"
   | "abilities"
+  | "passives"
   | "lore"
   | "relationships"
   | "achievements"
@@ -634,7 +638,7 @@ function AdventureCreatorContent() {
   const [isLocal, setIsLocal] = useState(false); // Track if adventure is stored locally
   const hasLoadedAdventureRef = useRef<string | null>(null); // Track loaded adventure ID to prevent re-fetching on tab focus
   const hasLoadedCopyRef = useRef(false); // Track if copy has been processed to prevent double-loading
-  
+
   // Conflict resolution state
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictData, setConflictData] = useState<{
@@ -643,7 +647,7 @@ function AdventureCreatorContent() {
     localUpdatedAt: number;
     onlineUpdatedAt: number;
   } | null>(null);
-  
+
   const [selectedPreset, setSelectedPreset] = useState<string>("custom");
   const [presets, setPresets] = useState<Preset[]>([DEFAULT_PRESET]);
   const [showPresetForm, setShowPresetForm] = useState(false);
@@ -656,6 +660,9 @@ function AdventureCreatorContent() {
   const [upgradeSettings, setUpgradeSettings] = useState<UpgradeSettings>(
     DEFAULT_UPGRADE_SETTINGS
   );
+
+  // Skill Trees
+  const [skillTrees, setSkillTrees] = useState<SkillTree[]>([]);
 
   // Basic Info
   const [title, setTitle] = useState("");
@@ -1226,6 +1233,52 @@ function AdventureCreatorContent() {
       );
     }
 
+    // Apply skill trees
+    if (data.skillTrees) {
+      setSkillTrees(
+        applyItemChanges(
+          skillTrees,
+          data.skillTrees as any,
+          "skill tree",
+          "id"
+        ).map((tree: any) => {
+          // Auto-generate ID for new trees without one
+          if (!tree.id) {
+            tree.id = `tree-${Date.now()}-${Math.random()
+              .toString(36)
+              .substring(2, 9)}`;
+          }
+          // Sanitize emoji symbols to valid icon names
+          if (tree.symbol && !/^[a-zA-Z][a-zA-Z0-9-]*$/.test(tree.symbol)) {
+            tree.symbol = "GitBranch";
+          }
+          // Sanitize node symbols
+          if (tree.nodes) {
+            tree.nodes = tree.nodes.map((node: any) => {
+              if (!node.id) {
+                node.id = `node-${Date.now()}-${Math.random()
+                  .toString(36)
+                  .substring(2, 9)}`;
+              }
+              if (node.symbol && !/^[a-zA-Z][a-zA-Z0-9-]*$/.test(node.symbol)) {
+                // Use type-based default icons
+                const typeIcons: Record<string, string> = {
+                  stat: "BarChart2",
+                  ability: "Sparkles",
+                  item: "Package",
+                  passive: "Shield",
+                  resource: "Zap",
+                };
+                node.symbol = typeIcons[node.type] || "Circle";
+              }
+              return node;
+            });
+          }
+          return tree;
+        })
+      );
+    }
+
     // Apply starting choices (adventure-level, not StoryData)
     if ((data as any).startingChoices) {
       setStartingChoices(
@@ -1332,6 +1385,8 @@ function AdventureCreatorContent() {
         setStats(template.stats || []);
         setResources(template.resources || []);
         setInventory(template.inventory || []);
+        setAbilities(template.abilities || []);
+        setPassives(template.nodeEffects?.passives || []);
         setLore(template.lore || []);
         setRelationships(template.relationships || []);
         setAchievements(template.achievements || []);
@@ -1341,6 +1396,7 @@ function AdventureCreatorContent() {
         setUpgradeSettings(
           template.upgradeSettings || DEFAULT_UPGRADE_SETTINGS
         );
+        setSkillTrees(template.skillTrees || []);
 
         // Load points and momentum
         setPoints(template.points || 0);
@@ -1466,35 +1522,46 @@ function AdventureCreatorContent() {
     if (saved.thumbnailUrl) setThumbnailUrl(saved.thumbnailUrl);
     if (saved.bannerUrl) setBannerUrl(saved.bannerUrl);
 
-    if (saved.selectedPreset !== undefined) setSelectedPreset(saved.selectedPreset);
+    if (saved.selectedPreset !== undefined)
+      setSelectedPreset(saved.selectedPreset);
     if (Array.isArray(saved.presets)) setPresets(saved.presets);
     if (saved.playerName !== undefined) setPlayerName(saved.playerName);
-    if (saved.playerSummary !== undefined) setPlayerSummary(saved.playerSummary);
+    if (saved.playerSummary !== undefined)
+      setPlayerSummary(saved.playerSummary);
     if (saved.premise !== undefined) setPremise(saved.premise);
     if (saved.intro !== undefined) setIntro(saved.intro);
-    if (typeof saved.maxChapters === "number") setMaxChapters(saved.maxChapters);
+    if (typeof saved.maxChapters === "number")
+      setMaxChapters(saved.maxChapters);
     if (saved.authorNotes !== undefined) setAuthorNotes(saved.authorNotes);
 
     if (typeof saved.points === "number") setPoints(saved.points);
     if (typeof saved.momentum === "number") setMomentum(saved.momentum);
-    if (typeof saved.maxMomentum === "number") setMaxMomentum(saved.maxMomentum);
+    if (typeof saved.maxMomentum === "number")
+      setMaxMomentum(saved.maxMomentum);
 
     if (Array.isArray(saved.stats)) setStats(saved.stats);
     if (Array.isArray(saved.resources)) setResources(saved.resources);
     if (Array.isArray(saved.inventory)) setInventory(saved.inventory);
     if (Array.isArray(saved.abilities)) setAbilities(saved.abilities);
+    if (Array.isArray(saved.passives)) setPassives(saved.passives);
     if (Array.isArray(saved.lore)) setLore(saved.lore);
-    if (Array.isArray(saved.relationships)) setRelationships(saved.relationships);
+    if (Array.isArray(saved.relationships))
+      setRelationships(saved.relationships);
     if (Array.isArray(saved.achievements)) setAchievements(saved.achievements);
     if (Array.isArray(saved.quests)) setQuests(saved.quests);
     if (Array.isArray(saved.customTables)) setCustomTables(saved.customTables);
     if (Array.isArray(saved.variables)) setVariables(saved.variables);
     if (saved.upgradeSettings) setUpgradeSettings(saved.upgradeSettings);
+    if (Array.isArray(saved.skillTrees)) setSkillTrees(saved.skillTrees);
     if (saved.agmtEnabled !== undefined) setAGMTEnabled(saved.agmtEnabled);
     if (saved.agmtState) setAGMTState(saved.agmtState);
-    if (Array.isArray(saved.startingChoices)) setStartingChoices(saved.startingChoices);
+    if (Array.isArray(saved.startingChoices))
+      setStartingChoices(saved.startingChoices);
 
-    if (typeof saved.currentStep === "string" && steps.some((s) => s.id === saved.currentStep)) {
+    if (
+      typeof saved.currentStep === "string" &&
+      steps.some((s) => s.id === saved.currentStep)
+    ) {
       setCurrentStep(saved.currentStep as CreatorStep);
     }
   };
@@ -1502,7 +1569,7 @@ function AdventureCreatorContent() {
   // Conflict resolution handlers
   const handleUseLocalVersion = () => {
     if (!conflictData || !editAdventureId) return;
-    
+
     applyLocalDraft(conflictData.localDraft);
     setShowConflictModal(false);
     setConflictData(null);
@@ -1511,13 +1578,13 @@ function AdventureCreatorContent() {
 
   const handleUseOnlineVersion = () => {
     if (!conflictData || !editAdventureId) return;
-    
+
     // Clear the local draft since user chose online version
     const draftKey = `your-story:creator-draft:${editAdventureId}`;
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(draftKey);
     }
-    
+
     // Online version is already loaded, just close the modal
     setShowConflictModal(false);
     setConflictData(null);
@@ -1586,6 +1653,7 @@ function AdventureCreatorContent() {
           setResources(template.resources || []);
           setInventory(template.inventory || []);
           setAbilities(template.abilities || []);
+          setPassives(template.nodeEffects?.passives || []);
           setLore(template.lore || []);
           setRelationships(template.relationships || []);
           setAchievements(template.achievements || []);
@@ -1595,6 +1663,7 @@ function AdventureCreatorContent() {
           setUpgradeSettings(
             template.upgradeSettings || DEFAULT_UPGRADE_SETTINGS
           );
+          setSkillTrees(template.skillTrees || []);
 
           // Load points and momentum
           setPoints(template.points || 0);
@@ -1712,6 +1781,16 @@ function AdventureCreatorContent() {
   );
   const [editAbility, setEditAbility] = useState<Partial<Ability>>({});
   const [editAbilityCosts, setEditAbilityCosts] = useState<AbilityCost[]>([]);
+
+  // Starting Passives
+  const [passives, setPassives] = useState<
+    { name: string; description: string; nodeId: string }[]
+  >([]);
+  const [newPassive, setNewPassive] = useState({ name: "", description: "" });
+  const [editingPassiveIndex, setEditingPassiveIndex] = useState<number | null>(
+    null
+  );
+  const [editPassive, setEditPassive] = useState({ name: "", description: "" });
 
   // Lore
   const [lore, setLore] = useState<StoryLore[]>([]);
@@ -1905,6 +1984,7 @@ function AdventureCreatorContent() {
     { id: "resources", label: "Resources", icon: "Gem" },
     { id: "inventory", label: "Starting Items", icon: "Backpack" },
     { id: "abilities", label: "Starting Abilities", icon: "Wand2" },
+    { id: "passives", label: "Passive Effects", icon: "Sparkles" },
     { id: "lore", label: "Lore", icon: "Scroll" },
     { id: "relationships", label: "Relationships", icon: "Users" },
     { id: "achievements", label: "Achievements", icon: "Trophy" },
@@ -1963,6 +2043,7 @@ function AdventureCreatorContent() {
       if (Array.isArray(saved.resources)) setResources(saved.resources);
       if (Array.isArray(saved.inventory)) setInventory(saved.inventory);
       if (Array.isArray(saved.abilities)) setAbilities(saved.abilities);
+      if (Array.isArray(saved.passives)) setPassives(saved.passives);
       if (Array.isArray(saved.lore)) setLore(saved.lore);
       if (Array.isArray(saved.achievements))
         setAchievements(saved.achievements);
@@ -1971,6 +2052,7 @@ function AdventureCreatorContent() {
         setCustomTables(saved.customTables);
       if (Array.isArray(saved.variables)) setVariables(saved.variables);
       if (saved.upgradeSettings) setUpgradeSettings(saved.upgradeSettings);
+      if (Array.isArray(saved.skillTrees)) setSkillTrees(saved.skillTrees);
       if (saved.agmtEnabled !== undefined) setAGMTEnabled(saved.agmtEnabled);
       if (saved.agmtState) setAGMTState(saved.agmtState);
       if (Array.isArray(saved.startingChoices))
@@ -2037,6 +2119,7 @@ function AdventureCreatorContent() {
       resources,
       inventory,
       abilities,
+      passives,
       lore,
       relationships,
       achievements,
@@ -2044,6 +2127,7 @@ function AdventureCreatorContent() {
       customTables,
       variables,
       upgradeSettings,
+      skillTrees,
       agmtEnabled,
       agmtState,
       startingChoices,
@@ -2085,6 +2169,7 @@ function AdventureCreatorContent() {
     resources,
     inventory,
     abilities,
+    passives,
     lore,
     relationships,
     achievements,
@@ -2094,6 +2179,7 @@ function AdventureCreatorContent() {
     agmtEnabled,
     agmtState,
     upgradeSettings,
+    skillTrees,
     startingChoices,
     currentStep,
   ]);
@@ -3043,6 +3129,15 @@ ${description || ""}`;
       upgradeSettings: upgradeSettings,
       rpgSystem: rpgSystem,
       agmtState: agmtEnabled ? agmtState : undefined,
+      skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
+      nodeEffects:
+        passives.length > 0
+          ? {
+              statBonuses: [],
+              resourceBonuses: [],
+              passives: passives,
+            }
+          : undefined,
     };
 
     // Save complete adventure using localAdventureManager
@@ -3208,6 +3303,15 @@ ${description || ""}`;
         upgradeSettings: upgradeSettings,
         rpgSystem: rpgSystem,
         agmtState: agmtEnabled ? agmtState : undefined,
+        skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
+        nodeEffects:
+          passives.length > 0
+            ? {
+                statBonuses: [],
+                resourceBonuses: [],
+                passives: passives,
+              }
+            : undefined,
       };
 
       // Get auth token
@@ -3348,6 +3452,15 @@ ${description || ""}`;
       upgradeSettings: upgradeSettings,
       rpgSystem: rpgSystem,
       agmtState: agmtEnabled ? agmtState : undefined,
+      skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
+      nodeEffects:
+        passives.length > 0
+          ? {
+              statBonuses: [],
+              resourceBonuses: [],
+              passives: passives,
+            }
+          : undefined,
     };
 
     // If editing a local adventure, save to IndexedDB instead of database
@@ -7028,6 +7141,215 @@ ${description || ""}`;
                             <DynamicIcon name="Trash2" className="w-4 h-4" />
                           </button>
                         </div>
+                      </div>
+                    </div>
+                  )
+                )
+              )}
+            </div>
+          </div>
+        );
+
+      case "passives":
+        return (
+          <div className="space-y-6">
+            <div className="bg-purple-900/20 border border-purple-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>Tip:</strong> Passives are story and RP traits that
+                  influence how the AI treats your character - they affect
+                  narrative, difficulty, and NPC reactions rather than giving
+                  direct mechanical bonuses. Example: &quot;Wolf Slayer&quot;
+                  might make wolves easier to fight or intimidate.
+                </span>
+              </p>
+            </div>
+
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
+                Add Starting Passive
+              </h3>
+              <div className="space-y-4 mb-4">
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newPassive.name}
+                    onChange={(e) =>
+                      setNewPassive({ ...newPassive, name: e.target.value })
+                    }
+                    placeholder="e.g., Swift Reflexes"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Description *
+                  </label>
+                  <textarea
+                    value={newPassive.description}
+                    onChange={(e) =>
+                      setNewPassive({
+                        ...newPassive,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., +1 to all Agility checks"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (newPassive.name && newPassive.description) {
+                    setPassives([
+                      ...passives,
+                      { ...newPassive, nodeId: "manual" },
+                    ]);
+                    setNewPassive({ name: "", description: "" });
+                  }
+                }}
+                disabled={!newPassive.name || !newPassive.description}
+                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+              >
+                Add Passive
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-lg font-bold text-white">
+                Starting Passives ({passives.length})
+              </h3>
+              {passives.length === 0 ? (
+                <p className="text-blue-300/60 text-sm">
+                  No passives added yet
+                </p>
+              ) : (
+                passives.map((passive, index) =>
+                  editingPassiveIndex === index ? (
+                    <div
+                      key={index}
+                      className="p-4 bg-purple-900/40 rounded-lg border-2 border-purple-600"
+                    >
+                      <div className="space-y-3 mb-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={editPassive.name}
+                            onChange={(e) =>
+                              setEditPassive({
+                                ...editPassive,
+                                name: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Description *
+                          </label>
+                          <textarea
+                            value={editPassive.description}
+                            onChange={(e) =>
+                              setEditPassive({
+                                ...editPassive,
+                                description: e.target.value,
+                              })
+                            }
+                            rows={3}
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm resize-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            if (editPassive.name && editPassive.description) {
+                              const updated = [...passives];
+                              updated[index] = {
+                                ...editPassive,
+                                nodeId: passives[index].nodeId,
+                              };
+                              setPassives(updated);
+                              setEditingPassiveIndex(null);
+                              setEditPassive({ name: "", description: "" });
+                            }
+                          }}
+                          disabled={
+                            !editPassive.name || !editPassive.description
+                          }
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          <DynamicIcon
+                            name="Save"
+                            className="inline-block w-4 h-4 mr-1"
+                          />
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingPassiveIndex(null);
+                            setEditPassive({ name: "", description: "" });
+                          }}
+                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-4 rounded-lg border bg-purple-900/15 border-purple-700/40"
+                    >
+                      <div className="text-2xl text-purple-400">
+                        <DynamicIcon name="Sparkles" className="w-8 h-8" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-bold text-white flex items-center gap-2">
+                          <span>{passive.name}</span>
+                          {passive.nodeId !== "manual" && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">
+                              Skill Tree
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-blue-300/60">
+                          {passive.description}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            setEditingPassiveIndex(index);
+                            setEditPassive({
+                              name: passive.name,
+                              description: passive.description,
+                            });
+                          }}
+                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          <DynamicIcon name="Edit2" className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setPassives(passives.filter((_, i) => i !== index));
+                          }}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          <DynamicIcon name="Trash2" className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   )
@@ -11348,6 +11670,69 @@ ${description || ""}`;
                     </div>
                   )}
                 </div>
+
+                {/* Skill Trees Section */}
+                <div className="bg-purple-900/20 rounded-lg border border-purple-700/40 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <DynamicIcon name="GitBranch" className="w-5 h-5" /> Skill
+                      Trees
+                    </h3>
+                    <button
+                      onClick={() => {
+                        const newTree = createEmptyTree();
+                        setSkillTrees([...skillTrees, newTree]);
+                      }}
+                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg flex items-center gap-1"
+                    >
+                      <DynamicIcon name="Plus" className="w-4 h-4" /> Add Tree
+                    </button>
+                  </div>
+                  <p className="text-xs text-purple-300/60 mb-4">
+                    Create skill trees with prerequisite-based unlocks. When
+                    skill trees are defined, simple stat/resource upgrades are
+                    hidden.
+                  </p>
+
+                  {skillTrees.length === 0 ? (
+                    <div className="text-center py-8 text-purple-300/50">
+                      <DynamicIcon
+                        name="GitBranch"
+                        className="w-12 h-12 mx-auto mb-2 opacity-50"
+                      />
+                      <p>No skill trees defined</p>
+                      <p className="text-xs mt-1">
+                        Players will see simple stat/resource upgrades
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {skillTrees.map((tree, index) => (
+                        <div
+                          key={tree.id}
+                          className="border border-purple-700/30 rounded-lg p-4"
+                        >
+                          <SkillTreeEditor
+                            tree={tree}
+                            onChange={(updatedTree) => {
+                              const newTrees = [...skillTrees];
+                              newTrees[index] = updatedTree;
+                              setSkillTrees(newTrees);
+                            }}
+                            availableStats={stats}
+                            availableResources={resources}
+                            availableAbilities={abilities}
+                            onDelete={() => {
+                              setSkillTrees(
+                                skillTrees.filter((_, i) => i !== index)
+                              );
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -11664,6 +12049,8 @@ ${description || ""}`;
                               upgradeSettings: upgradeSettings,
                               rpgSystem: rpgSystem,
                               agmtState: agmtEnabled ? agmtState : undefined,
+                              skillTrees:
+                                skillTrees.length > 0 ? skillTrees : undefined,
                             },
                             presets: presets,
                             startingChoices:
@@ -11875,33 +12262,59 @@ ${description || ""}`;
           <div className="bg-blue-950 border border-amber-500/50 rounded-xl p-6 max-w-2xl w-full shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
-                <DynamicIcon name="AlertTriangle" className="w-5 h-5 text-amber-400" />
+                <DynamicIcon
+                  name="AlertTriangle"
+                  className="w-5 h-5 text-amber-400"
+                />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">Version Conflict Detected</h3>
-                <p className="text-sm text-blue-300/70">Choose which version to keep</p>
+                <h3 className="text-lg font-bold text-white">
+                  Version Conflict Detected
+                </h3>
+                <p className="text-sm text-blue-300/70">
+                  Choose which version to keep
+                </p>
               </div>
             </div>
 
             <p className="text-blue-200/80 mb-6">
-              This adventure has been edited on another device. You have unsaved changes from this device that conflict with the online version.
+              This adventure has been edited on another device. You have unsaved
+              changes from this device that conflict with the online version.
             </p>
 
             <div className="grid md:grid-cols-2 gap-4 mb-6">
               {/* Local Version */}
               <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <DynamicIcon name="Laptop" className="w-4 h-4 text-blue-400" />
-                  <span className="font-semibold text-blue-300">This Device</span>
+                  <DynamicIcon
+                    name="Laptop"
+                    className="w-4 h-4 text-blue-400"
+                  />
+                  <span className="font-semibold text-blue-300">
+                    This Device
+                  </span>
                 </div>
                 <p className="text-xs text-blue-400/70 mb-3">
-                  Last saved: {new Date(conflictData.localUpdatedAt).toLocaleString()}
+                  Last saved:{" "}
+                  {new Date(conflictData.localUpdatedAt).toLocaleString()}
                 </p>
                 <div className="text-sm text-blue-200/70 space-y-1">
-                  <p><strong>Title:</strong> {conflictData.localDraft.title || "(empty)"}</p>
-                  <p><strong>Stats:</strong> {conflictData.localDraft.stats?.length || 0} items</p>
-                  <p><strong>Inventory:</strong> {conflictData.localDraft.inventory?.length || 0} items</p>
-                  <p><strong>Lore:</strong> {conflictData.localDraft.lore?.length || 0} entries</p>
+                  <p>
+                    <strong>Title:</strong>{" "}
+                    {conflictData.localDraft.title || "(empty)"}
+                  </p>
+                  <p>
+                    <strong>Stats:</strong>{" "}
+                    {conflictData.localDraft.stats?.length || 0} items
+                  </p>
+                  <p>
+                    <strong>Inventory:</strong>{" "}
+                    {conflictData.localDraft.inventory?.length || 0} items
+                  </p>
+                  <p>
+                    <strong>Lore:</strong>{" "}
+                    {conflictData.localDraft.lore?.length || 0} entries
+                  </p>
                 </div>
                 <button
                   onClick={handleUseLocalVersion}
@@ -11915,17 +12328,41 @@ ${description || ""}`;
               {/* Online Version */}
               <div className="bg-green-900/30 border border-green-500/30 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <DynamicIcon name="Cloud" className="w-4 h-4 text-green-400" />
-                  <span className="font-semibold text-green-300">Cloud (Online)</span>
+                  <DynamicIcon
+                    name="Cloud"
+                    className="w-4 h-4 text-green-400"
+                  />
+                  <span className="font-semibold text-green-300">
+                    Cloud (Online)
+                  </span>
                 </div>
                 <p className="text-xs text-green-400/70 mb-3">
-                  Last saved: {new Date(conflictData.onlineUpdatedAt).toLocaleString()}
+                  Last saved:{" "}
+                  {new Date(conflictData.onlineUpdatedAt).toLocaleString()}
                 </p>
                 <div className="text-sm text-green-200/70 space-y-1">
-                  <p><strong>Title:</strong> {conflictData.onlineAdventure.title || "(empty)"}</p>
-                  <p><strong>Stats:</strong> {conflictData.onlineAdventure.storyTemplate?.stats?.length || 0} items</p>
-                  <p><strong>Inventory:</strong> {conflictData.onlineAdventure.storyTemplate?.inventory?.length || 0} items</p>
-                  <p><strong>Lore:</strong> {conflictData.onlineAdventure.storyTemplate?.lore?.length || 0} entries</p>
+                  <p>
+                    <strong>Title:</strong>{" "}
+                    {conflictData.onlineAdventure.title || "(empty)"}
+                  </p>
+                  <p>
+                    <strong>Stats:</strong>{" "}
+                    {conflictData.onlineAdventure.storyTemplate?.stats
+                      ?.length || 0}{" "}
+                    items
+                  </p>
+                  <p>
+                    <strong>Inventory:</strong>{" "}
+                    {conflictData.onlineAdventure.storyTemplate?.inventory
+                      ?.length || 0}{" "}
+                    items
+                  </p>
+                  <p>
+                    <strong>Lore:</strong>{" "}
+                    {conflictData.onlineAdventure.storyTemplate?.lore?.length ||
+                      0}{" "}
+                    entries
+                  </p>
                 </div>
                 <button
                   onClick={handleUseOnlineVersion}

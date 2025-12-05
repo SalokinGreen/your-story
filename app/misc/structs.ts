@@ -343,7 +343,9 @@ export interface StoryData {
   lore: StoryLore[];
   momentum: number;
   maxMomentum: number;
-  points: number;
+  points: number; // XP (experience points) - legacy name kept for backward compatibility
+  level: number; // Current level derived from XP (calculated, but stored for convenience)
+  upgradesSpent: number; // Number of level-up upgrades the player has spent
   earnedPointsFromChapters: number[];
   quests: Quest[]; // Quest system
   earnedPointsFromQuests: string[]; // Array of quest IDs that have awarded points
@@ -377,6 +379,14 @@ export interface StoryData {
   variables?: Variable[]; // Dynamic tracked variables (numbers, booleans, lists)
   starting_choices?: StartingChoice[]; // Optional custom starting choices from adventure
   loreEmbeddingsDirty?: boolean; // Flag indicating lore has changed and needs re-embedding
+
+  // Skill Tree System
+  skillTrees?: SkillTree[]; // Author-defined skill trees
+  unlockedNodes?: string[]; // IDs of unlocked skill nodes (format: "treeId:nodeId")
+  nodeEffects?: NodeEffects; // Tracked effects from nodes (for respec)
+
+  // Player action tracking (cleared after AI sees them)
+  pendingPlayerActions?: string[]; // Human-readable actions taken between turns (level ups, skill purchases, etc.)
 }
 
 // Advanced RPG Tools state tracking
@@ -478,6 +488,57 @@ export interface ShopAbility {
   stat?: string; // Associated stat (optional)
 }
 
+// ============================================
+// SKILL TREE SYSTEM
+// ============================================
+
+// Node effect types - what happens when a node is unlocked
+export interface SkillNodeEffect {
+  type:
+    | "stat_bonus"
+    | "resource_bonus"
+    | "grant_ability"
+    | "grant_item"
+    | "passive";
+  target: string; // Stat name, resource name, ability name, item name, or passive description
+  value?: number; // For stat_bonus and resource_bonus
+  quantity?: number; // For grant_item
+  abilityData?: Ability; // Full ability data for grant_ability
+  itemData?: InventoryItem; // Full item data for grant_item
+}
+
+// A single node in a skill tree
+export interface SkillNode {
+  id: string; // Unique identifier within the tree
+  name: string;
+  description: string;
+  symbol: string;
+  custom_symbol_url?: string;
+  type: "stat" | "ability" | "item" | "passive" | "resource";
+  position: { x: number; y: number }; // 0-100 normalized coordinates for visual layout
+  prerequisites: string[]; // Node IDs that must be unlocked first (empty = root node)
+  effects: SkillNodeEffect[]; // What this node grants when unlocked
+}
+
+// A skill tree containing multiple nodes
+export interface SkillTree {
+  id: string; // Unique identifier
+  name: string; // Display name (e.g., "Warrior's Path", "Arcane Studies")
+  description: string;
+  symbol: string;
+  custom_symbol_url?: string;
+  nodes: SkillNode[];
+}
+
+// Tracked effects from skill tree nodes (for respec purposes)
+export interface NodeEffects {
+  statBonuses: { stat: string; amount: number; nodeId: string }[];
+  resourceBonuses: { resource: string; amount: number; nodeId: string }[];
+  passives: { name: string; description: string; nodeId: string }[];
+  // Note: abilities and items are tracked by nodeId in unlockedNodes,
+  // and can be removed by matching node during respec
+}
+
 // Default upgrade settings
 export const DEFAULT_UPGRADE_SETTINGS: UpgradeSettings = {
   enabled: true,
@@ -500,13 +561,13 @@ export const DEFAULT_UPGRADE_SETTINGS: UpgradeSettings = {
   abilityShop: [],
 };
 
-// Point system costs (legacy - kept for backward compatibility)
+// XP reward values (legacy name UPGRADE_COSTS kept for backward compatibility)
 export const UPGRADE_COSTS = {
-  STAT_INCREASE: 10, // 10 points to increase a stat by 1
-  RESOURCE_MAX_INCREASE: 15, // 15 points to increase max resource by 10
-  ADD_ITEM: 20, // 20 points to add a new item
-  CHAPTER_REWARD: 50, // Points earned for completing a chapter
-  BEAT_REWARD: 25, // Points earned for completing a story beat
+  STAT_INCREASE: 10, // Legacy: points to increase a stat by 1 (now level-up reward)
+  RESOURCE_MAX_INCREASE: 15, // Legacy: points to increase max resource (now level-up reward)
+  ADD_ITEM: 20, // Legacy: points to add a new item (now level-up reward)
+  CHAPTER_REWARD: 100, // XP earned for completing a chapter
+  BEAT_REWARD: 25, // XP earned for completing a story beat
 } as const;
 
 // Starting choice for adventure - allows custom intro choices instead of "Start Story"

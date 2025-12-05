@@ -1065,6 +1065,7 @@ function BigAdventureCreatorPage() {
     includeCustomTables: true,
     includePresets: true,
     includeStartingChoices: true,
+    includeSkillTrees: false,
     targetDuration: "medium",
     maxOutputTokens: 4000,
     stageConfigs: { ...DEFAULT_STAGE_CONFIGS },
@@ -1480,6 +1481,7 @@ function BigAdventureCreatorPage() {
         includeCustomTables: true,
         includePresets: true,
         includeStartingChoices: true,
+        includeSkillTrees: false,
         targetDuration: (genreDurationMap[genre] || "medium") as
           | "short"
           | "medium"
@@ -3835,6 +3837,27 @@ ${result.description || ""}`;
                       </div>
                       <p className="text-sm text-blue-300/60">
                         Multiple ways to begin the adventure
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 p-4 bg-blue-900/30 rounded-lg cursor-pointer hover:bg-blue-900/50 transition-colors border border-blue-700/30">
+                    <input
+                      type="checkbox"
+                      checked={config.includeSkillTrees}
+                      onChange={(e) =>
+                        updateConfig({
+                          includeSkillTrees: e.target.checked,
+                        })
+                      }
+                      className="w-5 h-5 mt-0.5 rounded bg-blue-900/50 border-blue-700/50 text-purple-500 focus:ring-purple-500"
+                    />
+                    <div>
+                      <div className="font-medium text-white">
+                        🌳 Skill Trees
+                      </div>
+                      <p className="text-sm text-blue-300/60">
+                        Unlock progression paths with interconnected abilities
                       </p>
                     </div>
                   </label>

@@ -38,6 +38,7 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - It should be wrapped in \`\`\`json ... \`\`\` code blocks.
 - **CRITICAL: You may only include ONE JSON block per response.** All changes must be combined into a single JSON object. The app cannot process multiple JSON blocks.
 - You can return a PARTIAL StoryData object. Only include the fields you want to change or add.
+- **CRITICAL: ONLY include fields the user EXPLICITLY requested.** Do NOT add extra fields "for convenience" or "best practice". If user asks for skill trees, ONLY output skillTrees. Do NOT also output upgradeSettings, stats, resources, or anything else unless specifically asked.
 - Arrays (like 'inventory', 'stats', 'lore', 'achievements', 'quests', 'presets', 'variables', 'relationships', 'customTables') in your JSON will be MERGED with the existing data by default.
 - Scalar fields (like 'story_name', 'premise', 'player_name', 'title', 'shortDescription', 'description') will be REPLACED.
 
@@ -275,6 +276,38 @@ You can control how items in arrays are applied using the **_command** field:
   - entries: Array of { text, weight } - possible results when rolling on the table
     - text: The result text that will be shown/used
     - weight: Probability weight (higher numbers = more likely to be selected). Default is 1.
+- skillTrees (Array of { id, name, description, symbol, nodes }) - **Skill trees for character progression**. When skill trees are defined, they REPLACE the simple upgrade system (stat/resource/item upgrades).
+  - id: Unique identifier for the tree (e.g., "warrior-path", "arcane-studies")
+  - name: Display name (e.g., "Warrior's Path", "Arcane Studies", "Shadow Arts")
+  - description: What this skill tree represents
+  - symbol: Emoji/icon representing the tree
+  - nodes: Array of skill tree nodes (see below)
+  
+  **Skill Tree Node Structure** (each node in the nodes array):
+  - id: Unique identifier within this tree (e.g., "power-strike", "fireball")
+  - name: Display name of the node
+  - description: What this node grants
+  - symbol: Emoji/icon for the node
+  - type: "stat" | "ability" | "item" | "passive" | "resource" - determines the node's primary effect type
+  - position: { x: number, y: number } - Visual position (0-100 normalized coordinates). Root nodes should be at y: 10-20, with children below them.
+  - prerequisites: Array of node IDs that must be unlocked first (empty array = root node, always unlockable first)
+  - effects: Array of effects this node grants when unlocked:
+    - Stat bonus: { type: "stat_bonus", target: "StatName", value: number }
+    - Resource bonus: { type: "resource_bonus", target: "ResourceName", value: number } (increases max)
+    - Grant ability: { type: "grant_ability", target: "AbilityName", abilityData: { full ability object } }
+    - Grant item: { type: "grant_item", target: "ItemName", quantity: number, itemData: { full item object } }
+    - Passive: { type: "passive", target: "PassiveName: Description of passive effect" }
+  
+  **Skill Tree Design Guidelines:**
+  - Each tree should have 1-3 root nodes (prerequisites: []) at the top
+  - Arrange nodes in a tree structure flowing downward (higher y = lower on screen)
+  - Space nodes horizontally (x: 0-100) to prevent overlap
+  - Use prerequisites to create meaningful progression paths
+  - A single node can have multiple effects (e.g., stat bonus AND passive)
+  - Trees should be thematic (combat tree, magic tree, stealth tree, etc.)
+  - Consider having 5-15 nodes per tree for meaningful progression
+  - **When skillTrees are defined, simple upgrade shop sections are automatically hidden in the UI** - you do NOT need to set upgradeSettings.enabled = false, the system handles this automatically
+  - When asked to create skill trees, ONLY output skillTrees - do NOT also modify upgradeSettings
 - startingChoices (Array of { text, intro_override, skill_used, skill_dc, resource_used, item_used, item_loss, ability_used, agmt_check, agmt_context_only, agmt_table, custom_table }) - Custom starting choices instead of default "Start Story" button
   - text: The choice text displayed to player (required)
   - intro_override: Optional alternate intro text for this path (if empty, uses main intro)
@@ -666,6 +699,143 @@ Assistant:
 }
 \`\`\`"
 
+**Example 17 - Creating a Skill Tree:**
+User: "Create a warrior skill tree with power attack, defensive stance, and a passive that gives damage reduction."
+Assistant:
+"I've created a Warrior skill tree with combat abilities.
+
+\`\`\`json
+{
+  "skillTrees": [
+    {
+      "id": "warrior-path",
+      "name": "Warrior's Path",
+      "description": "Master the art of combat through strength and discipline",
+      "symbol": "⚔️",
+      "nodes": [
+        {
+          "id": "basic-training",
+          "name": "Basic Training",
+          "description": "+5 Strength from foundational combat training",
+          "symbol": "💪",
+          "type": "stat",
+          "position": { "x": 50, "y": 15 },
+          "prerequisites": [],
+          "effects": [
+            { "type": "stat_bonus", "target": "Strength", "value": 5 }
+          ]
+        },
+        {
+          "id": "power-attack",
+          "name": "Power Attack",
+          "description": "Learn a devastating attack that deals massive damage",
+          "symbol": "⚡",
+          "type": "ability",
+          "position": { "x": 25, "y": 40 },
+          "prerequisites": ["basic-training"],
+          "effects": [
+            {
+              "type": "grant_ability",
+              "target": "Power Attack",
+              "abilityData": {
+                "name": "Power Attack",
+                "description": "A mighty strike that deals devastating damage",
+                "grade": "adept",
+                "cost": [{ "type": "resource", "name": "Stamina", "amount": 15 }],
+                "cooldown": 2,
+                "currentCooldown": 0,
+                "stat": "Strength",
+                "symbol": "⚡"
+              }
+            }
+          ]
+        },
+        {
+          "id": "defensive-stance",
+          "name": "Defensive Stance",
+          "description": "Learn to protect yourself and allies",
+          "symbol": "🛡️",
+          "type": "ability",
+          "position": { "x": 75, "y": 40 },
+          "prerequisites": ["basic-training"],
+          "effects": [
+            {
+              "type": "grant_ability",
+              "target": "Defensive Stance",
+              "abilityData": {
+                "name": "Defensive Stance",
+                "description": "Take a protective stance that reduces incoming damage",
+                "grade": "apprentice",
+                "cost": [{ "type": "resource", "name": "Stamina", "amount": 10 }],
+                "cooldown": 3,
+                "currentCooldown": 0,
+                "symbol": "🛡️"
+              }
+            }
+          ]
+        },
+        {
+          "id": "iron-skin",
+          "name": "Iron Skin",
+          "description": "Your skin hardens through combat experience",
+          "symbol": "🪨",
+          "type": "passive",
+          "position": { "x": 50, "y": 65 },
+          "prerequisites": ["power-attack", "defensive-stance"],
+          "effects": [
+            { "type": "passive", "target": "Iron Skin: Reduce all physical damage taken by 10%" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+\`\`\`"
+
+**Example 18 - Adding Nodes to Existing Skill Tree:**
+User: "Add a 'Berserker Rage' ability node to the warrior tree that requires Iron Skin."
+Assistant:
+"I've added the Berserker Rage node to your Warrior tree.
+
+\`\`\`json
+{
+  "skillTrees": [
+    {
+      "id": "warrior-path",
+      "nodes": [
+        {
+          "id": "berserker-rage",
+          "name": "Berserker Rage",
+          "description": "Unleash unstoppable fury in combat",
+          "symbol": "🔥",
+          "type": "ability",
+          "position": { "x": 50, "y": 85 },
+          "prerequisites": ["iron-skin"],
+          "effects": [
+            { "type": "stat_bonus", "target": "Strength", "value": 10 },
+            {
+              "type": "grant_ability",
+              "target": "Berserker Rage",
+              "abilityData": {
+                "name": "Berserker Rage",
+                "description": "Enter a rage that doubles damage but prevents defensive actions",
+                "grade": "expert",
+                "cost": [{ "type": "resource", "name": "Health", "amount": 20 }],
+                "cooldown": 5,
+                "currentCooldown": 0,
+                "stat": "Strength",
+                "symbol": "🔥"
+              }
+            }
+          ],
+          "_command": "add"
+        }
+      ]
+    }
+  ]
+}
+\`\`\`"
+
 ### Context - Current Adventure State:
 ${
   adventureMetadata
@@ -847,7 +1017,7 @@ export function parseCreatorOutput(content: string): {
   // Second try: look for raw JSON (no code fence) - common with some models
   // Find JSON object that starts with { and contains typical story data keys
   const rawJsonMatch = content.match(
-    /(\{[\s\S]*(?:"inventory"|"stats"|"lore"|"achievements"|"resources"|"quests"|"relationships"|"variables"|"abilities"|"customTables")[\s\S]*\})/
+    /(\{[\s\S]*(?:"inventory"|"stats"|"lore"|"achievements"|"resources"|"quests"|"relationships"|"variables"|"abilities"|"customTables"|"skillTrees"|"upgradeSettings"|"presets")[\s\S]*\})/
   );
 
   if (rawJsonMatch) {

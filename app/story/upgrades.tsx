@@ -8,25 +8,37 @@ import {
 } from "../misc/structs";
 import { ABILITY_GRADE_CONFIG, getAbilityBonus } from "../misc/abilitySystem";
 import { getSystemUpgradeDefaults } from "../misc/rpgSystems";
+import {
+  getXPProgress,
+  getAvailableUpgrades,
+  formatXP,
+} from "../misc/leveling";
+import {
+  hasSkillTrees,
+  unlockNode,
+  respecTree,
+  respecAllTrees,
+  getTreeUnlockedCount,
+} from "../misc/skillTree";
 import { useState } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
+import SkillTreeView from "../components/SkillTreeView";
 
 interface UpgradesPageProps {
   storyData: StoryData;
-  onPurchase: (cost: number, callback: () => void) => void;
+  onUpgrade: (callback: () => void) => void; // Changed from onPurchase - no cost, just callback
 }
 
 export default function UpgradesPage({
   storyData,
-  onPurchase,
+  onUpgrade,
 }: UpgradesPageProps) {
   const [selectedStat, setSelectedStat] = useState<string>("");
   const [selectedResource, setSelectedResource] = useState<string>("");
-  const [newItemName, setNewItemName] = useState("");
-  const [newItemDescription, setNewItemDescription] = useState("");
-  const [newItemType, setNewItemType] = useState<
-    "normal" | "consumable" | "story" | "misc"
-  >("normal");
+  const [activeTreeId, setActiveTreeId] = useState<string | null>(
+    storyData.skillTrees?.[0]?.id || null
+  );
+  const [showRespecConfirm, setShowRespecConfirm] = useState(false);
 
   // Use custom upgrade settings or fallback to defaults
   const upgradeSettings = storyData.upgradeSettings || DEFAULT_UPGRADE_SETTINGS;
@@ -38,6 +50,14 @@ export default function UpgradesPage({
   const effectiveResourceUpgradeAmount =
     upgradeSettings.resourceUpgradeAmount ||
     systemDefaults.resourceUpgradeAmount;
+
+  // Calculate XP progress and available upgrades
+  const xpProgress = getXPProgress(storyData.points || 0);
+  const availableUpgrades = getAvailableUpgrades(
+    storyData.level || 1,
+    storyData.upgradesSpent || 0,
+    storyData.difficulty
+  );
 
   // If upgrade system is disabled, show message
   if (!upgradeSettings.enabled) {
@@ -61,59 +81,67 @@ export default function UpgradesPage({
     );
   }
 
-  const handleStatUpgrade = () => {
-    if (!selectedStat) return;
-
-    onPurchase(upgradeSettings.statUpgradeCost, () => {
-      const stat = storyData.stats.find((s) => s.name === selectedStat);
-      if (stat && stat.value < 100) {
-        stat.value = Math.min(100, stat.value + effectiveStatUpgradeAmount);
-      }
+  // Wrapper that increments upgradesSpent after successful upgrade
+  const handleUpgrade = (callback: () => void) => {
+    onUpgrade(() => {
+      callback();
+      storyData.upgradesSpent = (storyData.upgradesSpent || 0) + 1;
     });
   };
 
-  const handleResourceUpgrade = () => {
-    if (!selectedResource) return;
+  const handleStatUpgrade = () => {
+    if (!selectedStat || availableUpgrades <= 0) return;
 
-    onPurchase(upgradeSettings.resourceUpgradeCost, () => {
-      const resource = storyData.resources.find(
-        (r) => r.name === selectedResource
-      );
-      if (resource) {
-        resource.maxValue += effectiveResourceUpgradeAmount;
-        resource.value = Math.min(
-          resource.value + effectiveResourceUpgradeAmount,
-          resource.maxValue
+    handleUpgrade(() => {
+      const stat = storyData.stats.find((s) => s.name === selectedStat);
+      if (stat && stat.value < 100) {
+        const oldValue = stat.value;
+        stat.value = Math.min(100, stat.value + effectiveStatUpgradeAmount);
+        // Track upgrade for AI context
+        if (!storyData.pendingPlayerActions) {
+          storyData.pendingPlayerActions = [];
+        }
+        storyData.pendingPlayerActions.push(
+          `Upgraded ${stat.name}: ${oldValue} → ${stat.value}`
         );
       }
     });
   };
 
-  const handleAddItem = () => {
-    if (!newItemName.trim()) return;
+  const handleResourceUpgrade = () => {
+    if (!selectedResource || availableUpgrades <= 0) return;
 
-    onPurchase(upgradeSettings.addItemCost, () => {
-      storyData.inventory.push({
-        name: newItemName,
-        quantity: 1,
-        description: newItemDescription || "A useful item",
-        type: newItemType,
-        symbol: "Package",
-      });
-      setNewItemName("");
-      setNewItemDescription("");
-      setNewItemType("normal");
+    handleUpgrade(() => {
+      const resource = storyData.resources.find(
+        (r) => r.name === selectedResource
+      );
+      if (resource) {
+        const oldMax = resource.maxValue;
+        resource.maxValue += effectiveResourceUpgradeAmount;
+        resource.value = Math.min(
+          resource.value + effectiveResourceUpgradeAmount,
+          resource.maxValue
+        );
+        // Track upgrade for AI context
+        if (!storyData.pendingPlayerActions) {
+          storyData.pendingPlayerActions = [];
+        }
+        storyData.pendingPlayerActions.push(
+          `Upgraded ${resource.name} max: ${oldMax} → ${resource.maxValue}`
+        );
+      }
     });
   };
 
   // Shop handlers
   const handleBuyShopStat = (shopStat: any) => {
+    if (availableUpgrades <= 0) return;
     // Check if already owned
     if (storyData.stats.some((s) => s.name === shopStat.name)) {
       return; // Already owned
     }
 
-    onPurchase(shopStat.cost, () => {
+    handleUpgrade(() => {
       storyData.stats.push({
         name: shopStat.name,
         description: shopStat.description,
@@ -121,16 +149,24 @@ export default function UpgradesPage({
         custom_symbol_url: shopStat.custom_symbol_url,
         value: shopStat.startingValue,
       });
+      // Track purchase for AI context
+      if (!storyData.pendingPlayerActions) {
+        storyData.pendingPlayerActions = [];
+      }
+      storyData.pendingPlayerActions.push(
+        `Unlocked new stat: ${shopStat.name} (starting at ${shopStat.startingValue})`
+      );
     });
   };
 
   const handleBuyShopResource = (shopResource: any) => {
+    if (availableUpgrades <= 0) return;
     // Check if already owned
     if (storyData.resources.some((r) => r.name === shopResource.name)) {
       return; // Already owned
     }
 
-    onPurchase(shopResource.cost, () => {
+    handleUpgrade(() => {
       storyData.resources.push({
         name: shopResource.name,
         description: shopResource.description,
@@ -139,11 +175,20 @@ export default function UpgradesPage({
         value: shopResource.startingValue,
         maxValue: shopResource.startingMaxValue,
       });
+      // Track purchase for AI context
+      if (!storyData.pendingPlayerActions) {
+        storyData.pendingPlayerActions = [];
+      }
+      storyData.pendingPlayerActions.push(
+        `Unlocked new resource: ${shopResource.name} (${shopResource.startingValue}/${shopResource.startingMaxValue})`
+      );
     });
   };
 
   const handleBuyShopItem = (shopItem: any) => {
-    onPurchase(shopItem.cost, () => {
+    if (availableUpgrades <= 0) return;
+
+    handleUpgrade(() => {
       const existing = storyData.inventory.find(
         (i) => i.name === shopItem.name
       );
@@ -158,16 +203,24 @@ export default function UpgradesPage({
           quantity: shopItem.quantity,
         });
       }
+      // Track purchase for AI context
+      if (!storyData.pendingPlayerActions) {
+        storyData.pendingPlayerActions = [];
+      }
+      storyData.pendingPlayerActions.push(
+        `Purchased item: ${shopItem.name} x${shopItem.quantity}`
+      );
     });
   };
 
   const handleBuyShopAbility = (shopAbility: ShopAbility) => {
+    if (availableUpgrades <= 0) return;
     // Check if already owned
     if (storyData.abilities?.some((a) => a.name === shopAbility.name)) {
       return; // Already owned
     }
 
-    onPurchase(shopAbility.cost, () => {
+    handleUpgrade(() => {
       if (!storyData.abilities) {
         storyData.abilities = [];
       }
@@ -181,143 +234,353 @@ export default function UpgradesPage({
         currentCooldown: 0,
         stat: shopAbility.stat,
       });
+      // Track purchase for AI context
+      if (!storyData.pendingPlayerActions) {
+        storyData.pendingPlayerActions = [];
+      }
+      storyData.pendingPlayerActions.push(
+        `Unlocked new ability: ${shopAbility.name}${
+          shopAbility.grade ? ` (${shopAbility.grade})` : ""
+        }`
+      );
     });
   };
+
+  // Skill Tree handlers
+  const handleNodeUnlock = (treeId: string, nodeId: string) => {
+    if (availableUpgrades <= 0) return;
+
+    onUpgrade(() => {
+      const result = unlockNode(storyData, treeId, nodeId);
+      if (!result.success) {
+        console.error("Failed to unlock node:", result.message);
+        return;
+      }
+      // Track skill tree purchase for AI context
+      const tree = storyData.skillTrees?.find((t) => t.id === treeId);
+      const node = tree?.nodes.find((n) => n.id === nodeId);
+      if (node) {
+        if (!storyData.pendingPlayerActions) {
+          storyData.pendingPlayerActions = [];
+        }
+        storyData.pendingPlayerActions.push(
+          `Unlocked skill tree node: ${node.name}${
+            tree ? ` (${tree.name})` : ""
+          } - ${node.description || node.type}`
+        );
+      }
+      // unlockNode already increments upgradesSpent
+    });
+  };
+
+  const handleRespecConfirm = (treeId?: string) => {
+    onUpgrade(() => {
+      if (treeId) {
+        respecTree(storyData, treeId);
+      } else {
+        respecAllTrees(storyData);
+      }
+    });
+    setShowRespecConfirm(false);
+  };
+
+  // Check if skill trees are available
+  const skillTreesAvailable = hasSkillTrees(storyData);
 
   return (
     <div className="w-full">
       <div className="bg-blue-950/50 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-blue-800/30">
         <div className="flex flex-col gap-6">
-          {/* Points Display */}
-          <div className="flex items-center justify-between p-6 rounded-lg bg-linear-to-r from-yellow-900/30 to-amber-900/30 border-2 border-yellow-500/50">
-            <div className="flex items-center gap-3">
-              <DynamicIcon name="Star" className="w-10 h-10 text-yellow-400" />
-              <div>
-                <h2 className="text-2xl font-bold text-white">
-                  {storyData.points} Points
-                </h2>
-                <p className="text-sm text-yellow-200/60">
-                  Available to spend on upgrades
-                </p>
+          {/* Level & XP Display */}
+          <div className="p-6 rounded-lg bg-linear-to-r from-yellow-900/30 to-amber-900/30 border-2 border-yellow-500/50">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-full bg-yellow-500/20 border-2 border-yellow-400 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-yellow-400">
+                    {xpProgress.currentLevel}
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    Level {xpProgress.currentLevel}
+                  </h2>
+                  <p className="text-sm text-yellow-200/60">
+                    {formatXP(xpProgress.totalXP)} XP total
+                  </p>
+                </div>
               </div>
+              {availableUpgrades > 0 && (
+                <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/20 border border-green-400/50">
+                  <DynamicIcon
+                    name="ArrowUp"
+                    className="w-5 h-5 text-green-400"
+                  />
+                  <span className="text-lg font-bold text-green-400">
+                    {availableUpgrades} Upgrade
+                    {availableUpgrades > 1 ? "s" : ""} Available
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* XP Progress Bar */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-yellow-200/80">
+                  Progress to Level {xpProgress.currentLevel + 1}
+                </span>
+                <span className="text-yellow-400 font-semibold">
+                  {formatXP(xpProgress.xpIntoLevel)} /{" "}
+                  {formatXP(xpProgress.xpNeededForNext)} XP
+                </span>
+              </div>
+              <div className="h-4 bg-yellow-950/50 rounded-full overflow-hidden border border-yellow-700/30">
+                <div
+                  className="h-full bg-linear-to-r from-yellow-500 to-amber-400 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${xpProgress.percentage}%` }}
+                />
+              </div>
+              <p className="text-xs text-yellow-300/50 text-center">
+                {xpProgress.percentage}% to next level
+              </p>
             </div>
           </div>
 
-          {/* How to Earn Points */}
+          {/* How to Earn XP */}
           <div className="p-4 rounded-lg bg-blue-900/30 border border-blue-700/40">
             <h3 className="text-sm font-bold text-blue-200 mb-2">
               <DynamicIcon
                 name="Lightbulb"
                 className="inline-block w-4 h-4 mr-1"
               />
-              How to Earn Points:
+              How to Earn XP:
             </h3>
             <ul className="text-xs text-blue-300/80 space-y-1">
               <li>
-                • Complete Story Beats:{" "}
-                <span className="font-semibold">
-                  {UPGRADE_COSTS.BEAT_REWARD} points
-                </span>
-              </li>
-              <li>
-                • Finish Chapters:{" "}
-                <span className="font-semibold">
-                  {UPGRADE_COSTS.CHAPTER_REWARD} points
-                </span>
-              </li>
-              <li>
                 • Unlock Achievements:{" "}
-                <span className="font-semibold">
-                  Points vary by achievement
-                </span>
+                <span className="font-semibold">XP varies by achievement</span>
+              </li>
+              <li>
+                • Complete Quests:{" "}
+                <span className="font-semibold">XP varies by quest</span>
+              </li>
+              <li>
+                • Win Scene Challenges:{" "}
+                <span className="font-semibold">XP varies by challenge</span>
               </li>
             </ul>
+            <p className="text-xs text-blue-400/70 mt-2 italic">
+              Each level up grants you one upgrade choice from the options
+              below.
+            </p>
           </div>
 
-          {/* Upgrade Stats */}
-          {upgradeSettings.allowStatUpgrade && storyData.stats.length > 0 && (
-            <div className="p-6 rounded-lg bg-blue-900/30 border border-blue-700/40">
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
-                <DynamicIcon
-                  name="BarChart2"
-                  className="w-8 h-8 text-blue-400"
-                />
-                Upgrade Stats
-              </h3>
-              <p className="text-sm text-blue-200/60 mb-4">
-                Cost:{" "}
-                <span className="font-bold text-blue-400">
-                  {upgradeSettings.statUpgradeCost} points
-                </span>{" "}
-                per +{effectiveStatUpgradeAmount} stat point
-              </p>
-
-              <div className="space-y-3">
-                {storyData.stats.map((stat) => (
-                  <div
-                    key={stat.name}
-                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all border-2 ${
-                      selectedStat === stat.name
-                        ? "bg-blue-800/40 border-blue-500"
-                        : "bg-blue-900/20 border-blue-800/30 hover:border-blue-600/50"
-                    }`}
-                    onClick={() => setSelectedStat(stat.name)}
-                  >
-                    <div className="flex items-center gap-3">
+          {/* Skill Trees Section */}
+          {skillTreesAvailable && storyData.skillTrees && (
+            <div className="p-6 rounded-lg bg-purple-900/30 border border-purple-700/40">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold flex items-center gap-2 text-white">
+                  <DynamicIcon
+                    name="GitBranch"
+                    className="w-8 h-8 text-purple-400"
+                  />
+                  Skill Trees
+                </h3>
+                <div className="flex gap-2">
+                  {(storyData.unlockedNodes?.length || 0) > 0 && (
+                    <button
+                      onClick={() => setShowRespecConfirm(true)}
+                      className="px-3 py-1.5 text-sm font-medium rounded-lg transition-all bg-red-900/40 text-red-300 hover:bg-red-800/50 border border-red-700/40"
+                    >
                       <DynamicIcon
-                        name={stat.symbol}
-                        className="w-8 h-8 text-blue-400"
+                        name="RotateCcw"
+                        className="w-4 h-4 inline-block mr-1"
                       />
-                      <div>
-                        <p className="font-bold text-white">{stat.name}</p>
-                        <p className="text-xs text-blue-200/60">
-                          {stat.description}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-blue-400">
-                        {stat.value}/100
-                      </p>
-                      {stat.value < 100 && (
-                        <p className="text-xs text-blue-300/50">
-                          → {stat.value + 1}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                      Respec All
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <button
-                onClick={handleStatUpgrade}
-                disabled={
-                  !selectedStat ||
-                  storyData.points < upgradeSettings.statUpgradeCost ||
-                  (storyData.stats.find((s) => s.name === selectedStat)
-                    ?.value ?? 100) >= 100
-                }
-                className="w-full mt-4 px-6 py-3 font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700 disabled:hover:bg-blue-600"
-              >
-                Upgrade Selected Stat ({upgradeSettings.statUpgradeCost} points)
-              </button>
+              {/* Tree Tabs (if multiple trees) */}
+              {storyData.skillTrees.length > 1 && (
+                <div className="flex gap-2 mb-4 flex-wrap">
+                  {storyData.skillTrees.map((tree) => (
+                    <button
+                      key={tree.id}
+                      onClick={() => setActiveTreeId(tree.id)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        activeTreeId === tree.id
+                          ? "bg-purple-600 text-white"
+                          : "bg-purple-900/30 text-purple-300 hover:bg-purple-800/40 border border-purple-700/40"
+                      }`}
+                    >
+                      {tree.name}
+                      <span className="ml-2 text-xs opacity-70">
+                        ({getTreeUnlockedCount(storyData, tree.id)}/
+                        {tree.nodes.length})
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Active Tree View */}
+              {activeTreeId &&
+                storyData.skillTrees.find((t) => t.id === activeTreeId) && (
+                  <SkillTreeView
+                    tree={
+                      storyData.skillTrees.find((t) => t.id === activeTreeId)!
+                    }
+                    storyData={storyData}
+                    availableUpgrades={availableUpgrades}
+                    onUnlock={(treeId: string, nodeId: string) =>
+                      handleNodeUnlock(treeId, nodeId)
+                    }
+                  />
+                )}
             </div>
           )}
 
-          {/* Upgrade Resources */}
-          {upgradeSettings.allowResourceUpgrade &&
-            storyData.resources.length > 0 && (
+          {/* Respec Confirmation Modal */}
+          {showRespecConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+              <div className="bg-gray-900 rounded-xl p-6 max-w-md border border-red-700/50">
+                <h3 className="text-xl font-bold text-red-400 mb-4">
+                  <DynamicIcon
+                    name="AlertTriangle"
+                    className="w-6 h-6 inline-block mr-2"
+                  />
+                  Confirm Respec
+                </h3>
+                <p className="text-gray-300 mb-4">
+                  This will remove <strong>all</strong> unlocked skill tree
+                  nodes and refund your upgrade points.
+                </p>
+                <p className="text-yellow-400/80 text-sm mb-6">
+                  <strong>Warning:</strong> All stats, abilities, items, and
+                  resources granted by skill trees will be removed!
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowRespecConfirm(false)}
+                    className="flex-1 px-4 py-2 font-medium rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleRespecConfirm()}
+                    className="flex-1 px-4 py-2 font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  >
+                    Confirm Respec
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* No Upgrades Available Message */}
+          {availableUpgrades === 0 && (
+            <div className="p-4 rounded-lg bg-blue-900/20 border border-blue-700/30 text-center">
+              <DynamicIcon
+                name="Clock"
+                className="w-8 h-8 mx-auto mb-2 text-blue-400/60"
+              />
+              <p className="text-blue-200/70">
+                Earn more XP to level up and unlock your next upgrade!
+              </p>
+              <p className="text-sm text-blue-300/50 mt-1">
+                {formatXP(xpProgress.xpNeededForNext - xpProgress.xpIntoLevel)}{" "}
+                XP until Level {xpProgress.currentLevel + 1}
+              </p>
+            </div>
+          )}
+
+          {/* Upgrade Stats - Only show when no skill trees are defined */}
+          {!skillTreesAvailable &&
+            upgradeSettings.allowStatUpgrade &&
+            storyData.stats.length > 0 &&
+            availableUpgrades > 0 && (
+              <div className="p-6 rounded-lg bg-blue-900/30 border border-blue-700/40">
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
+                  <DynamicIcon
+                    name="BarChart2"
+                    className="w-8 h-8 text-blue-400"
+                  />
+                  Upgrade Stats
+                </h3>
+                <p className="text-sm text-blue-200/60 mb-4">
+                  +{effectiveStatUpgradeAmount} to selected stat
+                </p>
+
+                <div className="space-y-3">
+                  {storyData.stats.map((stat) => (
+                    <div
+                      key={stat.name}
+                      className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all border-2 ${
+                        selectedStat === stat.name
+                          ? "bg-blue-800/40 border-blue-500"
+                          : "bg-blue-900/20 border-blue-800/30 hover:border-blue-600/50"
+                      }`}
+                      onClick={() => setSelectedStat(stat.name)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <DynamicIcon
+                          name={stat.symbol}
+                          className="w-8 h-8 text-blue-400"
+                        />
+                        <div>
+                          <p className="font-bold text-white">{stat.name}</p>
+                          <p className="text-xs text-blue-200/60">
+                            {stat.description}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-blue-400">
+                          {stat.value}/100
+                        </p>
+                        {stat.value < 100 && (
+                          <p className="text-xs text-blue-300/50">
+                            →{" "}
+                            {Math.min(
+                              100,
+                              stat.value + effectiveStatUpgradeAmount
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleStatUpgrade}
+                  disabled={
+                    !selectedStat ||
+                    availableUpgrades <= 0 ||
+                    (storyData.stats.find((s) => s.name === selectedStat)
+                      ?.value ?? 100) >= 100
+                  }
+                  className="w-full mt-4 px-6 py-3 font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700 disabled:hover:bg-blue-600"
+                >
+                  Upgrade Selected Stat
+                </button>
+              </div>
+            )}
+
+          {/* Upgrade Resources - Only show when no skill trees are defined */}
+          {!skillTreesAvailable &&
+            upgradeSettings.allowResourceUpgrade &&
+            storyData.resources.length > 0 &&
+            availableUpgrades > 0 && (
               <div className="p-6 rounded-lg bg-green-900/30 border border-green-700/40">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
                   <DynamicIcon name="Zap" className="w-8 h-8 text-green-400" />
                   Upgrade Resources
                 </h3>
                 <p className="text-sm text-green-200/60 mb-4">
-                  Cost:{" "}
-                  <span className="font-bold text-green-400">
-                    {upgradeSettings.resourceUpgradeCost} points
-                  </span>{" "}
-                  per +{effectiveResourceUpgradeAmount} max value
+                  +{effectiveResourceUpgradeAmount} max value
                 </p>
                 <div className="space-y-3">
                   {storyData.resources.map((resource) => (
@@ -350,8 +613,7 @@ export default function UpgradesPage({
                         </p>
                         <p className="text-xs text-green-300/50">
                           → Max{" "}
-                          {resource.maxValue +
-                            upgradeSettings.resourceUpgradeAmount}
+                          {resource.maxValue + effectiveResourceUpgradeAmount}
                         </p>
                       </div>
                     </div>
@@ -360,121 +622,26 @@ export default function UpgradesPage({
 
                 <button
                   onClick={handleResourceUpgrade}
-                  disabled={
-                    !selectedResource ||
-                    storyData.points < upgradeSettings.resourceUpgradeCost
-                  }
+                  disabled={!selectedResource || availableUpgrades <= 0}
                   className="w-full mt-4 px-6 py-3 font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 text-white hover:bg-green-700 disabled:hover:bg-green-600"
                 >
-                  Upgrade Selected Resource (
-                  {upgradeSettings.resourceUpgradeCost} points)
+                  Upgrade Selected Resource
                 </button>
               </div>
             )}
 
-          {/* Add Custom Item */}
-          {upgradeSettings.allowAddItem && (
-            <div className="p-6 rounded-lg bg-purple-900/30 border border-purple-700/40">
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
-                <DynamicIcon
-                  name="Backpack"
-                  className="w-8 h-8 text-purple-400"
-                />
-                Add Custom Item
-              </h3>
-              <p className="text-sm text-purple-200/60 mb-4">
-                Cost:{" "}
-                <span className="font-bold text-purple-400">
-                  {upgradeSettings.addItemCost} points
-                </span>{" "}
-                per item
-              </p>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-bold text-purple-200 mb-2">
-                    Item Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
-                    placeholder="e.g., Magic Sword, Health Potion"
-                    className="w-full px-4 py-2 rounded-lg border-2 border-purple-700/40 bg-purple-900/20 text-white placeholder-purple-300/40 focus:border-purple-500 focus:outline-none"
-                    maxLength={50}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-purple-200 mb-2">
-                    Description (Optional)
-                  </label>
-                  <textarea
-                    value={newItemDescription}
-                    onChange={(e) => setNewItemDescription(e.target.value)}
-                    placeholder="Describe the item..."
-                    className="w-full px-4 py-2 rounded-lg border-2 border-purple-700/40 bg-purple-900/20 text-white placeholder-purple-300/40 focus:border-purple-500 focus:outline-none resize-none"
-                    rows={2}
-                    maxLength={200}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-purple-200 mb-2">
-                    Item Type
-                  </label>
-                  <select
-                    value={newItemType}
-                    onChange={(e) =>
-                      setNewItemType(
-                        e.target.value as
-                          | "normal"
-                          | "consumable"
-                          | "story"
-                          | "misc"
-                      )
-                    }
-                    className="w-full px-4 py-2 rounded-lg border-2 border-purple-700/40 bg-purple-900/20 text-white focus:border-purple-500 focus:outline-none"
-                  >
-                    <option value="normal">
-                      Normal (Advantage, breaks on fail)
-                    </option>
-                    <option value="consumable">
-                      Consumable (Advantage, used immediately)
-                    </option>
-                    <option value="story">
-                      Story Item (Advantage, never breaks)
-                    </option>
-                    <option value="misc">
-                      Misc (No advantage, never breaks)
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              <button
-                onClick={handleAddItem}
-                disabled={
-                  !newItemName.trim() ||
-                  storyData.points < upgradeSettings.addItemCost
-                }
-                className="w-full mt-4 px-6 py-3 font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 text-white hover:bg-purple-700 disabled:hover:bg-purple-600"
-              >
-                Add Item to Inventory ({upgradeSettings.addItemCost} points)
-              </button>
-            </div>
-          )}
-
-          {/* Stat Shop */}
-          {upgradeSettings.statShopEnabled &&
-            upgradeSettings.statShop.length > 0 && (
+          {/* Stat Shop - Only show when no skill trees are defined */}
+          {!skillTreesAvailable &&
+            upgradeSettings.statShopEnabled &&
+            upgradeSettings.statShop.length > 0 &&
+            availableUpgrades > 0 && (
               <div className="p-6 rounded-lg bg-cyan-900/30 border border-cyan-700/40">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
                   <DynamicIcon name="Store" className="w-8 h-8 text-cyan-400" />
-                  Stat Shop
+                  Unlock New Stats
                 </h3>
                 <p className="text-sm text-cyan-200/60 mb-4">
-                  Purchase new stats to unlock additional abilities
+                  Gain new stats to expand your abilities
                 </p>
 
                 <div className="space-y-3">
@@ -519,12 +686,10 @@ export default function UpgradesPage({
                         </div>
                         <button
                           onClick={() => handleBuyShopStat(shopStat)}
-                          disabled={
-                            alreadyOwned || storyData.points < shopStat.cost
-                          }
+                          disabled={alreadyOwned || availableUpgrades <= 0}
                           className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-blue-800/50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
                         >
-                          {alreadyOwned ? "Owned" : `${shopStat.cost} pts`}
+                          {alreadyOwned ? "Owned" : "Unlock"}
                         </button>
                       </div>
                     );
@@ -533,19 +698,21 @@ export default function UpgradesPage({
               </div>
             )}
 
-          {/* Resource Shop */}
-          {upgradeSettings.resourceShopEnabled &&
-            upgradeSettings.resourceShop.length > 0 && (
+          {/* Resource Shop - Only show when no skill trees are defined */}
+          {!skillTreesAvailable &&
+            upgradeSettings.resourceShopEnabled &&
+            upgradeSettings.resourceShop.length > 0 &&
+            availableUpgrades > 0 && (
               <div className="p-6 rounded-lg bg-teal-900/30 border border-teal-700/40">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
                   <DynamicIcon
                     name="ShoppingCart"
                     className="w-8 h-8 text-teal-400"
                   />
-                  Resource Shop
+                  Unlock New Resources
                 </h3>
                 <p className="text-sm text-teal-200/60 mb-4">
-                  Purchase new resources to expand your capabilities
+                  Gain new resources to expand your capabilities
                 </p>
 
                 <div className="space-y-3">
@@ -591,12 +758,10 @@ export default function UpgradesPage({
                         </div>
                         <button
                           onClick={() => handleBuyShopResource(shopResource)}
-                          disabled={
-                            alreadyOwned || storyData.points < shopResource.cost
-                          }
+                          disabled={alreadyOwned || availableUpgrades <= 0}
                           className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:bg-blue-800/50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
                         >
-                          {alreadyOwned ? "Owned" : `${shopResource.cost} pts`}
+                          {alreadyOwned ? "Owned" : "Unlock"}
                         </button>
                       </div>
                     );
@@ -605,9 +770,11 @@ export default function UpgradesPage({
               </div>
             )}
 
-          {/* Item Shop */}
-          {upgradeSettings.itemShopEnabled &&
-            upgradeSettings.itemShop.length > 0 && (
+          {/* Item Shop - Only show when no skill trees are defined */}
+          {!skillTreesAvailable &&
+            upgradeSettings.itemShopEnabled &&
+            upgradeSettings.itemShop.length > 0 &&
+            availableUpgrades > 0 && (
               <div className="p-6 rounded-lg bg-amber-900/30 border border-amber-700/40">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
                   <DynamicIcon
@@ -617,7 +784,7 @@ export default function UpgradesPage({
                   Item Shop
                 </h3>
                 <p className="text-sm text-amber-200/60 mb-4">
-                  Purchase items curated by the adventure author
+                  Items curated by the adventure author
                 </p>
 
                 <div className="space-y-3">
@@ -650,10 +817,10 @@ export default function UpgradesPage({
                       </div>
                       <button
                         onClick={() => handleBuyShopItem(shopItem)}
-                        disabled={storyData.points < shopItem.cost}
+                        disabled={availableUpgrades <= 0}
                         className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-blue-800/50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
                       >
-                        {shopItem.cost} pts
+                        Get
                       </button>
                     </div>
                   ))}
@@ -661,20 +828,22 @@ export default function UpgradesPage({
               </div>
             )}
 
-          {/* Ability Shop */}
-          {upgradeSettings.abilityShopEnabled &&
+          {/* Ability Shop - Only show when no skill trees are defined */}
+          {!skillTreesAvailable &&
+            upgradeSettings.abilityShopEnabled &&
             upgradeSettings.abilityShop &&
-            upgradeSettings.abilityShop.length > 0 && (
+            upgradeSettings.abilityShop.length > 0 &&
+            availableUpgrades > 0 && (
               <div className="p-6 rounded-lg bg-violet-900/30 border border-violet-700/40">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
                   <DynamicIcon
                     name="Sparkles"
                     className="w-8 h-8 text-violet-400"
                   />
-                  Ability Shop
+                  Unlock Abilities
                 </h3>
                 <p className="text-sm text-violet-200/60 mb-4">
-                  Unlock new abilities and techniques
+                  Learn new abilities and techniques
                 </p>
 
                 <div className="space-y-3">
@@ -761,12 +930,10 @@ export default function UpgradesPage({
                         </div>
                         <button
                           onClick={() => handleBuyShopAbility(shopAbility)}
-                          disabled={
-                            alreadyOwned || storyData.points < shopAbility.cost
-                          }
+                          disabled={alreadyOwned || availableUpgrades <= 0}
                           className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:bg-blue-800/50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
                         >
-                          {alreadyOwned ? "Owned" : `${shopAbility.cost} pts`}
+                          {alreadyOwned ? "Owned" : "Learn"}
                         </button>
                       </div>
                     );

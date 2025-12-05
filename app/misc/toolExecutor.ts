@@ -84,6 +84,10 @@ const STATE_CHANGE_TOOLS = new Set([
   "reset_ability_cooldown",
   "reduce_cooldown",
   "refresh_ability",
+  // Passives - tool names and command names
+  "add_passive",
+  "remove_passive",
+  "modify_passive",
   // Conditions
   "add_condition",
   "upgrade_condition",
@@ -1812,6 +1816,8 @@ export function executeTools(
         const majority = Math.ceil(challenge.rounds / 2);
         let autoResolved = false;
         let autoResult: "won" | "lost" | null = null;
+        let leveledUp = false;
+        let newLevel = storyData.level || 1;
 
         if (challenge.currentSuccesses >= majority) {
           autoResolved = true;
@@ -1820,10 +1826,22 @@ export function executeTools(
           challenge.resolvedAt = Date.now();
           challenge.result = "won";
 
-          // Award points
+          // Award XP and update level
           if (challenge.pointsAwarded && challenge.pointsAwarded > 0) {
+            const oldLevel = storyData.level || 1;
             storyData.points =
               (storyData.points || 0) + challenge.pointsAwarded;
+            // Recalculate level (import-free calculation, starting at Level 1)
+            const xp = storyData.points;
+            let level = 1; // Start at Level 1
+            let cumulative = 0;
+            while (cumulative + 100 * level * level <= xp) {
+              cumulative += 100 * level * level;
+              level++;
+            }
+            storyData.level = level;
+            newLevel = level;
+            leveledUp = level > oldLevel;
           }
         } else if (challenge.currentFailures >= majority) {
           autoResolved = true;
@@ -1852,7 +1870,9 @@ export function executeTools(
           if (autoResult === "won") {
             message += `\n🏆 CHALLENGE WON: ${challenge.name}!${
               challenge.pointsAwarded
-                ? ` (+${challenge.pointsAwarded} points)`
+                ? ` (+${challenge.pointsAwarded} XP${
+                    leveledUp ? `, Level Up to ${newLevel}!` : ""
+                  })`
                 : ""
             }`;
           } else {
@@ -1923,15 +1943,31 @@ export function executeTools(
         challenge.result = result;
 
         let message = "";
+        let leveledUp = false;
+        let newLevel = storyData.level || 1;
         if (result === "won") {
-          // Award points
+          // Award XP and update level
           if (challenge.pointsAwarded && challenge.pointsAwarded > 0) {
+            const oldLevel = storyData.level || 1;
             storyData.points =
               (storyData.points || 0) + challenge.pointsAwarded;
+            // Recalculate level (import-free calculation, starting at Level 1)
+            const xp = storyData.points;
+            let level = 1; // Start at Level 1
+            let cumulative = 0;
+            while (cumulative + 100 * level * level <= xp) {
+              cumulative += 100 * level * level;
+              level++;
+            }
+            storyData.level = level;
+            newLevel = level;
+            leveledUp = level > oldLevel;
           }
           message = `🏆 CHALLENGE WON: ${challenge.name}!${
             challenge.pointsAwarded
-              ? ` (+${challenge.pointsAwarded} points)`
+              ? ` (+${challenge.pointsAwarded} XP${
+                  leveledUp ? `, Level Up to ${newLevel}!` : ""
+                })`
               : ""
           }${reason ? ` - ${reason}` : ""}`;
         } else {
@@ -1945,7 +1981,7 @@ export function executeTools(
           name: challenge.name,
           result,
           reason,
-          pointsAwarded: result === "won" ? challenge.pointsAwarded : 0,
+          xpAwarded: result === "won" ? challenge.pointsAwarded : 0,
         });
         responses.push({
           command: `/resolve_challenge: ${result}`,
@@ -2416,6 +2452,20 @@ function convertToolToCommand(
 
     case "refresh_ability":
       return `/refresh_ability: ${args.name}`;
+
+    // Passive Effect Management
+    case "add_passive":
+      return `/add_passive: ${args.name} | ${args.description}`;
+
+    case "remove_passive":
+      return `/remove_passive: ${args.name}`;
+
+    case "modify_passive": {
+      const parts = [args.name];
+      if (args.newName) parts.push(`name:${args.newName}`);
+      if (args.newDescription) parts.push(`desc:${args.newDescription}`);
+      return `/modify_passive: ${parts.join(" | ")}`;
+    }
 
     // Memory - handled directly in executeTools, not via command
     case "add_memory":
