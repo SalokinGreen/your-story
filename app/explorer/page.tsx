@@ -50,6 +50,10 @@ export default function ExplorerPage() {
 
   const filtersRef = useRef<HTMLDivElement>(null);
 
+  // Refs to track if we've already loaded data (prevents reload on tab focus)
+  const hasLoadedAdventuresRef = useRef<string | boolean>(false);
+  const hasLoadedFeaturedRef = useRef(false);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -67,6 +71,12 @@ export default function ExplorerPage() {
   // Fetch adventures
   useEffect(() => {
     const fetchAdventures = async () => {
+      // Skip re-fetch on tab focus if filters haven't changed
+      const currentFilterKey = `${searchQuery}-${selectedGenre}-${sortBy}-${showNsfw}`;
+      if (hasLoadedAdventuresRef.current === currentFilterKey) {
+        return;
+      }
+
       try {
         setLoading(true);
         const params = new URLSearchParams();
@@ -79,6 +89,9 @@ export default function ExplorerPage() {
         if (!response.ok) throw new Error("Failed to fetch");
         const { adventures: fetched } = await response.json();
         setAdventures(fetched);
+
+        // Mark this filter combination as loaded
+        hasLoadedAdventuresRef.current = currentFilterKey;
       } catch (error) {
         console.error("Error fetching adventures:", error);
       } finally {
@@ -91,12 +104,20 @@ export default function ExplorerPage() {
   // Fetch featured
   useEffect(() => {
     const fetchFeatured = async () => {
+      // Skip re-fetch on tab focus
+      if (hasLoadedFeaturedRef.current) {
+        return;
+      }
+
       try {
         setLoadingFeatured(true);
         const response = await fetch("/api/adventures?featured=true");
         if (!response.ok) throw new Error("Failed to fetch featured");
         const { adventures: featured } = await response.json();
         setFeaturedAdventures(featured);
+
+        // Mark as loaded
+        hasLoadedFeaturedRef.current = true;
       } catch (error) {
         console.error("Error fetching featured:", error);
       } finally {

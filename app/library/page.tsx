@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/misc/AuthContext";
 import { useNotification } from "@/app/misc/NotificationContext";
@@ -86,6 +86,9 @@ export default function LibraryPage() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
 
+  // Ref to track if we've already loaded data (prevents reload on tab focus)
+  const hasLoadedRef = useRef(false);
+
   // Filter and sort states
   const [storySearch, setStorySearch] = useState("");
   const [storyFilter, setStoryFilter] = useState<
@@ -137,11 +140,12 @@ export default function LibraryPage() {
     }
   }, [user, authLoading, router, addNotification]);
 
+  // Initial load: fetch both stories and adventures for accurate tab counts
   useEffect(() => {
-    if (user) {
-      fetchLibraryData();
+    if (user && !hasLoadedRef.current) {
+      fetchAllData();
     }
-  }, [user, view]);
+  }, [user]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -158,62 +162,71 @@ export default function LibraryPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showMassMoveDropdown]);
 
-  const fetchLibraryData = async () => {
+  // Fetch all data (stories and adventures) for accurate counts
+  const fetchAllData = async (forceRefresh = false) => {
     if (!user) return;
+
+    // Skip if already loaded (prevents reload on tab focus)
+    if (hasLoadedRef.current && !forceRefresh) {
+      return;
+    }
 
     setLoading(true);
     try {
-      if (view === "stories") {
-        // Fetch folders
-        const foldersResponse = await authenticatedFetch("/api/folders");
+      // Fetch everything in parallel
+      const [foldersResponse, storiesResponse, adventuresResponse] =
+        await Promise.all([
+          authenticatedFetch("/api/folders"),
+          authenticatedFetch(`/api/stories?userId=${user.id}`),
+          authenticatedFetch(`/api/adventures?userId=${user.id}`),
+        ]);
 
-        if (foldersResponse.ok) {
-          const foldersData = await foldersResponse.json();
-          setFolders(foldersData.folders || []);
-        }
-
-        // Fetch user's stories
-        const response = await authenticatedFetch(
-          `/api/stories?userId=${user.id}`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch stories");
-        }
-
-        const data = await response.json();
-        setStories(data.stories || []);
-
-        // Load local stories
-        const localStoriesList = await listLocalStories();
-        setLocalStories(localStoriesList);
-      } else {
-        // Fetch user's adventures
-        const response = await authenticatedFetch(
-          `/api/adventures?userId=${user.id}`
-        );
-
-        if (!response.ok) throw new Error("Failed to fetch adventures");
-
-        const data = await response.json();
-        setAdventures(data.adventures || []);
-
-        // Load local adventures from IndexedDB
-        try {
-          const localAdvs = await listLocalAdventures();
-          setLocalAdventures(localAdvs);
-        } catch (error) {
-          console.error("Error loading local adventures:", error);
-          setLocalAdventures([]);
-        }
+      // Process folders
+      if (foldersResponse.ok) {
+        const foldersData = await foldersResponse.json();
+        setFolders(foldersData.folders || []);
       }
+
+      // Process stories
+      if (storiesResponse.ok) {
+        const storiesData = await storiesResponse.json();
+        setStories(storiesData.stories || []);
+      } else {
+        console.error("Failed to fetch stories");
+      }
+
+      // Process adventures
+      if (adventuresResponse.ok) {
+        const adventuresData = await adventuresResponse.json();
+        setAdventures(adventuresData.adventures || []);
+      } else {
+        console.error("Failed to fetch adventures");
+      }
+
+      // Load local data in parallel
+      const [localStoriesList, localAdvs] = await Promise.all([
+        listLocalStories(),
+        listLocalAdventures().catch((error) => {
+          console.error("Error loading local adventures:", error);
+          return [];
+        }),
+      ]);
+
+      setLocalStories(localStoriesList);
+      setLocalAdventures(localAdvs);
+
+      // Mark as loaded to prevent re-fetching on tab focus
+      hasLoadedRef.current = true;
     } catch (error: any) {
       console.error("Error fetching library data:", error);
-      addNotification(`Failed to load ${view}: ${error.message}`, "failure");
+      addNotification(`Failed to load library: ${error.message}`, "failure");
     } finally {
       setLoading(false);
     }
   };
+
+  // Kept for backwards compatibility - used by refresh operations
+  const fetchLibraryData = fetchAllData;
 
   const handleDeleteStory = async (
     storyId: string,

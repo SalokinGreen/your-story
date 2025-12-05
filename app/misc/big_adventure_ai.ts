@@ -1110,7 +1110,7 @@ TARGET COUNTS:
 - Stats: ${statCount}
 - Resources: ${resourceCount}
 - Abilities: ${abilityCount}
-- Variables: 3-6 (mix of number, boolean, and list types)
+- Variables: 3-6 (mix of number, boolean, string, and list types)
 
 STAT VALUES (LEVEL 1 CHARACTER - START WEAK):
 - Range: 1-100 where 50 is human average
@@ -1150,6 +1150,7 @@ OUTPUT JSON SCHEMA:
   "variables": [
     { "id": "var_xxx", "name": "string", "description": "string", "type": "number", "value": number, "minValue": number, "maxValue": number }
     OR { "id": "var_xxx", "name": "string", "description": "string", "type": "boolean", "value": boolean }
+    OR { "id": "var_xxx", "name": "string", "description": "string", "type": "string", "value": "string", "options": ["option1", "option2", ...] }
     OR { "id": "var_xxx", "name": "string", "description": "string", "type": "list", "items": [], "maxSize": number }
   ]
 }
@@ -2616,8 +2617,8 @@ EXISTING CONTENT SUMMARY:`;
     },
     variables: {
       instruction:
-        "Generate 3-6 story tracking variables (mix of number, boolean, and list types).",
-      schema: `{ "variables": [{ "id": "var_xxx", "name": "string", "description": "string", "type": "number|boolean|list", "value": any, ... }] }`,
+        "Generate 3-6 story tracking variables (mix of number, boolean, string, and list types). String variables can have optional predefined options.",
+      schema: `{ "variables": [{ "id": "var_xxx", "name": "string", "description": "string", "type": "number|boolean|string|list", "value": any, "options": ["opt1", "opt2", ...] (string type only, optional) }] }`,
     },
     inventory: {
       instruction:

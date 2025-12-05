@@ -126,7 +126,7 @@ You can control how items in arrays are applied using the **_command** field:
   - maxValue: Maximum capacity
   - description: What the resource represents
   - symbol: Emoji/icon representing the resource
-- variables (Array of variable objects) - **IMPORTANT: Custom state tracking for counters, flags, and lists**. Three types:
+- variables (Array of variable objects) - **IMPORTANT: Custom state tracking for counters, flags, strings, and lists**. Four types:
   - **Number Variables**: { id, name, description, type: "number", value, minValue?, maxValue? }
     - id: Unique identifier (e.g., "var_gold", "var_time")
     - name: Display name (e.g., "Gold", "Time of Day", "Days Worked")
@@ -141,6 +141,13 @@ You can control how items in arrays are applied using the **_command** field:
     - description: What this flag represents
     - type: "boolean" (required - must be exactly this string)
     - value: true or false
+  - **String Variables**: { id, name, description, type: "string", value, options? }
+    - id: Unique identifier (e.g., "var_current_day", "var_location")
+    - name: Display name (e.g., "Current Day", "Current Location")
+    - description: What this variable tracks
+    - type: "string" (required - must be exactly this string)
+    - value: Current string value
+    - options: Optional array of predefined choices (e.g., ["Monday", "Tuesday", "Wednesday", ...] or ["Tavern", "Market", "Castle"])
   - **List Variables**: { id, name, description, type: "list", items, maxSize? }
     - id: Unique identifier (e.g., "var_spells")
     - name: Display name (e.g., "Known Spells", "Collected Items")
