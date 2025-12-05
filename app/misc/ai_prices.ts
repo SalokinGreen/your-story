@@ -77,8 +77,8 @@ export const AI_MODELS = {
   // Google AI Studio (BYOK) - Direct access via Google's OpenAI-compatible API
   "Google Gemini 2.5 Flash": {
     name: "Google Gemini 2.5 Flash (BYOK)",
-    original_model: "gemini-2.5-flash",
-    model: "gemini-2.5-flash",
+    original_model: "models/gemini-flash-latest",
+    model: "models/gemini-flash-latest",
     maxTokens: 1000000,
     maxOutputTokens: 65000,
     provider: "google",
@@ -96,8 +96,8 @@ export const AI_MODELS = {
 
   "Google Gemini 2.5 Flash Lite": {
     name: "Google Gemini 2.5 Flash Lite (BYOK)",
-    original_model: "gemini-2.5-flash-lite-preview-06-17",
-    model: "gemini-2.5-flash-lite-preview-06-17",
+    original_model: "models/gemini-flash-lite-latest",
+    model: "models/gemini-flash-lite-latest",
     maxTokens: 1000000,
     maxOutputTokens: 65000,
     provider: "google",
@@ -115,8 +115,8 @@ export const AI_MODELS = {
 
   "Google Gemini 2.5 Pro": {
     name: "Google Gemini 2.5 Pro (BYOK)",
-    original_model: "gemini-2.5-pro",
-    model: "gemini-2.5-pro",
+    original_model: "models/gemini-2.5-pro",
+    model: "models/gemini-2.5-pro",
     maxTokens: 1000000,
     maxOutputTokens: 65000,
     provider: "google",
@@ -134,8 +134,8 @@ export const AI_MODELS = {
 
   "Google Gemini 3 Pro": {
     name: "Google Gemini 3 Pro (BYOK)",
-    original_model: "gemini-3-pro-preview",
-    model: "gemini-3-pro-preview",
+    original_model: "models/gemini-3-pro-preview",
+    model: "models/gemini-3-pro-preview",
     maxTokens: 1000000,
     maxOutputTokens: 65000,
     provider: "google",
