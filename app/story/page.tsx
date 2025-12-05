@@ -165,6 +165,89 @@ function getSecureRandomInt(min: number, max: number): number {
   return min + (randomNumber % range);
 }
 
+// Helper to trigger notifications for quest-related tool responses
+function processQuestNotifications(
+  toolResponses: CommandResponse[],
+  addNotification: (
+    message: string,
+    type: "success" | "failure" | "info" | "warning"
+  ) => void
+) {
+  for (const response of toolResponses) {
+    if (!response.success) continue;
+
+    const command = response.command.toLowerCase();
+
+    // Quest created
+    if (command.includes("/create_quest:")) {
+      // Extract quest title from message like 'Created quest "Title" (X points)'
+      const match = response.message.match(/Created quest "([^"]+)"/);
+      if (match) {
+        addNotification(`📜 New Quest: ${match[1]}`, "info");
+      }
+    }
+
+    // Quest completed
+    if (command.includes("/complete_quest:")) {
+      const match = response.message.match(/Completed quest "([^"]+)"/);
+      if (match) {
+        const pointsMatch = response.message.match(/\+(\d+) points/);
+        if (pointsMatch) {
+          addNotification(
+            `✅ Quest Complete: ${match[1]} (+${pointsMatch[1]} points)`,
+            "success"
+          );
+        } else {
+          addNotification(`✅ Quest Complete: ${match[1]}`, "success");
+        }
+      }
+    }
+
+    // Quest failed
+    if (command.includes("/fail_quest:")) {
+      const match = response.message.match(/Failed quest "([^"]+)"/);
+      if (match) {
+        addNotification(`❌ Quest Failed: ${match[1]}`, "warning");
+      }
+    }
+
+    // Quest updated
+    if (
+      command.includes("/update_quest_description:") ||
+      command.includes("/update_quest_short_description:")
+    ) {
+      const match = response.message.match(/Updated quest "([^"]+)"/);
+      if (match) {
+        addNotification(`📝 Quest Updated: ${match[1]}`, "info");
+      }
+    }
+
+    // Quest deactivated
+    if (command.includes("/deactivate_quest:")) {
+      const match = response.message.match(/Deactivated quest "([^"]+)"/);
+      if (match) {
+        addNotification(`⏸️ Quest Deactivated: ${match[1]}`, "info");
+      }
+    }
+
+    // Quest activated
+    if (command.includes("/activate_quest:")) {
+      const match = response.message.match(/Activated quest "([^"]+)"/);
+      if (match) {
+        addNotification(`▶️ Quest Activated: ${match[1]}`, "info");
+      }
+    }
+
+    // Quest deleted
+    if (command.includes("/delete_quest:")) {
+      const match = response.message.match(/Deleted quest "([^"]+)"/);
+      if (match) {
+        addNotification(`🗑️ Quest Removed: ${match[1]}`, "info");
+      }
+    }
+  }
+}
+
 enum StoryState {
   STORY = "STORY",
   STATS = "STATS",
@@ -2557,6 +2640,9 @@ function StoryPageContent() {
             // Store tool responses for AI feedback in next turn
             setPendingCommandResponses(toolResponses);
 
+            // Notify player of quest changes
+            processQuestNotifications(toolResponses, addNotification);
+
             setStoryData({ ...storyData });
             toolsComplete = true;
             checkBothComplete();
@@ -4489,6 +4575,9 @@ function StoryPageContent() {
               // Store tool responses for AI feedback in next turn
               setPendingCommandResponses(toolResponses);
 
+              // Notify player of quest changes
+              processQuestNotifications(toolResponses, addNotification);
+
               setStoryData({ ...storyData });
               toolsComplete = true;
               checkBothComplete();
@@ -4790,6 +4879,9 @@ function StoryPageContent() {
 
             // Store tool responses for AI feedback in next turn
             setPendingCommandResponses(toolResponses);
+
+            // Notify player of quest changes
+            processQuestNotifications(toolResponses, addNotification);
 
             setStoryData({ ...storyData });
             toolsComplete = true;

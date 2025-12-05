@@ -639,8 +639,9 @@ export async function generateStoryTurn(
     storyContent = storyContent.trimStart();
 
     // Strip trailing dividers (---, ***, ___) that the model might add
-    while (/[-*_]{3,}[\s\n]*$/.test(storyContent)) {
-      storyContent = storyContent.replace(/[\s\n]*([-*_]{3,})[\s\n]*$/, "");
+    // Also catches \n--- and \n*** patterns at the end
+    while (/\n?[-*_]{3,}[\s\n]*$/.test(storyContent)) {
+      storyContent = storyContent.replace(/\n?[-*_]{3,}[\s\n]*$/, "");
     }
     storyContent = storyContent.trimEnd();
 

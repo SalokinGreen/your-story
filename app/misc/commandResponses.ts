@@ -187,6 +187,55 @@ export function executeCommandWithResponse(
     };
   }
 
+  // /fail_quest: quest title
+  const failQuestMatch = trimmed.match(/^\/fail_quest:\s*(.+)$/i);
+  if (failQuestMatch) {
+    const questTitle = failQuestMatch[1].trim();
+    if (!storyData.quests) storyData.quests = [];
+
+    const matchResult = findQuestMatch(questTitle, storyData.quests);
+    const quest = matchResult?.item;
+
+    if (!quest) {
+      return {
+        command: trimmed,
+        success: false,
+        message: `Quest "${questTitle}" not found`,
+        timestamp,
+      };
+    }
+
+    if (quest.fulfilled) {
+      return {
+        command: trimmed,
+        success: "partial",
+        message: `Quest "${quest.title}" was already completed (cannot fail)`,
+        timestamp,
+      };
+    }
+
+    // Mark quest as inactive (failed) - no points awarded
+    quest.active = false;
+
+    logger.action("Quest failed via command response", {
+      title: quest.title,
+    });
+
+    const fuzzyNote =
+      matchResult && !matchResult.isExact
+        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
+            matchResult.score * 100
+          )}%)`
+        : "";
+
+    return {
+      command: trimmed,
+      success: true,
+      message: `Failed quest "${quest.title}"${fuzzyNote}`,
+      timestamp,
+    };
+  }
+
   // /deactivate_quest: quest title
   const deactivateQuestMatch = trimmed.match(/^\/deactivate_quest:\s*(.+)$/i);
   if (deactivateQuestMatch) {

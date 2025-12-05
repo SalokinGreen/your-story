@@ -88,12 +88,8 @@ const STATE_CHANGE_TOOLS = new Set([
   "update_relationship_description",
   // Achievements - tool names and command names
   "trigger_achievement",
-  // Lore - tool names and command names
-  "show_lore",
-  "lore_show",
-  "hide_lore",
-  "lore_hide",
-  "create_lore",
+  // Note: Lore tools (show_lore, hide_lore, create_lore) excluded - lore visibility
+  // changes are not useful context for the AI story stage
   // Variables
   "set_variable",
   "modify_variable",
