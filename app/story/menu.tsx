@@ -4442,6 +4442,7 @@ function StoryMetaEditor({
 
 interface MenuProps extends StoryData {
   storyDbId: string | null;
+  sourceAdventureId?: string | null;
   onSaveProgress: () => Promise<void>;
   onUpdateStoryData: (updates: Partial<StoryData>) => void;
   onViewLogs?: () => void;
@@ -4450,6 +4451,7 @@ interface MenuProps extends StoryData {
 
 export default function MenuPage({
   storyDbId,
+  sourceAdventureId,
   onSaveProgress,
   onUpdateStoryData,
   onViewLogs,
@@ -4460,6 +4462,7 @@ export default function MenuPage({
   const { addNotification } = useNotification();
   const { user, getEncryptionPassword } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [savingAs, setSavingAs] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -4539,6 +4542,76 @@ export default function MenuPage({
       addNotification("Notes saved!", "success");
     } catch (error) {
       addNotification("Failed to save notes", "failure");
+    }
+  };
+
+  const handleSaveAs = async () => {
+    if (!user) {
+      addNotification("Please sign in to save", "warning");
+      return;
+    }
+
+    setSavingAs(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        addNotification("Please sign in to save", "warning");
+        return;
+      }
+
+      // Create a copy with a new name
+      const timestamp = new Date().toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const copyName = `${storyData.story_name} (Save ${timestamp})`;
+      const copyData = {
+        ...storyData,
+        story_name: copyName,
+      };
+
+      // Encrypt if needed
+      const password = getEncryptionPassword();
+      const email = user?.email;
+      let dataToSave = copyData;
+      if (password && email) {
+        dataToSave = (await encryptStoryData(copyData, email, password)) as any;
+      }
+
+      // Create new story via API
+      const response = await fetch("/api/stories", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          adventureId: sourceAdventureId,
+          userId: user.id,
+          storyName: copyName,
+          storyData: dataToSave,
+          isPublic: false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create save");
+      }
+
+      const { story } = await response.json();
+      addNotification(`Saved as "${copyName}"`, "success");
+
+      // Navigate to the new story
+      router.push(`/story?storyId=${story.id}`);
+    } catch (error) {
+      console.error("Error saving as:", error);
+      addNotification("Failed to create save", "failure");
+    } finally {
+      setSavingAs(false);
     }
   };
 
@@ -4752,6 +4825,20 @@ export default function MenuPage({
           <span>{saving ? "Saving..." : "Save"}</span>
         </button>
 
+        <button
+          onClick={handleSaveAs}
+          disabled={savingAs || !user}
+          className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-700 hover:bg-emerald-600 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white font-medium rounded-lg transition-colors text-sm"
+          title="Create a copy of this story as a save point"
+        >
+          {savingAs ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+          ) : (
+            <DynamicIcon name="Copy" className="w-4 h-4" />
+          )}
+          <span>{savingAs ? "Saving..." : "Save As"}</span>
+        </button>
+
         {onViewContext && (
           <button
             onClick={onViewContext}
@@ -4884,33 +4971,88 @@ export default function MenuPage({
                   setConfirmDialog({ ...confirmDialog, isOpen: false });
                   if (!storyDbId) return;
                   try {
+                    // Try to fetch fresh adventure data if we have a source adventure
+                    let freshTemplate: Partial<StoryData> | null = null;
+                    if (sourceAdventureId) {
+                      try {
+                        const adventureRes = await fetch(
+                          `/api/adventures/${sourceAdventureId}`
+                        );
+                        if (adventureRes.ok) {
+                          const { adventure } = await adventureRes.json();
+                          freshTemplate = adventure.storyTemplate;
+                        }
+                      } catch (e) {
+                        console.warn(
+                          "Could not fetch fresh adventure data, using current story values"
+                        );
+                      }
+                    }
+
+                    // Use fresh adventure data if available, otherwise fall back to current story values
                     const resetStoryData = {
                       ...storyData,
+                      // Reset dynamic fields from fresh adventure template or current story
+                      stats: freshTemplate?.stats || storyData.stats,
+                      resources:
+                        freshTemplate?.resources || storyData.resources,
+                      inventory:
+                        freshTemplate?.inventory || storyData.inventory,
+                      abilities:
+                        freshTemplate?.abilities || storyData.abilities,
+                      conditions: freshTemplate?.conditions || [],
+                      relationships:
+                        freshTemplate?.relationships || storyData.relationships,
+                      variables:
+                        freshTemplate?.variables || storyData.variables,
+                      skillTrees:
+                        freshTemplate?.skillTrees || storyData.skillTrees,
+                      agmtState:
+                        freshTemplate?.agmtState || storyData.agmtState,
+                      customTables:
+                        freshTemplate?.customTables || storyData.customTables,
+                      maxMomentum:
+                        freshTemplate?.maxMomentum ?? storyData.maxMomentum,
+                      restState: freshTemplate?.restState || {
+                        quickRestsUsed: 0,
+                        shortRestsUsed: 0,
+                      },
+                      nodeEffects:
+                        freshTemplate?.nodeEffects || storyData.nodeEffects,
+                      unlockedNodes:
+                        freshTemplate?.unlockedNodes || storyData.unlockedNodes,
+                      // Always reset these
                       scene: { parts: [] },
                       memory: [],
                       currentChapter: 0,
                       chapters: [],
-                      momentum: storyData.momentum,
+                      momentum: freshTemplate?.momentum ?? storyData.momentum,
                       points: 0,
                       earnedPointsFromChapters: [],
                       earnedPointsFromQuests: [],
-                      achievements: storyData.achievements.map((a) => ({
+                      achievements: (
+                        freshTemplate?.achievements || storyData.achievements
+                      ).map((a) => ({
                         ...a,
                         dateAchieved: null,
                       })),
                       quests:
-                        storyData.quests?.map((q) => ({
-                          ...q,
-                          fulfilled: false,
-                          active: false,
-                        })) || [],
-                      lore: storyData.lore.map((l) => ({
-                        ...l,
-                        on:
-                          l.on_triggers && l.on_triggers.length > 0
-                            ? false
-                            : true,
-                      })),
+                        (freshTemplate?.quests || storyData.quests)?.map(
+                          (q) => ({
+                            ...q,
+                            fulfilled: false,
+                            active: false,
+                          })
+                        ) || [],
+                      lore: (freshTemplate?.lore || storyData.lore).map(
+                        (l) => ({
+                          ...l,
+                          on:
+                            l.on_triggers && l.on_triggers.length > 0
+                              ? false
+                              : true,
+                        })
+                      ),
                       newGamePlusMode: false,
                     };
                     if (storyDbId.startsWith("local_")) {

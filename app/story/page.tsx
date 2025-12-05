@@ -1529,6 +1529,9 @@ function StoryPageContent() {
   );
   const [storyData, setStoryData] = useState<StoryData | null>(null);
   const [storyDbId, setStoryDbId] = useState<string | null>(null);
+  const [sourceAdventureId, setSourceAdventureId] = useState<string | null>(
+    null
+  );
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const hasLoadedStoryRef = useRef<string | null>(null); // Track loaded story ID to prevent re-fetching on tab focus
   const [choices, setChoices] = useState<Choices>({ choices: [] });
@@ -2032,6 +2035,7 @@ function StoryPageContent() {
         const { story } = await response.json();
         console.log("Story loaded from server:", story);
         setStoryDbId(story.id);
+        setSourceAdventureId(story.adventureId || null);
 
         //Checkifstorydataisencrypted
         let serverStoryData: StoryData;
@@ -5460,34 +5464,94 @@ function StoryPageContent() {
                           return;
                         }
 
+                        // Try to fetch fresh adventure data if we have a source adventure
+                        let freshTemplate: Partial<StoryData> | null = null;
+                        if (sourceAdventureId) {
+                          try {
+                            const adventureRes = await fetch(
+                              `/api/adventures/${sourceAdventureId}`
+                            );
+                            if (adventureRes.ok) {
+                              const { adventure } = await adventureRes.json();
+                              freshTemplate = adventure.storyTemplate;
+                            }
+                          } catch (e) {
+                            console.warn(
+                              "Could not fetch fresh adventure data, using current story values"
+                            );
+                          }
+                        }
+
                         //Resetstorytoinitialstatebutkeepadventuretemplate
                         const resetStoryData: StoryData = {
                           ...storyData,
+                          // Reset dynamic fields from fresh adventure template or current story
+                          stats: freshTemplate?.stats || storyData.stats,
+                          resources:
+                            freshTemplate?.resources || storyData.resources,
+                          inventory:
+                            freshTemplate?.inventory || storyData.inventory,
+                          abilities:
+                            freshTemplate?.abilities || storyData.abilities,
+                          conditions: freshTemplate?.conditions || [],
+                          relationships:
+                            freshTemplate?.relationships ||
+                            storyData.relationships,
+                          variables:
+                            freshTemplate?.variables || storyData.variables,
+                          skillTrees:
+                            freshTemplate?.skillTrees || storyData.skillTrees,
+                          agmtState:
+                            freshTemplate?.agmtState || storyData.agmtState,
+                          customTables:
+                            freshTemplate?.customTables ||
+                            storyData.customTables,
+                          maxMomentum:
+                            freshTemplate?.maxMomentum ?? storyData.maxMomentum,
+                          restState: freshTemplate?.restState || {
+                            quickRestsUsed: 0,
+                            shortRestsUsed: 0,
+                          },
+                          nodeEffects:
+                            freshTemplate?.nodeEffects || storyData.nodeEffects,
+                          unlockedNodes:
+                            freshTemplate?.unlockedNodes ||
+                            storyData.unlockedNodes,
+                          // Always reset these
                           scene: { parts: [] },
                           memory: [],
                           currentChapter: 0,
                           chapters: [],
-                          momentum: storyData.momentum,
+                          momentum:
+                            freshTemplate?.momentum ?? storyData.momentum,
                           points: 0,
                           earnedPointsFromChapters: [],
                           earnedPointsFromQuests: [],
-                          achievements: storyData.achievements.map((a) => ({
+                          achievements: (
+                            freshTemplate?.achievements ||
+                            storyData.achievements
+                          ).map((a) => ({
                             ...a,
                             dateAchieved: null,
                           })),
                           quests:
-                            storyData.quests?.map((q) => ({
-                              ...q,
-                              fulfilled: false,
-                              active: false,
-                            })) || [],
-                          lore: storyData.lore.map((l) => ({
-                            ...l,
-                            on:
-                              l.on_triggers && l.on_triggers.length > 0
-                                ? false
-                                : true,
-                          })),
+                            (freshTemplate?.quests || storyData.quests)?.map(
+                              (q) => ({
+                                ...q,
+                                fulfilled: false,
+                                active: false,
+                              })
+                            ) || [],
+                          lore: (freshTemplate?.lore || storyData.lore).map(
+                            (l) => ({
+                              ...l,
+                              on:
+                                l.on_triggers && l.on_triggers.length > 0
+                                  ? false
+                                  : true,
+                            })
+                          ),
+                          newGamePlusMode: false,
                         };
 
                         // Encrypt before saving
@@ -5569,6 +5633,24 @@ function StoryPageContent() {
                         const bonusPoints = ngPlusCount * 50; //50pointsperNG+run
                         const bonusMomentum = Math.min(ngPlusCount, 3); //Upto+3maxmomentum
 
+                        // Try to fetch fresh adventure data for story-specific fields (lore, quests)
+                        let freshTemplate: Partial<StoryData> | null = null;
+                        if (sourceAdventureId) {
+                          try {
+                            const adventureRes = await fetch(
+                              `/api/adventures/${sourceAdventureId}`
+                            );
+                            if (adventureRes.ok) {
+                              const { adventure } = await adventureRes.json();
+                              freshTemplate = adventure.storyTemplate;
+                            }
+                          } catch (e) {
+                            console.warn(
+                              "Could not fetch fresh adventure data, using current story values"
+                            );
+                          }
+                        }
+
                         //Resetstorybutkeepachievements,stats,resources,andinventory
                         const ngPlusStoryData: StoryData = {
                           ...storyData,
@@ -5581,24 +5663,48 @@ function StoryPageContent() {
                           points: bonusPoints, //Startwithbonuspoints
                           earnedPointsFromChapters: [],
                           earnedPointsFromQuests: [],
-                          //Keepachievements,stats,resources,andinventory!
+                          //Keepachievements,stats,resources,inventory,abilities!
                           achievements: storyData.achievements,
                           stats: storyData.stats, //Keepstats
                           resources: storyData.resources, //Keepresources
                           inventory: storyData.inventory, //Keepinventory
+                          abilities: storyData.abilities, //Keepabilities
+                          conditions: [], // Clear conditions
+                          // Reset story-specific fields from fresh adventure
+                          relationships:
+                            freshTemplate?.relationships ||
+                            storyData.relationships, // Reset relationships
+                          variables:
+                            freshTemplate?.variables || storyData.variables,
+                          agmtState:
+                            freshTemplate?.agmtState || storyData.agmtState,
+                          customTables:
+                            freshTemplate?.customTables ||
+                            storyData.customTables,
+                          restState: { quickRestsUsed: 0, shortRestsUsed: 0 },
+                          // Keep skill tree progress!
+                          skillTrees: storyData.skillTrees,
+                          unlockedNodes: storyData.unlockedNodes,
+                          nodeEffects: storyData.nodeEffects,
+                          // Reset quests from fresh adventure or current story
                           quests:
-                            storyData.quests?.map((q) => ({
-                              ...q,
-                              fulfilled: false,
-                              active: false,
-                            })) || [],
-                          lore: storyData.lore.map((l) => ({
-                            ...l,
-                            on:
-                              l.on_triggers && l.on_triggers.length > 0
-                                ? false
-                                : true,
-                          })),
+                            (freshTemplate?.quests || storyData.quests)?.map(
+                              (q) => ({
+                                ...q,
+                                fulfilled: false,
+                                active: false,
+                              })
+                            ) || [],
+                          // Reset lore from fresh adventure or current story
+                          lore: (freshTemplate?.lore || storyData.lore).map(
+                            (l) => ({
+                              ...l,
+                              on:
+                                l.on_triggers && l.on_triggers.length > 0
+                                  ? false
+                                  : true,
+                            })
+                          ),
                           newGamePlusCount: ngPlusCount,
                           newGamePlusMode: true,
                         };
@@ -5924,6 +6030,7 @@ function StoryPageContent() {
           <MenuPage
             {...storyData}
             storyDbId={storyDbId}
+            sourceAdventureId={sourceAdventureId}
             onSaveProgress={() => saveProgress(storyData)}
             onUpdateStoryData={updateStoryData}
             onViewLogs={() => setCurrentState(StoryState.LOGS)}

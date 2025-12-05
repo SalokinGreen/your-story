@@ -294,7 +294,9 @@ export default function SkillTreeEditor({
     const targetNode = tree.nodes.find((n) => n.id === toId);
     if (targetNode) {
       handleUpdateNode(toId, {
-        prerequisites: (targetNode.prerequisites || []).filter((p) => p !== fromId),
+        prerequisites: (targetNode.prerequisites || []).filter(
+          (p) => p !== fromId
+        ),
       });
     }
   };
@@ -530,44 +532,44 @@ export default function SkillTreeEditor({
           className="absolute inset-0"
           style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}
         >
-        {tree.nodes.map((node) => {
-          const pos = getNodePixelPos(node);
-          const isSelected = selectedNodeId === node.id;
-          const colors = NODE_COLORS[node.type];
+          {tree.nodes.map((node) => {
+            const pos = getNodePixelPos(node);
+            const isSelected = selectedNodeId === node.id;
+            const colors = NODE_COLORS[node.type];
 
-          return (
-            <div
-              key={node.id}
-              className={`skill-tree-node absolute rounded-full border-2 flex items-center justify-center cursor-move select-none touch-none ${
-                colors.bg
-              } ${colors.border} ${
-                isSelected
-                  ? "ring-2 ring-white ring-offset-2 ring-offset-gray-900 scale-110"
-                  : ""
-              }`}
-              style={{
-                width: NODE_SIZE,
-                height: NODE_SIZE,
-                left: pos.x - NODE_SIZE / 2,
-                top: pos.y - NODE_SIZE / 2,
-              }}
-              onMouseDown={(e) => handleNodePointerDown(e, node.id)}
-              onTouchStart={(e) => handleNodePointerDown(e, node.id)}
-              onDoubleClick={() => handleEditNode(node)}
-              title={`${node.name}\nDouble-click to edit`}
-            >
-              <DynamicIcon
-                name={node.symbol || NODE_TYPE_ICONS[node.type]}
-                className="w-6 h-6 text-white"
-              />
+            return (
+              <div
+                key={node.id}
+                className={`skill-tree-node absolute rounded-full border-2 flex items-center justify-center cursor-move select-none touch-none ${
+                  colors.bg
+                } ${colors.border} ${
+                  isSelected
+                    ? "ring-2 ring-white ring-offset-2 ring-offset-gray-900 scale-110"
+                    : ""
+                }`}
+                style={{
+                  width: NODE_SIZE,
+                  height: NODE_SIZE,
+                  left: pos.x - NODE_SIZE / 2,
+                  top: pos.y - NODE_SIZE / 2,
+                }}
+                onMouseDown={(e) => handleNodePointerDown(e, node.id)}
+                onTouchStart={(e) => handleNodePointerDown(e, node.id)}
+                onDoubleClick={() => handleEditNode(node)}
+                title={`${node.name}\nDouble-click to edit`}
+              >
+                <DynamicIcon
+                  name={node.symbol || NODE_TYPE_ICONS[node.type]}
+                  className="w-6 h-6 text-white"
+                />
 
-              {/* Node name label */}
-              <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-white whitespace-nowrap bg-gray-900/80 px-1 rounded">
-                {node.name}
+                {/* Node name label */}
+                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-white whitespace-nowrap bg-gray-900/80 px-1 rounded">
+                  {node.name}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
         </div>
 
         {/* Empty state */}
@@ -639,7 +641,8 @@ export default function SkillTreeEditor({
               </span>
             </span>
             <span>
-              Prerequisites: {(selectedNode.prerequisites || []).length || "None"}
+              Prerequisites:{" "}
+              {(selectedNode.prerequisites || []).length || "None"}
             </span>
             <span>Effects: {selectedNode.effects.length}</span>
           </div>
