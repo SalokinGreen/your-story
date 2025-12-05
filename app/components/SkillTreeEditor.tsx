@@ -171,7 +171,7 @@ export default function SkillTreeEditor({
       .filter((n) => n.id !== nodeId)
       .map((n) => ({
         ...n,
-        prerequisites: n.prerequisites.filter((p) => p !== nodeId),
+        prerequisites: (n.prerequisites || []).filter((p) => p !== nodeId),
       }));
     onChange({ ...tree, nodes: updatedNodes });
     setSelectedNodeId(null);
@@ -194,9 +194,10 @@ export default function SkillTreeEditor({
       // We're in connection mode - add prerequisite
       if (connectingFrom !== nodeId) {
         const targetNode = tree.nodes.find((n) => n.id === nodeId);
-        if (targetNode && !targetNode.prerequisites.includes(connectingFrom)) {
+        const prereqs = targetNode?.prerequisites || [];
+        if (targetNode && !prereqs.includes(connectingFrom)) {
           handleUpdateNode(nodeId, {
-            prerequisites: [...targetNode.prerequisites, connectingFrom],
+            prerequisites: [...prereqs, connectingFrom],
           });
         }
       }
@@ -293,7 +294,7 @@ export default function SkillTreeEditor({
     const targetNode = tree.nodes.find((n) => n.id === toId);
     if (targetNode) {
       handleUpdateNode(toId, {
-        prerequisites: targetNode.prerequisites.filter((p) => p !== fromId),
+        prerequisites: (targetNode.prerequisites || []).filter((p) => p !== fromId),
       });
     }
   };
@@ -444,22 +445,16 @@ export default function SkillTreeEditor({
         className="relative bg-gray-900/50 border border-gray-700 rounded-lg overflow-hidden w-full cursor-grab active:cursor-grabbing"
         style={{ aspectRatio: "8 / 5", minHeight: "300px" }}
         onMouseDown={(e) => {
-          // Only start panning if clicking on empty canvas (not a node)
-          if (
-            e.target === canvasRef.current ||
-            (e.target as HTMLElement).closest(".canvas-background")
-          ) {
+          // Start panning unless clicking on a node
+          if (!(e.target as HTMLElement).closest(".skill-tree-node")) {
             e.preventDefault();
             setIsPanning(true);
             setPanStart({ x: e.clientX, y: e.clientY });
           }
         }}
         onTouchStart={(e) => {
-          // Only start panning if touching empty canvas
-          if (
-            e.target === canvasRef.current ||
-            (e.target as HTMLElement).closest(".canvas-background")
-          ) {
+          // Start panning unless touching a node
+          if (!(e.target as HTMLElement).closest(".skill-tree-node")) {
             e.preventDefault();
             setIsPanning(true);
             setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
@@ -468,18 +463,18 @@ export default function SkillTreeEditor({
       >
         {/* Grid pattern */}
         <div
-          className="canvas-background absolute inset-0 opacity-10 transition-[background-position] duration-75 ease-out"
+          className="canvas-background absolute inset-0 opacity-10 pointer-events-none"
           style={{
             backgroundImage:
               "radial-gradient(circle, #666 1px, transparent 1px)",
-            backgroundSize: "20px 20px",
+            backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
             backgroundPosition: `${panOffset.x}px ${panOffset.y}px`,
           }}
         />
 
         {/* SVG for connections */}
         <svg
-          className="absolute inset-0 w-full h-full pointer-events-none transition-transform duration-75 ease-out"
+          className="absolute inset-0 w-full h-full pointer-events-none"
           style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}
         >
           <defs>
@@ -497,7 +492,7 @@ export default function SkillTreeEditor({
 
           {/* Draw connections */}
           {tree.nodes.map((node) =>
-            node.prerequisites.map((prereqId) => {
+            (node.prerequisites || []).map((prereqId) => {
               const prereqNode = tree.nodes.find((n) => n.id === prereqId);
               if (!prereqNode) return null;
 
@@ -531,6 +526,10 @@ export default function SkillTreeEditor({
         </svg>
 
         {/* Nodes */}
+        <div
+          className="absolute inset-0"
+          style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}
+        >
         {tree.nodes.map((node) => {
           const pos = getNodePixelPos(node);
           const isSelected = selectedNodeId === node.id;
@@ -539,7 +538,7 @@ export default function SkillTreeEditor({
           return (
             <div
               key={node.id}
-              className={`absolute rounded-full border-2 flex items-center justify-center cursor-move select-none touch-none transition-[left,top] duration-75 ease-out ${
+              className={`skill-tree-node absolute rounded-full border-2 flex items-center justify-center cursor-move select-none touch-none ${
                 colors.bg
               } ${colors.border} ${
                 isSelected
@@ -549,8 +548,8 @@ export default function SkillTreeEditor({
               style={{
                 width: NODE_SIZE,
                 height: NODE_SIZE,
-                left: pos.x - NODE_SIZE / 2 + panOffset.x,
-                top: pos.y - NODE_SIZE / 2 + panOffset.y,
+                left: pos.x - NODE_SIZE / 2,
+                top: pos.y - NODE_SIZE / 2,
               }}
               onMouseDown={(e) => handleNodePointerDown(e, node.id)}
               onTouchStart={(e) => handleNodePointerDown(e, node.id)}
@@ -569,6 +568,7 @@ export default function SkillTreeEditor({
             </div>
           );
         })}
+        </div>
 
         {/* Empty state */}
         {tree.nodes.length === 0 && (
@@ -639,7 +639,7 @@ export default function SkillTreeEditor({
               </span>
             </span>
             <span>
-              Prerequisites: {selectedNode.prerequisites.length || "None"}
+              Prerequisites: {(selectedNode.prerequisites || []).length || "None"}
             </span>
             <span>Effects: {selectedNode.effects.length}</span>
           </div>

@@ -93,7 +93,7 @@ function CreateCharacterContent() {
           setInventory(JSON.parse(JSON.stringify(data.inventory || [])));
           setUpgradeSettings(data.upgradeSettings || DEFAULT_UPGRADE_SETTINGS);
           // Set starting points from adventure data
-          const startingPoints = data.points || 20;
+          const startingPoints = data.points ?? 0;
           setInitialPoints(startingPoints);
           setRemainingPoints(startingPoints);
         } else {
@@ -143,7 +143,7 @@ function CreateCharacterContent() {
             storyDataToUse.upgradeSettings || DEFAULT_UPGRADE_SETTINGS
           );
           // Set starting points from adventure data
-          const startingPoints = storyDataToUse.points || 20;
+          const startingPoints = storyDataToUse.points ?? 0;
           setInitialPoints(startingPoints);
           setRemainingPoints(startingPoints);
         }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { SkillTree, SkillNode, StoryData } from "../misc/structs";
 import { getNodeState, NodeState, unlockNode } from "../misc/skillTree";
 import { DynamicIcon } from "./DynamicIcon";
@@ -53,8 +53,8 @@ const STATE_STYLES: Record<
 > = {
   locked: {
     opacity: "opacity-40",
-    scale: "scale-100",
-    cursor: "cursor-not-allowed",
+    scale: "scale-100 hover:scale-105",
+    cursor: "cursor-pointer",
   },
   available: {
     opacity: "opacity-100",
@@ -63,8 +63,8 @@ const STATE_STYLES: Record<
   },
   unlocked: {
     opacity: "opacity-100",
-    scale: "scale-100",
-    cursor: "cursor-default",
+    scale: "scale-100 hover:scale-105",
+    cursor: "cursor-pointer",
   },
 };
 
@@ -90,6 +90,12 @@ export default function SkillTreeView({
     width: 600,
     height: 400,
   });
+
+  // Zoom and pan state
+  const [zoom, setZoom] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   // Responsive container sizing - uses actual element dimensions
   useEffect(() => {
@@ -127,25 +133,29 @@ export default function SkillTreeView({
   // Use responsive dimensions
   const containerWidth = containerSize.width;
   const containerHeight = containerSize.height;
-  // Scale node size based on container width
-  const nodeSize = containerWidth < 350 ? 36 : containerWidth < 450 ? 42 : 48;
-  const padding = containerWidth < 400 ? 24 : 40;
+  // Scale node size based on container width and zoom
+  const baseNodeSize =
+    containerWidth < 350 ? 36 : containerWidth < 450 ? 42 : 48;
+  const nodeSize = baseNodeSize * zoom;
+  const padding = (containerWidth < 400 ? 24 : 40) * zoom;
 
   const nodePositions: NodePosition[] = tree.nodes.map((node) => ({
     node,
     x:
       padding +
-      (node.position.x / 100) * (containerWidth - padding * 2 - nodeSize),
+      (node.position.x / 100) *
+        (containerWidth * zoom - padding * 2 - nodeSize),
     y:
       padding +
-      (node.position.y / 100) * (containerHeight - padding * 2 - nodeSize),
+      (node.position.y / 100) *
+        (containerHeight * zoom - padding * 2 - nodeSize),
     state: getNodeState(storyData, tree, node),
   }));
 
   // Generate SVG paths for prerequisite connections
   const connections: Array<{ from: NodePosition; to: NodePosition }> = [];
   for (const pos of nodePositions) {
-    for (const prereqId of pos.node.prerequisites) {
+    for (const prereqId of pos.node.prerequisites || []) {
       const prereqPos = nodePositions.find((p) => p.node.id === prereqId);
       if (prereqPos) {
         connections.push({ from: prereqPos, to: pos });
@@ -154,16 +164,8 @@ export default function SkillTreeView({
   }
 
   const handleNodeClick = (node: SkillNode, state: NodeState) => {
-    if (readOnly) {
-      setSelectedNode(node);
-      return;
-    }
-
-    if (state === "available" && availableUpgrades > 0) {
-      setSelectedNode(node);
-    } else if (state === "unlocked") {
-      setSelectedNode(node);
-    }
+    // Always allow selecting a node to view its details
+    setSelectedNode(node);
   };
 
   const handleUnlock = () => {
@@ -193,6 +195,48 @@ export default function SkillTreeView({
     return "stroke-gray-600";
   };
 
+  // Handle panning
+  const handlePointerMove = useCallback(
+    (e: MouseEvent | TouchEvent) => {
+      if (!isPanning) return;
+
+      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+      const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+
+      const deltaX = (clientX - panStart.x) * 0.5;
+      const deltaY = (clientY - panStart.y) * 0.5;
+
+      setPanOffset((prev) => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY,
+      }));
+      setPanStart({ x: clientX, y: clientY });
+    },
+    [isPanning, panStart]
+  );
+
+  const handlePointerUp = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  // Add/remove event listeners for panning
+  useEffect(() => {
+    if (isPanning) {
+      window.addEventListener("mousemove", handlePointerMove);
+      window.addEventListener("mouseup", handlePointerUp);
+      window.addEventListener("touchmove", handlePointerMove, {
+        passive: false,
+      });
+      window.addEventListener("touchend", handlePointerUp);
+    }
+    return () => {
+      window.removeEventListener("mousemove", handlePointerMove);
+      window.removeEventListener("mouseup", handlePointerUp);
+      window.removeEventListener("touchmove", handlePointerMove);
+      window.removeEventListener("touchend", handlePointerUp);
+    };
+  }, [isPanning, handlePointerMove, handlePointerUp]);
+
   return (
     <div className="relative w-full">
       {/* Tree Header */}
@@ -206,17 +250,81 @@ export default function SkillTreeView({
         </div>
       </div>
 
+      {/* Zoom Controls */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-sm text-gray-400">Zoom:</span>
+        <button
+          onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
+          disabled={zoom <= 0.5}
+          className="p-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
+          title="Zoom out"
+        >
+          <DynamicIcon name="ZoomOut" className="w-4 h-4 text-white" />
+        </button>
+        <span className="text-sm text-white min-w-12 text-center">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          onClick={() => setZoom(Math.min(2, zoom + 0.25))}
+          disabled={zoom >= 2}
+          className="p-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
+          title="Zoom in"
+        >
+          <DynamicIcon name="ZoomIn" className="w-4 h-4 text-white" />
+        </button>
+        <button
+          onClick={() => {
+            setZoom(1);
+            setPanOffset({ x: 0, y: 0 });
+          }}
+          className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors"
+        >
+          Reset
+        </button>
+        <span className="text-xs text-gray-500 ml-2 hidden sm:inline">
+          Drag to pan
+        </span>
+      </div>
+
       {/* Tree Visualization */}
       <div
         ref={containerRef}
-        className="relative bg-linear-to-br from-gray-900/80 to-blue-950/80 rounded-xl border border-blue-800/30 overflow-hidden w-full"
-        style={{ maxWidth: 600, aspectRatio: "3 / 2" }}
+        className="relative bg-linear-to-br from-gray-900/80 to-blue-950/80 rounded-xl border border-blue-800/30 overflow-hidden w-full cursor-grab active:cursor-grabbing"
+        style={{ minHeight: "350px", aspectRatio: "8 / 5" }}
+        onMouseDown={(e) => {
+          // Start panning unless clicking on a node
+          if (!(e.target as HTMLElement).closest(".skill-node")) {
+            e.preventDefault();
+            setIsPanning(true);
+            setPanStart({ x: e.clientX, y: e.clientY });
+          }
+        }}
+        onTouchStart={(e) => {
+          // Start panning unless touching a node
+          if (!(e.target as HTMLElement).closest(".skill-node")) {
+            e.preventDefault();
+            setIsPanning(true);
+            setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+          }
+        }}
       >
+        {/* Grid pattern background */}
+        <div
+          className="canvas-background absolute inset-0 opacity-10 pointer-events-none"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle, #666 1px, transparent 1px)",
+            backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
+            backgroundPosition: `${panOffset.x}px ${panOffset.y}px`,
+          }}
+        />
+
         {/* SVG for connections */}
         <svg
           className="absolute inset-0 pointer-events-none"
           width={containerWidth}
           height={containerHeight}
+          style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}
         >
           <defs>
             {/* Glow filter for active connections */}
@@ -247,10 +355,7 @@ export default function SkillTreeView({
                   y1={fromY}
                   x2={toX}
                   y2={toY}
-                  className={`${getConnectionColor(
-                    conn.from,
-                    conn.to
-                  )} transition-all duration-300`}
+                  className={getConnectionColor(conn.from, conn.to)}
                   strokeWidth={conn.from.state === "unlocked" ? 3 : 2}
                   strokeDasharray={
                     conn.from.state === "unlocked" ? "none" : "4 4"
@@ -277,28 +382,32 @@ export default function SkillTreeView({
         </svg>
 
         {/* Nodes */}
-        {nodePositions.map((pos) => {
-          const colors = NODE_COLORS[pos.node.type];
-          const styles = STATE_STYLES[pos.state];
-          const isHovered = hoveredNode?.id === pos.node.id;
-          const isSelected = selectedNode?.id === pos.node.id;
+        <div
+          className="absolute inset-0"
+          style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}
+        >
+          {nodePositions.map((pos) => {
+            const colors = NODE_COLORS[pos.node.type];
+            const styles = STATE_STYLES[pos.state];
+            const isHovered = hoveredNode?.id === pos.node.id;
+            const isSelected = selectedNode?.id === pos.node.id;
 
-          return (
-            <div
-              key={pos.node.id}
-              className={`absolute transition-all duration-200 ${styles.cursor}`}
-              style={{
-                left: pos.x,
-                top: pos.y,
-                width: nodeSize,
-                height: nodeSize,
-              }}
-              onClick={() => handleNodeClick(pos.node, pos.state)}
-              onMouseEnter={() => handleMouseEnter(pos.node)}
-              onMouseLeave={handleMouseLeave}
-            >
+            return (
               <div
-                className={`
+                key={pos.node.id}
+                className={`skill-node absolute transition-all duration-200 ${styles.cursor}`}
+                style={{
+                  left: pos.x,
+                  top: pos.y,
+                  width: nodeSize,
+                  height: nodeSize,
+                }}
+                onClick={() => handleNodeClick(pos.node, pos.state)}
+                onMouseEnter={() => handleMouseEnter(pos.node)}
+                onMouseLeave={handleMouseLeave}
+              >
+                <div
+                  className={`
                   w-full h-full rounded-lg border-2 flex items-center justify-center
                   transition-all duration-200
                   ${styles.opacity} ${styles.scale}
@@ -321,35 +430,36 @@ export default function SkillTreeView({
                       : ""
                   }
                 `}
-              >
-                <DynamicIcon
-                  name={pos.node.symbol}
-                  className={`w-6 h-6 ${
-                    pos.state === "unlocked"
-                      ? "text-white"
-                      : pos.state === "available"
-                      ? "text-yellow-400"
-                      : "text-gray-500"
-                  }`}
-                />
+                >
+                  <DynamicIcon
+                    name={pos.node.symbol}
+                    className={`w-6 h-6 ${
+                      pos.state === "unlocked"
+                        ? "text-white"
+                        : pos.state === "available"
+                        ? "text-yellow-400"
+                        : "text-gray-500"
+                    }`}
+                  />
+                </div>
+
+                {/* Unlocked checkmark */}
+                {pos.state === "unlocked" && (
+                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 border-2 border-green-300 flex items-center justify-center">
+                    <DynamicIcon name="Check" className="w-3 h-3 text-white" />
+                  </div>
+                )}
+
+                {/* Node name tooltip */}
+                {isHovered && (
+                  <div className="absolute left-1/2 -translate-x-1/2 -bottom-8 whitespace-nowrap px-2 py-1 bg-gray-900 rounded text-xs text-white border border-gray-700 z-10">
+                    {pos.node.name}
+                  </div>
+                )}
               </div>
-
-              {/* Unlocked checkmark */}
-              {pos.state === "unlocked" && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 border-2 border-green-300 flex items-center justify-center">
-                  <DynamicIcon name="Check" className="w-3 h-3 text-white" />
-                </div>
-              )}
-
-              {/* Node name tooltip */}
-              {isHovered && (
-                <div className="absolute left-1/2 -translate-x-1/2 -bottom-8 whitespace-nowrap px-2 py-1 bg-gray-900 rounded text-xs text-white border border-gray-700 z-10">
-                  {pos.node.name}
-                </div>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* Node Details Panel */}
