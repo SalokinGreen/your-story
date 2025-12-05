@@ -4836,7 +4836,7 @@ export default function MenuPage({
           ) : (
             <DynamicIcon name="Copy" className="w-4 h-4" />
           )}
-          <span>{savingAs ? "Saving..." : "Save As"}</span>
+          <span>{savingAs ? "Saving..." : "Save Copy"}</span>
         </button>
 
         {onViewContext && (
