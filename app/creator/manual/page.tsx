@@ -31,6 +31,7 @@ import {
   Ability,
   AbilityCost,
   AbilityGrade,
+  DCTier,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
@@ -4560,7 +4561,7 @@ ${description || ""}`;
                           ...newStartingChoice,
                           skill_used: e.target.value || undefined,
                           skill_dc: e.target.value
-                            ? newStartingChoice.skill_dc || 50
+                            ? newStartingChoice.skill_dc || "average"
                             : undefined,
                         })
                       }
@@ -4577,21 +4578,33 @@ ${description || ""}`;
                   {newStartingChoice.skill_used && (
                     <div>
                       <label className="block text-sm font-semibold text-blue-200 mb-1">
-                        DC (Difficulty)
+                        Difficulty Tier
                       </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={newStartingChoice.skill_dc || 50}
+                      <select
+                        value={
+                          (newStartingChoice.skill_dc as string) || "average"
+                        }
                         onChange={(e) =>
                           setNewStartingChoice({
                             ...newStartingChoice,
-                            skill_dc: parseInt(e.target.value) || 50,
+                            skill_dc: e.target.value as DCTier,
                           })
                         }
                         className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                      />
+                      >
+                        <option value="trivial">
+                          Trivial - Almost automatic
+                        </option>
+                        <option value="easy">Easy - Most succeed</option>
+                        <option value="average">Average - 50/50 chance</option>
+                        <option value="hard">Hard - Skill required</option>
+                        <option value="very_hard">
+                          Very Hard - Only experts succeed
+                        </option>
+                        <option value="impossible">
+                          Impossible - Legendary difficulty
+                        </option>
+                      </select>
                     </div>
                   )}
                 </div>
@@ -4903,7 +4916,7 @@ ${description || ""}`;
                                   ...editStartingChoice,
                                   skill_used: e.target.value || undefined,
                                   skill_dc: e.target.value
-                                    ? editStartingChoice.skill_dc || 50
+                                    ? editStartingChoice.skill_dc || "average"
                                     : undefined,
                                 })
                               }
@@ -4920,21 +4933,40 @@ ${description || ""}`;
                           {editStartingChoice.skill_used && (
                             <div>
                               <label className="block text-sm font-semibold text-blue-200 mb-1">
-                                DC
+                                Difficulty Tier
                               </label>
-                              <input
-                                type="number"
-                                min="1"
-                                max="100"
-                                value={editStartingChoice.skill_dc || 50}
+                              <select
+                                value={
+                                  (editStartingChoice.skill_dc as string) ||
+                                  "average"
+                                }
                                 onChange={(e) =>
                                   setEditStartingChoice({
                                     ...editStartingChoice,
-                                    skill_dc: parseInt(e.target.value) || 50,
+                                    skill_dc: e.target.value as DCTier,
                                   })
                                 }
                                 className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                              />
+                              >
+                                <option value="trivial">
+                                  Trivial - Almost automatic
+                                </option>
+                                <option value="easy">
+                                  Easy - Most succeed
+                                </option>
+                                <option value="average">
+                                  Average - 50/50 chance
+                                </option>
+                                <option value="hard">
+                                  Hard - Skill required
+                                </option>
+                                <option value="very_hard">
+                                  Very Hard - Only experts succeed
+                                </option>
+                                <option value="impossible">
+                                  Impossible - Legendary difficulty
+                                </option>
+                              </select>
                             </div>
                           )}
                         </div>
@@ -5222,7 +5254,11 @@ ${description || ""}`;
                                   name="Dices"
                                   className="w-3 h-3 inline mr-1"
                                 />
-                                {choice.skill_used} DC {choice.skill_dc}
+                                {choice.skill_used} (
+                                {typeof choice.skill_dc === "number"
+                                  ? `DC ${choice.skill_dc}`
+                                  : choice.skill_dc || "average"}
+                                )
                               </span>
                             )}
                             {choice.item_used && (

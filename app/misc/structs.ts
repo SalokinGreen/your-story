@@ -514,7 +514,7 @@ export interface StartingChoice {
   text: string; // The choice text displayed to player
   intro_override?: string; // Optional: different intro text for this path (if empty, uses main intro)
   skill_used?: string; // Optional: skill check on this choice
-  skill_dc?: number; // DC for the skill check
+  skill_dc?: number | DCTier; // DC for the skill check (number for legacy, DCTier for new)
   resource_used?: string; // Optional: resource cost/check
   item_used?: string; // Optional: requires/uses an item
   item_loss?: boolean; // Whether the item is consumed when used
