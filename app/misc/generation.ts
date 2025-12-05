@@ -498,7 +498,8 @@ export async function generateStoryTurn(
         deepseekKey: options.deepseekKey,
         googleKey: options.googleKey,
         // Stop the AI before it generates GM state updates (handled by tools stage)
-        stop: ["[GM State Update]", "[GM State"],
+        // Also stop on [STOP] marker for player agency stopping points
+        stop: ["[GM State Update]", "[GM State", "[STOP]"],
       };
 
       // Add sampling settings for Coins mode (Mistral/DeepInfra)
@@ -1216,6 +1217,8 @@ export async function analyzeAction(
       agmt_check: null,
       table: null,
       is_plain_action: true,
+      stat_bonus: null,
+      rolls: undefined,
     };
   }
 
@@ -1441,10 +1444,12 @@ export function analysisToChoice(
     text: originalAction,
     skill_used: analysis.skill_used || undefined,
     skill_dc: analysis.skill_dc || undefined,
+    stat_bonus: analysis.stat_bonus || undefined,
     item_used: analysis.item_used || undefined,
     resource_used: analysis.resource_used || undefined,
     agmt_check: analysis.agmt_check || undefined,
     table: analysis.table || undefined,
+    rolls: analysis.rolls || undefined,
   };
 }
 

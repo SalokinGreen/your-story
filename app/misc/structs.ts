@@ -182,12 +182,18 @@ export interface Choice {
   skill_used?: string;
   skill_dc?: number;
   skill_dc_tier?: DCTier; // Tier-based DC (trivial, easy, average, hard, very_hard, impossible) - converted to number by game logic
+  stat_bonus?: number; // Bonus/penalty to stat value before calculating modifier (e.g., +10 from terrain)
   resource_used?: string;
   condition_applies?: string; // Name of condition that applies penalty to this roll (AI chooses most relevant)
   agmt_check?: string; // Format: "question (likelihood)" e.g., "Is the door locked? (Likely)"
   agmt_context_only?: boolean; // When true with skill_used, agmt provides context only and doesn't override skill check result
   table?: string; // Unified table field - checks both custom tables AND agmt element tables
   intro_override?: string; // Optional: For starting choices, use this text instead of AI generation
+  // Context rolls - dice rolled to determine situational details
+  rolls?: {
+    dice: string; // Dice notation (e.g., "1d4", "2d6")
+    description: string; // What the roll determines
+  }[];
   // Legacy fields for backward compatibility (deprecated - use 'table' instead)
   agmt_table?: string;
   custom_table?: string;
@@ -663,6 +669,7 @@ export interface ActionAnalysis {
   action_summary: string; // Brief description of the action
   skill_used: string | null; // Stat name for skill check, or null if no check needed
   skill_dc: number | null; // Difficulty class if skill check is needed
+  stat_bonus: number | null; // Bonus/penalty to stat value before calculating modifier (e.g., +10 from passive)
   item_used: string | null; // Item name if using an item
   ability_used: string | null; // Ability name if using an ability
   resource_used: string | null; // Resource name if using a resource
@@ -677,6 +684,11 @@ export interface ActionAnalysis {
     is_complex_event: boolean; // True if this implies a multi-step task
     challenge_name: string | null; // Name for new challenge (e.g., "Escape the burning inn")
   };
+  // Context rolls - dice rolled to determine situational details
+  rolls?: {
+    dice: string; // Dice notation (e.g., "1d4", "2d6", "1d8+2")
+    description: string; // What the roll determines (e.g., "How many enemies are present")
+  }[];
 }
 
 // For manual action building when AI analysis fails

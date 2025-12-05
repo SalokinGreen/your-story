@@ -531,10 +531,11 @@ export default function Story({
 const parseHiddenText = (text: string, showHidden: boolean): string => {
   if (showHidden) {
     // Show hidden text with special styling marker
-    return text.replace(/\|\|([^|]+)\|\|/g, "~~HIDDEN_START~~$1~~HIDDEN_END~~");
+    // Use markers that won't be affected by markdown processing
+    return text.replace(/\|\|([\s\S]*?)\|\|/g, "⟦HIDDEN_START⟧$1⟦HIDDEN_END⟧");
   } else {
-    // Remove hidden text entirely
-    return text.replace(/\|\|[^|]+\|\|/g, "");
+    // Remove hidden text entirely (use non-greedy match to handle nested ||)
+    return text.replace(/\|\|[\s\S]*?\|\|/g, "");
   }
 };
 
@@ -555,26 +556,30 @@ const prettify = (
       <ReactMarkdown
         components={{
           p: ({ node, children, ...props }) => {
+            // Track hidden state across all children
+            let inHidden = false;
+
             // Process children to handle hidden text markers
             const processChildren = (
-              child: React.ReactNode
+              child: React.ReactNode,
+              key: number | string
             ): React.ReactNode => {
               if (typeof child === "string") {
-                const parts = child.split(/(~~HIDDEN_START~~|~~HIDDEN_END~~)/);
-                let inHidden = false;
+                const parts = child.split(/(⟦HIDDEN_START⟧|⟦HIDDEN_END⟧)/);
                 return parts.map((part, i) => {
-                  if (part === "~~HIDDEN_START~~") {
+                  if (part === "⟦HIDDEN_START⟧") {
                     inHidden = true;
                     return null;
                   }
-                  if (part === "~~HIDDEN_END~~") {
+                  if (part === "⟦HIDDEN_END⟧") {
                     inHidden = false;
                     return null;
                   }
+                  if (part === "") return null;
                   if (inHidden) {
                     return (
                       <span
-                        key={i}
+                        key={`${key}-${i}`}
                         className="bg-purple-500/30 text-purple-200 px-1 rounded border border-purple-500/50"
                         title="Hidden message (only visible with setting enabled)"
                       >
@@ -585,13 +590,34 @@ const prettify = (
                   return part;
                 });
               }
+              // Handle React elements (like <em>, <strong>) that might be inside hidden text
+              if (React.isValidElement(child)) {
+                if (inHidden) {
+                  // Wrap the entire element in hidden styling
+                  return (
+                    <span
+                      key={key}
+                      className="bg-purple-500/30 text-purple-200 px-1 rounded border border-purple-500/50"
+                      title="Hidden message (only visible with setting enabled)"
+                    >
+                      {child}
+                    </span>
+                  );
+                }
+                return child;
+              }
               return child;
             };
 
-            const processedChildren = React.Children.map(
-              children,
-              processChildren
-            );
+            const processedChildren: React.ReactNode[] = [];
+            React.Children.forEach(children, (child, index) => {
+              const result = processChildren(child, index);
+              if (Array.isArray(result)) {
+                processedChildren.push(...result);
+              } else if (result !== null) {
+                processedChildren.push(result);
+              }
+            });
 
             return (
               <p

@@ -23,6 +23,9 @@ interface DiceVisualizerProps {
   netAdvantage?: number;
   advantageSources?: string;
   disadvantageSources?: string;
+  // Condition penalty
+  conditionPenalty?: number; // Negative modifier from conditions
+  conditionName?: string; // Name of the condition causing the penalty
   rpgSystem?:
     | "3d6"
     | "1d20"
@@ -59,6 +62,8 @@ export function DiceVisualizer({
   isCritical,
   hasAdvantage,
   hasDisadvantage,
+  conditionPenalty = 0,
+  conditionName,
   onComplete,
   diceRolls,
   rpgSystem = "3d6",
@@ -337,7 +342,10 @@ export function DiceVisualizer({
   // For roll-under percentile system, we don't add the stat/skill bonus to the roll.
   const isRollUnder = isPercentile;
   const effectiveStat = isRollUnder ? skillBonus : skillBonus; // same var for clarity
-  const total = isRollUnder ? finalRoll : finalRoll + skillBonus;
+  // Include condition penalty in the total (penalty is a negative number like -2, -4, etc.)
+  const total = isRollUnder
+    ? finalRoll
+    : finalRoll + skillBonus + conditionPenalty;
 
   // Colors based on animation phase
   const isResultPhase = animationPhase === "result";
@@ -861,6 +869,16 @@ export function DiceVisualizer({
             </div>
           )}
 
+          {/* Condition Penalty Label */}
+          {!isYZE && conditionPenalty !== 0 && conditionName && (
+            <div className="mb-3">
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-red-500/30 text-red-200 border border-red-400 animate-pulse">
+                <DynamicIcon name="AlertTriangle" className="w-4 h-4" />
+                {conditionName} ({conditionPenalty})
+              </span>
+            </div>
+          )}
+
           {!isYZE && (
             <>
               {/* Rolling Number */}
@@ -912,7 +930,7 @@ export function DiceVisualizer({
                         <span className="text-blue-300">DC {dc}</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-4 text-6xl font-bold text-white">
+                      <div className="flex items-center gap-2 text-5xl font-bold text-white">
                         <span
                           className={`${resultColor} transition-all duration-500 ${
                             isResultPhase
@@ -931,6 +949,17 @@ export function DiceVisualizer({
                         >
                           +{skillBonus}
                         </span>
+                        {conditionPenalty !== 0 && (
+                          <span
+                            className={`text-red-400 transition-all duration-500 animate-pulse ${
+                              isResultPhase
+                                ? "scale-0 w-0 opacity-0"
+                                : "scale-100"
+                            }`}
+                          >
+                            {conditionPenalty}
+                          </span>
+                        )}
                         <span
                           className={`transition-all duration-500 ${
                             isResultPhase

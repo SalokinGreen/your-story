@@ -1601,7 +1601,8 @@ function StoryPageContent() {
     explosions?: number; // Explosive: number of explosions
     dieSize?: number; // Explosive: die size (d4-d20)
     conditionAutoFail?: boolean; // Condition caused auto-fail
-    conditionName?: string; // Name of condition that caused auto-fail
+    conditionName?: string; // Name of condition that caused auto-fail/penalty
+    conditionPenalty?: number; // Condition penalty modifier (negative number like -2, -4)
   } | null>(null);
 
   // YZE: Stress dice selection state
@@ -3554,7 +3555,20 @@ function StoryPageContent() {
       // Try fuzzy matching first
       const matchResult = findStatMatch(choice.skill_used, storyData.stats);
       // If skill not found, treat as if player has 1 stat point in it
-      const statValue = matchResult?.item.value ?? 1;
+      // Apply stat_bonus if provided (situational modifier to effective stat value)
+      const baseStatValue = matchResult?.item.value ?? 1;
+      const statValue = baseStatValue + (choice.stat_bonus || 0);
+
+      // Notify if stat bonus is applied
+      if (choice.stat_bonus && choice.stat_bonus !== 0) {
+        const bonusSign = choice.stat_bonus > 0 ? "+" : "";
+        addNotification(
+          `Situational modifier: ${bonusSign}${choice.stat_bonus} to ${
+            matchResult?.name || choice.skill_used
+          } (${baseStatValue} → ${statValue})`,
+          choice.stat_bonus > 0 ? "success" : "warning"
+        );
+      }
 
       // Check for applicable conditions and apply penalties
       let conditionPenaltyModifier = 0;
@@ -4070,6 +4084,9 @@ function StoryPageContent() {
             disadvantageSources: disadvantageSources.join(", "),
             diceRolls: allDiceDetails, // Individual dice for each roll
             rpgSystem: storyData.rpgSystem || "3d6", // Pass system type
+            conditionPenalty:
+              conditionPenaltyModifier !== 0 ? -conditionPenaltyModifier : 0, // Convert to negative for display
+            conditionName: appliedCondition?.name,
             ...yzeData, // Spread YZE-specific data
           });
 
@@ -4388,6 +4405,46 @@ function StoryPageContent() {
         // If not a custom table, the agmt table was already handled earlier
       } catch (error) {
         console.error("Error processing table roll:", error);
+      }
+    }
+
+    // Process context rolls from action analysis
+    if (choice.rolls && choice.rolls.length > 0) {
+      for (const roll of choice.rolls) {
+        try {
+          // Parse dice notation (e.g., "1d4", "2d6", "1d20+5")
+          const diceMatch = roll.dice.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
+          if (diceMatch) {
+            const count = parseInt(diceMatch[1] || "1");
+            const sides = parseInt(diceMatch[2]);
+            const modifier = parseInt(diceMatch[3] || "0");
+
+            let total = modifier;
+            const diceResults: number[] = [];
+            for (let i = 0; i < count; i++) {
+              const dieRoll = Math.floor(Math.random() * sides) + 1;
+              diceResults.push(dieRoll);
+              total += dieRoll;
+            }
+
+            const rollStr =
+              count > 1 ? `(${diceResults.join("+")})` : `${diceResults[0]}`;
+            const modStr =
+              modifier !== 0 ? `${modifier > 0 ? "+" : ""}${modifier}` : "";
+            choiceDetails.push(
+              `[Context: ${roll.description} (${roll.dice}) = ${rollStr}${modStr} → ${total}]`
+            );
+            addNotification(
+              `Context Roll: ${roll.description} = ${total}`,
+              "success"
+            );
+          } else {
+            // Invalid dice notation, skip
+            console.warn(`Invalid dice notation: ${roll.dice}`);
+          }
+        } catch (error) {
+          console.error("Error processing context roll:", error);
+        }
       }
     }
 
@@ -6077,6 +6134,8 @@ function StoryPageContent() {
           panicEffect={diceRoll.panicEffect}
           stressLevel={diceRoll.stressLevel}
           stressRelief={diceRoll.stressRelief}
+          conditionPenalty={diceRoll.conditionPenalty}
+          conditionName={diceRoll.conditionName}
           onComplete={() => setDiceRoll(null)}
         />
       )}

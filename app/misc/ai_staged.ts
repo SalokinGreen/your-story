@@ -530,10 +530,10 @@ The Input will provide the "Action Result" (Success/Failure). You describe the o
 
 ## 2. PLAYER AGENCY & STOPPING RULES
 - **Protagonist:** The Player is the main character. NEVER write actions they didn't choose.
-- **Stop Markers:** You must STOP writing immediately before the player needs to react.
-    - *Crucial:* Do not resolve the suspense.
-    - *Example:* "The guard spins around, spotting you. 'Hey!' he shouts, reaching for his sword..." [STOP]
-- **Unclear Input:** If the player's choice is vague, describe the situation and PAUSE for input.
+- **Stop Early:** When you reach a moment where the player must react, decide, or speak, end your response with [STOP].
+    - *Crucial:* Do not resolve the suspense. Do not write what the player does next.
+    - *Example:* "The guard spins around, spotting you. 'Hey!' he shouts, reaching for his sword...[STOP]"
+- **Unclear Input:** If the player's choice is vague, describe the situation and end with [STOP] for input.
 
 ## 3. THE ACTIVE WORLD (The World Breathes)
 - **NPC Agency:** NPCs have agendas. They do not just wait for the player to speak. They interrupt, they leave, they pursue goals.
@@ -568,7 +568,7 @@ When an [ACTIVE CHALLENGE] is shown in the game state:
     - **No Headers:** Do NOT use ## headers in your prose - save them for major scene changes only (rare).
 - **No Meta-Text:** Do NOT write progress indicators, mechanical echoes, or UI labels like "Scene:", "Chapter:", "Progress 2/3".
 - **No Mechanical Summaries:** Do NOT echo back the skill check results, item usage, or resource costs. Those are INPUT context - the player already saw the dice roll.
-- **No Stop Markers in Output:** Do not literally write "[STOP]" - just stop writing at the appropriate moment.
+- **Stop Marker:** End your response with [STOP] when the player needs to react, decide, or speak next.
 
 WRITE THE NARRATIVE RESPONSE ONLY!
 
@@ -1335,6 +1335,7 @@ JSON STRUCTURE:
   "action_summary": "Objective description of intent (e.g., 'Attack guard with Longsword')",
   "skill_used": "Exact Stat Name" OR null,
   "skill_dc": Tier name ("trivial" | "easy" | "average" | "hard" | "very_hard" | "impossible") OR null,
+  "stat_bonus": Number OR null (bonus/penalty to the stat value, e.g., +10 from terrain advantage, -5 from injury),
   "item_used": "Exact Item Name" OR null,
   "ability_used": "Exact Ability Name" OR null,
   "resource_used": "Exact Resource Name" OR null,
@@ -1344,7 +1345,8 @@ JSON STRUCTURE:
   "challenge_handling": {
     "is_complex_event": Boolean (true = multi-step task like combat with group, chase, heist),
     "challenge_name": "Descriptive name" OR null (e.g., "Battle with the Bandits", "Escape the Collapsing Mine")
-  }
+  },
+  "rolls": [ { "dice": "1d4", "description": "How many guards are present" } ] OR null (contextual dice rolls for the scene)
 }
 
 DC TIER GUIDELINES:
@@ -1360,12 +1362,27 @@ COMPLEX EVENTS VS SIMPLE ACTIONS:
 - Set \`challenge_handling.is_complex_event: true\` and provide a \`challenge_name\`.
 - If a Challenge is ALREADY ACTIVE (see game state), this action is just a "step" in that challenge - set \`is_complex_event: false\`.
 
+STAT BONUS RULES:
+- Use \`stat_bonus\` when situational factors modify the character's effective skill level (NOT difficulty).
+- Positive bonus: High ground, favorable terrain, enemy distracted, magical enhancement.
+- Negative penalty: Darkness, slippery surface, wounded arm, fear effect.
+- This adjusts the STAT VALUE before calculating the modifier, not the DC.
+- Example: Fighting with high ground gives +10 to the stat, not -10 to DC.
+
+CONTEXT ROLLS:
+- Use \`rolls\` when the scene needs random elements determined BEFORE the action resolves.
+- Examples: "How many enemies?" (1d4), "How much treasure?" (2d6 x 10 gold), "Distance to cover" (1d20 x 5 feet).
+- These rolls add narrative texture and are reported to the player with the action result.
+- Standard dice: d4, d6, d8, d10, d12, d20, d100. Can include modifiers (1d6+2).
+
 DECISION PRIORITY:
 1. Is this just dialogue or looking around? -> \`is_plain_action: true\`
 2. Is the player trying to overcome an obstacle or opponent? -> Set \`skill_used\` + \`skill_dc\`.
-3. Is it an AGMT (Oracle) question? (e.g., "Is the door locked?") -> Set \`agmt_check\`.
-4. Is it a random discovery? (e.g., "Loot the body") -> Set \`table\`.
-5. Is it a BIG multi-step task? -> Set \`challenge_handling.is_complex_event: true\`.
+3. Does the situation grant bonuses/penalties? -> Set \`stat_bonus\`.
+4. Does the scene need random context? -> Add to \`rolls\` array.
+5. Is it an AGMT (Oracle) question? (e.g., "Is the door locked?") -> Set \`agmt_check\`.
+6. Is it a random discovery? (e.g., "Loot the body") -> Set \`table\`.
+7. Is it a BIG multi-step task? -> Set \`challenge_handling.is_complex_event: true\`.
 
 AVAILABLE DATA:
 STATS (for skill_used - pick one for skill checks): ${
