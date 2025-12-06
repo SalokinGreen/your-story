@@ -456,11 +456,23 @@ export default function StoryCreativeAssistant({
   };
 
   const handleApplyChanges = (
-    data: Partial<StoryData> & { _command?: string }
+    data: Partial<StoryData> & { _command?: string },
+    isToolChanges: boolean = false
   ) => {
-    // Use the converter to properly apply changes
-    const updates = applyCreatorChangesToStoryData(storyData, data);
-    onApplyChanges(updates);
+    // For tool-based changes, the data already contains final computed values
+    // (arrays are complete replacements, scalars like level/points are direct values)
+    // Only use applyCreatorChangesToStoryData for JSON output mode (which has _command markers)
+    
+    if (isToolChanges) {
+      // Direct tool changes - pass through directly
+      console.log("Applying direct tool changes:", data);
+      onApplyChanges(data);
+    } else {
+      // JSON mode - use the converter for merge/replace/delete logic
+      console.log("Applying via converter:", data);
+      const updates = applyCreatorChangesToStoryData(storyData, data);
+      onApplyChanges(updates);
+    }
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -792,7 +804,7 @@ function MessageItem({
     toolResults?: CreatorToolResult[];
     toolChanges?: CreatorChanges;
   };
-  onApplyChanges: (data: Partial<StoryData>) => void;
+  onApplyChanges: (data: Partial<StoryData>, isToolChanges?: boolean) => void;
 }) {
   const isUser = message.role === "user";
   const meta = message.meta;
@@ -1116,7 +1128,7 @@ function ToolResultsDisplay({
   toolResults: CreatorToolResult[];
   toolChanges?: CreatorChanges;
   hasToolChanges?: boolean;
-  onApplyChanges: (data: Partial<StoryData>) => void;
+  onApplyChanges: (data: Partial<StoryData>, isToolChanges?: boolean) => void;
 }) {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const successCount = toolResults.filter((r) => r.success).length;
@@ -1362,7 +1374,7 @@ function ToolResultsDisplay({
       {hasToolChanges && (
         <div className="p-3 bg-linear-to-r from-purple-100/80 to-indigo-100/80 dark:from-purple-900/40 dark:to-indigo-900/40 border-t border-purple-200 dark:border-purple-700/50">
           <button
-            onClick={() => onApplyChanges(toolChanges as Partial<StoryData>)}
+            onClick={() => onApplyChanges(toolChanges as Partial<StoryData>, true)}
             className="w-full rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white py-2.5 text-sm font-bold transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2"
           >
             <DynamicIcon name="Check" className="w-4 h-4" />
@@ -1841,6 +1853,53 @@ function ToolArgsDisplay({
             +{arrayItems.length - 3} more...
           </p>
         )}
+      </div>
+    );
+  }
+
+  // Progression (level, XP, upgrades)
+  if (toolName === "set_progression") {
+    const progressionIcons: Record<string, string> = {
+      level: "⭐",
+      points: "✨",
+      add_points: "➕",
+      upgradesSpent: "🔧",
+    };
+    const progressionLabels: Record<string, string> = {
+      level: "Level",
+      points: "XP (Total)",
+      add_points: "Add XP",
+      upgradesSpent: "Upgrades Spent",
+    };
+
+    const entries = Object.entries(args).filter(
+      ([, v]) => v !== undefined && v !== null
+    );
+    if (entries.length === 0) return null;
+
+    return (
+      <div className="mt-2 space-y-2">
+        {entries.map(([key, value]) => {
+          const icon = progressionIcons[key] || "📊";
+          const label = progressionLabels[key] || key;
+
+          return (
+            <div
+              key={key}
+              className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-2 border border-yellow-200 dark:border-yellow-700/50 flex items-center gap-2"
+            >
+              <span className="text-base">{icon}</span>
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {label}
+              </span>
+              <span className="ml-auto text-sm font-mono bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 px-2 py-0.5 rounded">
+                {typeof value === "number" && key === "add_points"
+                  ? (value >= 0 ? "+" : "") + String(value)
+                  : String(value)}
+              </span>
+            </div>
+          );
+        })}
       </div>
     );
   }

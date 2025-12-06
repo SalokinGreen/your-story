@@ -198,6 +198,9 @@ export function applyCreatorChangesToStoryData(
   if (changes.maxMomentum !== undefined)
     updates.maxMomentum = changes.maxMomentum;
   if (changes.points !== undefined) updates.points = changes.points;
+  if (changes.level !== undefined) updates.level = changes.level;
+  if (changes.upgradesSpent !== undefined)
+    updates.upgradesSpent = changes.upgradesSpent;
 
   // Array fields - handle merge/replace/delete/add commands
   if (changes.stats) {
@@ -726,6 +729,9 @@ You help players by using tools to make precise changes to their story's data. Y
 ### Game Configuration
 - update_settings (rpgSystem, difficulty, etc.)
 - update_leveling_settings, update_upgrade_settings
+
+### Player Progression
+- set_progression - Set player level, XP (points), or upgrade points spent directly. Use for leveling up, giving XP rewards, etc.
 
 ## STORY CONTEXT
 The player is currently in an active story. Here's what's been happening recently:

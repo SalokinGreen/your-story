@@ -51,6 +51,7 @@ import {
 } from "../misc/abilitySystem";
 import { getRPGSystem, type RPGSystemType } from "../misc/rpgSystems";
 import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
+import { getCumulativeXPForLevel, calculateLevel } from "../misc/leveling";
 
 // Basic Settings Component
 interface BasicSettingsForm {
@@ -60,6 +61,8 @@ interface BasicSettingsForm {
   premise: string;
   max_chapters: number;
   points: number;
+  level: number;
+  upgradesSpent: number;
   momentum: number;
   maxMomentum: number;
   rpgSystem:
@@ -140,10 +143,27 @@ function BasicSettings({
           className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
+      
+      {/* Level & XP Section */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-semibold text-blue-200 mb-2">
-            Starting Points
+            Level
+          </label>
+          <input
+            type="number"
+            min={1}
+            value={form.level}
+            onChange={(e) =>
+              onChange({ ...form, level: Math.max(1, parseInt(e.target.value) || 1) })
+            }
+            className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          <p className="text-xs text-blue-200/60 mt-1">Changing level auto-adjusts XP</p>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-blue-200 mb-2">
+            XP (Points)
           </label>
           <input
             type="number"
@@ -157,7 +177,25 @@ function BasicSettings({
         </div>
         <div>
           <label className="block text-sm font-semibold text-blue-200 mb-2">
-            Starting Momentum
+            Upgrades Spent
+          </label>
+          <input
+            type="number"
+            min={0}
+            value={form.upgradesSpent}
+            onChange={(e) =>
+              onChange({ ...form, upgradesSpent: parseInt(e.target.value) || 0 })
+            }
+            className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
+      </div>
+      
+      {/* Momentum Section */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-semibold text-blue-200 mb-2">
+            Momentum
           </label>
           <input
             type="number"
@@ -4617,6 +4655,8 @@ export default function MenuPage({
     premise: storyData.premise,
     max_chapters: storyData.max_chapters,
     points: storyData.points,
+    level: calculateLevel(storyData.points, storyData.levelingSettings),
+    upgradesSpent: storyData.upgradesSpent || 0,
     momentum: storyData.momentum,
     maxMomentum: storyData.maxMomentum,
     rpgSystem: storyData.rpgSystem || "3d6",
@@ -4757,13 +4797,23 @@ export default function MenuPage({
 
   const handleSaveSettings = async () => {
     try {
+      // Calculate XP from level if level changed
+      const currentLevel = calculateLevel(storyData.points, storyData.levelingSettings);
+      let newPoints = settingsForm.points;
+      
+      // If level changed, calculate the XP needed for that level
+      if (settingsForm.level !== currentLevel) {
+        newPoints = getCumulativeXPForLevel(settingsForm.level, storyData.levelingSettings);
+      }
+      
       onUpdateStoryData({
         story_name: settingsForm.story_name,
         player_name: settingsForm.player_name,
         player_summary: settingsForm.player_summary,
         premise: settingsForm.premise,
         max_chapters: settingsForm.max_chapters,
-        points: settingsForm.points,
+        points: newPoints,
+        upgradesSpent: settingsForm.upgradesSpent,
         momentum: settingsForm.momentum,
         maxMomentum: settingsForm.maxMomentum,
         rpgSystem: settingsForm.rpgSystem,
@@ -6248,6 +6298,8 @@ export default function MenuPage({
                     premise: storyData.premise,
                     max_chapters: storyData.max_chapters,
                     points: storyData.points,
+                    level: calculateLevel(storyData.points, storyData.levelingSettings),
+                    upgradesSpent: storyData.upgradesSpent || 0,
                     momentum: storyData.momentum,
                     maxMomentum: storyData.maxMomentum,
                     rpgSystem: storyData.rpgSystem || "3d6",

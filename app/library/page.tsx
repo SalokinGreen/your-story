@@ -868,20 +868,6 @@ export default function LibraryPage() {
             <h1 className="text-lg font-bold">Library</h1>
           </div>
           <div className="flex items-center gap-2">
-            {view === "stories" &&
-              (filteredStories.length > 0 ||
-                filteredLocalStories.length > 0) && (
-                <button
-                  onClick={toggleSelectionMode}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    selectionMode
-                      ? "bg-purple-600 text-white"
-                      : "hover:bg-white/10"
-                  }`}
-                >
-                  {selectionMode ? "Done" : "Select"}
-                </button>
-              )}
             <button
               onClick={() =>
                 router.push(view === "stories" ? "/explorer" : "/creator")
@@ -1045,27 +1031,44 @@ export default function LibraryPage() {
               </button>
             </DraggableScroll>
 
-            {/* Filter Pills */}
-            <div className="flex gap-2">
-              {["all", "inProgress", "completed"].map((filter) => (
+            {/* Filter Pills + Select Button */}
+            <div className="flex items-center gap-2">
+              <div className="flex gap-2">
+                {["all", "inProgress", "completed"].map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() =>
+                      setStoryFilter(filter as "all" | "completed" | "inProgress")
+                    }
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      storyFilter === filter
+                        ? "bg-purple-600 text-white"
+                        : "bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
+                    }`}
+                  >
+                    {filter === "all"
+                      ? "All"
+                      : filter === "inProgress"
+                      ? "In Progress"
+                      : "Completed"}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Select mode button - only show when there are stories */}
+              {(filteredStories.length > 0 || filteredLocalStories.length > 0) && (
                 <button
-                  key={filter}
-                  onClick={() =>
-                    setStoryFilter(filter as "all" | "completed" | "inProgress")
-                  }
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    storyFilter === filter
+                  onClick={toggleSelectionMode}
+                  className={`ml-auto px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    selectionMode
                       ? "bg-purple-600 text-white"
                       : "bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
                   }`}
                 >
-                  {filter === "all"
-                    ? "All"
-                    : filter === "inProgress"
-                    ? "In Progress"
-                    : "Completed"}
+                  <DynamicIcon name={selectionMode ? "Check" : "CheckSquare"} className="w-3.5 h-3.5" />
+                  {selectionMode ? "Done" : "Select"}
                 </button>
-              ))}
+              )}
             </div>
 
             {/* Selection Actions Bar */}

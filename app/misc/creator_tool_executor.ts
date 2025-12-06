@@ -30,6 +30,7 @@ import {
   ItemGrade,
   AbilityGrade,
 } from "@/app/misc/structs";
+import { getCumulativeXPForLevel } from "@/app/misc/leveling";
 
 // Tool call from AI response
 export interface CreatorToolCall {
@@ -75,6 +76,11 @@ export interface CreatorChanges {
   player_summary?: string;
   intro?: string;
   author_notes?: string;
+
+  // Progression changes
+  level?: number;
+  points?: number;
+  upgradesSpent?: number;
 
   // Metadata changes
   title?: string;
@@ -1339,6 +1345,72 @@ export function executeCreatorTool(
         if (Object.keys(settings).length > 0) {
           changes.levelingSettings = settings;
         }
+        break;
+      }
+
+      // ============================================
+      // PROGRESSION
+      // ============================================
+      case "set_progression": {
+        const currentPoints = (currentState.storyData.points as number) || 0;
+        const currentLevel = (currentState.storyData.level as number) || 1;
+        const currentUpgradesSpent =
+          (currentState.storyData.upgradesSpent as number) || 0;
+        const levelingSettings = currentState.storyData.levelingSettings as LevelingSettings | undefined;
+
+        // Handle add_points (relative change)
+        if (args.add_points !== undefined) {
+          const addAmount = args.add_points as number;
+          const newPoints = Math.max(0, currentPoints + addAmount);
+          changes.points = newPoints;
+          if (addAmount >= 0) {
+            changesList.push(`Added ${addAmount} XP (total: ${newPoints})`);
+          } else {
+            changesList.push(
+              `Removed ${Math.abs(addAmount)} XP (total: ${newPoints})`
+            );
+          }
+        }
+
+        // Handle points (absolute set)
+        if (args.points !== undefined) {
+          const newPoints = Math.max(0, args.points as number);
+          changes.points = newPoints;
+          changesList.push(`Set XP to ${newPoints}`);
+        }
+
+        // Handle level (absolute set) - also set XP to match!
+        if (args.level !== undefined) {
+          const newLevel = Math.max(1, args.level as number);
+          changes.level = newLevel;
+          
+          // Calculate the minimum XP required for this level
+          // Use getCumulativeXPForLevel which gives total XP needed to REACH that level
+          // For level 3, we need the XP threshold for level 2->3 transition
+          const requiredXP = getCumulativeXPForLevel(newLevel, levelingSettings);
+          
+          // Only update points if not already explicitly set in this call
+          if (args.points === undefined && args.add_points === undefined) {
+            changes.points = requiredXP;
+            changesList.push(`Set XP to ${requiredXP} (minimum for level ${newLevel})`);
+          }
+          
+          if (newLevel > currentLevel) {
+            changesList.push(`Leveled up to ${newLevel}!`);
+          } else if (newLevel < currentLevel) {
+            changesList.push(`Level reduced to ${newLevel}`);
+          } else {
+            changesList.push(`Level set to ${newLevel}`);
+          }
+        }
+
+        // Handle upgradesSpent
+        if (args.upgradesSpent !== undefined) {
+          const newSpent = Math.max(0, args.upgradesSpent as number);
+          changes.upgradesSpent = newSpent;
+          changesList.push(`Upgrades spent set to ${newSpent}`);
+        }
+
         break;
       }
 

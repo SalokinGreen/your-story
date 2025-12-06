@@ -1485,6 +1485,38 @@ export const update_upgrade_settings: ToolDefinition = {
   },
 };
 
+export const set_progression: ToolDefinition = {
+  name: "set_progression",
+  description:
+    "Set the player's current progression: level, XP (points), and upgrade points spent. Use this to level up a player, give them XP, or adjust their progression.",
+  parameters: {
+    type: "object",
+    properties: {
+      level: {
+        type: "number",
+        description:
+          "Set player's level directly (1+). If not provided, level will be recalculated from XP.",
+      },
+      points: {
+        type: "number",
+        description:
+          "Set player's XP/points directly. Use this to give or remove XP.",
+      },
+      add_points: {
+        type: "number",
+        description:
+          "Add this amount of XP/points to current total (can be negative to remove).",
+      },
+      upgradesSpent: {
+        type: "number",
+        description:
+          "Set how many upgrade points have been spent (affects available upgrades).",
+      },
+    },
+    required: [],
+  },
+};
+
 export const update_leveling_settings: ToolDefinition = {
   name: "update_leveling_settings",
   description:
@@ -1690,6 +1722,8 @@ export const CREATOR_TOOLS: ToolDefinition[] = [
   update_adventure_metadata,
   update_upgrade_settings,
   update_leveling_settings,
+  // Progression
+  set_progression,
   // Starting Choices
   add_starting_choices,
   modify_starting_choices,

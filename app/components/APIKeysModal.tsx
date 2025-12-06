@@ -133,16 +133,16 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             </span>
           </button>
           <button
-            onClick={() => setActiveTab("llm")}
+            onClick={() => setActiveTab("display")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "llm"
+              activeTab === "display"
                 ? "border-purple-500 text-purple-600 dark:text-purple-400"
                 : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
             }`}
           >
             <span className="flex items-center gap-2">
-              <DynamicIcon name="Key" className="w-4 h-4" />
-              API Keys
+              <DynamicIcon name="Monitor" className="w-4 h-4" />
+              Display
             </span>
           </button>
           <button
@@ -159,16 +159,16 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             </span>
           </button>
           <button
-            onClick={() => setActiveTab("display")}
+            onClick={() => setActiveTab("llm")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "display"
+              activeTab === "llm"
                 ? "border-purple-500 text-purple-600 dark:text-purple-400"
                 : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
             }`}
           >
             <span className="flex items-center gap-2">
-              <DynamicIcon name="Monitor" className="w-4 h-4" />
-              Display
+              <DynamicIcon name="Key" className="w-4 h-4" />
+              API Keys
             </span>
           </button>
         </div>
