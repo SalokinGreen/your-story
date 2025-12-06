@@ -2904,7 +2904,6 @@ export function executeCommandWithResponse(
       storyData.agmtState = {
         chaosFactor: 5,
         threads: [],
-        characters: [],
         sceneCount: 0,
         skillCheckHistory: [],
         currentStreak: 0,
@@ -3132,161 +3131,6 @@ export function executeCommandWithResponse(
     };
   }
 
-  // /add_character: name (role)
-  const addCharacterMatch = trimmed.match(
-    /^\/add_character:\s*(.+?)\s*\((.+)\)$/i
-  );
-  if (addCharacterMatch) {
-    const name = addCharacterMatch[1].trim();
-    const role = addCharacterMatch[2].trim();
-
-    if (!storyData.agmtState) {
-      storyData.agmtState = {
-        chaosFactor: 5,
-        threads: [],
-        characters: [],
-        sceneCount: 0,
-        skillCheckHistory: [],
-        currentStreak: 0,
-        lastChaosAdjustment: -999,
-      };
-    }
-
-    // Check for duplicate
-    const exists = storyData.agmtState.characters.some(
-      (c) => c.name.toLowerCase() === name.toLowerCase()
-    );
-    if (exists) {
-      return {
-        command: trimmed,
-        success: "partial",
-        message: `Character "${name}" already exists`,
-        timestamp,
-      };
-    }
-
-    storyData.agmtState.characters.push({
-      id: crypto.randomUUID(),
-      name,
-      role,
-      status: "active",
-      createdAt: Date.now(),
-    });
-
-    logger.action("Character added via command response", { name, role });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Added character: ${name} - ${role}`,
-      timestamp,
-    };
-  }
-
-  // /update_character: id | name | role (from tool executor format)
-  // Also handle simpler format: /update_character: old_name → new_name | new_role
-  const updateCharacterMatch = trimmed.match(
-    /^\/update_character:\s*(.+?)\s*→\s*(.+?)\s*\|\s*(.+)$/i
-  );
-  if (updateCharacterMatch) {
-    const oldName = updateCharacterMatch[1].trim();
-    const newName = updateCharacterMatch[2].trim();
-    const newRole = updateCharacterMatch[3].trim();
-
-    if (!storyData.agmtState) {
-      return {
-        command: trimmed,
-        success: false,
-        message: "Advanced RPG Tools not enabled",
-        timestamp,
-      };
-    }
-
-    const character = storyData.agmtState.characters.find(
-      (c) => c.name.toLowerCase() === oldName.toLowerCase()
-    );
-    if (!character) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Character "${oldName}" not found`,
-        timestamp,
-      };
-    }
-
-    const changes: string[] = [];
-    if (newName && newName !== character.name) {
-      character.name = newName;
-      changes.push(`name → "${newName}"`);
-    }
-    if (newRole && newRole !== character.role) {
-      character.role = newRole;
-      changes.push(`role → "${newRole}"`);
-    }
-
-    if (changes.length === 0) {
-      return {
-        command: trimmed,
-        success: "partial",
-        message: `No changes made to character "${oldName}"`,
-        timestamp,
-      };
-    }
-
-    logger.action("Character updated via command response", {
-      oldName,
-      newName,
-      newRole,
-    });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Updated character "${oldName}": ${changes.join(", ")}`,
-      timestamp,
-    };
-  }
-
-  // /remove_character: name
-  const removeCharacterMatch = trimmed.match(/^\/remove_character:\s*(.+)$/i);
-  if (removeCharacterMatch) {
-    const name = removeCharacterMatch[1].trim();
-
-    if (!storyData.agmtState) {
-      return {
-        command: trimmed,
-        success: false,
-        message: "Advanced RPG Tools not enabled",
-        timestamp,
-      };
-    }
-
-    const characterIndex = storyData.agmtState.characters.findIndex(
-      (c) => c.name.toLowerCase() === name.toLowerCase()
-    );
-    if (characterIndex === -1) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Character "${name}" not found`,
-        timestamp,
-      };
-    }
-
-    const removed = storyData.agmtState.characters.splice(characterIndex, 1)[0];
-
-    logger.action("Character removed via command response", {
-      name: removed.name,
-    });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Removed character: "${removed.name}"`,
-      timestamp,
-    };
-  }
-
   // /adjust_chaos: delta
   const adjustChaosMatch = trimmed.match(/^\/adjust_chaos:\s*([+-]?\d+)$/i);
   if (adjustChaosMatch) {
@@ -3321,69 +3165,6 @@ export function executeCommandWithResponse(
     };
   }
 
-  // /update_character_status: name oldStatus → newStatus
-  const updateCharStatusMatch = trimmed.match(
-    /^\/update_character_status:\s*(.+?)\s+(\w+)\s*→\s*(\w+)$/i
-  );
-  if (updateCharStatusMatch) {
-    const name = updateCharStatusMatch[1].trim();
-    const newStatus = updateCharStatusMatch[3].trim().toLowerCase() as
-      | "active"
-      | "deceased"
-      | "departed";
-
-    if (!["active", "deceased", "departed"].includes(newStatus)) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Invalid status "${newStatus}" - must be active, deceased, or departed`,
-        timestamp,
-      };
-    }
-
-    if (!storyData.agmtState) {
-      return {
-        command: trimmed,
-        success: false,
-        message: "Advanced RPG Tools not enabled",
-        timestamp,
-      };
-    }
-
-    // Find character by name or ID
-    let character = storyData.agmtState.characters.find(
-      (c) => c.name.toLowerCase() === name.toLowerCase()
-    );
-    if (!character) {
-      character = storyData.agmtState.characters.find((c) => c.id === name);
-    }
-
-    if (!character) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Character "${name}" not found`,
-        timestamp,
-      };
-    }
-
-    const oldStatus = character.status;
-    character.status = newStatus;
-
-    logger.action("Character status updated via command response", {
-      name: character.name,
-      oldStatus,
-      newStatus,
-    });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `${character.name} status: ${oldStatus} → ${newStatus}`,
-      timestamp,
-    };
-  }
-
   // /increment_scene: (with optional new value)
   const incrementSceneMatch = trimmed.match(
     /^\/increment_scene:\s*(\d+)\s*→\s*(\d+)$/i
@@ -3395,7 +3176,6 @@ export function executeCommandWithResponse(
       storyData.agmtState = {
         chaosFactor: 5,
         threads: [],
-        characters: [],
         sceneCount: 0,
         skillCheckHistory: [],
         currentStreak: 0,
@@ -3426,7 +3206,6 @@ export function executeCommandWithResponse(
       storyData.agmtState = {
         chaosFactor: 5,
         threads: [],
-        characters: [],
         sceneCount: 0,
         skillCheckHistory: [],
         currentStreak: 0,

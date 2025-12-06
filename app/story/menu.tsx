@@ -11,7 +11,6 @@ import {
   Relationship,
   AGMTState,
   AGMTThread,
-  AGMTCharacter,
   CustomTable,
   Variable,
   NumberVariable,
@@ -4688,7 +4687,6 @@ export default function MenuPage({
     | "variables"
     | "tables"
     | "threads"
-    | "characters"
     | "agmt"
     | "story"
     | "tts"
@@ -5457,10 +5455,7 @@ export default function MenuPage({
                 { id: "relationships", label: "Relationships", icon: "Users" },
                 { id: "agmt", label: "AGMT", icon: "Sparkles" },
                 ...(storyData.agmtState
-                  ? [
-                      { id: "threads", label: "Threads", icon: "ListTodo" },
-                      { id: "characters", label: "NPCs", icon: "Users" },
-                    ]
+                  ? [{ id: "threads", label: "Threads", icon: "ListTodo" }]
                   : []),
                 { id: "story", label: "Story", icon: "BookOpen" },
               ].map((tab) => (
@@ -5809,166 +5804,6 @@ export default function MenuPage({
                 </div>
               )}
 
-              {activeTab === "characters" && storyData.agmtState && (
-                <div className="mt-4 space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-lg font-bold text-white flex items-center gap-2">
-                      <DynamicIcon name="Users" className="w-6 h-6" />
-                      NPCs
-                    </h4>
-                    <button
-                      onClick={() => {
-                        const newChar: AGMTCharacter = {
-                          id: crypto.randomUUID(),
-                          name: "",
-                          role: "",
-                          status: "active",
-                          createdAt: Date.now(),
-                        };
-                        onUpdateStoryData({
-                          agmtState: {
-                            ...storyData.agmtState!,
-                            characters: [
-                              ...storyData.agmtState!.characters,
-                              newChar,
-                            ],
-                          },
-                        });
-                      }}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg flex items-center gap-2"
-                    >
-                      <DynamicIcon name="Plus" className="w-4 h-4" />
-                      New NPC
-                    </button>
-                  </div>
-
-                  <div className="grid gap-3">
-                    {storyData.agmtState.characters.map((char) => (
-                      <div
-                        key={char.id}
-                        className={`p-4 rounded-lg border space-y-3 ${
-                          char.status === "active"
-                            ? "bg-purple-900/30 border-purple-700/40"
-                            : char.status === "deceased"
-                            ? "bg-red-900/30 border-red-700/40 opacity-75"
-                            : "bg-blue-900/20 border-blue-800/30 opacity-75"
-                        }`}
-                      >
-                        <div className="flex gap-3">
-                          <input
-                            type="text"
-                            value={char.name}
-                            onChange={(e) => {
-                              onUpdateStoryData({
-                                agmtState: {
-                                  ...storyData.agmtState!,
-                                  characters:
-                                    storyData.agmtState!.characters.map((c) =>
-                                      c.id === char.id
-                                        ? { ...c, name: e.target.value }
-                                        : c
-                                    ),
-                                },
-                              });
-                            }}
-                            placeholder="Character name..."
-                            className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white font-semibold"
-                          />
-                          <select
-                            value={char.status}
-                            onChange={(e) => {
-                              onUpdateStoryData({
-                                agmtState: {
-                                  ...storyData.agmtState!,
-                                  characters:
-                                    storyData.agmtState!.characters.map((c) =>
-                                      c.id === char.id
-                                        ? {
-                                            ...c,
-                                            status: e.target.value as any,
-                                          }
-                                        : c
-                                    ),
-                                },
-                              });
-                            }}
-                            className="px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                          >
-                            <option value="active">Active</option>
-                            <option value="deceased">Deceased</option>
-                            <option value="departed">Departed</option>
-                          </select>
-                        </div>
-                        <textarea
-                          value={char.role}
-                          onChange={(e) => {
-                            onUpdateStoryData({
-                              agmtState: {
-                                ...storyData.agmtState!,
-                                characters: storyData.agmtState!.characters.map(
-                                  (c) =>
-                                    c.id === char.id
-                                      ? { ...c, role: e.target.value }
-                                      : c
-                                ),
-                              },
-                            });
-                          }}
-                          placeholder="Role/description..."
-                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
-                          rows={2}
-                        />
-                        <div className="flex items-center justify-between text-xs text-blue-300/50">
-                          <span>
-                            Introduced{" "}
-                            {new Date(char.createdAt).toLocaleDateString()}
-                          </span>
-                          <button
-                            onClick={() => {
-                              setConfirmDialog({
-                                isOpen: true,
-                                title: "Delete Character",
-                                message: `Delete ${
-                                  char.name || "this character"
-                                }?`,
-                                icon: "Trash2",
-                                onConfirm: () => {
-                                  onUpdateStoryData({
-                                    agmtState: {
-                                      ...storyData.agmtState!,
-                                      characters:
-                                        storyData.agmtState!.characters.filter(
-                                          (c) => c.id !== char.id
-                                        ),
-                                    },
-                                  });
-                                  addNotification(
-                                    "Character deleted",
-                                    "success"
-                                  );
-                                  setConfirmDialog({
-                                    ...confirmDialog,
-                                    isOpen: false,
-                                  });
-                                },
-                              });
-                            }}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {storyData.agmtState.characters.length === 0 && (
-                      <p className="text-sm text-blue-200/60 italic">
-                        No NPCs added yet. Click "New NPC" to add one.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
               {activeTab === "agmt" && (
                 <div className="mt-4 space-y-6">
                   <h4 className="text-lg font-bold text-white flex items-center gap-2">
@@ -5999,7 +5834,6 @@ export default function MenuPage({
                                 agmtState: {
                                   chaosFactor: 5,
                                   threads: [],
-                                  characters: [],
                                   sceneCount: 0,
                                   skillCheckHistory: [],
                                   currentStreak: 0,
@@ -6251,18 +6085,6 @@ export default function MenuPage({
                             Active Threads
                           </div>
                         </div>
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                          <div className="text-2xl font-bold text-purple-600">
-                            {
-                              storyData.agmtState.characters.filter(
-                                (c) => c.status === "active"
-                              ).length
-                            }
-                          </div>
-                          <div className="text-sm text-blue-200/60">
-                            Active NPCs
-                          </div>
-                        </div>
                         <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
                           <div className="text-2xl font-bold text-blue-200/60">
                             {
@@ -6273,14 +6095,6 @@ export default function MenuPage({
                           </div>
                           <div className="text-sm text-blue-200/60">
                             Closed Threads
-                          </div>
-                        </div>
-                        <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
-                          <div className="text-2xl font-bold text-blue-200/60">
-                            {storyData.agmtState.characters.length}
-                          </div>
-                          <div className="text-sm text-blue-200/60">
-                            Total NPCs
                           </div>
                         </div>
                       </div>

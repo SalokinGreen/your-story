@@ -21,7 +21,6 @@ import {
   Adventure,
   AGMTState,
   AGMTThread,
-  AGMTCharacter,
   CustomTable,
   StartingChoice,
   Variable,
@@ -1144,13 +1143,6 @@ function AdventureCreatorContent() {
           }
         });
       }
-      if (ms.characters) {
-        ms.characters.forEach((c: any) => {
-          if (c._command === "delete") {
-            deletions.push(`AGMT Character: ${c.name}`);
-          }
-        });
-      }
     }
 
     // Check custom table deletions
@@ -1401,25 +1393,6 @@ function AdventureCreatorContent() {
         });
       }
 
-      // Characters
-      if (ms.characters) {
-        const charChanges = ms.characters as any[];
-        newState.characters = applyItemChanges(
-          agmtState.characters,
-          charChanges,
-          "agmt character",
-          "id"
-        ).map((char: any) => {
-          // Auto-generate ID for new characters without one
-          if (!char.id) {
-            char.id = `char-${Date.now()}-${Math.random()
-              .toString(36)
-              .substring(2, 9)}`;
-          }
-          return char;
-        });
-      }
-
       setAGMTState(newState);
     }
 
@@ -1643,7 +1616,6 @@ function AdventureCreatorContent() {
           setAGMTState({
             chaosFactor: 5,
             threads: [],
-            characters: [],
             sceneCount: 0,
             skillCheckHistory: [],
             currentStreak: 0,
@@ -2091,22 +2063,14 @@ function AdventureCreatorContent() {
   const [agmtState, setAGMTState] = useState<AGMTState>({
     chaosFactor: 5,
     threads: [],
-    characters: [],
     sceneCount: 0,
     skillCheckHistory: [],
     currentStreak: 0,
     lastChaosAdjustment: -999,
   });
   const [newThread, setNewThread] = useState("");
-  const [newCharacterName, setNewCharacterName] = useState("");
-  const [newCharacterRole, setNewCharacterRole] = useState("");
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editThreadDescription, setEditThreadDescription] = useState("");
-  const [editingCharacterId, setEditingCharacterId] = useState<string | null>(
-    null
-  );
-  const [editCharacterName, setEditCharacterName] = useState("");
-  const [editCharacterRole, setEditCharacterRole] = useState("");
 
   // Achievements
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -3521,7 +3485,6 @@ ${description || ""}`;
       setAGMTState({
         chaosFactor: 5,
         threads: [],
-        characters: [],
         sceneCount: 0,
         skillCheckHistory: [],
         currentStreak: 0,
@@ -11519,229 +11482,6 @@ ${description || ""}`;
                                         ...agmtState,
                                         threads: agmtState.threads.filter(
                                           (t) => t.id !== thread.id
-                                        ),
-                                      })
-                                    }
-                                    className="text-red-400 hover:text-red-300"
-                                  >
-                                    <DynamicIcon
-                                      name="Trash2"
-                                      className="w-4 h-4"
-                                    />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Starting Characters/NPCs */}
-                <div className="p-6 rounded-lg bg-linear-to-br from-green-900/20 to-gray-900/50 border border-green-500/20">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-bold text-green-400 flex items-center gap-2">
-                      <span>👤</span>
-                      Starting NPCs
-                      {agmtState.characters.length > 0 && (
-                        <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-300">
-                          {agmtState.characters.length}
-                        </span>
-                      )}
-                    </h4>
-                  </div>
-                  <div className="space-y-3 mb-4">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newCharacterName}
-                        onChange={(e) => setNewCharacterName(e.target.value)}
-                        placeholder="Name (e.g., Marcus the Merchant)"
-                        className="flex-1 px-3 py-2 border-2 border-gray-600 rounded-lg bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
-                      />
-                      <input
-                        type="text"
-                        value={newCharacterRole}
-                        onChange={(e) => setNewCharacterRole(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (
-                            e.key === "Enter" &&
-                            newCharacterName.trim() &&
-                            newCharacterRole.trim()
-                          ) {
-                            setAGMTState({
-                              ...agmtState,
-                              characters: [
-                                ...agmtState.characters,
-                                {
-                                  id: crypto.randomUUID(),
-                                  name: newCharacterName.trim(),
-                                  role: newCharacterRole.trim(),
-                                  status: "active",
-                                  createdAt: Date.now(),
-                                },
-                              ],
-                            });
-                            setNewCharacterName("");
-                            setNewCharacterRole("");
-                          }
-                        }}
-                        placeholder="Role (e.g., Tavern keeper)"
-                        className="flex-1 px-3 py-2 border-2 border-gray-600 rounded-lg bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
-                      />
-                      <button
-                        onClick={() => {
-                          if (
-                            newCharacterName.trim() &&
-                            newCharacterRole.trim()
-                          ) {
-                            setAGMTState({
-                              ...agmtState,
-                              characters: [
-                                ...agmtState.characters,
-                                {
-                                  id: crypto.randomUUID(),
-                                  name: newCharacterName.trim(),
-                                  role: newCharacterRole.trim(),
-                                  status: "active",
-                                  createdAt: Date.now(),
-                                },
-                              ],
-                            });
-                            setNewCharacterName("");
-                            setNewCharacterRole("");
-                          }
-                        }}
-                        disabled={
-                          !newCharacterName.trim() || !newCharacterRole.trim()
-                        }
-                        className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 disabled:bg-gray-700 disabled:text-gray-500 text-green-400 font-semibold rounded-lg transition-colors border border-green-500/30 hover:border-green-500/50"
-                      >
-                        + Add
-                      </button>
-                    </div>
-                    {agmtState.characters.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <p className="text-sm">No characters yet</p>
-                        <p className="text-xs mt-1">
-                          Add important NPCs that will appear in the story
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {agmtState.characters.map((char) => (
-                          <div
-                            key={char.id}
-                            className="group p-4 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-green-500/50 transition-all duration-200"
-                          >
-                            {editingCharacterId === char.id ? (
-                              <div className="flex gap-3">
-                                <span className="text-2xl">👤</span>
-                                <div className="flex-1 space-y-2">
-                                  <input
-                                    type="text"
-                                    value={editCharacterName}
-                                    onChange={(e) =>
-                                      setEditCharacterName(e.target.value)
-                                    }
-                                    placeholder="Character name..."
-                                    className="w-full bg-transparent text-gray-200 placeholder-gray-500 focus:outline-none text-sm font-semibold border-b border-gray-700 focus:border-green-500/50 transition-colors pb-1"
-                                  />
-                                  <input
-                                    type="text"
-                                    value={editCharacterRole}
-                                    onChange={(e) =>
-                                      setEditCharacterRole(e.target.value)
-                                    }
-                                    placeholder="Role/description..."
-                                    className="w-full bg-transparent text-gray-300 placeholder-gray-500 focus:outline-none text-sm"
-                                  />
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    setAGMTState({
-                                      ...agmtState,
-                                      characters: agmtState.characters.map(
-                                        (c) =>
-                                          c.id === char.id
-                                            ? {
-                                                ...c,
-                                                name: editCharacterName,
-                                                role: editCharacterRole,
-                                              }
-                                            : c
-                                      ),
-                                    });
-                                    setEditingCharacterId(null);
-                                    setEditCharacterName("");
-                                    setEditCharacterRole("");
-                                  }}
-                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded"
-                                >
-                                  <DynamicIcon
-                                    name="Check"
-                                    className="w-4 h-4"
-                                  />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEditingCharacterId(null);
-                                    setEditCharacterName("");
-                                    setEditCharacterRole("");
-                                  }}
-                                  className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded"
-                                >
-                                  <DynamicIcon name="X" className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex gap-3">
-                                <span className="text-2xl">👤</span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-gray-200">
-                                    {char.name}
-                                  </p>
-                                  <p className="text-xs text-gray-400 mt-0.5">
-                                    {char.role}
-                                  </p>
-                                  {((char.name.length < 2 &&
-                                    char.name.length > 0) ||
-                                    (char.role.length < 5 &&
-                                      char.role.length > 0)) && (
-                                    <p className="text-xs text-red-400 mt-1">
-                                      {char.name.length < 2 &&
-                                      char.name.length > 0
-                                        ? "Name too short (min 2)"
-                                        : ""}
-                                      {char.role.length < 5 &&
-                                      char.role.length > 0
-                                        ? "Role too short (min 5)"
-                                        : ""}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={() => {
-                                      setEditingCharacterId(char.id);
-                                      setEditCharacterName(char.name);
-                                      setEditCharacterRole(char.role);
-                                    }}
-                                    className="text-blue-400 hover:text-blue-300"
-                                  >
-                                    <DynamicIcon
-                                      name="Edit2"
-                                      className="w-4 h-4"
-                                    />
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      setAGMTState({
-                                        ...agmtState,
-                                        characters: agmtState.characters.filter(
-                                          (c) => c.id !== char.id
                                         ),
                                       })
                                     }

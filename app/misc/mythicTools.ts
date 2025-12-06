@@ -2,7 +2,7 @@
  * Advanced RPG Tools Tool Definitions
  *
  * Tool schemas for AI-driven AGMT Game Master Emulator operations.
- * Enables AI to manage story threads, NPCs, chaos factor, and scene tracking.
+ * Enables AI to manage story threads, chaos factor, and scene tracking.
  */
 
 import { ToolSchema } from "./toolSchemas";
@@ -83,79 +83,6 @@ export const MYTHIC_TOOLS: ToolSchema[] = [
           },
         },
         required: ["threadId", "description"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "add_character",
-      description:
-        "Add a new NPC to track in the Advanced RPG Tools system. Use when an important character is introduced.",
-      parameters: {
-        type: "object",
-        properties: {
-          name: {
-            type: "string",
-            description: "Character's name",
-          },
-          role: {
-            type: "string",
-            description:
-              "Character's role/description (e.g., 'Village blacksmith', 'Mysterious stranger')",
-          },
-        },
-        required: ["name", "role"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "update_character",
-      description:
-        "Update an NPC's role/description to reflect character development.",
-      parameters: {
-        type: "object",
-        properties: {
-          characterId: {
-            type: "string",
-            description: "ID of the character to update",
-          },
-          name: {
-            type: "string",
-            description: "Updated name (optional)",
-          },
-          role: {
-            type: "string",
-            description: "Updated role/description (optional)",
-          },
-        },
-        required: ["characterId"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "update_character_status",
-      description:
-        "Change an NPC's status. Use when characters die, leave, or return.",
-      parameters: {
-        type: "object",
-        properties: {
-          characterId: {
-            type: "string",
-            description: "ID of the character to update",
-          },
-          status: {
-            type: "string",
-            enum: ["active", "deceased", "departed"],
-            description:
-              "New status: 'active' (present), 'deceased' (dead), 'departed' (left the story)",
-          },
-        },
-        required: ["characterId", "status"],
       },
     },
   },

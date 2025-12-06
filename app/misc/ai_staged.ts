@@ -390,10 +390,6 @@ export function buildInfoMessage(
 - Active Threads: ${
         storyData.agmtState.threads.filter((t) => t.status === "active").length
       }/${storyData.agmtState.threads.length}
-- Active NPCs: ${
-        storyData.agmtState.characters.filter((c) => c.status === "active")
-          .length
-      }/${storyData.agmtState.characters.length}
 
 ### Threads
 ${
@@ -407,13 +403,6 @@ ${
     .filter((t) => t.status === "closed")
     .map((t) => `- [Closed] ${t.description} (ID: ${t.id})`)
     .join("\n") || ""
-}
-
-### NPCs
-${
-  storyData.agmtState.characters
-    .map((c) => `- ${c.name} (${c.role}) [${c.status}] (ID: ${c.id})`)
-    .join("\n") || "(none)"
 }`
     : "";
 
@@ -859,7 +848,7 @@ DO NOT duplicate these changes. Only process NEW events from the STORY TEXT.
     - Examples: "Wolf Slayer" (gained after defeating many wolves), "Cursed Blood" (gained through dark ritual), "Friend of the Forest" (earned trust of woodland creatures)
     - Only add passives for SIGNIFICANT character developments, not minor events
 8. **Variables:** Did the story introduce or change a variable (e.g., "The ancient mechanism is now active")? -> \`set_variable\`.
-9. **Advanced RPG Tools (AGMT only):** If using AGMT, did the chaos factor change or NPC statuses change? -> \`update_agmt_state\`.
+9. **Advanced RPG Tools (AGMT only):** If using AGMT, did the chaos factor change or scene transitions occur? -> \`update_agmt_state\`.
 10. **Lore Management:** Did the story reveal new lore or update existing lore? -> \`create_lore\` / \`update_lore\`.
 11. **Rest System:** Did the player rest (quick/short/long)? -> \`take_rest\`.
 12. **Thread Management:** Did a new plotline/quest emerge or an existing one progress/conclude? -> \`create_thread\` / \`update_thread\` / \`resolve_thread\` / \`abandon_thread\`.

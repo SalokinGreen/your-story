@@ -2233,13 +2233,10 @@ function ChangeSummary({
   }
   if (data.agmtState) {
     const threads = data.agmtState.threads?.length || 0;
-    const chars = data.agmtState.characters?.length || 0;
     changes.push({
       type: "Update",
       label: "AGMT State",
-      value: `${threads} thread${threads !== 1 ? "s" : ""}, ${chars} character${
-        chars !== 1 ? "s" : ""
-      }`,
+      value: `${threads} thread${threads !== 1 ? "s" : ""}`,
       details: data.agmtState,
       icon: "Brain",
     });

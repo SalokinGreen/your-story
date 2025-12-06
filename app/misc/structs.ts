@@ -525,7 +525,6 @@ export interface StoryData {
 export interface AGMTState {
   chaosFactor: number; // 1-9, default 5
   threads: AGMTThread[]; // Active story threads
-  characters: AGMTCharacter[]; // Known NPCs
   sceneCount: number; // Number of scenes played
   skillCheckHistory: SkillCheckResult[]; // Recent skill check results
   currentStreak: number; // Positive = success streak, negative = failure streak
@@ -556,14 +555,6 @@ export interface AGMTThread {
   id: string;
   description: string;
   status: "active" | "closed";
-  createdAt: number;
-}
-
-export interface AGMTCharacter {
-  id: string;
-  name: string;
-  role: string;
-  status: "active" | "deceased" | "departed";
   createdAt: number;
 }
 

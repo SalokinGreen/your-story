@@ -9,7 +9,6 @@ import {
   StoryData,
   CommandResponse,
   AGMTThread,
-  AGMTCharacter,
   Condition,
   Variable,
   NumberVariable,
@@ -663,7 +662,6 @@ export function executeTools(
         storyData.agmtState = storyData.agmtState || {
           chaosFactor: 5,
           threads: [],
-          characters: [],
           sceneCount: 0,
           skillCheckHistory: [],
           currentStreak: 0,
@@ -868,223 +866,11 @@ export function executeTools(
         continue;
       }
 
-      // Add character
-      if (toolCall.function.name === "add_character") {
-        const name = args.name?.trim();
-        const role = args.role?.trim();
-
-        if (!name || name.length < 2) {
-          const errorMsg = "Character name must be at least 2 characters";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/add_character: ${name || ""}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        if (!role || role.length < 5) {
-          const errorMsg = "Character role must be at least 5 characters";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/add_character: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const newCharacter: AGMTCharacter = {
-          id: crypto.randomUUID(),
-          name,
-          role,
-          status: "active",
-          createdAt: Date.now(),
-        };
-
-        storyData.agmtState = storyData.agmtState || {
-          chaosFactor: 5,
-          threads: [],
-          characters: [],
-          sceneCount: 0,
-          skillCheckHistory: [],
-          currentStreak: 0,
-          lastChaosAdjustment: -999,
-        };
-
-        storyData.agmtState.characters.push(newCharacter);
-
-        logger.action("Character added via tool", {
-          toolCallId: toolId,
-          name,
-          role,
-        });
-        responses.push({
-          command: `/add_character: ${name} (${role})`,
-          success: true,
-          message: `✓ Added character: ${name} - ${role}`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Update character
-      if (toolCall.function.name === "update_character") {
-        const characterId = args.characterId;
-        const name = args.name?.trim();
-        const role = args.role?.trim();
-
-        if (!storyData.agmtState) {
-          const errorMsg = "Advanced RPG Tools not enabled";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/update_character: ${characterId}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const character = storyData.agmtState.characters.find(
-          (c) => c.id === characterId
-        );
-        if (!character) {
-          const errorMsg = `Character not found (ID: ${characterId})`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/update_character: ${characterId}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const oldName = character.name;
-        const oldRole = character.role;
-
-        if (name) character.name = name;
-        if (role) character.role = role;
-
-        logger.action("Character updated via tool", {
-          toolCallId: toolId,
-          oldName,
-          newName: character.name,
-          oldRole,
-          newRole: character.role,
-        });
-        responses.push({
-          command: `/update_character: ${oldName} → ${character.name} (${character.role})`,
-          success: true,
-          message: `✓ Updated character: ${oldName} (${oldRole}) → ${character.name} (${character.role})`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Update character status
-      if (toolCall.function.name === "update_character_status") {
-        const characterId = args.characterId;
-        const status = args.status as "active" | "deceased" | "departed";
-
-        if (!["active", "deceased", "departed"].includes(status)) {
-          const errorMsg = "Status must be 'active', 'deceased', or 'departed'";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/update_character_status: ${characterId} ${status}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        if (!storyData.agmtState) {
-          const errorMsg = "Advanced RPG Tools not enabled";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/update_character_status: ${characterId}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const character = storyData.agmtState.characters.find(
-          (c) => c.id === characterId
-        );
-        if (!character) {
-          const errorMsg = `Character not found (ID: ${characterId})`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/update_character_status: ${characterId}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const oldStatus = character.status;
-        character.status = status;
-
-        logger.action("Character status updated via tool", {
-          toolCallId: toolId,
-          name: character.name,
-          oldStatus,
-          newStatus: status,
-        });
-        responses.push({
-          command: `/update_character_status: ${character.name} ${oldStatus} → ${status}`,
-          success: true,
-          message: `✓ ${character.name} status changed: ${oldStatus} → ${status}`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
       // Increment scene
       if (toolCall.function.name === "increment_scene") {
         storyData.agmtState = storyData.agmtState || {
           chaosFactor: 5,
           threads: [],
-          characters: [],
           sceneCount: 0,
           skillCheckHistory: [],
           currentStreak: 0,

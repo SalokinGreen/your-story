@@ -466,14 +466,6 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
           .join("; ")}`
       );
     }
-    if (agmt.characters.length > 0) {
-      agmtSection.push(
-        `- Known Characters: ${agmt.characters
-          .filter((c) => c.status === "active")
-          .map((c) => `${c.name} (${c.role})`)
-          .join("; ")}`
-      );
-    }
     sections.push(agmtSection.join("\n"));
   }
 

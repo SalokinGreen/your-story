@@ -20,7 +20,6 @@ import {
   Preset,
   CustomTable,
   AGMTThread,
-  AGMTCharacter,
   SkillTree,
   getMemoryContent,
 } from "@/app/misc/structs";
@@ -317,13 +316,6 @@ export function applyCreatorChangesToStoryData(
               "description"
             )
           : storyData.agmtState.threads,
-        characters: changes.agmtState.characters
-          ? mergeArrayWithCommands(
-              storyData.agmtState.characters || [],
-              changes.agmtState.characters,
-              "name"
-            )
-          : storyData.agmtState.characters,
       };
     } else {
       updates.agmtState = changes.agmtState;
