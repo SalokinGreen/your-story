@@ -94,6 +94,7 @@ export const GameIcon: React.FC<GameIconProps> = ({
     width: size ?? style?.width ?? "1em",
     height: size ?? style?.height ?? "1em",
     color: color ?? style?.color ?? "currentColor",
+    flexShrink: 0,
   };
 
   // Error/loading fallback - show a simple circle

@@ -8,26 +8,47 @@ interface DynamicIconProps extends LucideProps {
 }
 
 /**
- * DynamicIcon renders icons from multiple sources:
+ * DynamicIcon renders icons from multiple sources with normalized sizing and colors:
  * 1. Game-icons.net (4000+ RPG icons) - if the name matches a game icon ID
  * 2. Lucide React icons - for UI elements (PascalCase names like "ChevronRight")
  * 3. Emoji fallback - if the name is an emoji
  * 4. Circle fallback - if nothing matches
+ * 
+ * All icons inherit color from currentColor and size from className (e.g., "w-5 h-5")
  */
 export const DynamicIcon: React.FC<DynamicIconProps> = ({
   name,
-  className,
+  className = "",
   style,
+  size,
+  color,
   ...props
 }) => {
   // Handle empty names
   if (!name) return null;
 
+  // Normalize size: extract pixel size from className or use size prop
+  // Look for w-X h-X patterns to determine size
+  const sizeMatch = className.match(/w-(\d+)/);
+  const pixelSize = size ?? (sizeMatch ? parseInt(sizeMatch[1]) * 4 : undefined);
+
   // Check if it's an emoji (simple check: non-ascii or specific ranges)
   const isEmoji = /\p{Extended_Pictographic}/u.test(name);
   if (isEmoji) {
+    // Render emoji with consistent sizing matching icon dimensions
     return (
-      <span className="text-xl leading-none" role="img" aria-label="icon">
+      <span 
+        className={`inline-flex items-center justify-center shrink-0 ${className}`}
+        style={{
+          fontSize: pixelSize ? `${pixelSize * 0.75}px` : '0.875em',
+          lineHeight: 1,
+          width: pixelSize ? `${pixelSize}px` : '1em',
+          height: pixelSize ? `${pixelSize}px` : '1em',
+          ...style,
+        }}
+        role="img" 
+        aria-label="icon"
+      >
         {name}
       </span>
     );
@@ -38,10 +59,9 @@ export const DynamicIcon: React.FC<DynamicIconProps> = ({
     return (
       <GameIcon
         name={name}
-        className={className}
-        style={style}
-        size={typeof props.size === "number" ? props.size : undefined}
-        color={props.color}
+        className={`shrink-0 ${className}`}
+        style={{ color: color ?? 'currentColor', ...style }}
+        size={pixelSize}
       />
     );
   }
@@ -50,7 +70,14 @@ export const DynamicIcon: React.FC<DynamicIconProps> = ({
   const IconComponent = (icons as Record<string, React.FC<LucideProps>>)[name];
 
   if (IconComponent) {
-    return <IconComponent className={className} style={style} {...props} />;
+    return (
+      <IconComponent 
+        className={`shrink-0 ${className}`} 
+        style={{ color: color ?? 'currentColor', ...style }} 
+        size={size}
+        {...props} 
+      />
+    );
   }
 
   // Fallback: try converting kebab-case to PascalCase for Lucide
@@ -64,10 +91,22 @@ export const DynamicIcon: React.FC<DynamicIconProps> = ({
 
   if (PascalIconComponent) {
     return (
-      <PascalIconComponent className={className} style={style} {...props} />
+      <PascalIconComponent 
+        className={`shrink-0 ${className}`} 
+        style={{ color: color ?? 'currentColor', ...style }} 
+        size={size}
+        {...props} 
+      />
     );
   }
 
   // Final fallback: circle icon
-  return <icons.Circle className={className} style={style} {...props} />;
+  return (
+    <icons.Circle 
+      className={`shrink-0 ${className}`} 
+      style={{ color: color ?? 'currentColor', ...style }} 
+      size={size}
+      {...props} 
+    />
+  );
 };
