@@ -8,6 +8,7 @@ import { SubscriptionProvider } from "./misc/SubscriptionContext";
 import NotificationContainer from "./components/NotificationContainer";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import SiteHeader from "./components/SiteHeader";
+import FontInitializer from "./components/FontInitializer";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -88,6 +89,7 @@ export default function RootLayout({
           </AuthProvider>
           <NotificationContainer />
           <PWAInstallPrompt />
+          <FontInitializer />
         </NotificationProvider>
         <SpeedInsights />
         <Analytics />

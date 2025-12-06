@@ -1,6 +1,6 @@
 "use client";
 import { Choice, Choices, StoryData, ActionAnalysis } from "../misc/structs";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import TTSControls from "../components/TTSControls";
 import ChoicesModal from "../components/ChoicesModal";
@@ -104,6 +104,71 @@ export default function Story({
 
   // STT state
   const [sttEnabled, setSttEnabled] = React.useState(false);
+
+  // Font settings state
+  const [fontSettings, setFontSettings] = useState({
+    fontSize: 16,
+    fontFamily:
+      "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    lineHeight: 1.6,
+    paragraphSpacing: 0.5,
+    theme: "default",
+    themeColors: {
+      background: "rgb(23, 37, 84)",
+      text: "rgb(239, 246, 255)",
+      accent: "rgb(59, 130, 246)",
+    },
+  });
+
+  // Load font settings from localStorage and listen for changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const loadFontSettings = () => {
+      // Get theme colors from CSS variables or use defaults
+      const computedStyle = getComputedStyle(document.documentElement);
+      const bgColor =
+        computedStyle.getPropertyValue("--story-bg-color").trim() ||
+        "rgb(23, 37, 84)";
+      const textColor =
+        computedStyle.getPropertyValue("--story-text-color").trim() ||
+        "rgb(239, 246, 255)";
+      const accentColor =
+        computedStyle.getPropertyValue("--story-accent-color").trim() ||
+        "rgb(59, 130, 246)";
+
+      setFontSettings({
+        fontSize: parseInt(localStorage.getItem("storyFontSize") || "16", 10),
+        fontFamily:
+          localStorage.getItem("storyFontFamily") ||
+          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        lineHeight: parseFloat(
+          localStorage.getItem("storyLineHeight") || "1.6"
+        ),
+        paragraphSpacing: parseFloat(
+          localStorage.getItem("storyParagraphSpacing") || "0.5"
+        ),
+        theme: localStorage.getItem("storyTheme") || "default",
+        themeColors: {
+          background: bgColor,
+          text: textColor,
+          accent: accentColor,
+        },
+      });
+    };
+
+    loadFontSettings();
+
+    // Listen for font settings changes from Settings modal
+    const handleFontChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setFontSettings(detail);
+    };
+
+    window.addEventListener("fontSettingsChanged", handleFontChange);
+    return () =>
+      window.removeEventListener("fontSettingsChanged", handleFontChange);
+  }, []);
 
   // Load STT settings from localStorage
   React.useEffect(() => {
@@ -288,7 +353,10 @@ export default function Story({
   return (
     <div className="w-full max-w-3xl mx-auto">
       {/* Main Story Card */}
-      <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 overflow-hidden relative">
+      <div
+        className="rounded-xl border border-gray-500/30 overflow-hidden relative"
+        style={{ backgroundColor: fontSettings.themeColors?.background }}
+      >
         {/* Sync Status Indicator - top right corner */}
         {syncStatus && syncStatus !== "local-only" && (
           <div className="absolute top-3 right-3 z-10">
@@ -399,7 +467,7 @@ export default function Story({
             </div>
           ) : (
             <>
-              {prettify(storyText, true, showHiddenMessages)}
+              {prettify(storyText, true, showHiddenMessages, fontSettings)}
 
               {/* Edit button overlay */}
               {isHovering && onEdit && !loading && !loadingStage && (
@@ -539,19 +607,49 @@ const parseHiddenText = (text: string, showHidden: boolean): string => {
   }
 };
 
+interface FontSettings {
+  fontSize: number;
+  fontFamily: string;
+  lineHeight: number;
+  paragraphSpacing: number;
+  theme?: string;
+  themeColors?: {
+    background: string;
+    text: string;
+    accent: string;
+  };
+}
+
 const prettify = (
   text: string,
   animate: boolean = true,
-  showHiddenMessages: boolean = false
+  showHiddenMessages: boolean = false,
+  fontSettings?: FontSettings
 ) => {
   // Process hidden text before rendering
   const processedText = parseHiddenText(text, showHiddenMessages);
 
+  const customStyle = fontSettings
+    ? {
+        fontSize: `${fontSettings.fontSize}px`,
+        fontFamily: fontSettings.fontFamily,
+        lineHeight: fontSettings.lineHeight,
+        color: fontSettings.themeColors?.text,
+      }
+    : undefined;
+
+  const paragraphStyle = fontSettings
+    ? {
+        marginBottom: `${fontSettings.paragraphSpacing}em`,
+      }
+    : undefined;
+
   return (
     <div
-      className={`prose prose-sm prose-invert max-w-none ${
+      className={`prose prose-sm max-w-none ${
         animate ? "animate-fade-in" : ""
       }`}
+      style={customStyle}
     >
       <ReactMarkdown
         components={{
@@ -621,7 +719,8 @@ const prettify = (
 
             return (
               <p
-                className="mb-2 leading-relaxed text-blue-50/90 last:mb-0"
+                className="leading-relaxed last:mb-0"
+                style={paragraphStyle}
                 {...props}
               >
                 {processedChildren}
@@ -629,38 +728,32 @@ const prettify = (
             );
           },
           h1: ({ node, ...props }) => (
-            <h1
-              className="text-xl font-bold mb-2 mt-3 first:mt-0 text-white"
-              {...props}
-            />
+            <h1 className="text-xl font-bold mb-2 mt-3 first:mt-0" {...props} />
           ),
           h2: ({ node, ...props }) => (
-            <h2
-              className="text-lg font-bold mb-2 mt-3 first:mt-0 text-white"
-              {...props}
-            />
+            <h2 className="text-lg font-bold mb-2 mt-3 first:mt-0" {...props} />
           ),
           h3: ({ node, ...props }) => (
             <h3
-              className="text-base font-bold mb-1.5 mt-2 first:mt-0 text-white"
+              className="text-base font-bold mb-1.5 mt-2 first:mt-0"
               {...props}
             />
           ),
           strong: ({ node, ...props }) => (
-            <strong className="font-bold text-white" {...props} />
+            <strong className="font-bold" {...props} />
           ),
           em: ({ node, ...props }) => (
-            <em className="italic text-blue-100" {...props} />
+            <em className="italic opacity-90" {...props} />
           ),
           ul: ({ node, ...props }) => (
             <ul
-              className="list-disc ml-4 mb-2 space-y-0.5 last:mb-0 text-blue-50/90"
+              className="list-disc ml-4 mb-2 space-y-0.5 last:mb-0"
               {...props}
             />
           ),
           ol: ({ node, ...props }) => (
             <ol
-              className="list-decimal ml-4 mb-2 space-y-0.5 last:mb-0 text-blue-50/90"
+              className="list-decimal ml-4 mb-2 space-y-0.5 last:mb-0"
               {...props}
             />
           ),
@@ -669,7 +762,8 @@ const prettify = (
           ),
           blockquote: ({ node, ...props }) => (
             <blockquote
-              className="border-l-2 border-blue-500 pl-3 italic text-blue-200/70 my-2"
+              className="border-l-2 pl-3 italic opacity-70 my-2"
+              style={{ borderColor: "currentColor" }}
               {...props}
             />
           ),

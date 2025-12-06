@@ -264,6 +264,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - **STT Settings**: Speech-to-text uses Voxtral (Mistral API) and costs 2 coins per transcription. Settings saved to localStorage (sttEnabled). STTButton in ChoicesModal sends audio to /api/stt/transcribe with auto-stop after 3s silence.
 - **Embeddings Settings**: Semantic search settings saved to localStorage (embeddingsEnabled, embeddingThreshold). When enabled, uses Mistral embeddings to find relevant lore/memories. embeddingThreshold (0.1-0.5, default 0.25) controls strictness: lower = more results (relaxed), higher = fewer results (strict). Auto-activates for stories with 30+ lore or 50+ memories. Cost: ~0.5 coins per 100 turns.
 - **Hidden Messages**: AI can use ||double pipes|| syntax for hidden text (DM notes). Players can't see hidden text unless "showHiddenMessages" is enabled in localStorage. When revealed, hidden text appears with purple highlighting.
+- **Font Settings**: Story text font customization via Settings > Display tab. Settings saved to localStorage (storyFontSize, storyFontFamily, storyLineHeight, storyParagraphSpacing, storyTheme). Custom fonts stored in IndexedDB ("your-story-fonts" database) and injected via @font-face. Theme presets: Ocean Blue (default), Sepia, Pure Dark, Paper White, Forest, Sunset, Nord, Solarized Dark. Components: FontSettingsTab.tsx (UI), FontInitializer.tsx (app load), useFontSettings hook. story.tsx receives font settings and applies via inline styles on the prose container.
 
 ### AI API Patterns
 
