@@ -355,14 +355,10 @@ export interface RestState {
 
 // Rest configuration per difficulty level
 export interface RestConfig {
-  // Recovery percentages (% of max)
-  resourceRecovery: { quick: number; short: number; long: number };
   // Cooldown reduction (turns)
   cooldownReduction: { quick: number; short: number; long: number };
   // Condition downgrade (tiers) - only affects non-permanent conditions
   conditionDowngrade: { quick: number; short: number; long: number };
-  // Item durability repair (% of max)
-  itemRepair: { quick: number; short: number; long: number };
   // Stress reduction (YZE only)
   stressReduction: { quick: number; short: number; long: number };
   // Max uses before long rest required
@@ -374,37 +370,29 @@ export interface RestConfig {
 // Harder difficulties = less effective rests, fewer uses
 export const REST_CONFIG: Record<AdventureDifficulty, RestConfig> = {
   easy: {
-    resourceRecovery: { quick: 15, short: 60, long: 100 },
     cooldownReduction: { quick: 2, short: 999, long: 999 }, // 999 = full reset
     conditionDowngrade: { quick: 0, short: 1, long: 2 },
-    itemRepair: { quick: 0, short: 25, long: 100 },
     stressReduction: { quick: 2, short: 5, long: 10 },
     maxQuickRests: 4,
     maxShortRests: 3,
   },
   medium: {
-    resourceRecovery: { quick: 10, short: 50, long: 100 },
     cooldownReduction: { quick: 1, short: 3, long: 999 },
     conditionDowngrade: { quick: 0, short: 1, long: 2 },
-    itemRepair: { quick: 0, short: 15, long: 100 },
     stressReduction: { quick: 1, short: 3, long: 10 },
     maxQuickRests: 3,
     maxShortRests: 2,
   },
   hard: {
-    resourceRecovery: { quick: 8, short: 40, long: 100 },
     cooldownReduction: { quick: 1, short: 2, long: 999 },
     conditionDowngrade: { quick: 0, short: 1, long: 1 },
-    itemRepair: { quick: 0, short: 10, long: 75 },
     stressReduction: { quick: 1, short: 2, long: 8 },
     maxQuickRests: 2,
     maxShortRests: 2,
   },
   expert: {
-    resourceRecovery: { quick: 5, short: 30, long: 100 },
     cooldownReduction: { quick: 1, short: 2, long: 999 },
     conditionDowngrade: { quick: 0, short: 0, long: 1 },
-    itemRepair: { quick: 0, short: 5, long: 50 },
     stressReduction: { quick: 0, short: 1, long: 5 },
     maxQuickRests: 2,
     maxShortRests: 1,
@@ -492,6 +480,7 @@ export interface StoryData {
   conditions: Condition[]; // Active conditions/afflictions affecting the player
   gameOver?: GameOver; // Game over state if the player has permanently died/lost
   activeChallenge?: SceneChallenge; // Current scene challenge (progress clock)
+  threads?: StoryThread[]; // Active story threads/plotlines (independent of AGMT)
   author_notes?: string;
   player_notes?: string;
   selected_preset?: string; // ID of the preset used
@@ -550,6 +539,17 @@ export interface SkillCheckResult {
   difficulty: number;
   margin: number; // How much they beat/missed the DC by
   timestamp: number;
+}
+
+// Story thread for tracking plotlines (independent of AGMT)
+export interface StoryThread {
+  id: string;
+  title: string; // Short title (e.g., "The Missing Artifact")
+  description: string; // Detailed description of the thread
+  status: "active" | "resolved" | "abandoned";
+  priority?: "main" | "side" | "background"; // Thread importance
+  createdAt: number;
+  resolvedAt?: number;
 }
 
 export interface AGMTThread {

@@ -19,6 +19,7 @@ import {
   AdventureDifficulty,
   RestType,
   REST_CONFIG,
+  StoryThread,
 } from "@/app/misc/structs";
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
@@ -101,6 +102,8 @@ const STATE_CHANGE_TOOLS = new Set([
   "modify_relationship",
   "delete_relationship",
   "update_relationship_description",
+  // NPC Management
+  "add_npc",
   // Achievements - tool names and command names
   "trigger_achievement",
   // Note: Lore tools (show_lore, hide_lore, create_lore) excluded - lore visibility
@@ -125,6 +128,11 @@ const STATE_CHANGE_TOOLS = new Set([
   "cancel_challenge",
   // Rest System
   "take_rest",
+  // Thread Management
+  "create_thread",
+  "update_thread",
+  "resolve_thread",
+  "abandon_thread",
   // Quests - completion includes XP gain and potential level ups
   "complete_quest",
   "fail_quest",
@@ -2057,6 +2065,200 @@ export function executeTools(
         continue;
       }
 
+      // === ADD NPC TOOL HANDLER ===
+      // Creates both a relationship entry and a lore entry for important NPCs
+      if (toolCall.function.name === "add_npc") {
+        const name = args.name?.trim();
+        const role = args.role?.trim();
+        const disposition = args.disposition ?? 0;
+        const appearance = args.appearance?.trim();
+        const personality = args.personality?.trim();
+        const motivation = args.motivation?.trim();
+        const secret = args.secret?.trim();
+        const location = args.location?.trim();
+
+        // Validate required fields
+        if (!name || name.length < 2) {
+          const errorMsg = "NPC name must be at least 2 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_npc: ${name || ""}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!role || role.length < 3) {
+          const errorMsg = "NPC role must be at least 3 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_npc: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!appearance || appearance.length < 10) {
+          const errorMsg = "NPC appearance must be at least 10 characters";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_npc: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Check for duplicate relationship
+        if (!storyData.relationships) {
+          storyData.relationships = [];
+        }
+        const existingRelationship = storyData.relationships.find(
+          (r) => r.name.toLowerCase() === name.toLowerCase()
+        );
+        if (existingRelationship) {
+          const errorMsg = `NPC "${name}" already exists as a relationship`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_npc: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Check for duplicate lore
+        if (!storyData.lore) {
+          storyData.lore = [];
+        }
+        const existingLore = storyData.lore.find(
+          (l) => l.title.toLowerCase() === name.toLowerCase()
+        );
+        if (existingLore) {
+          const errorMsg = `Lore entry "${name}" already exists`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: `/add_npc: ${name}`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Create relationship entry
+        const clampedDisposition = Math.max(-100, Math.min(100, disposition));
+        storyData.relationships.push({
+          name,
+          value: clampedDisposition,
+          description: role,
+          symbol: "👤", // Default person symbol for NPCs
+        });
+
+        // Build lore content
+        let loreContent = `**${role}**\n\n`;
+        loreContent += `**Appearance:** ${appearance}\n\n`;
+        loreContent += `**Personality:** ${personality}\n\n`;
+        if (motivation) {
+          loreContent += `**Motivation:** ${motivation}\n\n`;
+        }
+        if (location) {
+          loreContent += `**Usually Found:** ${location}\n\n`;
+        }
+        if (secret) {
+          loreContent += `**Secret:** ${secret}\n`;
+        }
+
+        // Create lore entry with the NPC's name as a trigger
+        const nameParts = name.split(/\s+/);
+        const triggers: string[] = [name.toLowerCase()];
+        // Add first name and last name as separate triggers if multi-word
+        if (nameParts.length > 1) {
+          nameParts.forEach((part: string) => {
+            if (part.length > 2) {
+              triggers.push(part.toLowerCase());
+            }
+          });
+        }
+
+        storyData.lore.push({
+          title: name,
+          content: loreContent.trim(),
+          relatedCharacters: [],
+          relatedLocations: location ? [location] : [],
+          secrtet: !!secret, // Note: typo in interface
+          keys: [],
+          enabled: true,
+          alwaysOn: false,
+          on: true, // Start visible since they were just introduced
+          on_triggers: triggers,
+          off_triggers: [],
+          embedded: false, // Mark for embedding sync
+        });
+
+        // Mark lore as dirty for embedding sync
+        storyData.loreEmbeddingsDirty = true;
+
+        const dispositionLabel =
+          clampedDisposition >= 50
+            ? "friendly"
+            : clampedDisposition >= 20
+            ? "warm"
+            : clampedDisposition > -20
+            ? "neutral"
+            : clampedDisposition > -50
+            ? "wary"
+            : "hostile";
+
+        logger.action("NPC added via tool", {
+          toolCallId: toolId,
+          name,
+          role,
+          disposition: clampedDisposition,
+          hasSecret: !!secret,
+        });
+
+        responses.push({
+          command: `/add_npc: ${name}`,
+          success: true,
+          message: `✓ Added NPC: ${name} (${role}) - ${dispositionLabel} disposition (${clampedDisposition})`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+
+        // Add state change for the story stage
+        stateChanges.push(
+          `New NPC introduced: ${name} (${role}, ${dispositionLabel})`
+        );
+        continue;
+      }
+
       // === REST SYSTEM TOOL HANDLER ===
       if (toolCall.function.name === "take_rest") {
         const restResult = executeRestTool(args, storyData, toolId);
@@ -2064,6 +2266,291 @@ export function executeTools(
           ...restResult,
           toolCallId: toolCall.id,
         });
+        continue;
+      }
+
+      // === THREAD MANAGEMENT TOOL HANDLERS ===
+      if (toolCall.function.name === "create_thread") {
+        const { title, description, priority } = args;
+
+        if (!title || !description) {
+          responses.push({
+            command: "/create_thread",
+            success: false,
+            message: "✗ Thread title and description are required",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Initialize threads array if needed
+        if (!storyData.threads) {
+          storyData.threads = [];
+        }
+
+        // Check for duplicate title
+        const existingThread = storyData.threads.find(
+          (t) => t.title.toLowerCase() === title.toLowerCase()
+        );
+        if (existingThread) {
+          responses.push({
+            command: `/create_thread: ${title}`,
+            success: false,
+            message: `✗ Thread '${title}' already exists`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const newThread: StoryThread = {
+          id: `thread_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          title,
+          description,
+          status: "active",
+          priority: priority || "side",
+          createdAt: Date.now(),
+        };
+
+        storyData.threads.push(newThread);
+
+        responses.push({
+          command: `/create_thread: ${title}`,
+          success: true,
+          message: `✓ Created ${priority || "side"} thread: ${title}`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        stateChanges.push(`New thread: ${title} (${priority || "side"})`);
+        continue;
+      }
+
+      if (toolCall.function.name === "update_thread") {
+        const { title, description, priority } = args;
+
+        if (!title) {
+          responses.push({
+            command: "/update_thread",
+            success: false,
+            message: "✗ Thread title is required",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!storyData.threads || storyData.threads.length === 0) {
+          responses.push({
+            command: `/update_thread: ${title}`,
+            success: false,
+            message: "✗ No threads exist",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Find thread (fuzzy match)
+        const thread = storyData.threads.find(
+          (t) =>
+            t.title.toLowerCase().includes(title.toLowerCase()) ||
+            title.toLowerCase().includes(t.title.toLowerCase())
+        );
+
+        if (!thread) {
+          responses.push({
+            command: `/update_thread: ${title}`,
+            success: false,
+            message: `✗ Thread '${title}' not found`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (thread.status !== "active") {
+          responses.push({
+            command: `/update_thread: ${thread.title}`,
+            success: false,
+            message: `✗ Thread '${thread.title}' is ${thread.status}, cannot update`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const changes: string[] = [];
+        if (description) {
+          thread.description = description;
+          changes.push("description");
+        }
+        if (priority) {
+          thread.priority = priority;
+          changes.push(`priority → ${priority}`);
+        }
+
+        if (changes.length === 0) {
+          responses.push({
+            command: `/update_thread: ${thread.title}`,
+            success: false,
+            message: "✗ No changes provided",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        responses.push({
+          command: `/update_thread: ${thread.title}`,
+          success: true,
+          message: `✓ Updated thread '${thread.title}': ${changes.join(", ")}`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        stateChanges.push(`Thread updated: ${thread.title}`);
+        continue;
+      }
+
+      if (toolCall.function.name === "resolve_thread") {
+        const { title, resolution } = args;
+
+        if (!title) {
+          responses.push({
+            command: "/resolve_thread",
+            success: false,
+            message: "✗ Thread title is required",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!storyData.threads || storyData.threads.length === 0) {
+          responses.push({
+            command: `/resolve_thread: ${title}`,
+            success: false,
+            message: "✗ No threads exist",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Find thread (fuzzy match)
+        const thread = storyData.threads.find(
+          (t) =>
+            t.title.toLowerCase().includes(title.toLowerCase()) ||
+            title.toLowerCase().includes(t.title.toLowerCase())
+        );
+
+        if (!thread) {
+          responses.push({
+            command: `/resolve_thread: ${title}`,
+            success: false,
+            message: `✗ Thread '${title}' not found`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (thread.status !== "active") {
+          responses.push({
+            command: `/resolve_thread: ${thread.title}`,
+            success: false,
+            message: `✗ Thread '${thread.title}' is already ${thread.status}`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        thread.status = "resolved";
+        thread.resolvedAt = Date.now();
+        if (resolution) {
+          thread.description = `${thread.description}\n\n[RESOLVED: ${resolution}]`;
+        }
+
+        responses.push({
+          command: `/resolve_thread: ${thread.title}`,
+          success: true,
+          message: `✓ Resolved thread: ${thread.title}`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        stateChanges.push(`Thread resolved: ${thread.title}`);
+        continue;
+      }
+
+      if (toolCall.function.name === "abandon_thread") {
+        const { title, reason } = args;
+
+        if (!title) {
+          responses.push({
+            command: "/abandon_thread",
+            success: false,
+            message: "✗ Thread title is required",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!storyData.threads || storyData.threads.length === 0) {
+          responses.push({
+            command: `/abandon_thread: ${title}`,
+            success: false,
+            message: "✗ No threads exist",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Find thread (fuzzy match)
+        const thread = storyData.threads.find(
+          (t) =>
+            t.title.toLowerCase().includes(title.toLowerCase()) ||
+            title.toLowerCase().includes(t.title.toLowerCase())
+        );
+
+        if (!thread) {
+          responses.push({
+            command: `/abandon_thread: ${title}`,
+            success: false,
+            message: `✗ Thread '${title}' not found`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (thread.status !== "active") {
+          responses.push({
+            command: `/abandon_thread: ${thread.title}`,
+            success: false,
+            message: `✗ Thread '${thread.title}' is already ${thread.status}`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        thread.status = "abandoned";
+        thread.resolvedAt = Date.now();
+        if (reason) {
+          thread.description = `${thread.description}\n\n[ABANDONED: ${reason}]`;
+        }
+
+        responses.push({
+          command: `/abandon_thread: ${thread.title}`,
+          success: true,
+          message: `✓ Abandoned thread: ${thread.title}`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        stateChanges.push(`Thread abandoned: ${thread.title}`);
         continue;
       }
 
@@ -3027,6 +3514,9 @@ function executeRestTool(
 ): Omit<CommandResponse, "toolCallId"> {
   const restType = args.type as RestType;
   const narrativeSummary = args.narrative_summary?.trim() || "";
+  const resourcesArg = args.resources as
+    | Array<{ name: string; amount: number; percentage?: boolean }>
+    | undefined;
   const difficulty = storyData.difficulty || "medium";
   const config = REST_CONFIG[difficulty];
 
@@ -3076,23 +3566,47 @@ function executeRestTool(
   // Track effects for summary message
   const effects: string[] = [];
 
-  // 1. Resource Recovery (% of max)
-  const resourceRecovery = config.resourceRecovery[restType];
-  if (resourceRecovery > 0 && storyData.resources?.length) {
-    for (const resource of storyData.resources) {
-      if (resource.value < resource.maxValue) {
-        const recoveryAmount = Math.ceil(
-          (resource.maxValue * resourceRecovery) / 100
+  // 1. Resource Recovery (GM-specified list only)
+  if (resourcesArg && resourcesArg.length > 0 && storyData.resources?.length) {
+    for (const resourceReq of resourcesArg) {
+      // Find matching resource using fuzzy match
+      const match = findBestMatch(
+        resourceReq.name,
+        storyData.resources,
+        (r) => r.name,
+        0.6
+      );
+
+      if (!match) {
+        // Resource not found - skip silently (don't fail the whole rest)
+        continue;
+      }
+
+      const resource = match.item;
+      if (resource.value >= resource.maxValue) {
+        // Already at max - skip
+        continue;
+      }
+
+      // Calculate recovery amount
+      const isPercentage = resourceReq.percentage !== false; // Default to true
+      let recoveryAmount: number;
+      if (isPercentage) {
+        recoveryAmount = Math.ceil(
+          (resource.maxValue * resourceReq.amount) / 100
         );
-        const oldValue = resource.value;
-        resource.value = Math.min(
-          resource.maxValue,
-          resource.value + recoveryAmount
-        );
-        const actualRecovery = resource.value - oldValue;
-        if (actualRecovery > 0) {
-          effects.push(`${resource.name} +${actualRecovery}`);
-        }
+      } else {
+        recoveryAmount = Math.ceil(resourceReq.amount);
+      }
+
+      const oldValue = resource.value;
+      resource.value = Math.min(
+        resource.maxValue,
+        resource.value + recoveryAmount
+      );
+      const actualRecovery = resource.value - oldValue;
+      if (actualRecovery > 0) {
+        effects.push(`${resource.name} +${actualRecovery}`);
       }
     }
   }
@@ -3184,43 +3698,7 @@ function executeRestTool(
     }
   }
 
-  // 5. Item Repair (% of max durability)
-  const itemRepair = config.itemRepair[restType];
-  if (itemRepair > 0 && storyData.inventory?.length) {
-    let itemsRepaired = 0;
-    for (const item of storyData.inventory) {
-      // Skip items without durability tracking or already at max
-      if (
-        item.durability === undefined ||
-        item.maxDurability === undefined ||
-        item.grade === "agmt" || // Infinite durability items
-        item.durability >= item.maxDurability
-      ) {
-        continue;
-      }
-
-      const repairAmount =
-        itemRepair >= 100
-          ? item.maxDurability // Full repair
-          : Math.ceil((item.maxDurability * itemRepair) / 100);
-
-      const oldDurability = item.durability;
-      item.durability = Math.min(
-        item.maxDurability,
-        item.durability + repairAmount
-      );
-      if (item.durability > oldDurability) {
-        itemsRepaired++;
-      }
-    }
-    if (itemsRepaired > 0) {
-      effects.push(
-        `${itemsRepaired} item${itemsRepaired > 1 ? "s" : ""} repaired`
-      );
-    }
-  }
-
-  // 6. Update rest state tracking
+  // 5. Update rest state tracking
   if (restType === "long") {
     // Long rest resets quick/short rest counts
     storyData.restState.quickRestsUsed = 0;

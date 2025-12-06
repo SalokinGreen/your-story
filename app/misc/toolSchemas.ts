@@ -146,7 +146,7 @@ const addItemTool: ToolSchema = {
   function: {
     name: "add_item",
     description:
-      "Add an item to player's inventory. Item types: normal (has durability, breaks when depleted), consumable (one-use, consumed immediately), story (quest item, tracks durability but never breaks), misc (prevents disadvantage, tracks durability). Grades: common (3 dur), uncommon (5 dur, +bonus), rare (8 dur, +bonus), epic (12 dur, +bonus), legendary (20 dur, +bonus), agmt (infinite dur, +max bonus)",
+      "Add an item to player's inventory. Item types: normal (has durability, breaks when depleted), consumable (one-use, consumed immediately), story (quest item, tracks durability but never breaks), misc (prevents disadvantage, tracks durability). Grades: common (3 dur), uncommon (5 dur, +bonus), rare (8 dur, +bonus), epic (12 dur, +bonus), legendary (20 dur, +bonus), mythic (infinite dur, +max bonus)",
     parameters: {
       type: "object",
       properties: {
@@ -166,9 +166,9 @@ const addItemTool: ToolSchema = {
         },
         grade: {
           type: "string",
-          enum: ["common", "uncommon", "rare", "epic", "legendary", "agmt"],
+          enum: ["common", "uncommon", "rare", "epic", "legendary", "mythic"],
           description:
-            "Item grade/rarity. Affects durability and bonus: common (3 dur, +0), uncommon (5 dur, small bonus), rare (8 dur, medium bonus), epic (12 dur, good bonus), legendary (20 dur, great bonus), agmt (infinite dur, max bonus). Default: common",
+            "Item grade/rarity. Affects durability and bonus: common (3 dur, +0), uncommon (5 dur, small bonus), rare (8 dur, medium bonus), epic (12 dur, good bonus), legendary (20 dur, great bonus), mythic (infinite dur, max bonus). Default: common",
         },
         quantity: {
           type: "number",
@@ -228,7 +228,7 @@ const modifyItemTool: ToolSchema = {
         },
         grade: {
           type: "string",
-          enum: ["common", "uncommon", "rare", "epic", "legendary", "agmt"],
+          enum: ["common", "uncommon", "rare", "epic", "legendary", "mythic"],
           description:
             "New item grade (optional) - upgrading increases max durability",
         },
@@ -327,7 +327,7 @@ const upgradeItemTool: ToolSchema = {
         },
         newGrade: {
           type: "string",
-          enum: ["uncommon", "rare", "epic", "legendary", "agmt"],
+          enum: ["uncommon", "rare", "epic", "legendary", "mythic"],
           description:
             "The new grade to upgrade to (must be higher than current grade)",
         },
@@ -1121,6 +1121,169 @@ const editRelationshipTool: ToolSchema = {
   },
 };
 
+// NPC Management Tool - combines relationship + lore creation
+const addNpcTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "add_npc",
+    description:
+      "Add a new NPC to the story. Creates BOTH a relationship entry (for tracking disposition) AND a lore entry (for detailed info). Use this when introducing important named characters who may appear again.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description:
+            "NPC's name (e.g., 'Captain Mira', 'Old Tom the Innkeeper')",
+        },
+        role: {
+          type: "string",
+          description:
+            "Brief role/title (e.g., 'Town guard captain', 'Mysterious merchant')",
+        },
+        disposition: {
+          type: "number",
+          description:
+            "Initial disposition toward player (-100 hostile to +100 friendly). 0 = neutral stranger, 20 = friendly acquaintance, -30 = suspicious/wary",
+          minimum: -100,
+          maximum: 100,
+        },
+        appearance: {
+          type: "string",
+          description:
+            "Physical description (age, build, distinguishing features, clothing)",
+        },
+        personality: {
+          type: "string",
+          description: "Key personality traits, mannerisms, speech patterns",
+        },
+        motivation: {
+          type: "string",
+          description: "What the NPC wants, their goals, what drives them",
+        },
+        secret: {
+          type: "string",
+          description:
+            "Hidden information about the NPC (optional - only GM will see until revealed)",
+        },
+        location: {
+          type: "string",
+          description: "Where this NPC can typically be found (optional)",
+        },
+      },
+      required: ["name", "role", "disposition", "appearance", "personality"],
+    },
+  },
+};
+
+// Thread Management Tools - track story plotlines independently
+const createThreadTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "create_thread",
+    description:
+      "Create a new story thread to track a plotline, mystery, quest, or goal. Use when a new narrative arc emerges that the player might pursue.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description:
+            "Short title for the thread (e.g., 'The Missing Artifact', 'Baron's Conspiracy', 'Find the Cure')",
+        },
+        description: {
+          type: "string",
+          description:
+            "Detailed description of the thread - what it involves, current state, known information",
+        },
+        priority: {
+          type: "string",
+          enum: ["main", "side", "background"],
+          description:
+            "Thread importance: 'main' (central plot), 'side' (optional subplot), 'background' (ambient/world events)",
+        },
+      },
+      required: ["title", "description"],
+    },
+  },
+};
+
+const updateThreadTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "update_thread",
+    description:
+      "Update a thread's description or priority to reflect story developments. Use when new information is revealed or circumstances change.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Thread title to update (fuzzy matching supported)",
+        },
+        description: {
+          type: "string",
+          description: "New description reflecting current state (optional)",
+        },
+        priority: {
+          type: "string",
+          enum: ["main", "side", "background"],
+          description: "Updated priority (optional)",
+        },
+      },
+      required: ["title"],
+    },
+  },
+};
+
+const resolveThreadTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "resolve_thread",
+    description:
+      "Mark a thread as resolved when the plotline concludes successfully or reaches a satisfying endpoint.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Thread title to resolve (fuzzy matching supported)",
+        },
+        resolution: {
+          type: "string",
+          description:
+            "Brief description of how the thread was resolved (optional)",
+        },
+      },
+      required: ["title"],
+    },
+  },
+};
+
+const abandonThreadTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "abandon_thread",
+    description:
+      "Mark a thread as abandoned when the plotline becomes irrelevant, impossible, or the player explicitly gives up on it.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Thread title to abandon (fuzzy matching supported)",
+        },
+        reason: {
+          type: "string",
+          description:
+            "Brief explanation of why the thread was abandoned (optional)",
+        },
+      },
+      required: ["title"],
+    },
+  },
+};
+
 // Memory Management Tool
 const addMemoryTool: ToolSchema = {
   type: "function",
@@ -1687,11 +1850,13 @@ const takeRestTool: ToolSchema = {
   function: {
     name: "take_rest",
     description: `Allow the player to rest and recover. Three types available:
-- QUICK (30 min): Brief break. Recovers 5-15% resources, reduces cooldowns by 1-2. Limited uses before long rest.
-- SHORT (4-8 hours): Sleep/extended rest. Recovers 30-60% resources, resets most cooldowns, downgrades minor conditions by 1 tier, repairs items slightly. Limited uses before long rest.
-- LONG (several days): Extended downtime/time skip. Full resource recovery, all cooldowns reset, conditions improve 1-2 tiers, items fully repaired. Resets quick/short rest counts.
+- QUICK (30 min): Brief break. Reduces cooldowns slightly. Limited uses before long rest.
+- SHORT (4-8 hours): Sleep/extended rest. Resets most cooldowns, downgrades minor conditions by 1 tier. Limited uses before long rest.
+- LONG (several days): Extended downtime/time skip. All cooldowns reset, conditions improve 1-2 tiers. Resets quick/short rest counts.
 
-Long rests require player confirmation as they involve a time skip. Use when narratively appropriate (safe haven, end of chapter, travel montage). Cannot rest during active danger/combat.`,
+IMPORTANT: Resource recovery is NOT automatic. You must specify which resources to restore using the 'resources' parameter. Only include resources that make sense to recover during rest (e.g., Health, Stamina, Mana). Do NOT include non-regenerating resources like Gold, Coins, Ammo, etc.
+
+Long rests involve a time skip. Use when narratively appropriate (safe haven, end of chapter, travel montage). Cannot rest during active danger/combat.`,
     parameters: {
       type: "object",
       properties: {
@@ -1705,6 +1870,31 @@ Long rests require player confirmation as they involve a time skip. Use when nar
           type: "string",
           description:
             "Brief description of how the rest happens narratively (e.g., 'You find a quiet corner to catch your breath', 'The party makes camp for the night', 'Several peaceful days pass at the inn')",
+        },
+        resources: {
+          type: "array",
+          description:
+            "List of resources to restore. Only include regenerating resources (Health, Stamina, Mana, Energy, etc). Do NOT include non-regenerating resources (Gold, Coins, Ammo, Arrows, etc).",
+          items: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description: "Resource name (fuzzy matching supported)",
+              },
+              amount: {
+                type: "number",
+                description:
+                  "Amount to restore. Use percentage of max for rest-type scaling (quick: 5-15%, short: 30-50%, long: 100%)",
+              },
+              percentage: {
+                type: "boolean",
+                description:
+                  "If true, 'amount' is treated as a percentage of max value. If false, it's a flat amount. Default: true",
+              },
+            },
+            required: ["name", "amount"],
+          },
         },
       },
       required: ["type", "narrative_summary"],
@@ -1773,6 +1963,15 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   modifyRelationshipTool,
   deleteRelationshipTool,
   editRelationshipTool,
+
+  // NPC Management (1 tool - creates relationship + lore)
+  addNpcTool,
+
+  // Thread Management (4 tools)
+  createThreadTool,
+  updateThreadTool,
+  resolveThreadTool,
+  abandonThreadTool,
 
   // Memory (1 tool)
   addMemoryTool,

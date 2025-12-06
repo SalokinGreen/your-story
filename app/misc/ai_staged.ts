@@ -498,6 +498,35 @@ ${
           .join("\n")}`
       : "";
 
+  // Build threads section - show active storylines/quests being tracked
+  const activeThreads =
+    storyData.threads?.filter((t) => t.status === "active") || [];
+  const completedThreads =
+    storyData.threads?.filter(
+      (t) => t.status === "resolved" || t.status === "abandoned"
+    ) || [];
+  const threadsSection =
+    activeThreads.length || completedThreads.length
+      ? `## Story Threads
+${
+  activeThreads.length
+    ? `### Active\n${activeThreads
+        .map(
+          (t) => `- [${t.priority || "side"}] **${t.title}**: ${t.description}`
+        )
+        .join("\n")}`
+    : ""
+}
+${
+  completedThreads.length
+    ? `### Completed\n${completedThreads
+        .slice(-5) // Only show last 5 completed
+        .map((t) => `- [${t.status}] ${t.title}`)
+        .join("\n")}`
+    : ""
+}`
+      : "";
+
   // Combine all sections
   const sections = [
     `# ${cleanString(storyData.story_name || "Untitled Story")}`,
@@ -524,6 +553,7 @@ ${
     variablesSection,
     activeChallengeSection,
     restStateSection,
+    threadsSection,
     agmtSection,
     customTablesSection,
     storyData.author_notes
@@ -816,21 +846,26 @@ DO NOT duplicate these changes. Only process NEW events from the STORY TEXT.
 
 ## ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 1. **Inventory Audit:** Did the narrative imply an item was consumed (e.g., "quaffed the potion"), broken, given away, or picked up? -> \`add_item\` / \`remove_item\`
-2. **Physiological Audit:** Did the player exert themselves, get hurt, or cast a spell in the text? -> \`update_resource\` (Health/Stamina/Mana).
+2. **Resource Delta:** Did the player do anything to lose or gain resources? -> \`update_resource\` (Eat/Bandage/Absorb Mana).
 3. **Condition Check:**
     - Did the player FAIL a check resulting in injury? -> \`add_condition\` (Tier I-VI).
     - Did the player receive medical aid or rest? -> \`downgrade_condition\`.
     - *Note:* Do not add conditions for "flavor" pain. Only for tactical disadvantages described in the story.
 4. **Knowledge & Quests:** Did the player learn a name, a secret, or a location? -> \`add_memory\` / \`update_quest\`.
-5. **Relationship Delta:** Did an NPC react positively or negatively? -> \`update_relationship\` (Small increments: +1/-1 for chat, +5/-5 for major deeds).
-6. **Passive Traits:** Did the player gain or lose a defining trait through story events? -> \`add_passive\` / \`remove_passive\` / \`modify_passive\`.
+5. **NPC Management:** Did a new NPC appear or an existing NPC change significantly? -> \`add_npc\` and  \`add_relationship\` / \`modify_npc\`.
+6. **Relationship Delta:** Did an NPC react positively or negatively? -> \`update_relationship\` (Small increments: +1/-1 for chat, +5/-5 for major deeds).
+7. **Passive Traits:** Did the player gain or lose a defining trait through story events? -> \`add_passive\` / \`remove_passive\` / \`modify_passive\`.
     - Passives are story/RP traits that influence narrative (NOT mechanical bonuses)
     - Examples: "Wolf Slayer" (gained after defeating many wolves), "Cursed Blood" (gained through dark ritual), "Friend of the Forest" (earned trust of woodland creatures)
     - Only add passives for SIGNIFICANT character developments, not minor events
+8. **Variables:** Did the story introduce or change a variable (e.g., "The ancient mechanism is now active")? -> \`set_variable\`.
+9. **Advanced RPG Tools (AGMT only):** If using AGMT, did the chaos factor change or NPC statuses change? -> \`update_agmt_state\`.
+10. **Lore Management:** Did the story reveal new lore or update existing lore? -> \`create_lore\` / \`update_lore\`.
+11. **Rest System:** Did the player rest (quick/short/long)? -> \`take_rest\`.
+12. **Thread Management:** Did a new plotline/quest emerge or an existing one progress/conclude? -> \`create_thread\` / \`update_thread\` / \`resolve_thread\` / \`abandon_thread\`.
 
 ## TOOL USAGE GUIDELINES
 - **Exact Matching:** You must use exact string matching for Item/Stat/Quest names.
-- **Lore Triggers:** If the story mentions a keyword (e.g., "The Order of the Rose"), check if \`onTrigger\` exists for it.
 - **Fail Forward:** If the narrative described a failure, ensure the *cost* of that failure is applied (lost resource, condition, etc.).
 
 ## LORE MANAGEMENT
@@ -878,9 +913,16 @@ Manage complex multi-step tasks using the Challenge Tools.
 Allow players to rest and recover when narratively appropriate.
 
 **Rest Types:**
-- **Quick Rest (~30 min):** Brief break to catch breath. Recovers 5-15% resources, reduces cooldowns slightly. Use between encounters.
-- **Short Rest (4-8 hours):** Sleep or extended rest. Recovers 30-60% resources, resets most cooldowns, heals minor conditions, repairs items slightly. Use at safe camps or inns.
-- **Long Rest (several days):** Extended downtime/time skip. Full recovery, all cooldowns reset, conditions improve significantly, items fully repaired. Resets quick/short rest counters.
+- **Quick Rest (~30 min):** Brief break to catch breath. Reduces cooldowns slightly. Use between encounters.
+- **Short Rest (4-8 hours):** Sleep or extended rest. Resets most cooldowns, heals minor conditions. Use at safe camps or inns.
+- **Long Rest (several days):** Extended downtime/time skip. All cooldowns reset, conditions improve significantly. Resets quick/short rest counters.
+
+**IMPORTANT: Resource Recovery:**
+Resources are NOT automatically recovered. You MUST specify which resources to restore using the \`resources\` parameter.
+- Only include REGENERATING resources (Health, Stamina, Mana, Energy, Focus, etc.)
+- Do NOT include non-regenerating resources (Gold, Coins, Ammo, Arrows, Supplies, etc.)
+- Scale recovery by rest type: quick (5-15%), short (30-50%), long (100%)
+- Example: \`resources: [{ name: "Health", amount: 50 }, { name: "Mana", amount: 30 }]\`
 
 **When to Call \`take_rest\`:**
 - Player explicitly requests rest, sleep, or recovery time
@@ -892,8 +934,37 @@ Allow players to rest and recover when narratively appropriate.
 - In immediate danger
 - When quick/short rest limits are exhausted (player needs long rest)
 
-**Long Rest Confirmation:**
-Long rests involve a time skip of several days. The AI should narratively describe the passage of time and what happens during the rest period.
+## THREAD MANAGEMENT
+Track ongoing storylines, mysteries, quests, and plot hooks using threads.
+
+**When to CREATE a Thread (\`create_thread\`):**
+- A new main quest or objective emerges from the narrative
+- An unresolved mystery or question is introduced (Who killed the merchant? What's behind the sealed door?)
+- A significant NPC makes a request or gives a task
+- A looming threat is revealed that will need to be addressed
+- The player expresses intent to pursue a long-term goal
+
+**Thread Priorities:**
+- **main:** Central story quests that drive the narrative forward
+- **side:** Optional objectives the player could pursue
+- **background:** Ambient world events, rumors, or distant threats
+
+**When to UPDATE a Thread (\`update_thread\`):**
+- New information is discovered that changes the thread's scope or direction
+- Progress is made but the thread isn't resolved yet
+- The situation escalates or de-escalates
+
+**When to RESOLVE a Thread (\`resolve_thread\`):**
+- The objective is completed successfully
+- The mystery is solved
+- The threat is neutralized
+- The goal is achieved
+
+**When to ABANDON a Thread (\`abandon_thread\`):**
+- The objective becomes impossible or irrelevant
+- The player explicitly gives up on it
+- Story developments make the thread obsolete
+- The opportunity window closes permanently
 
 Think through the narrative sentence-by-sentence, then execute the required Tool Calls.`;
 
