@@ -1356,7 +1356,9 @@ export function executeCreatorTool(
         const currentLevel = (currentState.storyData.level as number) || 1;
         const currentUpgradesSpent =
           (currentState.storyData.upgradesSpent as number) || 0;
-        const levelingSettings = currentState.storyData.levelingSettings as LevelingSettings | undefined;
+        const levelingSettings = currentState.storyData.levelingSettings as
+          | LevelingSettings
+          | undefined;
 
         // Handle add_points (relative change)
         if (args.add_points !== undefined) {
@@ -1383,18 +1385,23 @@ export function executeCreatorTool(
         if (args.level !== undefined) {
           const newLevel = Math.max(1, args.level as number);
           changes.level = newLevel;
-          
+
           // Calculate the minimum XP required for this level
           // Use getCumulativeXPForLevel which gives total XP needed to REACH that level
           // For level 3, we need the XP threshold for level 2->3 transition
-          const requiredXP = getCumulativeXPForLevel(newLevel, levelingSettings);
-          
+          const requiredXP = getCumulativeXPForLevel(
+            newLevel,
+            levelingSettings
+          );
+
           // Only update points if not already explicitly set in this call
           if (args.points === undefined && args.add_points === undefined) {
             changes.points = requiredXP;
-            changesList.push(`Set XP to ${requiredXP} (minimum for level ${newLevel})`);
+            changesList.push(
+              `Set XP to ${requiredXP} (minimum for level ${newLevel})`
+            );
           }
-          
+
           if (newLevel > currentLevel) {
             changesList.push(`Leveled up to ${newLevel}!`);
           } else if (newLevel < currentLevel) {

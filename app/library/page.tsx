@@ -1038,7 +1038,9 @@ export default function LibraryPage() {
                   <button
                     key={filter}
                     onClick={() =>
-                      setStoryFilter(filter as "all" | "completed" | "inProgress")
+                      setStoryFilter(
+                        filter as "all" | "completed" | "inProgress"
+                      )
                     }
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       storyFilter === filter
@@ -1054,9 +1056,10 @@ export default function LibraryPage() {
                   </button>
                 ))}
               </div>
-              
+
               {/* Select mode button - only show when there are stories */}
-              {(filteredStories.length > 0 || filteredLocalStories.length > 0) && (
+              {(filteredStories.length > 0 ||
+                filteredLocalStories.length > 0) && (
                 <button
                   onClick={toggleSelectionMode}
                   className={`ml-auto px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
@@ -1065,7 +1068,10 @@ export default function LibraryPage() {
                       : "bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
                   }`}
                 >
-                  <DynamicIcon name={selectionMode ? "Check" : "CheckSquare"} className="w-3.5 h-3.5" />
+                  <DynamicIcon
+                    name={selectionMode ? "Check" : "CheckSquare"}
+                    className="w-3.5 h-3.5"
+                  />
                   {selectionMode ? "Done" : "Select"}
                 </button>
               )}

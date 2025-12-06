@@ -64,11 +64,16 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
   // Player Progression (level, XP, upgrades)
   const progression: string[] = [];
   if (data.level !== undefined) progression.push(`- **Level:** ${data.level}`);
-  if (data.points !== undefined) progression.push(`- **XP (Points):** ${data.points}`);
+  if (data.points !== undefined)
+    progression.push(`- **XP (Points):** ${data.points}`);
   if (data.upgradesSpent !== undefined)
     progression.push(`- **Upgrades Spent:** ${data.upgradesSpent}`);
   if (data.momentum !== undefined)
-    progression.push(`- **Momentum:** ${data.momentum}${data.maxMomentum ? `/${data.maxMomentum}` : ""}`);
+    progression.push(
+      `- **Momentum:** ${data.momentum}${
+        data.maxMomentum ? `/${data.maxMomentum}` : ""
+      }`
+    );
   if (progression.length > 0) {
     sections.push("## Player Progression\n" + progression.join("\n"));
   }

@@ -462,7 +462,7 @@ export default function StoryCreativeAssistant({
     // For tool-based changes, the data already contains final computed values
     // (arrays are complete replacements, scalars like level/points are direct values)
     // Only use applyCreatorChangesToStoryData for JSON output mode (which has _command markers)
-    
+
     if (isToolChanges) {
       // Direct tool changes - pass through directly
       console.log("Applying direct tool changes:", data);
@@ -1374,7 +1374,9 @@ function ToolResultsDisplay({
       {hasToolChanges && (
         <div className="p-3 bg-linear-to-r from-purple-100/80 to-indigo-100/80 dark:from-purple-900/40 dark:to-indigo-900/40 border-t border-purple-200 dark:border-purple-700/50">
           <button
-            onClick={() => onApplyChanges(toolChanges as Partial<StoryData>, true)}
+            onClick={() =>
+              onApplyChanges(toolChanges as Partial<StoryData>, true)
+            }
             className="w-full rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white py-2.5 text-sm font-bold transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2"
           >
             <DynamicIcon name="Check" className="w-4 h-4" />

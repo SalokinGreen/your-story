@@ -65,6 +65,20 @@ export default function AIConfigTab() {
     return "";
   });
 
+  // Advanced toggle states
+  const [advancedGM, setAdvancedGM] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("advancedGM") === "true";
+    }
+    return false;
+  });
+  const [advancedChoices, setAdvancedChoices] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("advancedChoices") === "true";
+    }
+    return false;
+  });
+
   // Generation settings
   const [toolCallingEnabled, setToolCallingEnabled] = useState(() => {
     if (typeof window !== "undefined") {
@@ -248,6 +262,19 @@ export default function AIConfigTab() {
     }
   }, [choicesModel, hasLoadedSettings]);
 
+  // Persist advanced toggle settings
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("advancedGM", advancedGM.toString());
+    }
+  }, [advancedGM]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("advancedChoices", advancedChoices.toString());
+    }
+  }, [advancedChoices]);
+
   // Persist NovelAI settings
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -275,12 +302,24 @@ export default function AIConfigTab() {
   const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["mistralLarge"];
   const effectiveStoryModel =
     currentPreset === "custom" && storyModel ? storyModel : preset.storyModel;
-  const effectiveToolsModel =
+
+  // Apply advanced GM toggle - use advanced tools model if enabled and available
+  const baseToolsModel =
     currentPreset === "custom" && toolsModel ? toolsModel : preset.toolsModel;
-  const effectiveChoicesModel =
+  const effectiveToolsModel =
+    advancedGM && preset.advancedToolsModel
+      ? preset.advancedToolsModel
+      : baseToolsModel;
+
+  // Apply advanced choices toggle - use advanced choices model if enabled and available
+  const baseChoicesModel =
     currentPreset === "custom" && choicesModel
       ? choicesModel
       : preset.choicesModel;
+  const effectiveChoicesModel =
+    advancedChoices && preset.advancedChoicesModel
+      ? preset.advancedChoicesModel
+      : baseChoicesModel;
 
   // Helper to get display name for a model key (handles both built-in and custom models)
   const getModelDisplayName = (modelKey: string): string => {
@@ -300,16 +339,13 @@ export default function AIConfigTab() {
   const effectiveContextSize =
     customMaxContext > 0 ? customMaxContext : undefined;
 
-  // Calculate dynamic estimated cost
-  const baseEstimatedCost =
-    currentPreset === "custom"
-      ? getCustomEstimatedCost(
-          effectiveStoryModel,
-          effectiveToolsModel,
-          effectiveChoicesModel,
-          effectiveContextSize
-        )
-      : getPresetEstimatedCost(currentPreset, effectiveContextSize);
+  // Calculate dynamic estimated cost - always use effective models to account for advanced toggles
+  const baseEstimatedCost = getCustomEstimatedCost(
+    effectiveStoryModel,
+    effectiveToolsModel,
+    effectiveChoicesModel,
+    effectiveContextSize
+  );
 
   const contextForSavings = effectiveContextSize || 120000;
   const novelaiSavings =
@@ -705,7 +741,7 @@ export default function AIConfigTab() {
             )}
           </div>
           <div>
-            <span className="text-white/60">Tools:</span>{" "}
+            <span className="text-white/60">GM:</span>{" "}
             {getModelDisplayName(effectiveToolsModel)}
           </div>
           <div>
@@ -725,31 +761,136 @@ export default function AIConfigTab() {
           onChange={(e) => handlePresetChange(e.target.value)}
           className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
-          {Object.entries(MODEL_PRESETS)
-            .filter(([key]) => {
-              // BYOK presets start with "byok" - only show in BYOK mode
-              const isByokPreset = key.startsWith("byok");
-              if (byokMode) {
-                // In BYOK mode, show custom preset and BYOK presets
-                return key === "custom" || isByokPreset;
-              } else {
-                // In Coins mode, show all presets except custom and BYOK presets
-                return key !== "custom" && !isByokPreset;
-              }
-            })
-            .map(([key, presetConfig]) => (
-              <option key={key} value={key}>
-                {presetConfig.name}
-                {byokMode
-                  ? " - FREE with your keys"
-                  : ` - ~${getPresetEstimatedCost(
-                      key,
-                      effectiveContextSize
-                    )} coins`}
+          {byokMode ? (
+            // BYOK mode - show custom preset and BYOK presets
+            <>
+              <option key="custom" value="custom">
+                Custom - FREE with your keys
               </option>
-            ))}
+              <optgroup label="🔑 BYOK Presets">
+                {Object.entries(MODEL_PRESETS)
+                  .filter(([key]) => key.startsWith("byok"))
+                  .map(([key, presetConfig]) => (
+                    <option key={key} value={key}>
+                      {presetConfig.name} - FREE with your keys
+                    </option>
+                  ))}
+              </optgroup>
+            </>
+          ) : (
+            // Coins mode - show categorized presets
+            <>
+              <optgroup label="⭐ Recommended">
+                {Object.entries(MODEL_PRESETS)
+                  .filter(([, p]) => p.category === "recommended")
+                  .map(([key, presetConfig]) => (
+                    <option key={key} value={key}>
+                      {presetConfig.name} - ~
+                      {getPresetEstimatedCost(key, effectiveContextSize)} coins
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label="👑 Premium">
+                {Object.entries(MODEL_PRESETS)
+                  .filter(([, p]) => p.category === "premium")
+                  .map(([key, presetConfig]) => (
+                    <option key={key} value={key}>
+                      {presetConfig.name} - ~
+                      {getPresetEstimatedCost(key, effectiveContextSize)} coins
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label="💰 Budget">
+                {Object.entries(MODEL_PRESETS)
+                  .filter(([, p]) => p.category === "budget")
+                  .map(([key, presetConfig]) => (
+                    <option key={key} value={key}>
+                      {presetConfig.name} - ~
+                      {getPresetEstimatedCost(key, effectiveContextSize)} coins
+                    </option>
+                  ))}
+              </optgroup>
+            </>
+          )}
         </select>
       </div>
+
+      {/* Advanced Toggles - Only show for Coins mode presets with advanced options */}
+      {!byokMode && preset.advancedToolsModel && (
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Advanced Options
+          </label>
+          <div className="flex flex-col gap-2">
+            {/* Advanced GM Toggle */}
+            <button
+              onClick={() => setAdvancedGM(!advancedGM)}
+              className={`flex items-center justify-between px-4 py-2.5 rounded-lg border transition-colors ${
+                advancedGM
+                  ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
+                  : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <DynamicIcon name="Bot" className="w-4 h-4 text-purple-500" />
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  Advanced GM
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  (Devstral Medium for tools)
+                </span>
+              </div>
+              <div
+                className={`w-10 h-5 rounded-full transition-colors ${
+                  advancedGM ? "bg-purple-500" : "bg-gray-300 dark:bg-gray-600"
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform mt-0.5 ${
+                    advancedGM ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                  }`}
+                />
+              </div>
+            </button>
+
+            {/* Advanced Choices Toggle */}
+            <button
+              onClick={() => setAdvancedChoices(!advancedChoices)}
+              className={`flex items-center justify-between px-4 py-2.5 rounded-lg border transition-colors ${
+                advancedChoices
+                  ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
+                  : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <DynamicIcon
+                  name="ListChecks"
+                  className="w-4 h-4 text-purple-500"
+                />
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  Advanced Choices
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  (MiniMax M2 for actions)
+                </span>
+              </div>
+              <div
+                className={`w-10 h-5 rounded-full transition-colors ${
+                  advancedChoices
+                    ? "bg-purple-500"
+                    : "bg-gray-300 dark:bg-gray-600"
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform mt-0.5 ${
+                    advancedChoices ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                  }`}
+                />
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Memory Size Slider */}
       <div className="space-y-2">

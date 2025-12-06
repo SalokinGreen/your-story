@@ -79,6 +79,10 @@ function getModelsFromPreset() {
     localStorage.getItem("novelaiTemperature") || "1"
   );
 
+  // Advanced toggle settings
+  const advancedGM = localStorage.getItem("advancedGM") === "true";
+  const advancedChoices = localStorage.getItem("advancedChoices") === "true";
+
   // For custom preset, check if user has overridden any models
   if (currentPreset === "custom") {
     return {
@@ -92,11 +96,24 @@ function getModelsFromPreset() {
     };
   }
 
-  // For non-custom presets, use the preset's models directly
+  // For non-custom presets, apply advanced toggles if available
+  const baseToolsModel = preset.toolsModel;
+  const baseChoicesModel = preset.choicesModel;
+
+  const effectiveToolsModel =
+    advancedGM && preset.advancedToolsModel
+      ? preset.advancedToolsModel
+      : baseToolsModel;
+
+  const effectiveChoicesModel =
+    advancedChoices && preset.advancedChoicesModel
+      ? preset.advancedChoicesModel
+      : baseChoicesModel;
+
   return {
     storyModel: preset.storyModel,
-    toolsModel: preset.toolsModel,
-    choicesModel: preset.choicesModel,
+    toolsModel: effectiveToolsModel,
+    choicesModel: effectiveChoicesModel,
     novelaiEnabled,
     novelaiKey,
     novelaiTemperature,

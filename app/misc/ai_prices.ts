@@ -827,6 +827,30 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
+  "DeepInfra MiniMax M2": {
+    name: "DeepInfra MiniMax M2",
+    original_model: "MiniMaxAI/MiniMax-M2",
+    model: "MiniMaxAI/MiniMax-M2",
+    maxTokens: 262144,
+    maxOutputTokens: 131072,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.255,
+    outputPrice: 1.02,
+    finetunes: [],
+    strengths: [
+      "cost-effective",
+      "tool calling",
+      "large context",
+      "agentic workflows",
+    ],
+    weaknesses: [],
+    description:
+      "MiniMax M2 via DeepInfra. Mini model built for coding & agentic workflows with 262k context. Uses Coins.",
+    bannerUrl: undefined,
+  },
+
   "DeepInfra GPT-OSS 120B": {
     name: "DeepInfra GPT-OSS 120B",
     original_model: "openai/gpt-oss-120b",
@@ -1065,108 +1089,188 @@ export interface ModelPreset {
   toolsModel: string; // Key from AI_MODELS
   choicesModel: string; // Key from AI_MODELS
   estimatedCost: number; // Sum of the three model costs
+  // Advanced toggle options
+  advancedToolsModel?: string; // Upgraded tools model (e.g., Devstral Medium)
+  advancedChoicesModel?: string; // Upgraded choices model (e.g., MiniMax M2)
+  // Category for organizing in dropdown
+  category?: "recommended" | "premium" | "budget" | "byok";
 }
 
 export const MODEL_PRESETS: Record<string, ModelPreset> = {
+  // ============================================
+  // CUSTOM
+  // ============================================
   custom: {
     id: "custom",
     name: "Custom",
     description: "Choose your own models for each stage",
     storyModel: "Deepseek Chat", // Defaults
-    toolsModel: "Grok Code Fast 1",
-    choicesModel: "Gemini 2.5 Flash Lite",
+    toolsModel: "Devstral Small 1.1",
+    choicesModel: "DeepInfra Phi 4",
     estimatedCost: 12,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
   },
-  mistralLarge: {
-    id: "mistralLarge",
-    name: "Mistral Large",
-    description: "Mistral Large 3.0 for story with 256k context - uses Coins",
-    storyModel: "Mistral Large 3.0",
-    toolsModel: "Devstral Small 1.1",
-    choicesModel: "Ministral 3B",
-    estimatedCost: 5,
-  },
-  mistralMedium: {
-    id: "mistralMedium",
-    name: "Mistral Medium",
-    description: "Balanced Mistral models - uses Coins for payment",
-    storyModel: "Mistral Medium 3.1",
-    toolsModel: "Devstral Small 1.1",
-    choicesModel: "Ministral 3B",
-    estimatedCost: 4,
-  },
-  mistralBudget: {
-    id: "mistralBudget",
-    name: "Mistral Budget",
+
+  // ============================================
+  // RECOMMENDED - Mid-cost balanced options
+  // ============================================
+  ministral14b: {
+    id: "ministral14b",
+    name: "Ministral 14B",
     description: "Ministral 14B story with 256k context - uses Coins",
     storyModel: "Ministral 14B",
     toolsModel: "Devstral Small 1.1",
-    choicesModel: "Ministral 3B",
-    estimatedCost: 2,
-  },
-  deepseek: {
-    id: "deepseek",
-    name: "DeepSeek Standard",
-    description: "DeepSeek V3.2 story/tools, Phi 4 choices - uses Coins",
-    storyModel: "DeepInfra DeepSeek V3.2",
-    toolsModel: "DeepInfra DeepSeek V3.2",
     choicesModel: "DeepInfra Phi 4",
     estimatedCost: 2,
-  },
-  deepseekBrain: {
-    id: "deepseekBrain",
-    name: "DeepSeek Brain",
-    description: "DeepSeek R1-0528 reasoning for story - uses Coins",
-    storyModel: "DeepInfra DeepSeek R1-0528",
-    toolsModel: "DeepInfra DeepSeek V3.2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 3,
-  },
-  ultraBudget: {
-    id: "ultraBudget",
-    name: "Ultra Budget",
-    description: "Maximum savings with GPT-OSS 120B - uses Coins",
-    storyModel: "DeepInfra GPT-OSS 120B",
-    toolsModel: "DeepInfra GPT-OSS 120B",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 1,
-  },
-  qwenBudget: {
-    id: "qwenBudget",
-    name: "Qwen Budget",
-    description: "Qwen3 30B MoE for story, Qwen3 32B tools - uses Coins",
-    storyModel: "DeepInfra Qwen3 30B A3B",
-    toolsModel: "DeepInfra Qwen3 32B",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 1,
-  },
-  qwenPremium: {
-    id: "qwenPremium",
-    name: "Qwen Premium",
-    description: "Qwen3 Next 80B for story with 256k context - uses Coins",
-    storyModel: "DeepInfra Qwen3 Next 80B",
-    toolsModel: "DeepInfra Qwen3 32B",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 2,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "recommended",
   },
   glmCreative: {
     id: "glmCreative",
-    name: "GLM Creative",
+    name: "GLM 4.6",
     description: "GLM 4.6 for creative/NSFW writing - uses Coins",
     storyModel: "DeepInfra GLM 4.6",
-    toolsModel: "DeepInfra DeepSeek V3.2",
+    toolsModel: "Devstral Small 1.1",
     choicesModel: "DeepInfra Phi 4",
     estimatedCost: 2,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "recommended",
+  },
+  deepseek: {
+    id: "deepseek",
+    name: "DeepSeek V3.2",
+    description: "DeepSeek V3.2 story - uses Coins",
+    storyModel: "DeepInfra DeepSeek V3.2",
+    toolsModel: "Devstral Small 1.1",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 2,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "recommended",
+  },
+  mistralMedium: {
+    id: "mistralMedium",
+    name: "Mistral Medium 3.1",
+    description: "Balanced Mistral models - uses Coins for payment",
+    storyModel: "Mistral Medium 3.1",
+    toolsModel: "Devstral Small 1.1",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 4,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "recommended",
+  },
+  qwenPremium: {
+    id: "qwenPremium",
+    name: "Qwen3 Next 80B",
+    description: "Qwen3 Next 80B for story with 256k context - uses Coins",
+    storyModel: "DeepInfra Qwen3 Next 80B",
+    toolsModel: "Devstral Small 1.1",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 2,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "recommended",
+  },
+
+  // ============================================
+  // PREMIUM - Higher cost, best quality
+  // ============================================
+  mistralLarge: {
+    id: "mistralLarge",
+    name: "Mistral Large 3.0",
+    description: "Mistral Large 3.0 for story with 256k context - uses Coins",
+    storyModel: "Mistral Large 3.0",
+    toolsModel: "Devstral Small 1.1",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 5,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "premium",
+  },
+  deepseekBrain: {
+    id: "deepseekBrain",
+    name: "DeepSeek R1-0528",
+    description: "DeepSeek R1-0528 reasoning for story - uses Coins",
+    storyModel: "DeepInfra DeepSeek R1-0528",
+    toolsModel: "Devstral Small 1.1",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 3,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "premium",
+  },
+
+  // ============================================
+  // BUDGET - Lower cost options
+  // ============================================
+  ministral8b: {
+    id: "ministral8b",
+    name: "Ministral 8B",
+    description: "Ministral 8B story - ultra budget option - uses Coins",
+    storyModel: "Ministral 8B",
+    toolsModel: "Devstral Small 1.1",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 1,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "budget",
+  },
+  ministral3b: {
+    id: "ministral3b",
+    name: "Ministral 3B",
+    description: "Ministral 3B story - cheapest option - uses Coins",
+    storyModel: "Ministral 3B",
+    toolsModel: "Devstral Small 1.1",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 1,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "budget",
+  },
+  ultraBudget: {
+    id: "ultraBudget",
+    name: "GPT-OSS 120B",
+    description: "Maximum savings with GPT-OSS 120B - uses Coins",
+    storyModel: "DeepInfra GPT-OSS 120B",
+    toolsModel: "Devstral Small 1.1",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 1,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "budget",
+  },
+  qwenBudget: {
+    id: "qwenBudget",
+    name: "Qwen3 30B A3B",
+    description: "Qwen3 30B MoE for story - uses Coins",
+    storyModel: "DeepInfra Qwen3 30B A3B",
+    toolsModel: "Devstral Small 1.1",
+    choicesModel: "DeepInfra Phi 4",
+    estimatedCost: 1,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "budget",
   },
   gemmaBalanced: {
     id: "gemmaBalanced",
-    name: "Gemma Balanced",
-    description: "Google Gemma 3 27B for all stages - uses Coins",
+    name: "Gemma 3 27B",
+    description: "Google Gemma 3 27B for story - uses Coins",
     storyModel: "DeepInfra Gemma 3 27B",
-    toolsModel: "DeepInfra Gemma 3 27B",
-    choicesModel: "DeepInfra Llama 3.1 8B",
+    toolsModel: "Devstral Small 1.1",
+    choicesModel: "DeepInfra Phi 4",
     estimatedCost: 1,
+    advancedToolsModel: "Devstral Medium 1.0",
+    advancedChoicesModel: "DeepInfra MiniMax M2",
+    category: "budget",
   },
+
+  // ============================================
+  // BYOK - Bring Your Own Key
+  // ============================================
   byokDeepseek: {
     id: "byokDeepseek",
     name: "BYOK DeepSeek",
@@ -1175,6 +1279,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     toolsModel: "Deepseek Chat",
     choicesModel: "Deepseek Chat",
     estimatedCost: 0,
+    category: "byok",
   },
   byokOpenRouter: {
     id: "byokOpenRouter",
@@ -1184,6 +1289,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     toolsModel: "Gemini 2.5 Flash",
     choicesModel: "Gemini 2.5 Flash Lite",
     estimatedCost: 0,
+    category: "byok",
   },
   byokGoogle: {
     id: "byokGoogle",
@@ -1193,6 +1299,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     toolsModel: "Google Gemini 2.5 Flash",
     choicesModel: "Google Gemini 2.5 Flash Lite",
     estimatedCost: 0,
+    category: "byok",
   },
 };
 

@@ -13,7 +13,7 @@ interface DynamicIconProps extends LucideProps {
  * 2. Lucide React icons - for UI elements (PascalCase names like "ChevronRight")
  * 3. Emoji fallback - if the name is an emoji
  * 4. Circle fallback - if nothing matches
- * 
+ *
  * All icons inherit color from currentColor and size from className (e.g., "w-5 h-5")
  */
 export const DynamicIcon: React.FC<DynamicIconProps> = ({
@@ -30,23 +30,33 @@ export const DynamicIcon: React.FC<DynamicIconProps> = ({
   // Normalize size: extract pixel size from className or use size prop
   // Look for w-X h-X patterns to determine size
   const sizeMatch = className.match(/w-(\d+)/);
-  const pixelSize = size ?? (sizeMatch ? parseInt(sizeMatch[1]) * 4 : undefined);
+  // Convert size prop to number if it's a string, or use className-derived size
+  const numericSize = typeof size === "string" ? parseInt(size) : size;
+  const pixelSize: number | undefined =
+    numericSize ?? (sizeMatch ? parseInt(sizeMatch[1]) * 4 : undefined);
 
   // Check if it's an emoji (simple check: non-ascii or specific ranges)
   const isEmoji = /\p{Extended_Pictographic}/u.test(name);
   if (isEmoji) {
+    // Calculate emoji-specific sizes (emojis need slightly smaller font to fit)
+    const hasPixelSize = pixelSize !== undefined;
+    const emojiFontSize = hasPixelSize
+      ? `${(pixelSize as number) * 0.75}px`
+      : "0.875em";
+    const emojiBoxSize = hasPixelSize ? `${pixelSize}px` : "1em";
+
     // Render emoji with consistent sizing matching icon dimensions
     return (
-      <span 
+      <span
         className={`inline-flex items-center justify-center shrink-0 ${className}`}
         style={{
-          fontSize: pixelSize ? `${pixelSize * 0.75}px` : '0.875em',
+          fontSize: emojiFontSize,
           lineHeight: 1,
-          width: pixelSize ? `${pixelSize}px` : '1em',
-          height: pixelSize ? `${pixelSize}px` : '1em',
+          width: emojiBoxSize,
+          height: emojiBoxSize,
           ...style,
         }}
-        role="img" 
+        role="img"
         aria-label="icon"
       >
         {name}
@@ -60,7 +70,7 @@ export const DynamicIcon: React.FC<DynamicIconProps> = ({
       <GameIcon
         name={name}
         className={`shrink-0 ${className}`}
-        style={{ color: color ?? 'currentColor', ...style }}
+        style={{ color: color ?? "currentColor", ...style }}
         size={pixelSize}
       />
     );
@@ -71,11 +81,11 @@ export const DynamicIcon: React.FC<DynamicIconProps> = ({
 
   if (IconComponent) {
     return (
-      <IconComponent 
-        className={`shrink-0 ${className}`} 
-        style={{ color: color ?? 'currentColor', ...style }} 
+      <IconComponent
+        className={`shrink-0 ${className}`}
+        style={{ color: color ?? "currentColor", ...style }}
         size={size}
-        {...props} 
+        {...props}
       />
     );
   }
@@ -91,22 +101,22 @@ export const DynamicIcon: React.FC<DynamicIconProps> = ({
 
   if (PascalIconComponent) {
     return (
-      <PascalIconComponent 
-        className={`shrink-0 ${className}`} 
-        style={{ color: color ?? 'currentColor', ...style }} 
+      <PascalIconComponent
+        className={`shrink-0 ${className}`}
+        style={{ color: color ?? "currentColor", ...style }}
         size={size}
-        {...props} 
+        {...props}
       />
     );
   }
 
   // Final fallback: circle icon
   return (
-    <icons.Circle 
-      className={`shrink-0 ${className}`} 
-      style={{ color: color ?? 'currentColor', ...style }} 
+    <icons.Circle
+      className={`shrink-0 ${className}`}
+      style={{ color: color ?? "currentColor", ...style }}
       size={size}
-      {...props} 
+      {...props}
     />
   );
 };
