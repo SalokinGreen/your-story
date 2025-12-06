@@ -314,7 +314,9 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(getMemoryContent(storyData.memory[0])).toBe("Memory from JSON string");
+      expect(getMemoryContent(storyData.memory[0])).toBe(
+        "Memory from JSON string"
+      );
     });
 
     test("should parse JSON string arguments for create_lore", () => {

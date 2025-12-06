@@ -31,7 +31,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **AbilityCost**: { type: "resource" | "variable", name: string, amount: number }
   - **AbilityGrade**: "novice" | "apprentice" | "adept" | "expert" | "master" | "legendary"
   - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `var_on_triggers` (string[]), `var_off_triggers` (string[]) for dynamic visibility. Also includes `embedded?: boolean` to track embedding state for efficient re-embedding.
-  - **MemoryEntry**: Memory entries can be either `string` (legacy) or `{ content: string, embedded?: boolean }`. Use `getMemoryContent(entry)` helper to extract content. StoryData.memory is `(string | MemoryEntry)[]`.
+  - **MemoryEntry**: Memory entries can be either `string` (legacy) or `{ content: string, embedded?: boolean }`. Use `getMemoryContent(entry)` helper to extract content. StoryData.memory is `(string | MemoryEntry)[]`. Use `deduplicateMemories()` to remove exact duplicates and very similar entries (differing only by punctuation/whitespace).
   - **ScenePart**: Includes optional `toolCalls` (ToolCall[]) and `toolResponses` (CommandResponse[]) for preserving tool calling conversation history. Also includes `stateChanges` (string[]) for human-readable game state modifications that are sent to the story stage.
   - **CommandResponse**: Includes optional `toolCallId` for linking responses to specific tool calls in conversation history.
   - **Condition**: Afflictions/injuries with tiers I-VI that penalize skill checks. Includes `id`, `name`, `tier` (1-6), `description`, `affects` (array of stat names), `affectsAll` (boolean), `source`, `permanent`, `createdAt`.

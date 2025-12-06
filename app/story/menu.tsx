@@ -2687,7 +2687,8 @@ function LoreEditor({
     const original = items[index];
     // Check if content or title changed - mark as needing re-embedding
     const contentChanged =
-      (editLore.content !== undefined && editLore.content !== original.content) ||
+      (editLore.content !== undefined &&
+        editLore.content !== original.content) ||
       (editLore.title !== undefined && editLore.title !== original.title);
     items[index] = {
       ...items[index],

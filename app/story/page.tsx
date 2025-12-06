@@ -13,6 +13,7 @@ import {
   Preset,
   CommandResponse,
   getMemoryContent,
+  deduplicateMemories,
 } from "../misc/structs";
 import {
   getRPGSystem,
@@ -1747,7 +1748,10 @@ function StoryPageContent() {
           });
           // Add as MemoryEntry with embedded: false
           storyData.memory.push(
-            ...newMemories.map((content: string) => ({ content, embedded: false }))
+            ...newMemories.map((content: string) => ({
+              content,
+              embedded: false,
+            }))
           );
         }
       }
@@ -1938,6 +1942,18 @@ function StoryPageContent() {
 
       //ProcessLoretriggersonloadtoinitializeLorevisibility
       processLoreTriggers(loadedStoryData, addNotification, true);
+
+      // Deduplicate memories on load (removes exact duplicates and very similar entries)
+      if (loadedStoryData.memory && loadedStoryData.memory.length > 0) {
+        const originalCount = loadedStoryData.memory.length;
+        loadedStoryData.memory = deduplicateMemories(loadedStoryData.memory);
+        const removedCount = originalCount - loadedStoryData.memory.length;
+        if (removedCount > 0) {
+          console.log(
+            `[Story Load] Removed ${removedCount} duplicate memories`
+          );
+        }
+      }
 
       setStoryData(loadedStoryData);
 
@@ -2205,7 +2221,10 @@ function StoryPageContent() {
               );
             }
             // Mark successfully embedded lore entries and clear dirty flag
-            if (result.embeddedTitles.length > 0 || storyData.loreEmbeddingsDirty !== false) {
+            if (
+              result.embeddedTitles.length > 0 ||
+              storyData.loreEmbeddingsDirty !== false
+            ) {
               const updatedLore = storyData.lore.map((l) =>
                 result.embeddedTitles.includes(l.title)
                   ? { ...l, embedded: true }
@@ -2272,15 +2291,15 @@ function StoryPageContent() {
 
     const updatedStoryData = { ...storyData };
 
-    //Applypresettostorydata
+    // Apply preset to story data
     if (preset.playerName) updatedStoryData.player_name = preset.playerName;
     if (preset.playerSummary)
       updatedStoryData.player_summary = preset.playerSummary;
-    if (preset.stats.length > 0)
+    if (preset.stats?.length)
       updatedStoryData.stats = JSON.parse(JSON.stringify(preset.stats));
-    if (preset.resources.length > 0)
+    if (preset.resources?.length)
       updatedStoryData.resources = JSON.parse(JSON.stringify(preset.resources));
-    if (preset.inventory.length > 0)
+    if (preset.inventory?.length)
       updatedStoryData.inventory = JSON.parse(JSON.stringify(preset.inventory));
     if (preset.authorNotes) updatedStoryData.author_notes = preset.authorNotes;
 
@@ -2538,18 +2557,9 @@ function StoryPageContent() {
       modelConfig.maxTokens - modelConfig.maxOutputTokens;
     const memory_cap = availableInputTokens * 0.25 * CHARS_PER_TOKEN;
 
-    //Removeduplicateentriesfrommemory
-    let addedItems = new Set<string>();
-    const new_memory = storyData.memory.filter((item) => {
-      const content = getMemoryContent(item);
-      if (addedItems.has(content)) {
-        return false;
-      } else {
-        addedItems.add(content);
-        return true;
-      }
-    });
-    storyData.memory = new_memory;
+    // Deduplicate memories (removes exact duplicates and very similar entries)
+    storyData.memory = deduplicateMemories(storyData.memory);
+
     //Trimmemoryiftoolarge
     let totalMemoryLength = storyData.memory.reduce(
       (acc, entry) => acc + getMemoryContent(entry).length,
@@ -5842,113 +5852,115 @@ function StoryPageContent() {
     ];
 
     return (
-      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-6 px-4">
-        <div className="max-w-3xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
-              {storyData.story_name}
-            </h1>
-            <p className="text-sm text-blue-200/60">
-              Choose your character to begin
-            </p>
-          </div>
-
-          {/* Preset Selection */}
-          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 mb-4">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <DynamicIcon name="Users" className="w-5 h-5 text-blue-400" />
-              Select Character
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {availablePresets.map((preset) => (
-                <button
-                  key={preset.id}
-                  onClick={() => handlePresetSelect(preset)}
-                  className={`rounded-lg p-4 text-left transition-all border ${
-                    preset.id === "custom"
-                      ? "bg-purple-500/10 border-purple-500/30 hover:border-purple-500/60"
-                      : "bg-blue-900/30 border-blue-800/30 hover:border-blue-600/50"
-                  }`}
-                >
-                  <div className="flex items-start gap-3 mb-2">
-                    <div
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        preset.id === "custom"
-                          ? "bg-purple-500/20"
-                          : "bg-blue-500/20"
-                      }`}
-                    >
-                      <DynamicIcon
-                        name={preset.icon}
-                        className={`w-5 h-5 ${
-                          preset.id === "custom"
-                            ? "text-purple-400"
-                            : "text-blue-400"
-                        }`}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-white text-sm">
-                        {preset.name}
-                      </h3>
-                      <p className="text-xs text-blue-200/40 line-clamp-2">
-                        {preset.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    {preset.id !== "custom" ? (
-                      <>
-                        {preset.stats && preset.stats.length > 0 && (
-                          <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded">
-                            {preset.stats.length} Stats
-                          </span>
-                        )}
-                        {preset.resources && preset.resources.length > 0 && (
-                          <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded">
-                            {preset.resources.length} Resources
-                          </span>
-                        )}
-                        {preset.inventory && preset.inventory.length > 0 && (
-                          <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs rounded">
-                            {preset.inventory.length} Items
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
-                          Default Stats
-                        </span>
-                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
-                          Starter Items
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </button>
-              ))}
+      <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
+        <div className="py-6 px-4">
+          <div className="max-w-3xl mx-auto w-full">
+            {/* Header */}
+            <div className="text-center mb-6">
+              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+                {storyData.story_name}
+              </h1>
+              <p className="text-sm text-blue-200/60">
+                Choose your character to begin
+              </p>
             </div>
-          </div>
 
-          {/* Back Button */}
-          <button
-            onClick={() => router.push("/library")}
-            className="px-4 py-2 bg-blue-950/50 hover:bg-blue-900/50 text-blue-200 text-sm font-medium rounded-lg border border-blue-800/30 transition-colors flex items-center gap-2"
-          >
-            <DynamicIcon name="ArrowLeft" className="w-4 h-4" />
-            Back to Library
-          </button>
+            {/* Preset Selection */}
+            <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 mb-4">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <DynamicIcon name="Users" className="w-5 h-5 text-blue-400" />
+                Select Character
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {availablePresets.map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => handlePresetSelect(preset)}
+                    className={`rounded-lg p-4 text-left transition-all border ${
+                      preset.id === "custom"
+                        ? "bg-purple-500/10 border-purple-500/30 hover:border-purple-500/60"
+                        : "bg-blue-900/30 border-blue-800/30 hover:border-blue-600/50"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 mb-2">
+                      <div
+                        className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          preset.id === "custom"
+                            ? "bg-purple-500/20"
+                            : "bg-blue-500/20"
+                        }`}
+                      >
+                        <DynamicIcon
+                          name={preset.icon}
+                          className={`w-5 h-5 ${
+                            preset.id === "custom"
+                              ? "text-purple-400"
+                              : "text-blue-400"
+                          }`}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-white text-sm">
+                          {preset.name}
+                        </h3>
+                        <p className="text-xs text-blue-200/40 line-clamp-2">
+                          {preset.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {preset.id !== "custom" ? (
+                        <>
+                          {preset.stats && preset.stats.length > 0 && (
+                            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded">
+                              {preset.stats.length} Stats
+                            </span>
+                          )}
+                          {preset.resources && preset.resources.length > 0 && (
+                            <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded">
+                              {preset.resources.length} Resources
+                            </span>
+                          )}
+                          {preset.inventory && preset.inventory.length > 0 && (
+                            <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs rounded">
+                              {preset.inventory.length} Items
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
+                            Default Stats
+                          </span>
+                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
+                            Starter Items
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Back Button */}
+            <button
+              onClick={() => router.push("/library")}
+              className="px-4 py-2 bg-blue-950/50 hover:bg-blue-900/50 text-blue-200 text-sm font-medium rounded-lg border border-blue-800/30 transition-colors flex items-center gap-2"
+            >
+              <DynamicIcon name="ArrowLeft" className="w-4 h-4" />
+              Back to Library
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-4 px-4 pb-20">
+    <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-4 px-4 pb-20">
       <main className="flex gap-4 w-full max-w-4xl mx-auto flex-col">
         {/* Compact Story Header */}
         <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 px-4 py-3">

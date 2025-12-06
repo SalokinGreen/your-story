@@ -279,7 +279,9 @@ export function buildInfoMessage(
   } else {
     // Use all memories for smaller sets (or when no embeddings)
     memorySection = storyData.memory.length
-      ? `## Memory\n${storyData.memory.map((m) => `- ${getMemoryContent(m)}`).join("\n")}`
+      ? `## Memory\n${storyData.memory
+          .map((m) => `- ${getMemoryContent(m)}`)
+          .join("\n")}`
       : "";
   }
 

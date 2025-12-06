@@ -325,8 +325,8 @@ You can control how items in arrays are applied using the **_command** field:
   - xpBase: Number (default 100) - Base multiplier for XP requirements. Higher = slower leveling.
   - levelCap: Number (default 100) - Maximum level players can reach.
   - defaultUpgradesPerLevel: Number (default 1) - Upgrade points granted per level up.
-  - useCustomCurve: Boolean - When true, use customCurve instead of quadratic formula.
-  - customCurve: Array of { level, xp } - Custom XP thresholds for each level when useCustomCurve is true.
+  - useCustomCurve: Boolean - When true, use customCurve instead of quadratic formula. MUST set to true when providing customCurve.
+  - customCurve: Array of { level: number, cumulativeXP: number } - Custom XP thresholds for each level. Level is the target level (2+), cumulativeXP is total XP needed to reach that level. Example: [{ level: 2, cumulativeXP: 100 }, { level: 3, cumulativeXP: 300 }]
   - upgradeOverrides: Array of { level, upgrades } - Override upgrade points for specific levels (e.g., milestone bonus points).
   - startingUpgrades: Object { easy?: number, medium?: number, hard?: number, expert?: number } - Override starting upgrade points per difficulty.
 

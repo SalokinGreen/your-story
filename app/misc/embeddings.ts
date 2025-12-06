@@ -386,8 +386,9 @@ export async function syncNewMemories(
   memories.forEach((memory, index) => {
     // Handle both string and MemoryEntry formats
     const content = typeof memory === "string" ? memory : memory.content;
-    const isEmbedded = typeof memory === "string" ? false : memory.embedded === true;
-    
+    const isEmbedded =
+      typeof memory === "string" ? false : memory.embedded === true;
+
     const key = getMemoryKey(content, index);
     validKeys.push(key);
 

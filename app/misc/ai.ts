@@ -5,6 +5,7 @@ import {
   UPGRADE_COSTS,
   CommandResponse,
   getMemoryContent,
+  deduplicateMemories,
 } from "@/app/misc/structs";
 import { getRPGSystem, RPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
@@ -296,18 +297,9 @@ Narrative Best Practices:
   const memory_cap = memoryTokens * CHARS_PER_TOKEN;
   const story_cap = storyTokens * CHARS_PER_TOKEN;
 
-  // Remove duplicate entries from memory (by content)
-  let addedItems = new Set<string>();
-  const new_memory = storyData.memory.filter((item) => {
-    const content = getMemoryContent(item);
-    if (addedItems.has(content)) {
-      return false;
-    } else {
-      addedItems.add(content);
-      return true;
-    }
-  });
-  storyData.memory = new_memory;
+  // Deduplicate memories (removes exact duplicates and very similar entries)
+  storyData.memory = deduplicateMemories(storyData.memory);
+
   // Trim memory if too large
   let totalMemoryLength = storyData.memory.reduce(
     (acc, entry) => acc + getMemoryContent(entry).length,

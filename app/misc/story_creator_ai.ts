@@ -309,13 +309,24 @@ export function applyCreatorChangesToStoryData(
   // Leveling settings - merge with existing
   if (changes.levelingSettings !== undefined) {
     if (storyData.levelingSettings && changes.levelingSettings) {
+      // Normalize customCurve: handle both 'xp' and 'cumulativeXP' field names
+      let normalizedCustomCurve = changes.levelingSettings.customCurve;
+      if (normalizedCustomCurve) {
+        normalizedCustomCurve = normalizedCustomCurve.map(
+          (point: { level: number; cumulativeXP?: number; xp?: number }) => ({
+            level: point.level,
+            cumulativeXP: point.cumulativeXP ?? point.xp ?? 0,
+          })
+        );
+      }
+
       updates.levelingSettings = {
         ...storyData.levelingSettings,
         ...changes.levelingSettings,
         // Handle nested objects/arrays carefully
         customCurve:
-          changes.levelingSettings.customCurve !== undefined
-            ? changes.levelingSettings.customCurve
+          normalizedCustomCurve !== undefined
+            ? normalizedCustomCurve
             : storyData.levelingSettings.customCurve,
         upgradeOverrides:
           changes.levelingSettings.upgradeOverrides !== undefined
@@ -330,6 +341,16 @@ export function applyCreatorChangesToStoryData(
             : storyData.levelingSettings.startingUpgrades,
       };
     } else {
+      // Normalize customCurve for new levelingSettings too
+      if (changes.levelingSettings?.customCurve) {
+        changes.levelingSettings.customCurve =
+          changes.levelingSettings.customCurve.map(
+            (point: { level: number; cumulativeXP?: number; xp?: number }) => ({
+              level: point.level,
+              cumulativeXP: point.cumulativeXP ?? point.xp ?? 0,
+            })
+          );
+      }
       updates.levelingSettings = changes.levelingSettings;
     }
   }

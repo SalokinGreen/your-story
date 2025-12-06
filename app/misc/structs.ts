@@ -175,8 +175,38 @@ export function getMemoryContent(memory: string | MemoryEntry): string {
 }
 
 // Helper to convert memory array to content strings
-export function getMemoryContents(memories: (string | MemoryEntry)[]): string[] {
+export function getMemoryContents(
+  memories: (string | MemoryEntry)[]
+): string[] {
   return memories.map(getMemoryContent);
+}
+
+// Helper to deduplicate memories, keeping the first occurrence
+// Also removes extremely similar entries (differing only by minor punctuation/whitespace)
+export function deduplicateMemories(
+  memories: (string | MemoryEntry)[]
+): (string | MemoryEntry)[] {
+  if (!memories || memories.length === 0) return memories;
+
+  const seen = new Map<string, number>(); // normalized content -> index
+  const result: (string | MemoryEntry)[] = [];
+
+  for (const memory of memories) {
+    const content = getMemoryContent(memory);
+    // Normalize: lowercase, trim, collapse whitespace, remove trailing punctuation variations
+    const normalized = content
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(/[.!?,;:]+$/, ""); // Remove trailing punctuation
+
+    if (!seen.has(normalized)) {
+      seen.set(normalized, result.length);
+      result.push(memory);
+    }
+  }
+
+  return result;
 }
 export interface Chapter {
   title: string;

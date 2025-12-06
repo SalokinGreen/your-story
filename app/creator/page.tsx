@@ -186,6 +186,8 @@ export default function CreatorLandingPage() {
   );
   const [customPrompt, setCustomPrompt] = useState("");
   const [sizeIndex, setSizeIndex] = useState(1); // Default to "Standard"
+  const [showCustomGenreInput, setShowCustomGenreInput] = useState(false);
+  const [customGenreName, setCustomGenreName] = useState("");
 
   const selectedSize = sizePresets[sizeIndex];
 
@@ -211,6 +213,19 @@ export default function CreatorLandingPage() {
     setSelectedGenre(genre);
     setCustomPrompt("");
     setShowQuickModal(true);
+    setShowCustomGenreInput(false);
+  };
+
+  const selectCustomGenre = () => {
+    if (!customGenreName.trim()) return;
+    const customGenre = {
+      name: customGenreName.trim(),
+      icon: "Sparkles" as const,
+      color: "from-violet-500 to-fuchsia-500",
+      description: "Your custom adventure genre",
+    };
+    setSelectedGenre(customGenre);
+    setShowCustomGenreInput(false);
   };
 
   // Show loading while checking auth
@@ -439,6 +454,8 @@ export default function CreatorLandingPage() {
                 onClick={() => {
                   setShowQuickModal(false);
                   setSelectedGenre(null);
+                  setShowCustomGenreInput(false);
+                  setCustomGenreName("");
                 }}
                 className="text-blue-400 hover:text-white transition-colors"
               >
@@ -473,13 +490,64 @@ export default function CreatorLandingPage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Custom Genre Input */}
+                <div className="mt-4 pt-4 border-t border-blue-700/30">
+                  {!showCustomGenreInput ? (
+                    <button
+                      onClick={() => setShowCustomGenreInput(true)}
+                      className="w-full p-3 bg-violet-900/30 hover:bg-violet-800/40 rounded-lg border border-violet-600/30 hover:border-violet-500/50 transition-all flex items-center justify-center gap-2 text-violet-300 hover:text-white"
+                    >
+                      <StaticIcon name="Edit3" className="w-4 h-4" />
+                      <span className="font-medium text-sm">Custom Genre</span>
+                    </button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customGenreName}
+                        onChange={(e) => setCustomGenreName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && customGenreName.trim()) {
+                            selectCustomGenre();
+                          } else if (e.key === "Escape") {
+                            setShowCustomGenreInput(false);
+                            setCustomGenreName("");
+                          }
+                        }}
+                        placeholder="Enter your genre name..."
+                        className="flex-1 px-4 py-2 bg-blue-900/30 border border-blue-700/30 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        autoFocus
+                      />
+                      <button
+                        onClick={selectCustomGenre}
+                        disabled={!customGenreName.trim()}
+                        className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800/50 disabled:text-violet-400 text-white rounded-lg transition-colors"
+                      >
+                        <StaticIcon name="Check" className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCustomGenreInput(false);
+                          setCustomGenreName("");
+                        }}
+                        className="px-4 py-2 bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 hover:text-white rounded-lg transition-colors"
+                      >
+                        <StaticIcon name="X" className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               <>
                 {/* Genre Header */}
                 <div className="flex items-center gap-3 mb-6">
                   <button
-                    onClick={() => setSelectedGenre(null)}
+                    onClick={() => {
+                      setSelectedGenre(null);
+                      setCustomGenreName("");
+                    }}
                     className="text-blue-400 hover:text-white transition-colors"
                   >
                     <StaticIcon name="ArrowLeft" className="w-5 h-5" />
