@@ -7813,7 +7813,7 @@ ${description || ""}`;
                 {/* Folder and Tags for organization */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
+                    <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
                       <DynamicIcon
                         name="Folder"
                         className="w-4 h-4 text-yellow-500"
@@ -7839,7 +7839,7 @@ ${description || ""}`;
                     </datalist>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
+                    <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
                       <DynamicIcon
                         name="Tag"
                         className="w-4 h-4 text-purple-400"
@@ -8743,7 +8743,7 @@ ${description || ""}`;
                               {/* Folder and Tags for organization (edit mode) */}
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                  <label className="block text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
+                                  <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
                                     <DynamicIcon
                                       name="Folder"
                                       className="w-4 h-4 text-yellow-500"
@@ -8778,7 +8778,7 @@ ${description || ""}`;
                                   </datalist>
                                 </div>
                                 <div>
-                                  <label className="block text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
+                                  <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
                                     <DynamicIcon
                                       name="Tag"
                                       className="w-4 h-4 text-purple-400"

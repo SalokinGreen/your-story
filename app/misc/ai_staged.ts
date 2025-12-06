@@ -64,6 +64,50 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+// Token budgets for different stages (these are for scene history only)
+export const TOOL_STAGE_TOKEN_BUDGET = 12000; // ~12k tokens for tool stage history
+export const CHOICES_STAGE_TOKEN_BUDGET = 4000; // ~4k tokens for choices stage history
+export const ACTION_ANALYSIS_TOKEN_BUDGET = 4000; // ~4k tokens for action analysis
+
+/**
+ * Get scene parts that fit within a token budget, taking most recent first
+ * @param parts - Array of scene parts
+ * @param tokenBudget - Maximum tokens to include
+ * @returns Array of parts that fit, preserving chronological order
+ */
+export function getPartsWithinTokenBudget(
+  parts: StoryData["scene"]["parts"],
+  tokenBudget: number
+): StoryData["scene"]["parts"] {
+  if (!parts || parts.length === 0) return [];
+
+  // Start from the end (most recent) and work backwards
+  const selectedParts: StoryData["scene"]["parts"] = [];
+  let totalTokens = 0;
+
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const part = parts[i];
+    const partText = part.raw || part.content;
+    const partTokens = estimateTokens(partText);
+
+    // Include tool call/response overhead if present
+    const toolOverhead =
+      (part.toolCalls?.length || 0) * 50 +
+      (part.toolResponses?.length || 0) * 30;
+
+    const totalPartTokens = partTokens + toolOverhead;
+
+    if (totalTokens + totalPartTokens > tokenBudget) {
+      break; // Can't fit any more
+    }
+
+    selectedParts.unshift(part); // Add to front to maintain order
+    totalTokens += totalPartTokens;
+  }
+
+  return selectedParts;
+}
+
 // Cleans text by removing problematic characters and normalizing whitespace
 export function cleanString(text: string): string {
   if (!text) return "";
@@ -852,8 +896,11 @@ ${
     { role: "user", content: cleanString(infoMessage) },
   ];
 
-  // Add last 20 scene parts for context (INCLUDING PAST TOOL CALLS)
-  const recentParts = storyData.scene.parts.slice(-20);
+  // Add scene parts within token budget for context (INCLUDING PAST TOOL CALLS)
+  const recentParts = getPartsWithinTokenBudget(
+    storyData.scene.parts,
+    TOOL_STAGE_TOKEN_BUDGET
+  );
   let lastWasToolResponse = false; // Track if last message was a tool response
 
   for (const part of recentParts) {
@@ -1263,8 +1310,11 @@ Example: "Take a risk <table: ${
     { role: "user", content: cleanString(infoMessage) },
   ];
 
-  // Add last 8 scene parts for context
-  const recentParts = storyData.scene.parts.slice(-8);
+  // Add scene parts within token budget for context
+  const recentParts = getPartsWithinTokenBudget(
+    storyData.scene.parts,
+    CHOICES_STAGE_TOKEN_BUDGET
+  );
   for (const part of recentParts) {
     if (part.user) {
       messages.push({
@@ -1477,8 +1527,11 @@ ACTIVE CHALLENGE: ${
 
 RESPOND WITH JSON ONLY.`;
 
-  // Build minimal context - just recent story for situational awareness
-  const recentParts = storyData.scene.parts.slice(-4);
+  // Build minimal context within token budget for situational awareness
+  const recentParts = getPartsWithinTokenBudget(
+    storyData.scene.parts,
+    ACTION_ANALYSIS_TOKEN_BUDGET
+  );
   const recentContext = recentParts
     .map((p) =>
       p.user ? `Player: ${p.content}` : `Story: ${p.content.slice(0, 300)}...`
