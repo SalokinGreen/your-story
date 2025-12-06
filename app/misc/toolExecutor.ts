@@ -125,6 +125,10 @@ const STATE_CHANGE_TOOLS = new Set([
   "cancel_challenge",
   // Rest System
   "take_rest",
+  // Quests - completion includes XP gain and potential level ups
+  "complete_quest",
+  "fail_quest",
+  "create_quest",
 ]);
 
 /**

@@ -2037,6 +2037,8 @@ function AdventureCreatorContent() {
     alwaysOn: false,
     trigger_lores: [],
     untrigger_lores: [],
+    tags: [],
+    folder: "",
   });
   const [newLoreOnTrigger, setNewLoreOnTrigger] = useState("");
   const [newLoreOffTrigger, setNewLoreOffTrigger] = useState("");
@@ -2055,6 +2057,11 @@ function AdventureCreatorContent() {
   const loreItemsPerPage = 10;
   // Pending tag deletion confirmation (key format: "type:context:value")
   const [pendingTagDelete, setPendingTagDelete] = useState<string | null>(null);
+  // Lore filtering by tags and folders
+  const [loreFilterFolder, setLoreFilterFolder] = useState<string>("");
+  const [loreFilterTags, setLoreFilterTags] = useState<string[]>([]);
+  const [newLoreTag, setNewLoreTag] = useState("");
+  const [editLoreTag, setEditLoreTag] = useState("");
 
   // Relationships
   const [relationships, setRelationships] = useState<Relationship[]>([]);
@@ -7803,6 +7810,112 @@ ${description || ""}`;
                     </label>
                   </div>
                 </div>
+                {/* Folder and Tags for organization */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
+                      <DynamicIcon
+                        name="Folder"
+                        className="w-4 h-4 text-yellow-500"
+                      />
+                      Folder (for organization)
+                    </label>
+                    <input
+                      type="text"
+                      value={newLore.folder || ""}
+                      onChange={(e) =>
+                        setNewLore({ ...newLore, folder: e.target.value })
+                      }
+                      placeholder="e.g., Characters, Locations, History..."
+                      list="lore-folders-list"
+                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    />
+                    <datalist id="lore-folders-list">
+                      {[
+                        ...new Set(lore.map((l) => l.folder).filter(Boolean)),
+                      ].map((folder) => (
+                        <option key={folder} value={folder} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
+                      <DynamicIcon
+                        name="Tag"
+                        className="w-4 h-4 text-purple-400"
+                      />
+                      Tags (for filtering)
+                    </label>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={newLoreTag}
+                        onChange={(e) => setNewLoreTag(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const tag = newLoreTag.trim();
+                            if (tag && !(newLore.tags || []).includes(tag)) {
+                              setNewLore({
+                                ...newLore,
+                                tags: [...(newLore.tags || []), tag],
+                              });
+                              setNewLoreTag("");
+                            }
+                          }
+                        }}
+                        placeholder="Add tag..."
+                        list="lore-tags-list"
+                        className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                      />
+                      <datalist id="lore-tags-list">
+                        {[...new Set(lore.flatMap((l) => l.tags || []))].map(
+                          (tag) => (
+                            <option key={tag} value={tag} />
+                          )
+                        )}
+                      </datalist>
+                      <button
+                        onClick={() => {
+                          const tag = newLoreTag.trim();
+                          if (tag && !(newLore.tags || []).includes(tag)) {
+                            setNewLore({
+                              ...newLore,
+                              tags: [...(newLore.tags || []), tag],
+                            });
+                            setNewLoreTag("");
+                          }
+                        }}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(newLore.tags || []).map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2 py-1 rounded-full text-sm flex items-center gap-1 bg-purple-900/30 text-purple-300"
+                        >
+                          <DynamicIcon name="Tag" className="w-3 h-3" /> {tag}
+                          <button
+                            onClick={() =>
+                              setNewLore({
+                                ...newLore,
+                                tags: (newLore.tags || []).filter(
+                                  (t) => t !== tag
+                                ),
+                              })
+                            }
+                            className="ml-1 text-purple-400 hover:text-purple-200"
+                          >
+                            <DynamicIcon name="X" className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
                 <div>
                   <label className="block text-sm font-semibold text-blue-200 mb-1">
                     Thumbnail (optional)
@@ -8356,25 +8469,116 @@ ${description || ""}`;
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-bold text-white">
-                  Lore Entries ({lore.length})
-                </h3>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={loreSearchQuery}
-                    onChange={(e) => {
-                      setLoreSearchQuery(e.target.value);
-                      setLorePage(1);
-                    }}
-                    placeholder="Search lore..."
-                    className="pl-8 pr-3 py-1 text-sm border border-blue-700/40 rounded-lg bg-blue-900/20 text-white focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">
-                    <DynamicIcon name="Search" className="w-4 h-4" />
-                  </span>
+              <div className="flex flex-col gap-3 mb-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-white">
+                    Lore Entries ({lore.length})
+                  </h3>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={loreSearchQuery}
+                      onChange={(e) => {
+                        setLoreSearchQuery(e.target.value);
+                        setLorePage(1);
+                      }}
+                      placeholder="Search lore..."
+                      className="pl-8 pr-3 py-1 text-sm border border-blue-700/40 rounded-lg bg-blue-900/20 text-white focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">
+                      <DynamicIcon name="Search" className="w-4 h-4" />
+                    </span>
+                  </div>
                 </div>
+                {/* Folder and Tag Filters */}
+                {lore.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Folder filter */}
+                    {[...new Set(lore.map((l) => l.folder).filter(Boolean))]
+                      .length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <DynamicIcon
+                          name="Folder"
+                          className="w-4 h-4 text-yellow-500"
+                        />
+                        <select
+                          value={loreFilterFolder}
+                          onChange={(e) => {
+                            setLoreFilterFolder(e.target.value);
+                            setLorePage(1);
+                          }}
+                          className="px-2 py-1 text-sm border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                        >
+                          <option value="">All Folders</option>
+                          {[
+                            ...new Set(
+                              lore.map((l) => l.folder).filter(Boolean)
+                            ),
+                          ]
+                            .sort()
+                            .map((folder) => (
+                              <option key={folder} value={folder}>
+                                {folder} (
+                                {lore.filter((l) => l.folder === folder).length}
+                                )
+                              </option>
+                            ))}
+                          <option value="__none__">
+                            No Folder ({lore.filter((l) => !l.folder).length})
+                          </option>
+                        </select>
+                      </div>
+                    )}
+                    {/* Tag filter chips */}
+                    {[...new Set(lore.flatMap((l) => l.tags || []))].length >
+                      0 && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <DynamicIcon
+                          name="Tag"
+                          className="w-4 h-4 text-purple-400"
+                        />
+                        {[...new Set(lore.flatMap((l) => l.tags || []))]
+                          .sort()
+                          .map((tag) => {
+                            const isActive = loreFilterTags.includes(tag);
+                            return (
+                              <button
+                                key={tag}
+                                onClick={() => {
+                                  if (isActive) {
+                                    setLoreFilterTags(
+                                      loreFilterTags.filter((t) => t !== tag)
+                                    );
+                                  } else {
+                                    setLoreFilterTags([...loreFilterTags, tag]);
+                                  }
+                                  setLorePage(1);
+                                }}
+                                className={`px-2 py-0.5 rounded-full text-xs transition-colors ${
+                                  isActive
+                                    ? "bg-purple-600 text-white"
+                                    : "bg-purple-900/30 text-purple-300 hover:bg-purple-800/40"
+                                }`}
+                              >
+                                {tag}
+                              </button>
+                            );
+                          })}
+                        {loreFilterTags.length > 0 && (
+                          <button
+                            onClick={() => {
+                              setLoreFilterTags([]);
+                              setLorePage(1);
+                            }}
+                            className="px-2 py-0.5 rounded-full text-xs bg-gray-600 hover:bg-gray-500 text-white"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {lore.length === 0 ? (
@@ -8387,12 +8591,22 @@ ${description || ""}`;
                     .map((entry, index) => ({ entry, originalIndex: index }))
                     .filter(
                       (item) =>
-                        item.entry.title
+                        (item.entry.title
                           .toLowerCase()
                           .includes(loreSearchQuery.toLowerCase()) ||
-                        item.entry.content
-                          .toLowerCase()
-                          .includes(loreSearchQuery.toLowerCase())
+                          item.entry.content
+                            .toLowerCase()
+                            .includes(loreSearchQuery.toLowerCase())) &&
+                        // Folder filter
+                        (loreFilterFolder === "" ||
+                          (loreFilterFolder === "__none__" &&
+                            !item.entry.folder) ||
+                          item.entry.folder === loreFilterFolder) &&
+                        // Tag filter (must have all selected tags)
+                        (loreFilterTags.length === 0 ||
+                          loreFilterTags.every((tag) =>
+                            (item.entry.tags || []).includes(tag)
+                          ))
                     )
                     .sort((a, b) => a.entry.title.localeCompare(b.entry.title));
 
@@ -8407,7 +8621,7 @@ ${description || ""}`;
                   if (filteredLore.length === 0 && lore.length > 0) {
                     return (
                       <p className="text-blue-300/50 text-sm italic">
-                        No lore entries match your search.
+                        No lore entries match your filters.
                       </p>
                     );
                   }
@@ -8524,6 +8738,146 @@ ${description || ""}`;
                                     />
                                     Always On
                                   </label>
+                                </div>
+                              </div>
+                              {/* Folder and Tags for organization (edit mode) */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
+                                    <DynamicIcon
+                                      name="Folder"
+                                      className="w-4 h-4 text-yellow-500"
+                                    />
+                                    Folder
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={editLore.folder || ""}
+                                    onChange={(e) =>
+                                      setEditLore({
+                                        ...editLore,
+                                        folder: e.target.value,
+                                      })
+                                    }
+                                    placeholder="e.g., Characters, Locations..."
+                                    list={`edit-lore-folders-list-${index}`}
+                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                  />
+                                  <datalist
+                                    id={`edit-lore-folders-list-${index}`}
+                                  >
+                                    {[
+                                      ...new Set(
+                                        lore
+                                          .map((l) => l.folder)
+                                          .filter(Boolean)
+                                      ),
+                                    ].map((folder) => (
+                                      <option key={folder} value={folder} />
+                                    ))}
+                                  </datalist>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
+                                    <DynamicIcon
+                                      name="Tag"
+                                      className="w-4 h-4 text-purple-400"
+                                    />
+                                    Tags
+                                  </label>
+                                  <div className="flex gap-2 mb-2">
+                                    <input
+                                      type="text"
+                                      value={editLoreTag}
+                                      onChange={(e) =>
+                                        setEditLoreTag(e.target.value)
+                                      }
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          const tag = editLoreTag.trim();
+                                          if (
+                                            tag &&
+                                            !(editLore.tags || []).includes(tag)
+                                          ) {
+                                            setEditLore({
+                                              ...editLore,
+                                              tags: [
+                                                ...(editLore.tags || []),
+                                                tag,
+                                              ],
+                                            });
+                                            setEditLoreTag("");
+                                          }
+                                        }
+                                      }}
+                                      placeholder="Add tag..."
+                                      list={`edit-lore-tags-list-${index}`}
+                                      className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                    />
+                                    <datalist
+                                      id={`edit-lore-tags-list-${index}`}
+                                    >
+                                      {[
+                                        ...new Set(
+                                          lore.flatMap((l) => l.tags || [])
+                                        ),
+                                      ].map((tag) => (
+                                        <option key={tag} value={tag} />
+                                      ))}
+                                    </datalist>
+                                    <button
+                                      onClick={() => {
+                                        const tag = editLoreTag.trim();
+                                        if (
+                                          tag &&
+                                          !(editLore.tags || []).includes(tag)
+                                        ) {
+                                          setEditLore({
+                                            ...editLore,
+                                            tags: [
+                                              ...(editLore.tags || []),
+                                              tag,
+                                            ],
+                                          });
+                                          setEditLoreTag("");
+                                        }
+                                      }}
+                                      className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                                    >
+                                      Add
+                                    </button>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {(editLore.tags || []).map((tag) => (
+                                      <span
+                                        key={tag}
+                                        className="px-2 py-1 rounded-full text-sm flex items-center gap-1 bg-purple-900/30 text-purple-300"
+                                      >
+                                        <DynamicIcon
+                                          name="Tag"
+                                          className="w-3 h-3"
+                                        />{" "}
+                                        {tag}
+                                        <button
+                                          onClick={() =>
+                                            setEditLore({
+                                              ...editLore,
+                                              tags: (
+                                                editLore.tags || []
+                                              ).filter((t) => t !== tag),
+                                            })
+                                          }
+                                          className="ml-1 text-purple-400 hover:text-purple-200"
+                                        >
+                                          <DynamicIcon
+                                            name="X"
+                                            className="w-3 h-3"
+                                          />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
                               <div>
@@ -9333,6 +9687,33 @@ ${description || ""}`;
                                       {entry.var_off_triggers.join(", ")}
                                     </div>
                                   )}
+                                {/* Folder and Tags display */}
+                                {(entry.folder ||
+                                  (entry.tags && entry.tags.length > 0)) && (
+                                  <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-blue-700/30">
+                                    {entry.folder && (
+                                      <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-900/30 text-yellow-300 flex items-center gap-1">
+                                        <DynamicIcon
+                                          name="Folder"
+                                          className="w-3 h-3"
+                                        />
+                                        {entry.folder}
+                                      </span>
+                                    )}
+                                    {(entry.tags || []).map((tag) => (
+                                      <span
+                                        key={tag}
+                                        className="px-2 py-0.5 rounded-full text-xs bg-purple-900/30 text-purple-300 flex items-center gap-1"
+                                      >
+                                        <DynamicIcon
+                                          name="Tag"
+                                          className="w-3 h-3"
+                                        />
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                               <div className="flex flex-col items-center  gap-2 ml-3">
                                 {/* Reordering disabled in sorted view */}

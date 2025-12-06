@@ -184,11 +184,9 @@ export default function StatsPage(storyData: StoryData) {
               </h3>
               <div className="space-y-2">
                 {storyData.stats.map((stat, index) => {
-                  // Use 100 as the max scale for stats (can go beyond but bar caps at 50% each direction)
-                  // This means +50 fills 25% of total bar (half of the positive side)
+                  // Use 100 as the max scale for stats display
                   const maxScale = 100;
-                  const fillPercent =
-                    Math.min(Math.abs(stat.value) / maxScale, 1) * 50;
+                  const fillPercent = Math.min(stat.value / maxScale, 1) * 100;
 
                   // Get RPG system specific modifier
                   const system = getRPGSystem(storyData.rpgSystem || "3d6");
@@ -252,7 +250,6 @@ export default function StatsPage(storyData: StoryData) {
                             {nodeBonus !== 0 ? (
                               <div className="flex items-baseline gap-1">
                                 <span className="text-xs text-blue-200/40">
-                                  {baseValue >= 0 ? "+" : ""}
                                   {baseValue}
                                 </span>
                                 <span
@@ -264,30 +261,12 @@ export default function StatsPage(storyData: StoryData) {
                                 <span className="text-xs text-blue-200/40">
                                   =
                                 </span>
-                                <span
-                                  className={`font-bold text-sm ${
-                                    stat.value > 0
-                                      ? "text-green-400"
-                                      : stat.value < 0
-                                      ? "text-red-400"
-                                      : "text-blue-200/60"
-                                  }`}
-                                >
-                                  {stat.value >= 0 ? "+" : ""}
+                                <span className="font-bold text-sm text-green-400">
                                   {stat.value}
                                 </span>
                               </div>
                             ) : (
-                              <span
-                                className={`font-bold text-sm ${
-                                  stat.value > 0
-                                    ? "text-green-400"
-                                    : stat.value < 0
-                                    ? "text-red-400"
-                                    : "text-blue-200/60"
-                                }`}
-                              >
-                                {stat.value >= 0 ? "+" : ""}
+                              <span className="font-bold text-sm text-green-400">
                                 {stat.value}
                               </span>
                             )}
@@ -296,27 +275,12 @@ export default function StatsPage(storyData: StoryData) {
                         <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
                           {stat.description}
                         </p>
-                        {/* Stat bar visualization - fills from center */}
-                        <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-2 relative overflow-hidden">
-                          {/* Center marker */}
-                          <div className="absolute left-1/2 top-0 w-0.5 h-full bg-gray-400 dark:bg-gray-600 -translate-x-1/2 z-10" />
-                          {/* Stat fill - positioned from center */}
-                          {stat.value !== 0 && (
-                            <div
-                              className={`absolute top-0 h-full rounded-full transition-all duration-300 ${
-                                stat.value >= 0
-                                  ? "bg-linear-to-r from-blue-400 to-blue-500"
-                                  : "bg-linear-to-l from-red-400 to-red-500"
-                              }`}
-                              style={{
-                                width: `${fillPercent}%`,
-                                left:
-                                  stat.value >= 0
-                                    ? "50%"
-                                    : `${50 - fillPercent}%`,
-                              }}
-                            />
-                          )}
+                        {/* Stat bar visualization - fills from left */}
+                        <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="h-full bg-linear-to-r from-blue-400 to-blue-500 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.max(fillPercent, 0)}%` }}
+                          />
                         </div>
                       </div>
                     </div>

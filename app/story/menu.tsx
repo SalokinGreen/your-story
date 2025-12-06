@@ -2629,6 +2629,7 @@ function LoreEditor({
   const [editLore, setEditLore] = useState<Partial<StoryLore>>({});
   const [editLoreAdvancedExpanded, setEditLoreAdvancedExpanded] =
     useState(false);
+  const [editLoreTag, setEditLoreTag] = useState("");
   const { addNotification } = useNotification();
 
   // Drag-and-drop handlers for lore
@@ -2728,6 +2729,8 @@ function LoreEditor({
       trigger_lores: [],
       untrigger_lores: [],
       embedded: false, // Mark new entries for embedding
+      tags: [],
+      folder: "",
     };
     const updated = [...localLore, newLore];
     setLocalLore(updated);
@@ -2941,6 +2944,118 @@ function LoreEditor({
                       Always On
                     </span>
                   </label>
+                </div>
+
+                {/* Folder and Tags for organization */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-blue-200 mb-2">
+                      <DynamicIcon
+                        name="Folder"
+                        className="inline-block w-4 h-4 mr-1 text-yellow-500"
+                      />
+                      Folder
+                    </label>
+                    <input
+                      type="text"
+                      value={editLore.folder || ""}
+                      onChange={(e) =>
+                        setEditLore({ ...editLore, folder: e.target.value })
+                      }
+                      placeholder="e.g., Characters, Locations..."
+                      list="lore-folders-list"
+                      className="w-full px-3 py-2 text-sm bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                    />
+                    <datalist id="lore-folders-list">
+                      {[
+                        ...new Set(
+                          localLore.map((l) => l.folder).filter(Boolean)
+                        ),
+                      ].map((folder) => (
+                        <option key={folder} value={folder} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-blue-200 mb-2">
+                      <DynamicIcon
+                        name="Tag"
+                        className="inline-block w-4 h-4 mr-1 text-purple-400"
+                      />
+                      Tags
+                    </label>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={editLoreTag}
+                          onChange={(e) => setEditLoreTag(e.target.value)}
+                          placeholder="Add tag..."
+                          list="lore-tags-list"
+                          className="flex-1 px-3 py-2 text-sm bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const tag = editLoreTag.trim();
+                              if (tag && !(editLore.tags || []).includes(tag)) {
+                                setEditLore({
+                                  ...editLore,
+                                  tags: [...(editLore.tags || []), tag],
+                                });
+                                setEditLoreTag("");
+                              }
+                            }
+                          }}
+                        />
+                        <datalist id="lore-tags-list">
+                          {[
+                            ...new Set(localLore.flatMap((l) => l.tags || [])),
+                          ].map((tag) => (
+                            <option key={tag} value={tag} />
+                          ))}
+                        </datalist>
+                        <button
+                          onClick={() => {
+                            const tag = editLoreTag.trim();
+                            if (tag && !(editLore.tags || []).includes(tag)) {
+                              setEditLore({
+                                ...editLore,
+                                tags: [...(editLore.tags || []), tag],
+                              });
+                              setEditLoreTag("");
+                            }
+                          }}
+                          className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {(editLore.tags || []).map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-1 bg-purple-900/30 text-purple-300 rounded-full text-xs flex items-center gap-1"
+                          >
+                            <DynamicIcon name="Tag" className="w-3 h-3" />
+                            {tag}
+                            <button
+                              onClick={() =>
+                                setEditLore({
+                                  ...editLore,
+                                  tags: (editLore.tags || []).filter(
+                                    (_, i) => i !== idx
+                                  ),
+                                })
+                              }
+                              className="hover:text-purple-100"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* ON/OFF Trigger Words */}

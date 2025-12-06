@@ -30,7 +30,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Ability**: Skills/spells/techniques with `name`, `description`, `grade` (AbilityGrade), `cost` (AbilityCost[]), `cooldown`, `currentCooldown`, `stat` (optional), `symbol`.
   - **AbilityCost**: { type: "resource" | "variable", name: string, amount: number }
   - **AbilityGrade**: "novice" | "apprentice" | "adept" | "expert" | "master" | "legendary"
-  - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `var_on_triggers` (string[]), `var_off_triggers` (string[]) for dynamic visibility. Also includes `embedded?: boolean` to track embedding state for efficient re-embedding.
+  - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `var_on_triggers` (string[]), `var_off_triggers` (string[]) for dynamic visibility. Also includes `embedded?: boolean` to track embedding state for efficient re-embedding. Organization fields `tags?: string[]` and `folder?: string` are for creator UI filtering only (not visible during gameplay).
   - **MemoryEntry**: Memory entries can be either `string` (legacy) or `{ content: string, embedded?: boolean }`. Use `getMemoryContent(entry)` helper to extract content. StoryData.memory is `(string | MemoryEntry)[]`. Use `deduplicateMemories()` to remove exact duplicates and very similar entries (differing only by punctuation/whitespace).
   - **ScenePart**: Includes optional `toolCalls` (ToolCall[]) and `toolResponses` (CommandResponse[]) for preserving tool calling conversation history. Also includes `stateChanges` (string[]) for human-readable game state modifications that are sent to the story stage.
   - **CommandResponse**: Includes optional `toolCallId` for linking responses to specific tool calls in conversation history.
@@ -75,7 +75,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/misc/toolExecutor.ts: Executes tool calls from AI responses locally on the frontend, mapping AI tool names to XML command format. Modifies storyData directly and returns `{ responses: CommandResponse[], stateChanges: string[] }`. The `stateChanges` array contains human-readable descriptions of game state modifications for tools like stat/resource changes, item updates, conditions, etc.
 - app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter, Mistral). Includes getModelConfig() helper for dynamic model selection. Exports AI_MODELS constant with models from multiple providers:
   - **BYOK providers** (user provides API key): OpenRouter, DeepSeek, NovelAI
-  - **Coins provider** (server-side key, user pays with coins): Mistral (mistral-small-2506, mistral-medium-2508, codestral-2508)
+  - **Coins provider** (server-side key, user pays with coins): Mistral (mistral-small-2506, mistral-medium-2508, codestral-2508, devstral-small-2507, devstral-medium-2507)
   - **APIKeysAvailable**: Interface with `coinsEnabled` flag for Mistral models
   - **Image models**: `OPENROUTER_IMAGE_MODELS` (BYOK via OpenRouter), `DEEPINFRA_IMAGE_MODELS` (Coins: Bria 3.2 FREE, P-Image $0.005, FLUX 2 Pro $0.015)
 - app/misc/story_creator_ai.ts: **Story Creative Assistant utilities**. Exports buildStoryCreatorMessages() and applyCreatorChangesToStoryData(). Converts between Adventure-style AI outputs and StoryData structures.
@@ -278,7 +278,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - Parses choices from AI response
 - **Multi-provider support**: Automatically routes to DeepSeek, OpenRouter, Mistral, or DeepInfra based on model parameter.
 - Requires DEEPSEEK_API_KEY for DeepSeek models, OPENROUTER_API_KEY for OpenRouter models, MISTRAL_API_KEY for Mistral (Coins mode), DEEPINFRA_API_KEY for DeepInfra (Coins mode).
-- Mistral models (mistral-small-2506, mistral-medium-2508, codestral-2508) use server-side key - users pay with coins.
+- Mistral models (mistral-small-2506, mistral-medium-2508, codestral-2508, devstral-small-2507, devstral-medium-2507) use server-side key - users pay with coins.
 - DeepInfra models (DeepSeek V3.2/V3.1/R1, Qwen3, Llama 3, Gemma 3, etc.) use server-side key - users pay with coins.
 - Optional: DEFAULT_AI_MODEL, DEEPSEEK_MODEL, NEXT_PUBLIC_SITE_URL environment variables.
 - Deducts tokens based on actual usage; returns updated balance in response meta.
