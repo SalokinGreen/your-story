@@ -160,6 +160,23 @@ export interface StoryLore {
   thumbnailUrl?: string;
   on?: boolean;
   lastTriggeredIndex?: number; // Track when lore was last triggered for auto-expiry
+  embedded?: boolean; // True if content has been embedded for semantic search
+}
+
+// Memory entry with embedding tracking
+export interface MemoryEntry {
+  content: string;
+  embedded?: boolean; // True if content has been embedded for semantic search
+}
+
+// Helper to get memory content from either string or MemoryEntry format
+export function getMemoryContent(memory: string | MemoryEntry): string {
+  return typeof memory === "string" ? memory : memory.content;
+}
+
+// Helper to convert memory array to content strings
+export function getMemoryContents(memories: (string | MemoryEntry)[]): string[] {
+  return memories.map(getMemoryContent);
 }
 export interface Chapter {
   title: string;
@@ -419,7 +436,7 @@ export interface StoryData {
   player_name: string;
   player_summary: string;
   intro: string;
-  memory: string[];
+  memory: (string | MemoryEntry)[]; // Supports both legacy string[] and new MemoryEntry[] format
   max_chapters: number;
   currentChapter: number;
   chapters: Chapter[];

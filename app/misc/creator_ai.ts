@@ -121,13 +121,13 @@ You can control how items in arrays are applied using the **_command** field:
   - name: Stat name (e.g., "Strength", "Intelligence")
   - value: Starting value, 1-100 where 50 is average
   - description: What the stat represents
-  - symbol: Emoji/icon representing the stat
+  - symbol: Icon name as words (e.g., "biceps", "brain", "heart") - we fuzzy-match to our icon library
 - resources (Array of { name, value, maxValue, description, symbol })
   - name: Resource name (e.g., "Health", "Mana", "Stamina")
   - value: Current amount
   - maxValue: Maximum capacity
   - description: What the resource represents
-  - symbol: Emoji/icon representing the resource
+  - symbol: Icon name as words (e.g., "heart", "water-drop", "lightning")
 - variables (Array of variable objects) - **IMPORTANT: Custom state tracking for counters, flags, strings, and lists**. Four types:
   - **Number Variables**: { id, name, description, type: "number", value, minValue?, maxValue? }
     - id: Unique identifier (e.g., "var_gold", "var_time")
@@ -162,7 +162,7 @@ You can control how items in arrays are applied using the **_command** field:
   - quantity: Number of items
   - description: Item description
   - type: "normal" (advantage, breaks on fail), "consumable" (advantage, consumed on use), "story" (advantage, never breaks/consumed), "misc" (prevents disadvantage, never breaks/consumed)
-  - symbol: Emoji/icon representing the item
+  - symbol: Icon name as words (e.g., "sword", "potion", "shield", "scroll")
   - grade: Item quality tier - "common" (dur 8, +0 bonus), "uncommon" (dur 13, +1), "rare" (dur 20, +2), "epic" (dur 30, +3), "legendary" (dur 50, +4), "agmt" (infinite dur, +5)
   - durability: Current durability points (auto-set from grade if omitted)
   - maxDurability: Maximum durability (auto-set from grade if omitted)
@@ -177,7 +177,7 @@ You can control how items in arrays are applied using the **_command** field:
   - cooldown: Turns until ability can be used again after use (0 = no cooldown)
   - currentCooldown: Current cooldown remaining (usually 0 for new abilities)
   - stat: Optional stat name this ability is associated with (for skill checks)
-  - symbol: Emoji/icon representing the ability
+  - symbol: Icon name as words (e.g., "fireball", "sword-clash", "healing")
 - lore (Array of { title, content, secrtet, on, alwaysOn, on_triggers, off_triggers, trigger_lores, untrigger_lores, var_on_triggers, var_off_triggers })
   - title: Lore entry title
   - content: Full lore text
@@ -199,7 +199,7 @@ You can control how items in arrays are applied using the **_command** field:
   - title: Achievement name
   - description: Public description shown to player
   - points: Points awarded when unlocked
-  - symbol: Emoji/icon representing the achievement
+  - symbol: Icon name as words (e.g., "trophy", "crown", "star", "medal")
   - ai_hint: (Optional) Precise trigger conditions for the AI to award this achievement
 - quests (Array of { title, shortDescription, description, points, active, fulfilled })
   - title: Quest name
@@ -212,7 +212,7 @@ You can control how items in arrays are applied using the **_command** field:
   - id: Unique identifier (use "preset-" + timestamp for new ones)
   - name: Preset display name
   - description: What this preset/build represents
-  - icon: Emoji representing the preset
+  - icon: Icon name as words (e.g., "knight", "wizard", "rogue")
   - playerName: Default character name for this preset
   - playerSummary: Character background for this preset
   - intro: Unique opening narrative for this preset
@@ -230,13 +230,13 @@ You can control how items in arrays are applied using the **_command** field:
   - statShop: Array of { name, description, symbol, startingValue, cost } - new stats players can unlock
     - name: Name of the new stat to unlock
     - description: What the stat represents
-    - symbol: Emoji/icon for the stat
+    - symbol: Icon name as words (e.g., "biceps", "brain")
     - startingValue: Initial value when unlocked (1-100, 50 = average)
     - cost: Progression points required to unlock
   - resourceShop: Array of { name, description, symbol, startingValue, startingMaxValue, cost } - new resources players can unlock
     - name: Name of the new resource to unlock
     - description: What the resource represents
-    - symbol: Emoji/icon for the resource
+    - symbol: Icon name as words (e.g., "heart", "lightning")
     - startingValue: Initial current value when unlocked
     - startingMaxValue: Initial maximum value when unlocked
     - cost: Progression points required to unlock
@@ -280,14 +280,14 @@ You can control how items in arrays are applied using the **_command** field:
   - id: Unique identifier for the tree (e.g., "warrior-path", "arcane-studies")
   - name: Display name (e.g., "Warrior's Path", "Arcane Studies", "Shadow Arts")
   - description: What this skill tree represents
-  - symbol: Emoji/icon representing the tree
+  - symbol: Icon name as words (e.g., "sword", "magic-swirl", "shadow")
   - nodes: Array of skill tree nodes (see below)
   
   **Skill Tree Node Structure** (each node in the nodes array):
   - id: Unique identifier within this tree (e.g., "power-strike", "fireball")
   - name: Display name of the node
   - description: What this node grants
-  - symbol: Emoji/icon for the node
+  - symbol: Icon name as words (e.g., "fireball", "shield", "running")
   - type: "stat" | "ability" | "item" | "passive" | "resource" - determines the node's primary effect type
   - position: { x: number, y: number } - Visual position (0-100 normalized coordinates). Root nodes should be at y: 10-20, with children below them.
   - prerequisites: Array of node IDs that must be unlocked first (empty array = root node, always unlockable first)
@@ -332,7 +332,7 @@ You can control how items in arrays are applied using the **_command** field:
 
 Notes:
 - All characters should share the same stats and resources, but they may have different values.
-- Use the 'symbol' field to add an emoji or icon representing the item/stat/resource.
+- **ICONS**: Use the 'symbol' field with descriptive WORDS like "heart", "sword", "shield", "fire", "brain", "lightning", "coin", "skull", "potion", "book", "eye", "moon" - NOT emoji characters. We fuzzy-match these words to our icon library automatically. Examples: "broken-heart" for health loss, "fire" for fire magic, "shield" for defense stats.
 - Be creative and thematic in your additions/modifications based on the story setting.
 - When creating stat/resource shop items, these are NEW stats/resources that players can unlock, not upgrades to existing ones.
 - Advanced RPG Tools is enabled by providing a agmtState object. If you want to enable AGMT, simply include agmtState with at least chaosFactor.
@@ -351,10 +351,10 @@ Assistant:
 \`\`\`json
 {
   "stats": [
-    { "name": "Strength", "value": 10, "description": "Physical power", "symbol": "💪" }
+    { "name": "Strength", "value": 10, "description": "Physical power", "symbol": "biceps" }
   ],
   "inventory": [
-    { "name": "Fire Sword", "quantity": 1, "description": "A blade wreathed in eternal flame.", "type": "normal", "symbol": "⚔️", "grade": "rare" }
+    { "name": "Fire Sword", "quantity": 1, "description": "A blade wreathed in eternal flame.", "type": "normal", "symbol": "fire-sword", "grade": "rare" }
   ]
 }
 \`\`\`"
@@ -375,7 +375,7 @@ Assistant:
       "cooldown": 2,
       "currentCooldown": 0,
       "stat": "Intelligence",
-      "symbol": "🔥"
+      "symbol": "fireball"
     },
     {
       "name": "Kick",
@@ -385,7 +385,7 @@ Assistant:
       "cooldown": 0,
       "currentCooldown": 0,
       "stat": "Strength",
-      "symbol": "🦶"
+      "symbol": "boot-stomp"
     }
   ]
 }

@@ -22,6 +22,7 @@ import {
   AGMTThread,
   AGMTCharacter,
   SkillTree,
+  getMemoryContent,
 } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
 import { buildCreatorMessages, CreatorOutputData } from "@/app/misc/creator_ai";
@@ -121,7 +122,7 @@ ${historyLines.join("\n")}
     memoryContext = `
 
 ### Story Memories (key events and details):
-${recentMemories.map((m) => `• ${m}`).join("\n")}
+${recentMemories.map((m) => `• ${getMemoryContent(m)}`).join("\n")}
 `;
   }
 

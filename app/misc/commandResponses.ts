@@ -2231,6 +2231,7 @@ export function executeCommandWithResponse(
       on_triggers: onTriggerArray,
       off_triggers: offTriggerArray,
       on: onTriggerArray.length === 0, // If no triggers, show from start
+      embedded: false, // New entry needs embedding
     });
 
     // Mark lore embeddings as dirty for re-sync
@@ -2399,10 +2400,12 @@ export function executeCommandWithResponse(
     if (newTitle) {
       loreEntry.title = newTitle;
       changes.push("title");
+      loreEntry.embedded = false; // Title changed, needs re-embedding
     }
     if (newContent) {
       loreEntry.content = newContent;
       changes.push("content");
+      loreEntry.embedded = false; // Content changed, needs re-embedding
     }
     if (onValue === "true") {
       loreEntry.on = true;
@@ -2485,6 +2488,7 @@ export function executeCommandWithResponse(
     }
 
     loreEntry.content = loreEntry.content.trim() + "\n" + newText;
+    loreEntry.embedded = false; // Content changed, needs re-embedding
 
     // Mark lore embeddings as dirty for re-sync
     storyData.loreEmbeddingsDirty = true;
@@ -2542,6 +2546,7 @@ export function executeCommandWithResponse(
     }
 
     loreEntry.content = loreEntry.content.replace(oldText, newText);
+    loreEntry.embedded = false; // Content changed, needs re-embedding
 
     // Mark lore embeddings as dirty for re-sync
     storyData.loreEmbeddingsDirty = true;
@@ -2602,6 +2607,7 @@ export function executeCommandWithResponse(
     // Clean up multiple spaces and newlines
     loreEntry.content = loreEntry.content.replace(/  +/g, " ");
     loreEntry.content = loreEntry.content.replace(/\n{3,}/g, "\n\n");
+    loreEntry.embedded = false; // Content changed, needs re-embedding
 
     // Mark lore embeddings as dirty for re-sync
     storyData.loreEmbeddingsDirty = true;

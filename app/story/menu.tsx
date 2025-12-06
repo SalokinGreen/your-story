@@ -21,6 +21,8 @@ import {
   Ability,
   AbilityCost,
   AbilityGrade,
+  MemoryEntry,
+  getMemoryContent,
 } from "../misc/structs";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -2682,7 +2684,16 @@ function LoreEditor({
 
   const saveEditLore = (index: number) => {
     const items = [...localLore];
-    items[index] = { ...items[index], ...editLore };
+    const original = items[index];
+    // Check if content or title changed - mark as needing re-embedding
+    const contentChanged =
+      (editLore.content !== undefined && editLore.content !== original.content) ||
+      (editLore.title !== undefined && editLore.title !== original.title);
+    items[index] = {
+      ...items[index],
+      ...editLore,
+      ...(contentChanged ? { embedded: false } : {}),
+    };
     setLocalLore(items);
     onUpdate(items);
     setEditingLoreIndex(null);
@@ -2692,6 +2703,10 @@ function LoreEditor({
   const updateLore = (index: number, field: keyof StoryLore, value: any) => {
     const updated = [...localLore];
     (updated[index] as any)[field] = value;
+    // Mark as needing re-embedding if content or title changed
+    if (field === "content" || field === "title") {
+      updated[index].embedded = false;
+    }
     setLocalLore(updated);
     onUpdate(updated);
   };
@@ -2711,6 +2726,7 @@ function LoreEditor({
       off_triggers: [],
       trigger_lores: [],
       untrigger_lores: [],
+      embedded: false, // Mark new entries for embedding
     };
     const updated = [...localLore, newLore];
     setLocalLore(updated);
@@ -4347,7 +4363,7 @@ function StoryMetaEditor({
   authorNotes,
   onUpdate,
 }: {
-  memory: string[];
+  memory: (string | MemoryEntry)[];
   premise: string;
   authorNotes?: string;
   onUpdate: (updates: Partial<StoryData>) => void;
@@ -4355,7 +4371,10 @@ function StoryMetaEditor({
   const [localAuthorNotes, setLocalAuthorNotes] = useState<string>(
     authorNotes || ""
   );
-  const [localMemory, setLocalMemory] = useState<string[]>([...memory]);
+  // Store the full memory array with MemoryEntry objects
+  const [localMemory, setLocalMemory] = useState<(string | MemoryEntry)[]>([
+    ...memory,
+  ]);
   const [newMemoryEntry, setNewMemoryEntry] = useState<string>("");
 
   return (
@@ -4399,7 +4418,12 @@ function StoryMetaEditor({
               onClick={() => {
                 const trimmed = newMemoryEntry.trim();
                 if (!trimmed) return;
-                const updated = [...localMemory, trimmed];
+                // Create a MemoryEntry with embedded: false to mark for embedding
+                const newEntry: MemoryEntry = {
+                  content: trimmed,
+                  embedded: false,
+                };
+                const updated = [...localMemory, newEntry];
                 setLocalMemory(updated);
                 onUpdate({ memory: updated });
                 setNewMemoryEntry("");
@@ -4415,7 +4439,7 @@ function StoryMetaEditor({
                 key={index}
                 className="p-3 bg-blue-900/20 rounded text-sm text-blue-200 flex justify-between items-center"
               >
-                <span className="pr-2 flex-1">{entry}</span>
+                <span className="pr-2 flex-1">{getMemoryContent(entry)}</span>
                 <button
                   onClick={() => {
                     const updated = localMemory.filter((_, i) => i !== index);

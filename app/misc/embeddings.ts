@@ -3,6 +3,8 @@
  * Uses Mistral's mistral-embed model (1024 dimensions)
  */
 
+import { MemoryEntry } from "./structs";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -352,16 +354,23 @@ function getMemoryKey(content: string, index: number): string {
 }
 
 /**
- * Sync memories to the embedding database with full cleanup
- * Handles additions, deletions, and content changes
+ * Sync memories to the embedding database
+ * Only embeds entries where embedded !== true
+ * Returns indices of newly embedded entries so caller can mark them
  */
 export async function syncNewMemories(
   storyId: string,
-  memories: string[],
+  memories: (string | MemoryEntry)[],
   existingKeys: Set<string>,
   authToken: string
-): Promise<{ synced: number; cleaned: number; errors: string[] }> {
+): Promise<{
+  synced: number;
+  cleaned: number;
+  errors: string[];
+  embeddedIndices: number[];
+}> {
   const errors: string[] = [];
+  const embeddedIndices: number[] = [];
 
   // Build current memory entries with content-based keys
   const memoryEntries: Array<{
@@ -369,21 +378,29 @@ export async function syncNewMemories(
     content: string;
     type: "memory";
     importance?: number;
+    originalIndex: number;
   }> = [];
 
   const validKeys: string[] = [];
 
   memories.forEach((memory, index) => {
-    const key = getMemoryKey(memory, index);
+    // Handle both string and MemoryEntry formats
+    const content = typeof memory === "string" ? memory : memory.content;
+    const isEmbedded = typeof memory === "string" ? false : memory.embedded === true;
+    
+    const key = getMemoryKey(content, index);
     validKeys.push(key);
 
-    // Only generate embedding if this key doesn't exist
-    if (!existingKeys.has(key)) {
+    // Only generate embedding if:
+    // 1. This key doesn't exist in DB, OR
+    // 2. The entry is marked as not embedded (embedded !== true)
+    if (!existingKeys.has(key) || !isEmbedded) {
       memoryEntries.push({
         key,
-        content: memory,
+        content,
         type: "memory",
-        importance: calculateMemoryImportance(memory),
+        importance: calculateMemoryImportance(content),
+        originalIndex: index,
       });
     }
   });
@@ -394,8 +411,19 @@ export async function syncNewMemories(
   // Upsert new/changed memories
   if (memoryEntries.length > 0) {
     try {
-      const result = await upsertEmbeddings(storyId, memoryEntries, authToken);
+      const result = await upsertEmbeddings(
+        storyId,
+        memoryEntries.map(({ key, content, type, importance }) => ({
+          key,
+          content,
+          type,
+          importance,
+        })),
+        authToken
+      );
       synced = result.upserted;
+      // Track which indices were successfully embedded
+      memoryEntries.forEach((e) => embeddedIndices.push(e.originalIndex));
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       errors.push(`Upsert failed: ${message}`);
@@ -416,22 +444,32 @@ export async function syncNewMemories(
     errors.push(`Cleanup failed: ${message}`);
   }
 
-  return { synced, cleaned, errors };
+  return { synced, cleaned, errors, embeddedIndices };
 }
 
 /**
- * Sync all lore entries to the embedding database
- * Call this when loading a story or when lore changes
+ * Sync lore entries to the embedding database
+ * Only embeds entries where embedded !== true
+ * Returns titles of newly embedded entries so caller can mark them
  */
 export async function syncLoreEmbeddings(
   storyId: string,
-  lore: Array<{ title: string; content: string }>,
+  lore: Array<{ title: string; content: string; embedded?: boolean }>,
   authToken: string
-): Promise<{ synced: number; cleaned: number; errors: string[] }> {
+): Promise<{
+  synced: number;
+  cleaned: number;
+  errors: string[];
+  embeddedTitles: string[];
+}> {
   const errors: string[] = [];
+  const embeddedTitles: string[] = [];
+
+  // Filter to only entries that need embedding (embedded !== true)
+  const loreToEmbed = lore.filter((l) => l.embedded !== true);
 
   // Prepare lore entries for embedding
-  const loreEntries = lore.map((l) => ({
+  const loreEntries = loreToEmbed.map((l) => ({
     key: l.title,
     content: `${l.title}: ${l.content}`,
     type: "lore" as const,
@@ -441,11 +479,13 @@ export async function syncLoreEmbeddings(
   let synced = 0;
   let cleaned = 0;
 
-  // Upsert all lore (upsert handles duplicates gracefully)
+  // Upsert only entries that need embedding
   if (loreEntries.length > 0) {
     try {
       const result = await upsertEmbeddings(storyId, loreEntries, authToken);
       synced = result.upserted;
+      // Track which titles were successfully embedded
+      loreToEmbed.forEach((l) => embeddedTitles.push(l.title));
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       errors.push(`Upsert failed: ${message}`);
@@ -467,7 +507,7 @@ export async function syncLoreEmbeddings(
     errors.push(`Cleanup failed: ${message}`);
   }
 
-  return { synced, cleaned, errors };
+  return { synced, cleaned, errors, embeddedTitles };
 }
 
 /**

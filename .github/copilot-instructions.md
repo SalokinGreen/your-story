@@ -30,7 +30,8 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Ability**: Skills/spells/techniques with `name`, `description`, `grade` (AbilityGrade), `cost` (AbilityCost[]), `cooldown`, `currentCooldown`, `stat` (optional), `symbol`.
   - **AbilityCost**: { type: "resource" | "variable", name: string, amount: number }
   - **AbilityGrade**: "novice" | "apprentice" | "adept" | "expert" | "master" | "legendary"
-  - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `var_on_triggers` (string[]), `var_off_triggers` (string[]) for dynamic visibility.
+  - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `var_on_triggers` (string[]), `var_off_triggers` (string[]) for dynamic visibility. Also includes `embedded?: boolean` to track embedding state for efficient re-embedding.
+  - **MemoryEntry**: Memory entries can be either `string` (legacy) or `{ content: string, embedded?: boolean }`. Use `getMemoryContent(entry)` helper to extract content. StoryData.memory is `(string | MemoryEntry)[]`.
   - **ScenePart**: Includes optional `toolCalls` (ToolCall[]) and `toolResponses` (CommandResponse[]) for preserving tool calling conversation history. Also includes `stateChanges` (string[]) for human-readable game state modifications that are sent to the story stage.
   - **CommandResponse**: Includes optional `toolCallId` for linking responses to specific tool calls in conversation history.
   - **Condition**: Afflictions/injuries with tiers I-VI that penalize skill checks. Includes `id`, `name`, `tier` (1-6), `description`, `affects` (array of stat names), `affectsAll` (boolean), `source`, `permanent`, `createdAt`.
@@ -275,6 +276,10 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - **Purpose**: Uses Mistral's mistral-embed model (1024 dimensions, $0.10/M tokens) for semantic search of lore and memories.
 - **Database**: `story_embeddings` table with pgvector extension in Supabase (see docs/embeddings-migration.sql).
 - **When to use**: Automatically enabled when `options.enableEmbeddings=true` and story has >30 lore entries or >50 memories.
+- **Embedded tracking**: Both `StoryLore` and memory entries (`MemoryEntry`) have an `embedded?: boolean` field.
+  - When content is modified, `embedded` is set to `false` to mark it for re-embedding
+  - After successful embedding sync, entries are marked as `embedded: true`
+  - Sync functions only embed entries where `embedded !== true`, avoiding redundant API calls
 - **API Routes**:
   - `/api/embeddings/generate` - Generate embeddings for texts array
   - `/api/embeddings/search` - Semantic search using pgvector RPC
@@ -283,17 +288,17 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - **Client utilities** (`app/misc/embeddings.ts`):
   - `searchRelevantContext(storyId, query, authToken, options)` - Retrieve relevant lore/memories
   - `upsertEmbeddings(storyId, entries, authToken)` - Sync entries to database
-  - `syncNewMemories(storyId, memories, existingKeys, authToken)` - Background memory sync
-  - `syncLoreEmbeddings(storyId, lore, authToken)` - Full lore sync
+  - `syncNewMemories(storyId, memories, existingKeys, authToken)` - Background memory sync, returns `embeddedIndices`
+  - `syncLoreEmbeddings(storyId, lore, authToken)` - Full lore sync, returns `embeddedTitles`
   - `buildSearchQuery(userChoice, recentParts)` - Build query from context
 - **Integration in generation.ts**:
   - Stage 0 (before story): Retrieves embedding context if enabled and thresholds met
-  - Stage 4 (after tools): Background sync of new memories (fire-and-forget)
+  - Stage 4 (after tools): Background sync of new memories (fire-and-forget), marks synced entries as `embedded: true`
   - `EmbeddingContext` interface passed to `buildStoryPrompt()` and `buildInfoMessage()`
 - **Integration in story/page.tsx**:
   - On story load: Syncs lore embeddings if `embeddingsEnabled=true`, 5+ lore entries, and `loreEmbeddingsDirty !== false`
   - On lore update via menu: Sets `loreEmbeddingsDirty = true`, triggering sync on next render
-  - Clears dirty flag after successful sync
+  - Clears dirty flag after successful sync and marks lore entries as `embedded: true`
 - **Dirty flag (`loreEmbeddingsDirty`)**: Tracks when lore content has changed and needs re-embedding
   - Set by: `updateStoryData({ lore })`, AI lore commands (create_lore, lore_update, lore_add_content, lore_replace_content, lore_delete_content)
   - Checked by: useEffect in page.tsx that triggers sync only when dirty

@@ -315,7 +315,8 @@ export function executeTools(
         });
         if (!storyData.memory) storyData.memory = [];
         const entry = args.entry;
-        storyData.memory.push(entry);
+        // Add as MemoryEntry with embedded: false so it gets embedded on next sync
+        storyData.memory.push({ content: entry, embedded: false });
         const successMsg = `Added memory: "${entry.substring(0, 50)}${
           entry.length > 50 ? "..." : ""
         }"`;

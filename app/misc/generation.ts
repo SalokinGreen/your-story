@@ -16,6 +16,7 @@ import {
   Choice,
   ScenePart,
   ActionAnalysis,
+  MemoryEntry,
 } from "@/app/misc/structs";
 import {
   buildStoryPrompt,
@@ -634,8 +635,15 @@ export async function generateStoryTurn(
       storyContent = rawContent;
     }
 
-    // Strip [STOP] marker if the model added it (from following affirmation too literally)
-    storyContent = storyContent.replace(/\s*\[STOP\]\s*$/i, "").trimEnd();
+    // Strip [STOP] marker and partial variants if the model added it
+    // Handles: [STOP], [STOP, [STO, [ST, ---[STOP], ***[STOP], etc.
+    storyContent = storyContent
+      .replace(/\s*[-*_]{0,3}\s*\[STOP\]?\s*$/i, "")
+      .replace(/\s*\[STO?P?\s*$/i, "")
+      .replace(/\s*\[S\s*$/i, "")
+      .replace(/\s*[-*]{3}\s*\[\s*$/i, "") // ---[ or ***[
+      .replace(/\s*[-*]{3}\s*$/i, "") // trailing --- or ***
+      .trimEnd();
 
     // Strip trailing meta-blocks that start with dividers (---, ***) followed by bracketed content
     // Patterns like: "--- [GM State Update] ..." or "--- *[STOP – Player must choose...]*"
@@ -971,6 +979,21 @@ export async function generateStoryTurn(
               synced: result.synced,
               cleaned: result.cleaned,
               total: memoryCount,
+            });
+          }
+          // Mark embedded memory entries
+          if (result.embeddedIndices && result.embeddedIndices.length > 0) {
+            result.embeddedIndices.forEach((index) => {
+              const entry = storyData.memory[index];
+              if (entry) {
+                if (typeof entry === "string") {
+                  // Convert to MemoryEntry with embedded: true
+                  storyData.memory[index] = { content: entry, embedded: true };
+                } else {
+                  // Mark existing MemoryEntry as embedded
+                  entry.embedded = true;
+                }
+              }
             });
           }
         })

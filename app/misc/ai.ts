@@ -4,6 +4,7 @@ import {
   Choice,
   UPGRADE_COSTS,
   CommandResponse,
+  getMemoryContent,
 } from "@/app/misc/structs";
 import { getRPGSystem, RPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
@@ -295,26 +296,27 @@ Narrative Best Practices:
   const memory_cap = memoryTokens * CHARS_PER_TOKEN;
   const story_cap = storyTokens * CHARS_PER_TOKEN;
 
-  // Remove duplicate entries from memory
+  // Remove duplicate entries from memory (by content)
   let addedItems = new Set<string>();
-  const new_memory = storyData.memory.filter((item, index) => {
-    if (addedItems.has(item)) {
+  const new_memory = storyData.memory.filter((item) => {
+    const content = getMemoryContent(item);
+    if (addedItems.has(content)) {
       return false;
     } else {
-      addedItems.add(item);
+      addedItems.add(content);
       return true;
     }
   });
   storyData.memory = new_memory;
   // Trim memory if too large
   let totalMemoryLength = storyData.memory.reduce(
-    (acc, entry) => acc + entry.length,
+    (acc, entry) => acc + getMemoryContent(entry).length,
     0
   );
   while (totalMemoryLength > memory_cap && storyData.memory.length > 0) {
     const removed = storyData.memory.shift();
     if (removed) {
-      totalMemoryLength -= removed.length;
+      totalMemoryLength -= getMemoryContent(removed).length;
     }
   }
   const info = cleanString(storyDataToString(storyData));
@@ -496,8 +498,8 @@ export function storyDataToString(storyData: StoryData): string {
   }
 
   result += `## Memory:\n`;
-  storyData.memory.forEach((mem, index) => {
-    result += `- ${mem}\n`;
+  storyData.memory.forEach((mem) => {
+    result += `- ${getMemoryContent(mem)}\n`;
   });
 
   // Quests

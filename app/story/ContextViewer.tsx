@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { StoryData } from "../misc/structs";
+import { StoryData, getMemoryContents } from "../misc/structs";
 import {
   buildStoryPrompt,
   buildToolPrompt,
@@ -171,7 +171,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         (l) => l.enabled !== false && l.on !== false
       );
       const simulatedLoreTitles = activeLore.slice(0, 8).map((l) => l.title);
-      const simulatedMemories = storyData.memory.slice(-15); // Most recent 15
+      const simulatedMemories = getMemoryContents(storyData.memory.slice(-15)); // Most recent 15
 
       // Always use embedding context when enabled
       simulatedEmbeddingContext = {

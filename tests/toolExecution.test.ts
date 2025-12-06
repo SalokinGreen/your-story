@@ -8,6 +8,7 @@
 import { describe, test, expect } from "vitest";
 import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
 import type { StoryData } from "@/app/misc/structs";
+import { getMemoryContent } from "@/app/misc/structs";
 
 // Helper to create minimal story data
 function createTestStory(): StoryData {
@@ -63,7 +64,7 @@ describe("Tool Execution", () => {
       expect(responses[0].success).toBe(true);
       expect(responses[0].message).toContain("Added memory");
       expect(storyData.memory).toHaveLength(1);
-      expect(storyData.memory[0]).toBe(
+      expect(getMemoryContent(storyData.memory[0])).toBe(
         "Met the mysterious merchant Aldric in the tavern"
       );
     });
@@ -97,8 +98,8 @@ describe("Tool Execution", () => {
       expect(responses[0].success).toBe(true);
       expect(responses[1].success).toBe(true);
       expect(storyData.memory).toHaveLength(2);
-      expect(storyData.memory[0]).toBe("First memory");
-      expect(storyData.memory[1]).toBe("Second memory");
+      expect(getMemoryContent(storyData.memory[0])).toBe("First memory");
+      expect(getMemoryContent(storyData.memory[1])).toBe("Second memory");
     });
 
     test("should truncate long memory entries in message", () => {
@@ -119,7 +120,7 @@ describe("Tool Execution", () => {
       expect(responses[0].success).toBe(true);
       expect(responses[0].message).toContain("...");
       expect(responses[0].message.length).toBeLessThan(100);
-      expect(storyData.memory[0]).toBe(longEntry); // Full entry stored
+      expect(getMemoryContent(storyData.memory[0])).toBe(longEntry); // Full entry stored
     });
   });
 
@@ -313,7 +314,7 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(storyData.memory[0]).toBe("Memory from JSON string");
+      expect(getMemoryContent(storyData.memory[0])).toBe("Memory from JSON string");
     });
 
     test("should parse JSON string arguments for create_lore", () => {

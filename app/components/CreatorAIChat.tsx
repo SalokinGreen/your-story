@@ -22,6 +22,7 @@ import {
   calculateTokenCost,
 } from "@/app/misc/ai_prices";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
+import { CustomModel } from "@/app/misc/user_settings";
 
 interface CreatorAIChatProps {
   isOpen: boolean;
@@ -109,17 +110,71 @@ export default function CreatorAIChat({
     return "";
   });
   const [showKeyInput, setShowKeyInput] = useState(false);
+
+  // Load custom models from localStorage
+  const [customModels, setCustomModels] = useState<CustomModel[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("customModels");
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  // Re-check localStorage for custom models periodically (in case user adds them in settings)
+  useEffect(() => {
+    const checkCustomModels = () => {
+      try {
+        const stored = localStorage.getItem("customModels");
+        const models = stored ? JSON.parse(stored) : [];
+        if (JSON.stringify(models) !== JSON.stringify(customModels)) {
+          setCustomModels(models);
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    };
+    // Check on focus (user might have updated in another tab/modal)
+    window.addEventListener("focus", checkCustomModels);
+    return () => window.removeEventListener("focus", checkCustomModels);
+  }, [customModels]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Get model config
-  const modelConfig = useMemo(() => getModelConfig(model), [model]);
+  // Get model config - check custom models first, then fallback to built-in
+  const modelConfig = useMemo(() => {
+    // Check if model is a custom model UUID
+    const customModel = customModels.find((m) => m.id === model);
+    if (customModel) {
+      return {
+        name: customModel.name,
+        original_model: customModel.modelId,
+        model: customModel.modelId,
+        maxTokens: customModel.contextSize,
+        maxOutputTokens: customModel.maxOutputTokens,
+        provider: "openrouter" as const,
+        supportsToolCalling: true,
+        cost: 0,
+        inputPrice: customModel.inputPrice || 0,
+        outputPrice: customModel.outputPrice || 0,
+        finetunes: [],
+        strengths: [],
+        weaknesses: [],
+        description: "Custom user-defined model",
+        bannerUrl: undefined,
+      };
+    }
+    return getModelConfig(model);
+  }, [model, customModels]);
 
   // Check if NovelAI is selected
   const isNovelAISelected = modelConfig.provider === "novelai";
 
   // Filter models based on BYOK mode
   const filteredModels = useMemo(() => {
-    return Object.entries(AI_MODELS).filter(([, m]) => {
+    const builtInModels = Object.entries(AI_MODELS).filter(([, m]) => {
       const provider = (m as { provider?: string }).provider;
       if (byokMode) {
         // BYOK mode: show openrouter, deepseek, novelai, google
@@ -134,7 +189,19 @@ export default function CreatorAIChat({
         return provider === "mistral" || provider === "deepinfra";
       }
     });
-  }, [byokMode]);
+
+    // Add custom models in BYOK mode
+    if (byokMode && customModels.length > 0) {
+      const customEntries: [string, { name: string; cost: number }][] =
+        customModels.map((m) => [
+          m.id, // Use UUID as key
+          { name: `⭐ ${m.name}`, cost: 0 },
+        ]);
+      return [...builtInModels, ...customEntries];
+    }
+
+    return builtInModels;
+  }, [byokMode, customModels]);
 
   // Check if user has any BYOK keys configured
   const hasAnyBYOKKey =

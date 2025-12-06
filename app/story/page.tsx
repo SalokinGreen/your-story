@@ -12,6 +12,7 @@ import {
   UPGRADE_COSTS,
   Preset,
   CommandResponse,
+  getMemoryContent,
 } from "../misc/structs";
 import {
   getRPGSystem,
@@ -1687,7 +1688,7 @@ function StoryPageContent() {
           );
           if (memoryToolCalls.length > 0) {
             const existingMemoryLower = storyData.memory.map((m) =>
-              m.toLowerCase().trim()
+              getMemoryContent(m).toLowerCase().trim()
             );
             for (const tc of memoryToolCalls) {
               let args: any = tc.function?.arguments;
@@ -1703,7 +1704,8 @@ function StoryPageContent() {
                 entry &&
                 !existingMemoryLower.includes(entry.toLowerCase().trim())
               ) {
-                storyData.memory.push(entry);
+                // Add as MemoryEntry with embedded: false
+                storyData.memory.push({ content: entry, embedded: false });
                 existingMemoryLower.push(entry.toLowerCase().trim());
                 addNotification(
                   `Memory added: ${entry.substring(0, 80)}${
@@ -1732,7 +1734,7 @@ function StoryPageContent() {
       // Handle memory entries (legacy system)
       if (part.memoryEntries && part.memoryEntries.length > 0) {
         const existingMemoryLower = storyData.memory.map((m) =>
-          m.toLowerCase().trim()
+          getMemoryContent(m).toLowerCase().trim()
         );
         const newMemories = part.memoryEntries.filter(
           (entry: string) =>
@@ -1743,7 +1745,10 @@ function StoryPageContent() {
             count: newMemories.length,
             entries: newMemories,
           });
-          storyData.memory.push(...newMemories);
+          // Add as MemoryEntry with embedded: false
+          storyData.memory.push(
+            ...newMemories.map((content: string) => ({ content, embedded: false }))
+          );
         }
       }
 
@@ -2186,7 +2191,11 @@ function StoryPageContent() {
       if (shouldSyncLore) {
         syncLoreEmbeddings(
           storyDbId,
-          storyData.lore.map((l) => ({ title: l.title, content: l.content })),
+          storyData.lore.map((l) => ({
+            title: l.title,
+            content: l.content,
+            embedded: l.embedded,
+          })),
           token
         )
           .then((result) => {
@@ -2195,10 +2204,18 @@ function StoryPageContent() {
                 `[Embeddings] Lore sync: ${result.synced} entries, ${result.cleaned} cleaned`
               );
             }
-            // Clear the dirty flag after successful sync
-            if (storyData.loreEmbeddingsDirty !== false) {
-              storyData.loreEmbeddingsDirty = false;
-              setStoryData({ ...storyData });
+            // Mark successfully embedded lore entries and clear dirty flag
+            if (result.embeddedTitles.length > 0 || storyData.loreEmbeddingsDirty !== false) {
+              const updatedLore = storyData.lore.map((l) =>
+                result.embeddedTitles.includes(l.title)
+                  ? { ...l, embedded: true }
+                  : l
+              );
+              setStoryData({
+                ...storyData,
+                lore: updatedLore,
+                loreEmbeddingsDirty: false,
+              });
             }
           })
           .catch((err) => {
@@ -2219,6 +2236,18 @@ function StoryPageContent() {
               console.log(
                 `[Embeddings] Memory sync: ${result.synced} entries, ${result.cleaned} cleaned`
               );
+            }
+            // Mark successfully embedded memory entries
+            if (result.embeddedIndices.length > 0) {
+              const updatedMemory = storyData.memory.map((m, i) => {
+                if (result.embeddedIndices.includes(i)) {
+                  // Convert to MemoryEntry format with embedded: true
+                  const content = typeof m === "string" ? m : m.content;
+                  return { content, embedded: true };
+                }
+                return m;
+              });
+              setStoryData({ ...storyData, memory: updatedMemory });
             }
           })
           .catch((err) => {
@@ -2511,24 +2540,25 @@ function StoryPageContent() {
 
     //Removeduplicateentriesfrommemory
     let addedItems = new Set<string>();
-    const new_memory = storyData.memory.filter((item, index) => {
-      if (addedItems.has(item)) {
+    const new_memory = storyData.memory.filter((item) => {
+      const content = getMemoryContent(item);
+      if (addedItems.has(content)) {
         return false;
       } else {
-        addedItems.add(item);
+        addedItems.add(content);
         return true;
       }
     });
     storyData.memory = new_memory;
     //Trimmemoryiftoolarge
     let totalMemoryLength = storyData.memory.reduce(
-      (acc, entry) => acc + entry.length,
+      (acc, entry) => acc + getMemoryContent(entry).length,
       0
     );
     while (totalMemoryLength > memory_cap && storyData.memory.length > 0) {
       const removed = storyData.memory.shift();
       if (removed) {
-        totalMemoryLength -= removed.length;
+        totalMemoryLength -= getMemoryContent(removed).length;
       }
     }
     const updatedStory = { ...storyData, ...updates };

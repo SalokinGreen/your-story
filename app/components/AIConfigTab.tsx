@@ -180,6 +180,13 @@ export default function AIConfigTab() {
         .then((settings) => {
           if (settings) {
             setCustomModels(settings.custom_models || []);
+            // Cache custom models to localStorage for use in other components
+            if (settings.custom_models?.length) {
+              localStorage.setItem(
+                "customModels",
+                JSON.stringify(settings.custom_models)
+              );
+            }
 
             // Load AI config from cloud (overrides localStorage)
             if (settings.ai_config) {
@@ -361,7 +368,10 @@ export default function AIConfigTab() {
       outputPrice: newOutputPrice,
     };
 
-    setCustomModels([...customModels, newModel]);
+    const updatedModels = [...customModels, newModel];
+    setCustomModels(updatedModels);
+    // Update localStorage cache
+    localStorage.setItem("customModels", JSON.stringify(updatedModels));
     setNewModelId("");
     setNewModelName("");
     setNewContextSize(4096);
@@ -375,7 +385,10 @@ export default function AIConfigTab() {
   };
 
   const handleDeleteModel = (id: string) => {
-    setCustomModels(customModels.filter((m) => m.id !== id));
+    const updatedModels = customModels.filter((m) => m.id !== id);
+    setCustomModels(updatedModels);
+    // Update localStorage cache
+    localStorage.setItem("customModels", JSON.stringify(updatedModels));
     addNotification(
       "Model removed! Click Sync to save to your account.",
       "warning"
@@ -413,6 +426,8 @@ export default function AIConfigTab() {
     );
 
     setCustomModels(updatedModels);
+    // Update localStorage cache
+    localStorage.setItem("customModels", JSON.stringify(updatedModels));
     setEditingModelId(null);
     setNewModelId("");
     setNewModelName("");
@@ -1114,6 +1129,32 @@ export default function AIConfigTab() {
                               className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
                             />
                           </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={newInputPrice}
+                              onChange={(e) =>
+                                setNewInputPrice(
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              placeholder="Input $/M tokens"
+                              className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
+                            />
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={newOutputPrice}
+                              onChange={(e) =>
+                                setNewOutputPrice(
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              placeholder="Output $/M tokens"
+                              className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
+                            />
+                          </div>
                           <div className="flex gap-2">
                             <button
                               onClick={handleUpdateModel}
@@ -1209,6 +1250,36 @@ export default function AIConfigTab() {
                         value={newMaxOutput}
                         onChange={(e) =>
                           setNewMaxOutput(parseInt(e.target.value) || 1000)
+                        }
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        Input $/M tokens
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newInputPrice}
+                        onChange={(e) =>
+                          setNewInputPrice(parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        Output $/M tokens
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newOutputPrice}
+                        onChange={(e) =>
+                          setNewOutputPrice(parseFloat(e.target.value) || 0)
                         }
                         className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
                       />

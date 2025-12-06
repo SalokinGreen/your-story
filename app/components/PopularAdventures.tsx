@@ -41,7 +41,7 @@ export default function PopularAdventures({
         </button>
       </div>
 
-      <div className="flex gap-3 pb-2 -mx-4 px-4 overflow-x-auto scrollbar-hide">
+      <div className="flex gap-3 pb-2 -mx-4 px-4 overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing touch-pan-x">
         {adventures.length === 0 ? (
           <div className="w-full text-center py-8 text-blue-200/40">
             No adventures yet. Be the first to create one!
@@ -51,7 +51,7 @@ export default function PopularAdventures({
             <div
               key={adventure.id}
               onClick={() => router.push(`/explorer/${adventure.id}`)}
-              className="shrink-0 w-64 h-[196px] bg-blue-950/50 rounded-xl border border-blue-800/30 overflow-hidden cursor-pointer hover:border-blue-600/50 transition-all group"
+              className="shrink-0 w-64 bg-blue-950/50 rounded-xl border border-blue-800/30 overflow-hidden cursor-pointer hover:border-blue-600/50 transition-all group"
             >
               {adventure.thumbnailUrl ? (
                 <div className="h-32 w-64 relative overflow-hidden">
@@ -85,10 +85,10 @@ export default function PopularAdventures({
                 <h3 className="font-medium text-white text-sm line-clamp-1 mb-1">
                   {adventure.title}
                 </h3>
-                <p className="text-xs text-blue-200/40 line-clamp-1 mb-2">
+                <p className="text-xs text-blue-200/40 line-clamp-1">
                   {adventure.shortDescription}
                 </p>
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-2 text-xs mt-1.5">
                   <span className="text-yellow-400 flex items-center gap-0.5">
                     <StaticIcon name="Star" className="w-3 h-3 fill-current" />
                     {adventure.rating?.toFixed(1) || "-"}

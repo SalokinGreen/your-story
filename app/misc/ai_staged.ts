@@ -5,6 +5,7 @@ import {
   AbilityGrade,
   StoryLore,
   REST_CONFIG,
+  getMemoryContent,
 } from "@/app/misc/structs";
 import { getRPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
@@ -278,7 +279,7 @@ export function buildInfoMessage(
   } else {
     // Use all memories for smaller sets (or when no embeddings)
     memorySection = storyData.memory.length
-      ? `## Memory\n${storyData.memory.map((m) => `- ${m}`).join("\n")}`
+      ? `## Memory\n${storyData.memory.map((m) => `- ${getMemoryContent(m)}`).join("\n")}`
       : "";
   }
 

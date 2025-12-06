@@ -1524,15 +1524,12 @@ export function getModelConfig(modelKey: string): AIModelConfig {
 
   if (isUUID) {
     // Custom models are always OpenRouter BYOK - return a generic OpenRouter config
-    // The actual model ID will be resolved from user settings on the frontend
-    console.warn(
-      `Custom model UUID "${modelKey}" passed to getModelConfig. Using OpenRouter fallback. ` +
-        `For proper handling, pass the actual model ID instead of UUID.`
-    );
+    // The actual model config will be resolved from user settings on the API side
+    // This is expected behavior - no warning needed since API handles it properly
     return {
       name: "Custom Model",
       original_model: modelKey,
-      model: modelKey, // This won't work directly - frontend should pass modelId
+      model: modelKey,
       maxTokens: 128000,
       maxOutputTokens: 8000,
       provider: "openrouter", // Custom models are always OpenRouter
