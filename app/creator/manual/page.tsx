@@ -5003,6 +5003,135 @@ ${description || ""}`;
                 </p>
               </div>
             </div>
+
+            {/* Point Allocation Settings */}
+            <div className="bg-purple-900/20 border border-purple-800/50 rounded-lg p-4 mt-6">
+              <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
+                <DynamicIcon name="Zap" className="w-5 h-5 text-purple-400" />
+                Point Allocation Settings
+              </h3>
+              <p className="text-sm text-blue-300/60 mb-4">
+                Configure how players spend starting points during character
+                creation. These settings control the conversion rate between
+                points and stat/resource increases.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Points per Stat Increase
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={upgradeSettings.statUpgradeCost}
+                    onChange={(e) =>
+                      setUpgradeSettings((prev) => ({
+                        ...prev,
+                        statUpgradeCost: Math.max(
+                          1,
+                          parseInt(e.target.value) || 1
+                        ),
+                      }))
+                    }
+                    className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                  />
+                  <p className="text-xs text-blue-300/60 mt-1">
+                    Cost to increase a stat (default: 1)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Stat Increase Amount
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={upgradeSettings.statUpgradeAmount}
+                    onChange={(e) =>
+                      setUpgradeSettings((prev) => ({
+                        ...prev,
+                        statUpgradeAmount: Math.max(
+                          1,
+                          parseInt(e.target.value) || 1
+                        ),
+                      }))
+                    }
+                    className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                  />
+                  <p className="text-xs text-blue-300/60 mt-1">
+                    How much a stat increases per purchase (default: 1)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Points per Resource Increase
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={upgradeSettings.resourceUpgradeCost}
+                    onChange={(e) =>
+                      setUpgradeSettings((prev) => ({
+                        ...prev,
+                        resourceUpgradeCost: Math.max(
+                          1,
+                          parseInt(e.target.value) || 1
+                        ),
+                      }))
+                    }
+                    className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                  />
+                  <p className="text-xs text-blue-300/60 mt-1">
+                    Cost to increase a resource (default: 5)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Resource Increase Amount
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={upgradeSettings.resourceUpgradeAmount}
+                    onChange={(e) =>
+                      setUpgradeSettings((prev) => ({
+                        ...prev,
+                        resourceUpgradeAmount: Math.max(
+                          1,
+                          parseInt(e.target.value) || 1
+                        ),
+                      }))
+                    }
+                    className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                  />
+                  <p className="text-xs text-blue-300/60 mt-1">
+                    How much a resource increases per purchase (default: 10)
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 p-3 bg-blue-900/30 rounded-lg border border-blue-700/30">
+                <p className="text-xs text-blue-300 flex items-center gap-2">
+                  <DynamicIcon name="Info" className="w-4 h-4 shrink-0" />
+                  <span>
+                    <strong>Preview:</strong> {upgradeSettings.statUpgradeCost}{" "}
+                    point{upgradeSettings.statUpgradeCost !== 1 ? "s" : ""} → +
+                    {upgradeSettings.statUpgradeAmount} stat |{" "}
+                    {upgradeSettings.resourceUpgradeCost} point
+                    {upgradeSettings.resourceUpgradeCost !== 1 ? "s" : ""} → +
+                    {upgradeSettings.resourceUpgradeAmount} resource
+                  </span>
+                </p>
+              </div>
+            </div>
           </div>
         );
 
