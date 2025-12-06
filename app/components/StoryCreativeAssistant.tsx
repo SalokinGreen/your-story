@@ -1688,10 +1688,8 @@ function ToolArgsDisplay({
 
   // Relationships display
   if (toolName.includes("relationship")) {
-    const items = (args.relationships || args.modifications || [args]) as Record<
-      string,
-      unknown
-    >[];
+    const items = (args.relationships ||
+      args.modifications || [args]) as Record<string, unknown>[];
     const arrayItems = Array.isArray(items) ? items : [items];
 
     return (
