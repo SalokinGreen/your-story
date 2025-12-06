@@ -637,10 +637,13 @@ export async function generateStoryTurn(
 
     // Strip [STOP] marker and partial variants if the model added it
     // Handles: [STOP], [STOP, [STO, [ST, ---[STOP], ***[STOP], etc.
+    // Also handles partial [GM State markers from stop sequences
     storyContent = storyContent
       .replace(/\s*[-*_]{0,3}\s*\[STOP\]?\s*$/i, "")
       .replace(/\s*\[STO?P?\s*$/i, "")
       .replace(/\s*\[S\s*$/i, "")
+      .replace(/\s*\[GM?\s*S?t?a?t?e?\s*$/i, "") // Partial [GM State... from stop sequence
+      .replace(/\s*\[\s*$/i, "") // Lone [ at end (from stop sequence cutting mid-bracket)
       .replace(/\s*[-*]{3}\s*\[\s*$/i, "") // ---[ or ***[
       .replace(/\s*[-*]{3}\s*$/i, "") // trailing --- or ***
       .trimEnd();
