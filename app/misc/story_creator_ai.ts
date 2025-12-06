@@ -135,10 +135,26 @@ ${recentMemories.map((m) => `• ${getMemoryContent(m)}`).join("\n")}
         "### Context - Current Adventure State:"
       );
       if (insertPoint !== -1) {
+        // Build skill tree summary if exists
+        let skillTreeSummary = "";
+        if (storyData.skillTrees && storyData.skillTrees.length > 0) {
+          const treeNames = storyData.skillTrees.map((t) => t.name).join(", ");
+          const totalNodes = storyData.skillTrees.reduce(
+            (sum, t) => sum + (t.nodes?.length || 0),
+            0
+          );
+          skillTreeSummary = `
+**Progression System:** This story uses SKILL TREES (${storyData.skillTrees.length} trees: ${treeNames}) with ${totalNodes} total nodes.
+- 1 upgrade point = 1 skill tree node unlock
+- Current levelingSettings.defaultUpgradesPerLevel determines points per level
+- Adjust defaultUpgradesPerLevel (1-3 typical) and startingUpgrades based on skill tree depth
+`;
+        }
+
         const storyContextHeader = `
 ### Story-Specific Context:
 This is an ACTIVE STORY with ongoing gameplay. The player is editing their current game.
-${historyContext}${memoryContext}
+${skillTreeSummary}${historyContext}${memoryContext}
 `;
         systemMessage.content =
           systemMessage.content.slice(0, insertPoint) +

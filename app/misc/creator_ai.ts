@@ -1,4 +1,21 @@
-import { StoryData, StartingChoice } from "@/app/misc/structs";
+import {
+  StoryData,
+  StartingChoice,
+  Stat,
+  Resource,
+  InventoryItem,
+  Ability,
+  Achievement,
+  StoryLore,
+  Quest,
+  Relationship,
+  Condition,
+  Variable,
+  SkillTree,
+  CustomTable,
+  Preset,
+  getMemoryContent,
+} from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
 
 export interface CreatorAIInput {
@@ -10,6 +27,523 @@ export interface CreatorAIInput {
     description?: string;
     startingChoices?: StartingChoice[];
   };
+}
+
+/**
+ * Formats StoryData as readable markdown for AI context.
+ * Replaces JSON.stringify for better AI comprehension.
+ */
+export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
+  const sections: string[] = [];
+
+  // Basic info
+  if (
+    data.story_name ||
+    data.premise ||
+    data.player_name ||
+    data.player_summary
+  ) {
+    const basic: string[] = ["## Basic Info"];
+    if (data.story_name) basic.push(`- **Story Name:** ${data.story_name}`);
+    if (data.premise) basic.push(`- **Premise:** ${data.premise}`);
+    if (data.player_name) basic.push(`- **Player Name:** ${data.player_name}`);
+    if (data.player_summary)
+      basic.push(`- **Player Summary:** ${data.player_summary}`);
+    if (data.intro)
+      basic.push(
+        `- **Intro:** ${data.intro.substring(0, 200)}${
+          data.intro.length > 200 ? "..." : ""
+        }`
+      );
+    if (data.author_notes)
+      basic.push(`- **Author Notes:** ${data.author_notes}`);
+    sections.push(basic.join("\n"));
+  }
+
+  // Game settings
+  const settings: string[] = [];
+  if (data.rpgSystem) settings.push(`- **RPG System:** ${data.rpgSystem}`);
+  if (data.difficulty) settings.push(`- **Difficulty:** ${data.difficulty}`);
+  if (data.max_chapters)
+    settings.push(`- **Max Chapters:** ${data.max_chapters}`);
+  if (data.nsfw !== undefined)
+    settings.push(`- **NSFW:** ${data.nsfw ? "Yes" : "No"}`);
+  if (settings.length > 0) {
+    sections.push("## Game Settings\n" + settings.join("\n"));
+  }
+
+  // Stats
+  if (data.stats && data.stats.length > 0) {
+    const statsSection = ["## Stats"];
+    data.stats.forEach((stat: Stat) => {
+      statsSection.push(
+        `- **${stat.name}:** ${stat.value} ${
+          stat.symbol ? `(${stat.symbol})` : ""
+        }`
+      );
+      if (stat.description) statsSection.push(`  - ${stat.description}`);
+    });
+    sections.push(statsSection.join("\n"));
+  }
+
+  // Resources
+  if (data.resources && data.resources.length > 0) {
+    const resourcesSection = ["## Resources"];
+    data.resources.forEach((resource: Resource) => {
+      resourcesSection.push(
+        `- **${resource.name}:** ${resource.value}/${resource.maxValue} ${
+          resource.symbol ? `(${resource.symbol})` : ""
+        }`
+      );
+      if (resource.description)
+        resourcesSection.push(`  - ${resource.description}`);
+    });
+    sections.push(resourcesSection.join("\n"));
+  }
+
+  // Inventory
+  if (data.inventory && data.inventory.length > 0) {
+    const invSection = ["## Inventory"];
+    data.inventory.forEach((item: InventoryItem) => {
+      const typeStr = item.type !== "normal" ? ` [${item.type}]` : "";
+      const gradeStr =
+        item.grade && item.grade !== "common" ? ` (${item.grade})` : "";
+      const durStr =
+        item.durability !== undefined && item.maxDurability
+          ? ` - Durability: ${item.durability}/${item.maxDurability}`
+          : "";
+      invSection.push(
+        `- **${item.name}** x${item.quantity}${typeStr}${gradeStr}${durStr} ${
+          item.symbol || ""
+        }`
+      );
+      if (item.description) invSection.push(`  - ${item.description}`);
+      if (item.stat) invSection.push(`  - Affects: ${item.stat}`);
+    });
+    sections.push(invSection.join("\n"));
+  }
+
+  // Abilities
+  if (data.abilities && data.abilities.length > 0) {
+    const abilitiesSection = ["## Abilities"];
+    data.abilities.forEach((ability: Ability) => {
+      const costStr =
+        ability.cost.length > 0
+          ? ` - Cost: ${ability.cost
+              .map((c) => `${c.amount} ${c.name}`)
+              .join(", ")}`
+          : "";
+      const cooldownStr = ability.cooldown
+        ? ` - Cooldown: ${ability.cooldown} turns`
+        : "";
+      abilitiesSection.push(
+        `- **${ability.name}** [${ability.grade}]${costStr}${cooldownStr} ${
+          ability.symbol || ""
+        }`
+      );
+      if (ability.description)
+        abilitiesSection.push(`  - ${ability.description}`);
+      if (ability.stat)
+        abilitiesSection.push(`  - Associated stat: ${ability.stat}`);
+    });
+    sections.push(abilitiesSection.join("\n"));
+  }
+
+  // Achievements
+  if (data.achievements && data.achievements.length > 0) {
+    const achievementsSection = ["## Achievements"];
+    data.achievements.forEach((ach: Achievement) => {
+      const status = ach.dateAchieved ? "✓ Unlocked" : "○ Locked";
+      const hiddenStr = ach.hidden ? " [Hidden]" : "";
+      achievementsSection.push(
+        `- **${ach.title}** (${ach.points} pts) ${status}${hiddenStr} ${
+          ach.symbol || ""
+        }`
+      );
+      if (ach.description) achievementsSection.push(`  - ${ach.description}`);
+      if (ach.ai_hint)
+        achievementsSection.push(`  - *AI Hint:* ${ach.ai_hint}`);
+      if (ach.rewardDescription)
+        achievementsSection.push(`  - Reward: ${ach.rewardDescription}`);
+    });
+    sections.push(achievementsSection.join("\n"));
+  }
+
+  // Lore
+  if (data.lore && data.lore.length > 0) {
+    const loreSection = ["## Lore Entries"];
+    data.lore.forEach((lore: StoryLore) => {
+      const statusStr =
+        lore.on === false ? " [OFF]" : lore.alwaysOn ? " [Always On]" : "";
+      const secretStr = lore.secrtet ? " [Secret]" : "";
+      loreSection.push(`### ${lore.title}${statusStr}${secretStr}`);
+      loreSection.push(lore.content);
+      if (lore.on_triggers?.length)
+        loreSection.push(`- *On Triggers:* ${lore.on_triggers.join(", ")}`);
+      if (lore.off_triggers?.length)
+        loreSection.push(`- *Off Triggers:* ${lore.off_triggers.join(", ")}`);
+      if (lore.var_on_triggers?.length)
+        loreSection.push(
+          `- *Variable On Triggers:* ${lore.var_on_triggers.join(", ")}`
+        );
+      if (lore.var_off_triggers?.length)
+        loreSection.push(
+          `- *Variable Off Triggers:* ${lore.var_off_triggers.join(", ")}`
+        );
+      if (lore.trigger_lores?.length)
+        loreSection.push(
+          `- *Triggered By Lore:* ${lore.trigger_lores.join(", ")}`
+        );
+      loreSection.push(""); // Empty line between entries
+    });
+    sections.push(loreSection.join("\n"));
+  }
+
+  // Quests
+  if (data.quests && data.quests.length > 0) {
+    const questsSection = ["## Quests"];
+    data.quests.forEach((quest: Quest) => {
+      const status = quest.fulfilled
+        ? "✓ Complete"
+        : quest.active
+        ? "○ Active"
+        : "- Inactive";
+      questsSection.push(
+        `- **${quest.title}** (${quest.points} pts) ${status}`
+      );
+      questsSection.push(`  - ${quest.shortDescription}`);
+      if (quest.description !== quest.shortDescription) {
+        questsSection.push(`  - *Details:* ${quest.description}`);
+      }
+    });
+    sections.push(questsSection.join("\n"));
+  }
+
+  // Relationships
+  if (data.relationships && data.relationships.length > 0) {
+    const relSection = ["## Relationships"];
+    data.relationships.forEach((rel: Relationship) => {
+      const sentiment =
+        rel.value > 50 ? "Positive" : rel.value < -50 ? "Negative" : "Neutral";
+      relSection.push(
+        `- **${rel.name}:** ${rel.value} (${sentiment}) ${rel.symbol || ""}`
+      );
+      if (rel.description) relSection.push(`  - ${rel.description}`);
+    });
+    sections.push(relSection.join("\n"));
+  }
+
+  // Conditions
+  if (data.conditions && data.conditions.length > 0) {
+    const condSection = ["## Active Conditions"];
+    data.conditions.forEach((cond: Condition) => {
+      const permStr = cond.permanent ? " [Permanent]" : "";
+      const affectsStr = cond.affectsAll
+        ? "All checks"
+        : cond.affects.join(", ");
+      condSection.push(`- **${cond.name}** Tier ${cond.tier}${permStr}`);
+      condSection.push(`  - ${cond.description}`);
+      condSection.push(`  - Affects: ${affectsStr}`);
+      if (cond.source) condSection.push(`  - Source: ${cond.source}`);
+    });
+    sections.push(condSection.join("\n"));
+  }
+
+  // Variables
+  if (data.variables && data.variables.length > 0) {
+    const varsSection = ["## Variables"];
+    data.variables.forEach((v: Variable) => {
+      let valueStr: string;
+      if (v.type === "list") {
+        valueStr = v.items.length > 0 ? v.items.join(", ") : "(empty list)";
+      } else {
+        valueStr = String(v.value);
+      }
+      varsSection.push(`- **${v.name}** [${v.type}]: ${valueStr}`);
+      if (v.description) varsSection.push(`  - ${v.description}`);
+    });
+    sections.push(varsSection.join("\n"));
+  }
+
+  // Custom Tables
+  if (data.customTables && data.customTables.length > 0) {
+    const tablesSection = ["## Custom Tables"];
+    data.customTables.forEach((table: CustomTable) => {
+      tablesSection.push(`### ${table.name}`);
+      if (table.description) tablesSection.push(`*${table.description}*`);
+      table.entries.forEach((entry) => {
+        tablesSection.push(`- ${entry.text} (weight: ${entry.weight})`);
+      });
+      tablesSection.push("");
+    });
+    sections.push(tablesSection.join("\n"));
+  }
+
+  // Skill Trees
+  if (data.skillTrees && data.skillTrees.length > 0) {
+    const treesSection = ["## Skill Trees"];
+    data.skillTrees.forEach((tree: SkillTree) => {
+      treesSection.push(`### ${tree.name} ${tree.symbol || ""}`);
+      if (tree.description) treesSection.push(`*${tree.description}*`);
+      treesSection.push(`Nodes (${tree.nodes.length} total):`);
+      tree.nodes.forEach((node) => {
+        const prereqs =
+          node.prerequisites.length > 0
+            ? ` (requires: ${node.prerequisites.join(", ")})`
+            : " (root)";
+        treesSection.push(`- **${node.name}** [${node.type}]${prereqs}`);
+        if (node.description) treesSection.push(`  - ${node.description}`);
+        node.effects.forEach((effect) => {
+          if (effect.type === "stat_bonus") {
+            treesSection.push(`  - Effect: +${effect.value} ${effect.target}`);
+          } else if (effect.type === "resource_bonus") {
+            treesSection.push(
+              `  - Effect: +${effect.value} max ${effect.target}`
+            );
+          } else if (effect.type === "grant_ability") {
+            treesSection.push(`  - Effect: Grants ability "${effect.target}"`);
+          } else if (effect.type === "grant_item") {
+            treesSection.push(
+              `  - Effect: Grants item "${effect.target}" x${
+                effect.quantity || 1
+              }`
+            );
+          } else if (effect.type === "passive") {
+            treesSection.push(`  - Effect: Passive - ${effect.target}`);
+          }
+        });
+      });
+      treesSection.push("");
+    });
+    sections.push(treesSection.join("\n"));
+  }
+
+  // Unlocked nodes
+  if (data.unlockedNodes && data.unlockedNodes.length > 0) {
+    sections.push(`## Unlocked Skill Nodes\n${data.unlockedNodes.join(", ")}`);
+  }
+
+  // Presets
+  if (data.presets && data.presets.length > 0) {
+    const presetsSection = ["## Character Presets"];
+    data.presets.forEach((preset: Preset) => {
+      presetsSection.push(`### ${preset.name} ${preset.icon || ""}`);
+      presetsSection.push(`*${preset.description}*`);
+      if (preset.playerName)
+        presetsSection.push(`- Default name: ${preset.playerName}`);
+      if (preset.playerSummary)
+        presetsSection.push(`- Summary: ${preset.playerSummary}`);
+      if (preset.stats.length > 0) {
+        presetsSection.push(
+          `- Stats: ${preset.stats
+            .map((s) => `${s.name}: ${s.value}`)
+            .join(", ")}`
+        );
+      }
+      if (preset.resources.length > 0) {
+        presetsSection.push(
+          `- Resources: ${preset.resources
+            .map((r) => `${r.name}: ${r.value}/${r.maxValue}`)
+            .join(", ")}`
+        );
+      }
+      if (preset.inventory.length > 0) {
+        presetsSection.push(
+          `- Starting items: ${preset.inventory
+            .map((i) => `${i.name} x${i.quantity}`)
+            .join(", ")}`
+        );
+      }
+      if (preset.abilities && preset.abilities.length > 0) {
+        presetsSection.push(
+          `- Starting abilities: ${preset.abilities
+            .map((a) => a.name)
+            .join(", ")}`
+        );
+      }
+      if (preset.authorNotes)
+        presetsSection.push(`- *Author notes:* ${preset.authorNotes}`);
+      presetsSection.push("");
+    });
+    sections.push(presetsSection.join("\n"));
+  }
+
+  // Leveling Settings
+  if (data.levelingSettings) {
+    const ls = data.levelingSettings;
+    const levelingSection = ["## Leveling Settings"];
+    if (ls.xpBase !== undefined)
+      levelingSection.push(`- XP Base: ${ls.xpBase}`);
+    if (ls.levelCap !== undefined)
+      levelingSection.push(`- Level Cap: ${ls.levelCap}`);
+    if (ls.defaultUpgradesPerLevel !== undefined) {
+      levelingSection.push(
+        `- Default Upgrades Per Level: ${ls.defaultUpgradesPerLevel} (1 upgrade = 1 skill tree node)`
+      );
+    }
+    if (ls.useCustomCurve && ls.customCurve?.length) {
+      levelingSection.push(
+        `- Custom XP Curve: ${ls.customCurve
+          .map((c) => `Lvl ${c.level}: ${c.cumulativeXP} XP`)
+          .join(", ")}`
+      );
+    }
+    if (ls.upgradeOverrides?.length) {
+      levelingSection.push(
+        `- Upgrade Overrides: ${ls.upgradeOverrides
+          .map((o) => `Lvl ${o.level}: ${o.upgrades} upgrades`)
+          .join(", ")}`
+      );
+    }
+    if (ls.startingUpgrades) {
+      const starts = Object.entries(ls.startingUpgrades)
+        .map(([d, u]) => `${d}: ${u}`)
+        .join(", ");
+      levelingSection.push(`- Starting Upgrades by Difficulty: ${starts}`);
+    }
+    sections.push(levelingSection.join("\n"));
+  }
+
+  // Upgrade Settings
+  if (data.upgradeSettings) {
+    const us = data.upgradeSettings;
+    const upgradeSection = ["## Upgrade Settings"];
+    upgradeSection.push(`- System Enabled: ${us.enabled ? "Yes" : "No"}`);
+    if (us.enabled) {
+      if (us.allowStatUpgrade)
+        upgradeSection.push(
+          `- Stat Upgrade: +${us.statUpgradeAmount} for ${us.statUpgradeCost} points`
+        );
+      if (us.allowResourceUpgrade)
+        upgradeSection.push(
+          `- Resource Upgrade: +${us.resourceUpgradeAmount} max for ${us.resourceUpgradeCost} points`
+        );
+      if (us.allowAddItem)
+        upgradeSection.push(`- Add Item Cost: ${us.addItemCost} points`);
+      if (us.statShopEnabled && us.statShop.length > 0) {
+        upgradeSection.push(
+          `- Stat Shop (${us.statShop.length} items): ${us.statShop
+            .map((s) => `${s.name} (${s.cost}pts)`)
+            .join(", ")}`
+        );
+      }
+      if (us.resourceShopEnabled && us.resourceShop.length > 0) {
+        upgradeSection.push(
+          `- Resource Shop (${us.resourceShop.length} items): ${us.resourceShop
+            .map((r) => `${r.name} (${r.cost}pts)`)
+            .join(", ")}`
+        );
+      }
+      if (us.itemShopEnabled && us.itemShop.length > 0) {
+        upgradeSection.push(
+          `- Item Shop (${us.itemShop.length} items): ${us.itemShop
+            .map((i) => `${i.name} (${i.cost}pts)`)
+            .join(", ")}`
+        );
+      }
+      if (us.abilityShopEnabled && us.abilityShop.length > 0) {
+        upgradeSection.push(
+          `- Ability Shop (${us.abilityShop.length} items): ${us.abilityShop
+            .map((a) => `${a.name} (${a.cost}pts)`)
+            .join(", ")}`
+        );
+      }
+    }
+    sections.push(upgradeSection.join("\n"));
+  }
+
+  // Progress info
+  const progress: string[] = [];
+  if (data.points !== undefined)
+    progress.push(`- **XP (Points):** ${data.points}`);
+  if (data.level !== undefined) progress.push(`- **Level:** ${data.level}`);
+  if (data.upgradesSpent !== undefined)
+    progress.push(`- **Upgrades Spent:** ${data.upgradesSpent}`);
+  if (data.momentum !== undefined)
+    progress.push(`- **Momentum:** ${data.momentum}/${data.maxMomentum || 3}`);
+  if (data.currentChapter !== undefined)
+    progress.push(`- **Current Chapter:** ${data.currentChapter}`);
+  if (progress.length > 0) {
+    sections.push("## Progress\n" + progress.join("\n"));
+  }
+
+  // Memory (truncated for context)
+  if (data.memory && data.memory.length > 0) {
+    const memorySection = ["## Memory Entries"];
+    const memories = data.memory.slice(-10); // Last 10 memories
+    if (data.memory.length > 10) {
+      memorySection.push(
+        `*(Showing last 10 of ${data.memory.length} entries)*`
+      );
+    }
+    memories.forEach((mem) => {
+      memorySection.push(`- ${getMemoryContent(mem)}`);
+    });
+    sections.push(memorySection.join("\n"));
+  }
+
+  // AGMT State
+  if (data.agmtState) {
+    const agmt = data.agmtState;
+    const agmtSection = ["## AGMT State (Advanced Game Master Tools)"];
+    agmtSection.push(`- Chaos Factor: ${agmt.chaosFactor}`);
+    agmtSection.push(`- Scene Count: ${agmt.sceneCount}`);
+    if (agmt.threads.length > 0) {
+      agmtSection.push(
+        `- Active Threads: ${agmt.threads
+          .filter((t) => t.status === "active")
+          .map((t) => t.description)
+          .join("; ")}`
+      );
+    }
+    if (agmt.characters.length > 0) {
+      agmtSection.push(
+        `- Known Characters: ${agmt.characters
+          .filter((c) => c.status === "active")
+          .map((c) => `${c.name} (${c.role})`)
+          .join("; ")}`
+      );
+    }
+    sections.push(agmtSection.join("\n"));
+  }
+
+  // Game Over state
+  if (data.gameOver) {
+    sections.push(
+      `## Game Over\n- Reason: ${data.gameOver.reason}${
+        data.gameOver.condition
+          ? `\n- Caused by: ${data.gameOver.condition}`
+          : ""
+      }`
+    );
+  }
+
+  // Starting choices
+  if (data.starting_choices && data.starting_choices.length > 0) {
+    const choicesSection = ["## Starting Choices"];
+    data.starting_choices.forEach((choice, i) => {
+      choicesSection.push(`${i + 1}. "${choice.text}"`);
+      if (choice.intro_override)
+        choicesSection.push(
+          `   - Custom intro: ${choice.intro_override.substring(0, 100)}...`
+        );
+      if (choice.skill_used)
+        choicesSection.push(
+          `   - Skill check: ${choice.skill_used} DC ${choice.skill_dc || "?"}`
+        );
+      if (choice.resource_used)
+        choicesSection.push(`   - Resource: ${choice.resource_used}`);
+      if (choice.item_used)
+        choicesSection.push(
+          `   - Item: ${choice.item_used}${
+            choice.item_loss ? " (consumed)" : ""
+          }`
+        );
+    });
+    sections.push(choicesSection.join("\n"));
+  }
+
+  return sections.join("\n\n");
 }
 
 export function buildCreatorMessages({
@@ -324,11 +858,11 @@ You can control how items in arrays are applied using the **_command** field:
 - levelingSettings (Object with leveling curve and upgrade point configuration)
   - xpBase: Number (default 100) - Base multiplier for XP requirements. Higher = slower leveling.
   - levelCap: Number (default 100) - Maximum level players can reach.
-  - defaultUpgradesPerLevel: Number (default 1) - Upgrade points granted per level up.
+  - defaultUpgradesPerLevel: Number (default 1) - Upgrade points granted per level up. **Each upgrade point unlocks ONE skill tree node**, so 1 point/level is standard. For faster progression, use 2-3 points/level.
   - useCustomCurve: Boolean - When true, use customCurve instead of quadratic formula. MUST set to true when providing customCurve.
   - customCurve: Array of { level: number, cumulativeXP: number } - Custom XP thresholds for each level. Level is the target level (2+), cumulativeXP is total XP needed to reach that level. Example: [{ level: 2, cumulativeXP: 100 }, { level: 3, cumulativeXP: 300 }]
-  - upgradeOverrides: Array of { level, upgrades } - Override upgrade points for specific levels (e.g., milestone bonus points).
-  - startingUpgrades: Object { easy?: number, medium?: number, hard?: number, expert?: number } - Override starting upgrade points per difficulty.
+  - upgradeOverrides: Array of { level, upgrades } - Override upgrade points for specific levels (e.g., milestone bonus points at level 10).
+  - startingUpgrades: Object { easy?: number, medium?: number, hard?: number, expert?: number } - Starting upgrade points per difficulty. Since 1 point = 1 skill tree node, giving 5-10 starting points lets players customize their build immediately.
 
 Notes:
 - All characters should share the same stats and resources, but they may have different values.
@@ -853,14 +1387,22 @@ ${
 - Description: ${adventureMetadata.description || "(not set)"}
 - Starting Choices: ${
         adventureMetadata.startingChoices?.length
-          ? JSON.stringify(adventureMetadata.startingChoices, null, 2)
+          ? adventureMetadata.startingChoices
+              .map(
+                (c, i) =>
+                  `${i + 1}. "${c.text}"${
+                    c.skill_used ? ` [${c.skill_used} DC ${c.skill_dc}]` : ""
+                  }${c.intro_override ? " (custom intro)" : ""}`
+              )
+              .join("\n  ")
           : "(none - using default Start Story button)"
       }
 
 `
     : ""
-}**Story Template:**
-${JSON.stringify(cleanedStoryData, null, 2)}
+}**Current Adventure Data:**
+
+${formatStoryDataAsMarkdown(cleanedStoryData)}
 `;
 
   return [{ role: "system", content: systemPrompt }, ...messages];
@@ -1025,7 +1567,7 @@ export function parseCreatorOutput(content: string): {
   // Second try: look for raw JSON (no code fence) - common with some models
   // Find JSON object that starts with { and contains typical story data keys
   const rawJsonMatch = content.match(
-    /(\{[\s\S]*(?:"inventory"|"stats"|"lore"|"achievements"|"resources"|"quests"|"relationships"|"variables"|"abilities"|"customTables"|"skillTrees"|"upgradeSettings"|"presets")[\s\S]*\})/
+    /(\{[\s\S]*(?:"inventory"|"stats"|"lore"|"achievements"|"resources"|"quests"|"relationships"|"variables"|"abilities"|"customTables"|"skillTrees"|"upgradeSettings"|"levelingSettings"|"presets")[\s\S]*\})/
   );
 
   if (rawJsonMatch) {

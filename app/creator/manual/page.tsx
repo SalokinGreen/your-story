@@ -1325,6 +1325,40 @@ function AdventureCreatorContent() {
       });
     }
 
+    // Apply leveling settings
+    if (data.levelingSettings) {
+      const ls = data.levelingSettings;
+      setLevelingSettings((prev) => {
+        const updated = { ...prev };
+
+        if (ls.xpBase !== undefined) updated.xpBase = ls.xpBase;
+        if (ls.levelCap !== undefined) updated.levelCap = ls.levelCap;
+        if (ls.defaultUpgradesPerLevel !== undefined)
+          updated.defaultUpgradesPerLevel = ls.defaultUpgradesPerLevel;
+        if (ls.useCustomCurve !== undefined)
+          updated.useCustomCurve = ls.useCustomCurve;
+        if (ls.customCurve !== undefined) {
+          // Normalize customCurve: handle both 'xp' and 'cumulativeXP' field names
+          updated.customCurve = ls.customCurve.map(
+            (point: { level: number; cumulativeXP?: number; xp?: number }) => ({
+              level: point.level,
+              cumulativeXP: point.cumulativeXP ?? point.xp ?? 0,
+            })
+          );
+        }
+        if (ls.upgradeOverrides !== undefined)
+          updated.upgradeOverrides = ls.upgradeOverrides;
+        if (ls.startingUpgrades !== undefined) {
+          updated.startingUpgrades = {
+            ...prev.startingUpgrades,
+            ...ls.startingUpgrades,
+          };
+        }
+
+        return updated;
+      });
+    }
+
     // Apply Advanced RPG Tools settings
     // agmtEnabled is derived from agmtState presence, not a separate field
     if (data.agmtState) {

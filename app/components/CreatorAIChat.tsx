@@ -1266,6 +1266,25 @@ function ChangeSummary({
       icon: "ShoppingCart",
     });
   }
+  if (data.levelingSettings) {
+    const ls = data.levelingSettings;
+    const details = [];
+    if (ls.xpBase !== undefined) details.push(`XP Base: ${ls.xpBase}`);
+    if (ls.defaultUpgradesPerLevel !== undefined)
+      details.push(`Upgrades/Level: ${ls.defaultUpgradesPerLevel}`);
+    if (ls.levelCap !== undefined) details.push(`Level Cap: ${ls.levelCap}`);
+    if (ls.startingUpgrades) details.push(`Starting Upgrades: configured`);
+    changes.push({
+      type: "Update",
+      label: "Leveling Settings",
+      value:
+        details.length > 0
+          ? details.join(", ")
+          : "Updated leveling configuration",
+      details: data.levelingSettings,
+      icon: "TrendingUp",
+    });
+  }
   if (data.points !== undefined) {
     changes.push({
       type: "Update",

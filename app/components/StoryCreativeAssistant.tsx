@@ -647,7 +647,7 @@ export default function StoryCreativeAssistant({
                   className="w-10 h-10 text-purple-600 dark:text-purple-400"
                 />
               </div>
-              <div className="max-w-sm">
+              <div className="max-w-md w-full">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                   Edit Your Story
                 </h3>
@@ -657,19 +657,10 @@ export default function StoryCreativeAssistant({
                   history.
                 </p>
 
-                <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3 mb-4 text-left">
-                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-                    <DynamicIcon name="Info" className="w-4 h-4" />
-                    Story Context Available
-                  </h4>
-                  <p className="text-xs text-purple-800 dark:text-purple-200 leading-relaxed">
-                    I can see your current stats, inventory, lore, quests, and
-                    recent story events. Ask me to make changes based on
-                    what&apos;s happening in your adventure!
-                  </p>
-                </div>
+                {/* Story Context Display */}
+                <StoryContextDisplay storyData={storyData} />
 
-                <div className="grid grid-cols-1 gap-2 text-sm">
+                <div className="grid grid-cols-1 gap-2 text-sm mt-4">
                   <button
                     onClick={() =>
                       setInput("Give me a healing potion for this tough fight")
@@ -1231,6 +1222,25 @@ function ChangeSummary({
       icon: "ShoppingCart",
     });
   }
+  if (data.levelingSettings) {
+    const ls = data.levelingSettings;
+    const details = [];
+    if (ls.xpBase !== undefined) details.push(`XP Base: ${ls.xpBase}`);
+    if (ls.defaultUpgradesPerLevel !== undefined)
+      details.push(`Upgrades/Level: ${ls.defaultUpgradesPerLevel}`);
+    if (ls.levelCap !== undefined) details.push(`Level Cap: ${ls.levelCap}`);
+    if (ls.startingUpgrades) details.push(`Starting Upgrades: configured`);
+    changes.push({
+      type: "Update",
+      label: "Leveling Settings",
+      value:
+        details.length > 0
+          ? details.join(", ")
+          : "Updated leveling configuration",
+      details: data.levelingSettings,
+      icon: "TrendingUp",
+    });
+  }
   if (data.agmtState) {
     const threads = data.agmtState.threads?.length || 0;
     const chars = data.agmtState.characters?.length || 0;
@@ -1350,6 +1360,278 @@ function ChangeSummary({
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// Story Context Display - shows a nice summary of the story data
+function StoryContextDisplay({ storyData }: { storyData: StoryData }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Build context items
+  const contextItems: {
+    icon: string;
+    label: string;
+    value: string;
+    color: string;
+  }[] = [];
+
+  // Stats
+  if (storyData.stats?.length) {
+    const statNames = storyData.stats.map((s) => s.name).slice(0, 4);
+    const more =
+      storyData.stats.length > 4 ? ` +${storyData.stats.length - 4} more` : "";
+    contextItems.push({
+      icon: "BarChart2",
+      label: "Stats",
+      value: statNames.join(", ") + more,
+      color: "text-blue-500",
+    });
+  }
+
+  // Resources
+  if (storyData.resources?.length) {
+    const resourceInfo = storyData.resources
+      .slice(0, 3)
+      .map((r) => `${r.name}: ${r.value}/${r.maxValue}`)
+      .join(", ");
+    const more =
+      storyData.resources.length > 3
+        ? ` +${storyData.resources.length - 3}`
+        : "";
+    contextItems.push({
+      icon: "Heart",
+      label: "Resources",
+      value: resourceInfo + more,
+      color: "text-red-500",
+    });
+  }
+
+  // Inventory
+  if (storyData.inventory?.length) {
+    const itemNames = storyData.inventory.slice(0, 3).map((i) => i.name);
+    const more =
+      storyData.inventory.length > 3
+        ? ` +${storyData.inventory.length - 3} more`
+        : "";
+    contextItems.push({
+      icon: "Backpack",
+      label: "Inventory",
+      value: `${storyData.inventory.length} items: ${itemNames.join(
+        ", "
+      )}${more}`,
+      color: "text-yellow-500",
+    });
+  }
+
+  // Abilities
+  if (storyData.abilities?.length) {
+    const abilityNames = storyData.abilities.slice(0, 3).map((a) => a.name);
+    const more =
+      storyData.abilities.length > 3
+        ? ` +${storyData.abilities.length - 3}`
+        : "";
+    contextItems.push({
+      icon: "Sparkles",
+      label: "Abilities",
+      value: abilityNames.join(", ") + more,
+      color: "text-purple-500",
+    });
+  }
+
+  // Skill Trees - IMPORTANT for upgrade point context
+  if (storyData.skillTrees?.length) {
+    const totalNodes = storyData.skillTrees.reduce(
+      (sum, t) => sum + (t.nodes?.length || 0),
+      0
+    );
+    const treeNames = storyData.skillTrees.map((t) => t.name).join(", ");
+    contextItems.push({
+      icon: "GitBranch",
+      label: "Skill Trees",
+      value: `${storyData.skillTrees.length} trees (${totalNodes} nodes): ${treeNames}`,
+      color: "text-emerald-500",
+    });
+  }
+
+  // Leveling Settings
+  if (storyData.levelingSettings) {
+    const ls = storyData.levelingSettings;
+    const parts = [];
+    if (ls.defaultUpgradesPerLevel)
+      parts.push(`${ls.defaultUpgradesPerLevel} pts/lvl`);
+    if (ls.xpBase) parts.push(`XP×${ls.xpBase}`);
+    if (ls.levelCap) parts.push(`Cap: ${ls.levelCap}`);
+    if (parts.length > 0) {
+      contextItems.push({
+        icon: "TrendingUp",
+        label: "Leveling",
+        value: parts.join(", "),
+        color: "text-cyan-500",
+      });
+    }
+  }
+
+  // Current Progress
+  if (storyData.level !== undefined || storyData.points !== undefined) {
+    const parts = [];
+    if (storyData.level !== undefined) parts.push(`Level ${storyData.level}`);
+    if (storyData.points !== undefined) parts.push(`${storyData.points} XP`);
+    if (storyData.upgradesSpent !== undefined) {
+      const available =
+        (storyData.points || 0) - (storyData.upgradesSpent || 0);
+      if (available > 0) parts.push(`${available} upgrade pts available`);
+    }
+    contextItems.push({
+      icon: "Award",
+      label: "Progress",
+      value: parts.join(", "),
+      color: "text-amber-500",
+    });
+  }
+
+  // Lore
+  if (storyData.lore?.length) {
+    const activeLore = storyData.lore.filter((l) => l.on !== false);
+    contextItems.push({
+      icon: "Scroll",
+      label: "Lore",
+      value: `${storyData.lore.length} entries (${activeLore.length} active)`,
+      color: "text-orange-500",
+    });
+  }
+
+  // Achievements
+  if (storyData.achievements?.length) {
+    const unlocked = storyData.achievements.filter(
+      (a) => a.dateAchieved !== null
+    );
+    contextItems.push({
+      icon: "Trophy",
+      label: "Achievements",
+      value: `${unlocked.length}/${storyData.achievements.length} unlocked`,
+      color: "text-yellow-400",
+    });
+  }
+
+  // Quests
+  if (storyData.quests?.length) {
+    const active = storyData.quests.filter((q) => q.active && !q.fulfilled);
+    contextItems.push({
+      icon: "Swords",
+      label: "Quests",
+      value: `${active.length} active, ${storyData.quests.length} total`,
+      color: "text-red-400",
+    });
+  }
+
+  // Relationships
+  if (storyData.relationships?.length) {
+    const topRelations = storyData.relationships
+      .slice(0, 2)
+      .map((r) => `${r.name} (${r.value > 0 ? "+" : ""}${r.value})`);
+    const more =
+      storyData.relationships.length > 2
+        ? ` +${storyData.relationships.length - 2}`
+        : "";
+    contextItems.push({
+      icon: "Users",
+      label: "Relationships",
+      value: topRelations.join(", ") + more,
+      color: "text-pink-500",
+    });
+  }
+
+  // Variables
+  if (storyData.variables?.length) {
+    contextItems.push({
+      icon: "Variable",
+      label: "Variables",
+      value: `${storyData.variables.length} tracked`,
+      color: "text-indigo-500",
+    });
+  }
+
+  // Conditions
+  if (storyData.conditions?.length) {
+    const condNames = storyData.conditions
+      .map((c) => `${c.name} (Tier ${c.tier})`)
+      .slice(0, 2);
+    const more =
+      storyData.conditions.length > 2
+        ? ` +${storyData.conditions.length - 2}`
+        : "";
+    contextItems.push({
+      icon: "AlertTriangle",
+      label: "Conditions",
+      value: condNames.join(", ") + more,
+      color: "text-rose-500",
+    });
+  }
+
+  // Story history
+  const historyParts = storyData.scene?.parts?.length || 0;
+  if (historyParts > 0) {
+    contextItems.push({
+      icon: "BookOpen",
+      label: "Story Progress",
+      value: `${historyParts} turns played`,
+      color: "text-slate-500",
+    });
+  }
+
+  const visibleItems = isExpanded ? contextItems : contextItems.slice(0, 4);
+  const hasMore = contextItems.length > 4;
+
+  return (
+    <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3 mb-4 text-left">
+      <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+        <DynamicIcon name="Database" className="w-4 h-4" />
+        Story Context Available
+      </h4>
+
+      {contextItems.length === 0 ? (
+        <p className="text-xs text-purple-800 dark:text-purple-200">
+          No story data yet. Start playing to build your character!
+        </p>
+      ) : (
+        <>
+          <div className="space-y-1.5">
+            {visibleItems.map((item, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 text-xs text-purple-800 dark:text-purple-200"
+              >
+                <DynamicIcon
+                  name={item.icon as any}
+                  className={`w-3.5 h-3.5 ${item.color} shrink-0`}
+                />
+                <span className="font-medium shrink-0">{item.label}:</span>
+                <span className="truncate opacity-80">{item.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {hasMore && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="mt-2 text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+            >
+              {isExpanded ? (
+                <>
+                  <DynamicIcon name="ChevronUp" className="w-3 h-3" />
+                  Show less
+                </>
+              ) : (
+                <>
+                  <DynamicIcon name="ChevronDown" className="w-3 h-3" />
+                  Show {contextItems.length - 4} more...
+                </>
+              )}
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }
