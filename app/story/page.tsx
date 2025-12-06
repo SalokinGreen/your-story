@@ -2717,14 +2717,15 @@ function StoryPageContent() {
             }
 
             setStoryText(fullContent);
-            setStoryData({ ...storyData });
+            // Don't call setStoryData here - it causes infinite loops during rapid streaming
+            // storyText is sufficient for display, full update happens in onStoryComplete
             setLoading(false); // Let player read while tools/choices generate
           },
           onStoryComplete: (content: string, usage: any) => {
             // Update the partial part with the cleaned content (strips [GM State Update] etc)
             partialPart.content = content;
             setStoryText(content);
-            setStoryData({ ...storyData });
+            setStoryData({ ...storyData }); // Full update only at completion
 
             setLoadingStage("tools");
             logger.ai_response("Story narration complete (custom input)", {
@@ -4741,14 +4742,15 @@ function StoryPageContent() {
               }
 
               setStoryText(fullContent);
-              setStoryData({ ...storyData });
+              // Don't call setStoryData here - it causes infinite loops during rapid streaming
+              // storyText is sufficient for display, full update happens in onStoryComplete
               setLoading(false); // Let player read while tools/choices generate
             },
             onStoryComplete: (content: string, usage: any) => {
               // Update the partial part with the cleaned content (strips [GM State Update] etc)
               partialPart.content = content;
               setStoryText(content);
-              setStoryData({ ...storyData });
+              setStoryData({ ...storyData }); // Full update only at completion
 
               setLoadingStage("tools");
               logger.ai_response("Story narration complete", {
@@ -5072,14 +5074,15 @@ function StoryPageContent() {
             }
 
             setStoryText(fullContent);
-            setStoryData({ ...storyData });
+            // Don't call setStoryData here - it causes infinite loops during rapid streaming
+            // storyText is sufficient for display, full update happens in onStoryComplete
             setLoading(false); // Let player read while tools/choices generate
           },
           onStoryComplete: (content: string, usage: any) => {
             // Update the partial part with the cleaned content (strips [GM State Update] etc)
             partialPart.content = content;
             setStoryText(content);
-            setStoryData({ ...storyData });
+            setStoryData({ ...storyData }); // Full update only at completion
 
             setLoadingStage("tools");
             logger.ai_response("Story narration complete (retry)", {
