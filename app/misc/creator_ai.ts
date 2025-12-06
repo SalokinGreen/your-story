@@ -17,6 +17,7 @@ import {
   getMemoryContent,
 } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
+import { getCreatorToolsForAPI } from "@/app/misc/creator_tools";
 
 export interface CreatorAIInput {
   messages: ChatMessage[];
@@ -1609,4 +1610,123 @@ export function parseCreatorOutput(content: string): {
   }
 
   return { text: content, data: null };
+}
+
+/**
+ * Build messages for tool-based creator AI.
+ * Returns messages + tools for API call.
+ */
+export function buildCreatorMessagesWithTools({
+  messages,
+  currentStoryData,
+  adventureMetadata,
+}: CreatorAIInput): {
+  messages: ChatMessage[];
+  tools: ReturnType<typeof getCreatorToolsForAPI>;
+} {
+  // Clean up deprecated fields from lore entries
+  const cleanedStoryData = { ...currentStoryData };
+  if (cleanedStoryData.lore && Array.isArray(cleanedStoryData.lore)) {
+    cleanedStoryData.lore = cleanedStoryData.lore.map((loreEntry) => {
+      const { relatedCharacters, relatedLocations, keys, ...cleanEntry } =
+        loreEntry as any;
+      return cleanEntry;
+    });
+  }
+
+  const systemPrompt = `You are an expert Game Designer and Creative Writer assistant.
+Your goal is to help the user design a text adventure game scenario.
+You can brainstorm ideas, write content, and modify the scenario using the available tools.
+
+## How to Use Tools
+
+When the user asks you to create or modify parts of the scenario (like "create a dragon boss", "make a sci-fi setting", "add a healing potion"), you should:
+1. Think about what changes are needed
+2. Call the appropriate tools to make those changes
+3. Explain what you did in your response
+
+### Tool Categories:
+
+**Stats & Resources:**
+- add_stats, modify_stats, remove_stats - Manage character attributes (Strength, Intelligence, etc.)
+- add_resources, modify_resources, remove_resources - Manage pools (Health, Mana, Stamina)
+
+**Items & Abilities:**
+- add_items, modify_items, remove_items - Manage inventory items with grades, types
+- add_abilities, modify_abilities, remove_abilities - Manage skills/spells with costs, cooldowns
+
+**Story Content:**
+- add_lore, modify_lore, remove_lore - Manage world-building entries with triggers
+- add_achievements, modify_achievements, remove_achievements - Manage unlockables
+- add_quests, modify_quests, remove_quests - Manage objectives
+
+**Relationships & Variables:**
+- add_relationships, modify_relationships, remove_relationships - Manage NPC/faction standings
+- add_variables, modify_variables, remove_variables - Manage custom counters, flags, lists
+
+**Complex Structures:**
+- add_presets, modify_presets, remove_presets - Manage character build presets
+- add_skill_trees, modify_skill_trees, remove_skill_trees - Manage progression trees
+- add_custom_tables, modify_custom_tables, remove_custom_tables - Manage random tables
+
+**Settings:**
+- update_basic_info - Update story_name, premise, player_name, player_summary, intro, author_notes
+- update_adventure_metadata - Update title, shortDescription, description
+- update_upgrade_settings - Configure progression shop system
+- update_leveling_settings - Configure XP curve and level caps
+
+**Starting Choices:**
+- add_starting_choices, modify_starting_choices, remove_starting_choices - Custom game starts
+
+## Important Guidelines:
+
+1. **Only modify what the user asks for.** If they say "add a sword", only call add_items - don't also add stats or abilities.
+
+2. **Use batch operations.** If adding multiple items, call add_items once with all items, not multiple times.
+
+3. **Maintain consistency.** If the user has a fantasy setting, use appropriate names and descriptions.
+
+4. **Be creative.** Add interesting details and flavor text to make the scenario engaging.
+
+5. **Icons:** Use descriptive WORDS like "heart", "sword", "shield", "fire" for symbols - we fuzzy-match to our icon library.
+
+6. **Grades & Tiers:**
+   - Items: "common" (+0), "uncommon" (+1), "rare" (+2), "epic" (+3), "legendary" (+4), "agmt" (+5)
+   - Abilities: "novice" (+0), "apprentice" (+1), "adept" (+2), "expert" (+3), "master" (+4), "legendary" (+5)
+
+7. **Stat values:** 1-100 scale where 50 is average human.
+
+8. **Relationship values:** -100 (sworn enemy) to +100 (devoted ally).
+
+## Current Adventure State:
+${
+  adventureMetadata
+    ? `**Adventure Metadata:**
+- Title: ${adventureMetadata.title || "(not set)"}
+- Short Description: ${adventureMetadata.shortDescription || "(not set)"}
+- Description: ${adventureMetadata.description || "(not set)"}
+- Starting Choices: ${
+        adventureMetadata.startingChoices?.length
+          ? adventureMetadata.startingChoices
+              .map(
+                (c, i) =>
+                  `${i + 1}. "${c.text}"${
+                    c.skill_used ? ` [${c.skill_used} DC ${c.skill_dc}]` : ""
+                  }${c.intro_override ? " (custom intro)" : ""}`
+              )
+              .join("\n  ")
+          : "(none - using default Start Story button)"
+      }
+
+`
+    : ""
+}**Current Adventure Data:**
+
+${formatStoryDataAsMarkdown(cleanedStoryData)}
+`;
+
+  return {
+    messages: [{ role: "system", content: systemPrompt }, ...messages],
+    tools: getCreatorToolsForAPI(),
+  };
 }

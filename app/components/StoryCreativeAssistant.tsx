@@ -11,12 +11,17 @@ import ReactMarkdown from "react-markdown";
 import { ChatMessage } from "@/app/misc/ai";
 import { StoryData } from "@/app/misc/structs";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
-import { parseCreatorOutput } from "@/app/misc/creator_ai";
 import {
-  buildStoryCreatorMessages,
+  buildStoryCreatorMessagesWithTools,
   applyCreatorChangesToStoryData,
   sanitizeSkillTrees,
 } from "@/app/misc/story_creator_ai";
+import {
+  executeCreatorTools,
+  CreatorToolCall,
+  CreatorToolResult,
+  CreatorChanges,
+} from "@/app/misc/creator_tool_executor";
 import { DynamicIcon } from "./DynamicIcon";
 import {
   AI_MODELS,
@@ -261,11 +266,13 @@ export default function StoryCreativeAssistant({
   useEffect(() => {
     if (isOpen && messages.length > 0) {
       // Small delay to ensure DOM is rendered
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
-      }, 50);
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+        }, 100);
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, messages.length]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -303,34 +310,36 @@ export default function StoryCreativeAssistant({
     try {
       // Build messages with story context and recent history
       const recentMessages = [...messages, userMsg].slice(-10);
-      const recentHistory = storyData.scene?.parts?.slice(-20) || [];
 
-      const aiMessages = buildStoryCreatorMessages({
-        messages: recentMessages,
-        storyData,
-        recentHistory,
-        maxHistoryParts: 15,
-      });
+      // Check if model supports tool calling
+      const supportsTools =
+        modelConfig.supportsToolCalling !== false && !isNovelAISelected;
 
       let response: Response;
 
       if (isNovelAISelected) {
-        response = await authenticatedFetch("/api/novelai/generate-stream", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: aiMessages,
-            novelaiKey: novelaiKey,
-            maxTokens: Math.min(maxOutputTokens, 1000),
-            temperature: 0.7,
-          }),
-        });
-      } else {
+        // NovelAI doesn't support tool calling - show helpful message
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "NovelAI models don't support tool calling which is required for story editing. Please select a different model (DeepSeek, OpenRouter, or Coins models).",
+          },
+        ]);
+        setLoading(false);
+        return;
+      } else if (supportsTools) {
+        // Use tool-based prompt
+        const { messages: aiMessages, tools } =
+          buildStoryCreatorMessagesWithTools(storyData, input, recentMessages);
+
         response = await authenticatedFetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messages: aiMessages,
+            tools: tools,
             model: model,
             maxTokens: maxOutputTokens,
             temperature: 0.7,
@@ -339,6 +348,18 @@ export default function StoryCreativeAssistant({
             googleKey: byokMode ? apiKeys.googleKey : undefined,
           }),
         });
+      } else {
+        // Model doesn't support tool calling
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "This model doesn't support tool calling. Please select a different model.",
+          },
+        ]);
+        setLoading(false);
+        return;
       }
 
       if (!response.ok) {
@@ -350,37 +371,32 @@ export default function StoryCreativeAssistant({
         );
       }
 
-      let content: string;
-      let meta: Record<string, unknown>;
+      const data = await response.json();
+      const content: string = data.content || "";
+      const toolCalls: CreatorToolCall[] | undefined = data.toolCalls;
+      const meta: Record<string, unknown> = {
+        ...data.meta,
+        isByok: byokMode,
+      };
 
-      if (isNovelAISelected) {
-        const text = await response.text();
-        const lines = text.split("\n");
-        let fullContent = "";
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.type === "content" && data.content) {
-                fullContent += data.content;
-              }
-            } catch {
-              // Ignore parse errors
-            }
-          }
-        }
-        content = fullContent;
-        meta = { isByok: true, modelName: model };
-      } else {
-        const data = await response.json();
-        content = data.content;
-        meta = {
-          ...data.meta,
-          isByok: byokMode,
-        };
+      // Handle tool calls if present
+      let toolResults: CreatorToolResult[] | undefined;
+      let toolChanges: CreatorChanges | undefined;
+
+      if (toolCalls && toolCalls.length > 0) {
+        const { results, mergedChanges } = executeCreatorTools(toolCalls, {
+          storyData: storyData,
+        });
+        toolResults = results;
+        toolChanges = mergedChanges;
+
+        // Log tool execution results
+        console.log("Tool execution results:", results);
+        console.log("Merged changes:", mergedChanges);
       }
 
-      if (!content || !content.trim()) {
+      // Skip empty messages if no tools were called
+      if ((!content || !content.trim()) && !toolResults?.length) {
         setMessages((prev) => [
           ...prev,
           {
@@ -393,10 +409,17 @@ export default function StoryCreativeAssistant({
         return;
       }
 
-      const assistantMsg: ChatMessage & { meta?: Record<string, unknown> } = {
+      const assistantMsg: ChatMessage & {
+        meta?: Record<string, unknown>;
+        toolResults?: CreatorToolResult[];
+        toolChanges?: CreatorChanges;
+      } = {
         role: "assistant",
-        content,
+        content:
+          content || "I've made the requested changes using the tools above.",
         meta,
+        toolResults,
+        toolChanges,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -692,9 +715,14 @@ export default function StoryCreativeAssistant({
           {messages.map((msg, idx) => (
             <MessageItem
               key={idx}
-              message={msg as ChatMessage & { meta?: Record<string, unknown> }}
+              message={
+                msg as ChatMessage & {
+                  meta?: Record<string, unknown>;
+                  toolResults?: CreatorToolResult[];
+                  toolChanges?: CreatorChanges;
+                }
+              }
               onApplyChanges={handleApplyChanges}
-              storyData={storyData}
             />
           ))}
           {loading && (
@@ -758,25 +786,21 @@ export default function StoryCreativeAssistant({
 function MessageItem({
   message,
   onApplyChanges,
-  storyData,
 }: {
-  message: ChatMessage & { meta?: Record<string, unknown> };
+  message: ChatMessage & {
+    meta?: Record<string, unknown>;
+    toolResults?: CreatorToolResult[];
+    toolChanges?: CreatorChanges;
+  };
   onApplyChanges: (data: Partial<StoryData>) => void;
-  storyData: StoryData;
 }) {
   const isUser = message.role === "user";
-  const { text, data: rawData } = parseCreatorOutput(message.content);
   const meta = message.meta;
+  const toolResults = message.toolResults;
+  const toolChanges = message.toolChanges;
 
-  // Sanitize skill trees if present
-  const data = rawData
-    ? {
-        ...rawData,
-        skillTrees: rawData.skillTrees
-          ? sanitizeSkillTrees(rawData.skillTrees)
-          : undefined,
-      }
-    : null;
+  // Check if we have tool-based changes
+  const hasToolChanges = toolChanges && Object.keys(toolChanges).length > 0;
 
   // Calculate dollar cost from usage if available
   const dollarCost = useMemo(() => {
@@ -967,7 +991,7 @@ function MessageItem({
               ),
             }}
           >
-            {text}
+            {message.content}
           </ReactMarkdown>
         </div>
         {!isUser &&
@@ -990,36 +1014,669 @@ function MessageItem({
               )}
             </div>
           )}
-        {data && (
-          <div className="mt-4 rounded-xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-gray-700/50 overflow-hidden shadow-inner">
-            <div className="bg-gray-100/50 dark:bg-white/5 px-4 py-2 border-b border-gray-200 dark:border-gray-700/50 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                Proposed Changes
-              </span>
-            </div>
 
-            {/* Change Summary with expandable details */}
-            <div className="p-3 space-y-2">
-              <ChangeSummary data={data} />
-            </div>
-
-            <div className="p-3 bg-gray-100/50 dark:bg-white/5 border-t border-gray-200 dark:border-gray-700/50">
-              <button
-                onClick={() => onApplyChanges(data)}
-                className="w-full rounded-lg bg-green-600 hover:bg-green-500 text-white py-2 text-sm font-bold transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <DynamicIcon name="Check" className="w-4 h-4" />
-                Apply Changes
-              </button>
-            </div>
-          </div>
+        {/* Tool Results Display */}
+        {toolResults && toolResults.length > 0 && (
+          <ToolResultsDisplay
+            toolResults={toolResults}
+            toolChanges={toolChanges}
+            hasToolChanges={hasToolChanges}
+            onApplyChanges={onApplyChanges}
+          />
         )}
       </div>
     </div>
   );
 }
 
+// Helper to get icon for tool type
+function getToolIcon(
+  toolName: string
+):
+  | "BarChart2"
+  | "Diamond"
+  | "Backpack"
+  | "Wand2"
+  | "Scroll"
+  | "Trophy"
+  | "Swords"
+  | "Users"
+  | "Variable"
+  | "Table"
+  | "GitBranch"
+  | "LayoutTemplate"
+  | "Target"
+  | "Settings"
+  | "TrendingUp"
+  | "Wrench"
+  | "AlertCircle"
+  | "Brain" {
+  if (toolName.includes("stat")) return "BarChart2";
+  if (toolName.includes("resource")) return "Diamond";
+  if (toolName.includes("item") || toolName.includes("inventory"))
+    return "Backpack";
+  if (toolName.includes("ability")) return "Wand2";
+  if (toolName.includes("lore")) return "Scroll";
+  if (toolName.includes("achievement")) return "Trophy";
+  if (toolName.includes("quest")) return "Swords";
+  if (toolName.includes("relationship")) return "Users";
+  if (toolName.includes("variable")) return "Variable";
+  if (toolName.includes("table")) return "Table";
+  if (toolName.includes("skill_tree")) return "GitBranch";
+  if (toolName.includes("preset")) return "LayoutTemplate";
+  if (toolName.includes("starting_choice")) return "Target";
+  if (toolName.includes("basic_info") || toolName.includes("metadata"))
+    return "Settings";
+  if (toolName.includes("leveling") || toolName.includes("upgrade"))
+    return "TrendingUp";
+  if (toolName.includes("condition")) return "AlertCircle";
+  if (toolName.includes("memory")) return "Brain";
+  return "Wrench";
+}
+
+// Helper to get action type from tool name
+function getActionType(toolName: string): {
+  type: "add" | "modify" | "remove";
+  color: string;
+  bgColor: string;
+} {
+  if (toolName.startsWith("add_") || toolName.startsWith("create_")) {
+    return {
+      type: "add",
+      color: "text-green-600 dark:text-green-400",
+      bgColor: "bg-green-100 dark:bg-green-900/30",
+    };
+  }
+  if (toolName.startsWith("remove_") || toolName.startsWith("delete_")) {
+    return {
+      type: "remove",
+      color: "text-red-600 dark:text-red-400",
+      bgColor: "bg-red-100 dark:bg-red-900/30",
+    };
+  }
+  return {
+    type: "modify",
+    color: "text-blue-600 dark:text-blue-400",
+    bgColor: "bg-blue-100 dark:bg-blue-900/30",
+  };
+}
+
+// Helper to format tool name nicely
+function formatToolName(toolName: string): string {
+  return toolName.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+// Tool Results Display component
+function ToolResultsDisplay({
+  toolResults,
+  toolChanges,
+  hasToolChanges,
+  onApplyChanges,
+}: {
+  toolResults: CreatorToolResult[];
+  toolChanges?: CreatorChanges;
+  hasToolChanges?: boolean;
+  onApplyChanges: (data: Partial<StoryData>) => void;
+}) {
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const successCount = toolResults.filter((r) => r.success).length;
+  const failCount = toolResults.length - successCount;
+
+  // Helper to safely check if a value exists and is truthy
+  const has = (val: unknown): val is string | number | boolean =>
+    val !== undefined && val !== null && val !== "";
+
+  return (
+    <div className="mt-4 rounded-xl bg-linear-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-700/50 overflow-hidden shadow-lg">
+      {/* Header */}
+      <div className="bg-linear-to-r from-purple-100/80 to-indigo-100/80 dark:from-purple-900/40 dark:to-indigo-900/40 px-4 py-3 border-b border-purple-200 dark:border-purple-700/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-purple-500 to-indigo-500 flex items-center justify-center shadow-md">
+              <DynamicIcon name="Wrench" className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100">
+                Tool Actions
+              </h4>
+              <div className="flex items-center gap-2 text-xs">
+                {successCount > 0 && (
+                  <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <DynamicIcon name="CheckCircle" className="w-3 h-3" />
+                    {successCount} success
+                  </span>
+                )}
+                {failCount > 0 && (
+                  <span className="text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <DynamicIcon name="XCircle" className="w-3 h-3" />
+                    {failCount} failed
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tool Results List */}
+      <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
+        {toolResults.map((result, idx) => {
+          const action = getActionType(result.toolName);
+          const icon = getToolIcon(result.toolName);
+          const isExpanded = expandedIdx === idx;
+
+          return (
+            <div
+              key={idx}
+              className={`rounded-lg border overflow-hidden transition-all ${
+                result.success
+                  ? "bg-white dark:bg-gray-800/50 border-gray-200 dark:border-gray-700"
+                  : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700/30"
+              }`}
+            >
+              {/* Header Row - Clickable */}
+              <div
+                className="flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                onClick={() => setExpandedIdx(isExpanded ? null : idx)}
+              >
+                {/* Icon */}
+                <div
+                  className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${action.bgColor}`}
+                >
+                  <DynamicIcon
+                    name={icon}
+                    className={`w-4 h-4 ${action.color}`}
+                  />
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                      {formatToolName(result.toolName)}
+                    </span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                        action.type === "add"
+                          ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
+                          : action.type === "remove"
+                          ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                          : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+                      }`}
+                    >
+                      {action.type}
+                    </span>
+                  </div>
+
+                  {/* Show preview when collapsed */}
+                  {!isExpanded && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {result.args && Object.keys(result.args).length > 0 ? (
+                        <>
+                          {Object.entries(result.args)
+                            .slice(0, 3)
+                            .map(([key, value], i) => {
+                              const label = key
+                                .replace(/([A-Z])/g, " $1")
+                                .replace(/_/g, " ")
+                                .trim();
+                              const displayValue =
+                                typeof value === "boolean"
+                                  ? value
+                                    ? "✓"
+                                    : "✗"
+                                  : typeof value === "number"
+                                  ? String(value)
+                                  : Array.isArray(value)
+                                  ? `${value.length} items`
+                                  : typeof value === "object" && value !== null
+                                  ? "configured"
+                                  : String(value).substring(0, 20);
+                              return (
+                                <span
+                                  key={i}
+                                  className="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded"
+                                >
+                                  <span className="text-gray-500 dark:text-gray-500">
+                                    {label}:
+                                  </span>{" "}
+                                  <span className="font-medium">
+                                    {displayValue}
+                                  </span>
+                                </span>
+                              );
+                            })}
+                          {Object.keys(result.args).length > 3 && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              +{Object.keys(result.args).length - 3} more
+                            </span>
+                          )}
+                        </>
+                      ) : result.changes && result.changes.length > 0 ? (
+                        <>
+                          {result.changes.slice(0, 2).map((change, i) => (
+                            <span
+                              key={i}
+                              className="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded"
+                            >
+                              {change.length > 40
+                                ? change.substring(0, 40) + "..."
+                                : change}
+                            </span>
+                          ))}
+                          {result.changes.length > 2 && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              +{result.changes.length - 2} more
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-500 dark:text-gray-400 italic">
+                          Click to see details
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Status & Expand */}
+                <div className="shrink-0 flex items-center gap-2">
+                  {result.success ? (
+                    <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                      <DynamicIcon
+                        name="Check"
+                        className="w-3.5 h-3.5 text-green-600 dark:text-green-400"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
+                      <DynamicIcon
+                        name="X"
+                        className="w-3.5 h-3.5 text-red-600 dark:text-red-400"
+                      />
+                    </div>
+                  )}
+                  <DynamicIcon
+                    name={isExpanded ? "ChevronUp" : "ChevronDown"}
+                    className="w-4 h-4 text-gray-400"
+                  />
+                </div>
+              </div>
+
+              {/* Expanded Details */}
+              {isExpanded && (
+                <div className="px-3 pb-3 border-t border-gray-100 dark:border-gray-700/50 pt-2">
+                  {/* Changes List */}
+                  {result.changes && result.changes.length > 0 && (
+                    <div className="mb-3">
+                      <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
+                        Changes Made
+                      </span>
+                      <ul className="mt-1 space-y-0.5">
+                        {result.changes.map((change, i) => (
+                          <li
+                            key={i}
+                            className="text-xs text-gray-700 dark:text-gray-300 flex items-start gap-1.5"
+                          >
+                            <span className="text-green-500 mt-0.5">•</span>
+                            {change}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Detailed Args Display */}
+                  {result.args && Object.keys(result.args).length > 0 && (
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
+                        Parameters
+                      </span>
+                      <ToolArgsDisplay
+                        toolName={result.toolName}
+                        args={result.args}
+                        has={has}
+                      />
+                    </div>
+                  )}
+
+                  {/* Raw JSON toggle for debugging */}
+                  {result.args && Object.keys(result.args).length > 0 && (
+                    <details className="mt-3">
+                      <summary className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-400">
+                        Raw Data
+                      </summary>
+                      <pre className="mt-1 text-[10px] bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-x-auto text-gray-600 dark:text-gray-400 max-h-40 overflow-y-auto">
+                        {JSON.stringify(result.args, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Apply Button */}
+      {hasToolChanges && (
+        <div className="p-3 bg-linear-to-r from-purple-100/80 to-indigo-100/80 dark:from-purple-900/40 dark:to-indigo-900/40 border-t border-purple-200 dark:border-purple-700/50">
+          <button
+            onClick={() => onApplyChanges(toolChanges as Partial<StoryData>)}
+            className="w-full rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white py-2.5 text-sm font-bold transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            <DynamicIcon name="Check" className="w-4 h-4" />
+            Apply Tool Changes
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Tool Args Display component
+function ToolArgsDisplay({
+  toolName,
+  args,
+  has,
+}: {
+  toolName: string;
+  args?: Record<string, unknown>;
+  has: (val: unknown) => val is string | number | boolean;
+}) {
+  if (!args || Object.keys(args).length === 0) return null;
+
+  // Stats/Resources display
+  if (toolName.includes("stat") || toolName.includes("resource")) {
+    const items = (args.stats ||
+      args.resources ||
+      args.modifications || [args]) as Record<string, unknown>[];
+    const arrayItems = Array.isArray(items) ? items : [items];
+
+    return (
+      <div className="mt-2 space-y-2">
+        {arrayItems.slice(0, 3).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              {has(item.symbol) && (
+                <span className="text-base">{String(item.symbol)}</span>
+              )}
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {String(item.name || item.new_name || "Unknown")}
+              </span>
+              {item.value !== undefined && (
+                <span className="ml-auto text-sm font-mono bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded">
+                  {String(item.value)}
+                  {item.maxValue !== undefined ? `/${item.maxValue}` : ""}
+                </span>
+              )}
+            </div>
+            {has(item.description) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                {String(item.description)}
+              </p>
+            )}
+          </div>
+        ))}
+        {arrayItems.length > 3 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            +{arrayItems.length - 3} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Items/Inventory display
+  if (toolName.includes("item") || toolName.includes("inventory")) {
+    const items = (args.items || args.modifications || [args]) as Record<
+      string,
+      unknown
+    >[];
+    const arrayItems = Array.isArray(items) ? items : [items];
+
+    return (
+      <div className="mt-2 space-y-2">
+        {arrayItems.slice(0, 3).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              {has(item.symbol) && (
+                <span className="text-base">{String(item.symbol)}</span>
+              )}
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {String(item.name || "Unknown")}
+              </span>
+              {has(item.quantity) && (
+                <span className="text-xs text-gray-500">
+                  x{String(item.quantity)}
+                </span>
+              )}
+              {has(item.grade) && (
+                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                  {String(item.grade)}
+                </span>
+              )}
+              {has(item.type) && (
+                <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                  {String(item.type)}
+                </span>
+              )}
+            </div>
+            {has(item.description) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                {String(item.description)}
+              </p>
+            )}
+          </div>
+        ))}
+        {arrayItems.length > 3 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            +{arrayItems.length - 3} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Abilities display
+  if (toolName.includes("ability")) {
+    const items = (args.abilities || args.modifications || [args]) as Record<
+      string,
+      unknown
+    >[];
+    const arrayItems = Array.isArray(items) ? items : [items];
+
+    return (
+      <div className="mt-2 space-y-2">
+        {arrayItems.slice(0, 3).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              {has(item.symbol) && (
+                <span className="text-base">{String(item.symbol)}</span>
+              )}
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {String(item.name || "Unknown")}
+              </span>
+              {has(item.grade) && (
+                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+                  {String(item.grade)}
+                </span>
+              )}
+            </div>
+            {has(item.description) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                {String(item.description)}
+              </p>
+            )}
+          </div>
+        ))}
+        {arrayItems.length > 3 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            +{arrayItems.length - 3} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Lore display
+  if (toolName.includes("lore")) {
+    const items = (args.lore_entries || args.lore || [args]) as Record<
+      string,
+      unknown
+    >[];
+    const arrayItems = Array.isArray(items) ? items : [items];
+
+    return (
+      <div className="mt-2 space-y-2">
+        {arrayItems.slice(0, 2).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <DynamicIcon
+                name="Scroll"
+                className="w-3.5 h-3.5 text-amber-500"
+              />
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {String(item.title || item.name || "Unknown")}
+              </span>
+              {item.secret === true && (
+                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300">
+                  Secret
+                </span>
+              )}
+            </div>
+            {has(item.content) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-3">
+                {String(item.content)}
+              </p>
+            )}
+          </div>
+        ))}
+        {arrayItems.length > 2 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            +{arrayItems.length - 2} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Leveling/Upgrade settings
+  if (toolName.includes("leveling") || toolName.includes("upgrade_settings")) {
+    const settingIcons: Record<string, string> = {
+      xpBase: "⚡",
+      levelCap: "🎯",
+      defaultUpgradesPerLevel: "⬆️",
+      useCustomCurve: "📈",
+      startingUpgrades: "🌟",
+      pointsToLevelUp: "💎",
+      maxLevel: "🏆",
+      upgradePointsPerLevel: "📦",
+    };
+    const settingLabels: Record<string, string> = {
+      xpBase: "XP Base Multiplier",
+      levelCap: "Maximum Level",
+      defaultUpgradesPerLevel: "Upgrades Per Level",
+      useCustomCurve: "Custom XP Curve",
+      startingUpgrades: "Starting Upgrades",
+      pointsToLevelUp: "Points to Level Up",
+      maxLevel: "Max Level",
+      upgradePointsPerLevel: "Upgrade Points/Level",
+    };
+
+    const entries = Object.entries(args).filter(
+      ([, v]) => v !== undefined && v !== null
+    );
+    if (entries.length === 0) return null;
+
+    return (
+      <div className="mt-2 space-y-2">
+        {entries.map(([key, value]) => {
+          const icon = settingIcons[key] || "⚙️";
+          const label =
+            settingLabels[key] ||
+            key
+              .replace(/([A-Z])/g, " $1")
+              .replace(/_/g, " ")
+              .trim();
+
+          return (
+            <div
+              key={key}
+              className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700 flex items-center gap-2"
+            >
+              <span className="text-base">{icon}</span>
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100 capitalize">
+                {label}
+              </span>
+              <span className="ml-auto text-sm font-mono bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded">
+                {typeof value === "boolean"
+                  ? value
+                    ? "✓ Enabled"
+                    : "✗ Disabled"
+                  : String(value)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Default: generic key-value display
+  return (
+    <div className="mt-2 space-y-1">
+      {Object.entries(args)
+        .slice(0, 8)
+        .map(([key, value]) => {
+          const label = key
+            .replace(/([A-Z])/g, " $1")
+            .replace(/_/g, " ")
+            .trim();
+          const displayValue =
+            typeof value === "boolean"
+              ? value
+                ? "Yes"
+                : "No"
+              : typeof value === "object"
+              ? JSON.stringify(value)
+              : String(value);
+
+          return (
+            <div key={key} className="flex items-start gap-2 py-1">
+              <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 w-24 shrink-0 pt-0.5">
+                {label}
+              </span>
+              <span className="text-xs text-gray-800 dark:text-gray-200 line-clamp-2">
+                {displayValue.length > 60
+                  ? displayValue.substring(0, 60) + "..."
+                  : displayValue}
+              </span>
+            </div>
+          );
+        })}
+      {Object.keys(args).length > 8 && (
+        <p className="text-xs text-gray-500 text-center">
+          +{Object.keys(args).length - 8} more...
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Keep ChangeSummary for backward compatibility but it's no longer used
 function ChangeSummary({
   data,
 }: {
@@ -1352,15 +2009,568 @@ function ChangeSummary({
           </div>
 
           {expandedIndex === i && change.details !== undefined && (
-            <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-black/20 text-xs font-mono text-gray-600 dark:text-gray-300 overflow-x-auto max-h-64 overflow-y-auto">
-              <pre className="whitespace-pre-wrap">
-                {JSON.stringify(change.details, null, 2)}
-              </pre>
+            <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-black/20 overflow-x-auto max-h-80 overflow-y-auto">
+              <DetailsDisplay label={change.label} details={change.details} />
             </div>
           )}
         </div>
       ))}
     </div>
+  );
+}
+
+// Rich details display component - shows formatted data instead of raw JSON
+function DetailsDisplay({
+  label,
+  details,
+}: {
+  label: string;
+  details: unknown;
+}) {
+  // Helper to safely check if a value exists and is truthy
+  const has = (val: unknown): val is string | number | boolean =>
+    val !== undefined && val !== null && val !== "";
+
+  // Handle arrays of items (stats, resources, inventory, abilities, etc.)
+  if (Array.isArray(details)) {
+    const items = details as Record<string, unknown>[];
+
+    // Stats display
+    if (label === "Stats") {
+      return (
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2">
+                {has(item.symbol) && (
+                  <span className="text-lg">{String(item.symbol)}</span>
+                )}
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                  {String(item.name || "Unknown")}
+                </span>
+                {item.value !== undefined && (
+                  <span className="ml-auto text-sm font-mono bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">
+                    {String(item.value)}
+                  </span>
+                )}
+              </div>
+              {has(item.description) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {String(item.description)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Resources display
+    if (label === "Resources") {
+      return (
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2">
+                {has(item.symbol) && (
+                  <span className="text-lg">{String(item.symbol)}</span>
+                )}
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                  {String(item.name || "Unknown")}
+                </span>
+                <span className="ml-auto text-sm font-mono bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 rounded">
+                  {String(item.value ?? 0)}/{String(item.maxValue ?? 0)}
+                </span>
+              </div>
+              {has(item.description) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {String(item.description)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Inventory display
+    if (label === "Inventory") {
+      return (
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                {has(item.symbol) && (
+                  <span className="text-lg">{String(item.symbol)}</span>
+                )}
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                  {String(item.name || "Unknown")}
+                </span>
+                {item.quantity !== undefined && Number(item.quantity) > 1 && (
+                  <span className="text-xs text-gray-500">
+                    x{String(item.quantity)}
+                  </span>
+                )}
+                {has(item.grade) && (
+                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                    {String(item.grade)}
+                  </span>
+                )}
+                {has(item.type) && (
+                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                    {String(item.type)}
+                  </span>
+                )}
+              </div>
+              {has(item.description) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {String(item.description)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Abilities display
+    if (label === "Abilities") {
+      return (
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                {has(item.symbol) && (
+                  <span className="text-lg">{String(item.symbol)}</span>
+                )}
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                  {String(item.name || "Unknown")}
+                </span>
+                {has(item.grade) && (
+                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+                    {String(item.grade)}
+                  </span>
+                )}
+                {has(item.stat) && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                    {String(item.stat)}
+                  </span>
+                )}
+              </div>
+              {has(item.description) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {String(item.description)}
+                </p>
+              )}
+              {(item.cooldown !== undefined || has(item.cost)) && (
+                <div className="flex gap-3 mt-1.5 text-[10px]">
+                  {item.cooldown !== undefined && (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      Cooldown: {String(item.cooldown)} turns
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Lore display
+    if (label === "Lore") {
+      return (
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2">
+                <DynamicIcon name="Scroll" className="w-4 h-4 text-amber-500" />
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                  {String(item.title || item.name || "Unknown")}
+                </span>
+                {item.secret === true && (
+                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300">
+                    Secret
+                  </span>
+                )}
+              </div>
+              {has(item.content) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-3">
+                  {String(item.content)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Achievements display
+    if (label === "Achievements") {
+      return (
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg">
+                  {has(item.symbol) ? String(item.symbol) : "🏆"}
+                </span>
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                  {String(item.name || "Unknown")}
+                </span>
+                {item.xp !== undefined && (
+                  <span className="ml-auto text-xs font-medium text-green-600 dark:text-green-400">
+                    +{String(item.xp)} XP
+                  </span>
+                )}
+              </div>
+              {has(item.description) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {String(item.description)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Quests display
+    if (label === "Quests") {
+      return (
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2">
+                <DynamicIcon
+                  name="Swords"
+                  className="w-4 h-4 text-orange-500"
+                />
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                  {String(item.name || item.title || "Unknown")}
+                </span>
+                {has(item.status) && (
+                  <span
+                    className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${
+                      item.status === "completed"
+                        ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
+                        : item.status === "failed"
+                        ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                        : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+                    }`}
+                  >
+                    {String(item.status)}
+                  </span>
+                )}
+              </div>
+              {has(item.description) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {String(item.description)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Relationships display
+    if (label === "Relationships") {
+      return (
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2">
+                <DynamicIcon name="Users" className="w-4 h-4 text-pink-500" />
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                  {String(item.name || "Unknown")}
+                </span>
+                {item.affinity !== undefined && (
+                  <span
+                    className={`ml-auto text-sm font-mono px-2 py-0.5 rounded ${
+                      Number(item.affinity) > 0
+                        ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
+                        : Number(item.affinity) < 0
+                        ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                    }`}
+                  >
+                    {Number(item.affinity) > 0 ? "+" : ""}
+                    {String(item.affinity)}
+                  </span>
+                )}
+              </div>
+              {has(item.description) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {String(item.description)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Skill Trees display
+    if (label === "Skill Trees") {
+      return (
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2">
+                <DynamicIcon
+                  name="GitBranch"
+                  className="w-4 h-4 text-emerald-500"
+                />
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                  {String(item.name || "Unknown")}
+                </span>
+                {Array.isArray(item.nodes) && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {item.nodes.length} nodes
+                  </span>
+                )}
+              </div>
+              {has(item.description) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {String(item.description)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Generic array fallback
+    return (
+      <div className="space-y-2">
+        {items.slice(0, 10).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2">
+              {has(item.symbol) && (
+                <span className="text-lg">{String(item.symbol)}</span>
+              )}
+              <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                {String(item.name || item.title || `Item ${idx + 1}`)}
+              </span>
+            </div>
+            {(has(item.description) || has(item.content)) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                {String(item.description || item.content)}
+              </p>
+            )}
+          </div>
+        ))}
+        {items.length > 10 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-1">
+            +{items.length - 10} more items...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Handle objects (leveling settings, upgrade settings, etc.)
+  if (typeof details === "object" && details !== null) {
+    const obj = details as Record<string, unknown>;
+    const entries = Object.entries(obj).filter(
+      ([, v]) => v !== undefined && v !== null
+    );
+
+    // Leveling/Upgrade settings with icons
+    if (label.includes("Leveling") || label.includes("Upgrade")) {
+      const settingIcons: Record<string, string> = {
+        xpBase: "⚡",
+        levelCap: "🎯",
+        defaultUpgradesPerLevel: "⬆️",
+        useCustomCurve: "📈",
+        customCurve: "📊",
+        upgradeOverrides: "🔧",
+        startingUpgrades: "🌟",
+        pointsToLevelUp: "💎",
+        maxLevel: "🏆",
+      };
+
+      return (
+        <div className="space-y-2">
+          {entries.map(([key, value]) => {
+            const icon = settingIcons[key] || "⚙️";
+            const displayLabel = key
+              .replace(/([A-Z])/g, " $1")
+              .replace(/_/g, " ")
+              .trim();
+
+            if (Array.isArray(value)) {
+              return (
+                <div
+                  key={key}
+                  className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span>{icon}</span>
+                    <span className="font-medium text-sm text-gray-900 dark:text-gray-100 capitalize">
+                      {displayLabel}
+                    </span>
+                    <span className="ml-auto text-xs text-gray-500">
+                      {value.length} entries
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {(value as Record<string, unknown>[])
+                      .slice(0, 5)
+                      .map((item, i) => (
+                        <span
+                          key={i}
+                          className="text-[10px] bg-gray-100 dark:bg-gray-700 rounded px-1.5 py-0.5"
+                        >
+                          {key === "customCurve"
+                            ? `Lvl ${item.level}: ${item.cumulativeXP} XP`
+                            : key === "upgradeOverrides"
+                            ? `Lvl ${item.level}: ${item.upgrades} pts`
+                            : JSON.stringify(item)}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              );
+            }
+
+            if (typeof value === "object" && value !== null) {
+              return (
+                <div
+                  key={key}
+                  className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span>{icon}</span>
+                    <span className="font-medium text-sm text-gray-900 dark:text-gray-100 capitalize">
+                      {displayLabel}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(value as Record<string, unknown>).map(
+                      ([k, v]) => (
+                        <span
+                          key={k}
+                          className="text-[10px] bg-gray-100 dark:bg-gray-700 rounded px-2 py-1"
+                        >
+                          <span className="text-gray-500 capitalize">{k}:</span>{" "}
+                          <span className="font-medium">{String(v)}</span>
+                        </span>
+                      )
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={key}
+                className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700 flex items-center gap-2"
+              >
+                <span>{icon}</span>
+                <span className="font-medium text-sm text-gray-900 dark:text-gray-100 capitalize">
+                  {displayLabel}
+                </span>
+                <span className="ml-auto text-sm font-mono bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded">
+                  {typeof value === "boolean"
+                    ? value
+                      ? "✓ Enabled"
+                      : "✗ Disabled"
+                    : String(value)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // Generic object display
+    return (
+      <div className="space-y-1">
+        {entries.slice(0, 10).map(([key, value]) => {
+          const displayLabel = key
+            .replace(/([A-Z])/g, " $1")
+            .replace(/_/g, " ")
+            .trim();
+          const displayValue =
+            typeof value === "boolean"
+              ? value
+                ? "Yes"
+                : "No"
+              : typeof value === "object"
+              ? JSON.stringify(value)
+              : String(value);
+
+          return (
+            <div key={key} className="flex items-start gap-2 py-1">
+              <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 w-28 shrink-0">
+                {displayLabel}
+              </span>
+              <span className="text-xs text-gray-800 dark:text-gray-200 line-clamp-2">
+                {displayValue.length > 100
+                  ? displayValue.substring(0, 100) + "..."
+                  : displayValue}
+              </span>
+            </div>
+          );
+        })}
+        {entries.length > 10 && (
+          <p className="text-xs text-gray-500 text-center pt-1">
+            +{entries.length - 10} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // String/primitive fallback
+  if (typeof details === "string") {
+    return (
+      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+        {details}
+      </p>
+    );
+  }
+
+  // Final fallback - raw JSON
+  return (
+    <pre className="text-xs font-mono text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+      {JSON.stringify(details, null, 2)}
+    </pre>
   );
 }
 

@@ -11,10 +11,13 @@ import ReactMarkdown from "react-markdown";
 import { ChatMessage } from "@/app/misc/ai";
 import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { authenticatedFetch } from "@/app/misc/getAuthToken";
+import { buildCreatorMessagesWithTools } from "@/app/misc/creator_ai";
 import {
-  parseCreatorOutput,
-  buildCreatorMessages,
-} from "@/app/misc/creator_ai";
+  executeCreatorTools,
+  CreatorToolCall,
+  CreatorToolResult,
+  CreatorChanges,
+} from "@/app/misc/creator_tool_executor";
 import { DynamicIcon } from "./DynamicIcon";
 import {
   AI_MODELS,
@@ -333,33 +336,39 @@ export default function CreatorAIChat({
     try {
       // Build messages using the creator AI prompt builder
       const recentMessages = [...messages, userMsg].slice(-10);
-      const aiMessages = buildCreatorMessages({
-        messages: recentMessages,
-        currentStoryData,
-        adventureMetadata,
-      });
+
+      // Check if model supports tool calling and tool mode is enabled
+      const supportsTools =
+        modelConfig.supportsToolCalling !== false && !isNovelAISelected;
 
       let response: Response;
 
       if (isNovelAISelected) {
-        // NovelAI uses a separate endpoint
-        response = await authenticatedFetch("/api/novelai/generate-stream", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: aiMessages,
-            novelaiKey: novelaiKey,
-            maxTokens: Math.min(maxOutputTokens, 1000), // NovelAI has 1K limit
-            temperature: 0.7,
-          }),
+        // NovelAI doesn't support tool calling - show helpful message
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "NovelAI models don't support tool calling which is required for adventure editing. Please select a different model (DeepSeek, OpenRouter, or Coins models).",
+          },
+        ]);
+        setLoading(false);
+        return;
+      } else if (supportsTools) {
+        // Use tool-based prompt
+        const { messages: aiMessages, tools } = buildCreatorMessagesWithTools({
+          messages: recentMessages,
+          currentStoryData,
+          adventureMetadata,
         });
-      } else {
-        // Use the generic /api/generate endpoint
+
         response = await authenticatedFetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messages: aiMessages,
+            tools: tools,
             model: model,
             maxTokens: maxOutputTokens,
             temperature: 0.7,
@@ -368,6 +377,18 @@ export default function CreatorAIChat({
             googleKey: byokMode ? apiKeys.googleKey : undefined,
           }),
         });
+      } else {
+        // Model doesn't support tool calling
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "This model doesn't support tool calling. Please select a different model.",
+          },
+        ]);
+        setLoading(false);
+        return;
       }
 
       if (!response.ok) {
@@ -382,6 +403,7 @@ export default function CreatorAIChat({
 
       let content: string;
       let meta: any;
+      let toolCalls: CreatorToolCall[] | undefined;
 
       if (isNovelAISelected) {
         // NovelAI returns SSE stream, read as text
@@ -405,15 +427,33 @@ export default function CreatorAIChat({
         meta = { isByok: true, modelName: model };
       } else {
         const data = await response.json();
-        content = data.content;
+        content = data.content || "";
+        toolCalls = data.toolCalls;
         meta = {
           ...data.meta,
           isByok: byokMode,
         };
       }
 
-      // Skip empty messages - they break the chat
-      if (!content || !content.trim()) {
+      // Handle tool calls if present
+      let toolResults: CreatorToolResult[] | undefined;
+      let toolChanges: CreatorChanges | undefined;
+
+      if (toolCalls && toolCalls.length > 0) {
+        const { results, mergedChanges } = executeCreatorTools(toolCalls, {
+          storyData: currentStoryData,
+          adventureMetadata,
+        });
+        toolResults = results;
+        toolChanges = mergedChanges;
+
+        // Log tool execution results
+        console.log("Tool execution results:", results);
+        console.log("Merged changes:", mergedChanges);
+      }
+
+      // Skip empty messages if no tools were called - they break the chat
+      if ((!content || !content.trim()) && !toolResults?.length) {
         setMessages((prev) => [
           ...prev,
           {
@@ -426,10 +466,17 @@ export default function CreatorAIChat({
         return;
       }
 
-      const assistantMsg: ChatMessage & { meta?: any } = {
+      const assistantMsg: ChatMessage & {
+        meta?: any;
+        toolResults?: CreatorToolResult[];
+        toolChanges?: CreatorChanges;
+      } = {
         role: "assistant",
-        content,
+        content:
+          content || "I've made the requested changes using the tools above.",
         meta,
+        toolResults,
+        toolChanges,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -806,7 +853,11 @@ function MessageItem({
   message,
   onApplyChanges,
 }: {
-  message: ChatMessage & { meta?: any };
+  message: ChatMessage & {
+    meta?: any;
+    toolResults?: CreatorToolResult[];
+    toolChanges?: CreatorChanges;
+  };
   onApplyChanges: (
     data: Partial<StoryData> & {
       title?: string;
@@ -816,8 +867,12 @@ function MessageItem({
   ) => void;
 }) {
   const isUser = message.role === "user";
-  const { text, data } = parseCreatorOutput(message.content);
   const meta = message.meta;
+  const toolResults = message.toolResults;
+  const toolChanges = message.toolChanges;
+
+  // Check if we have tool-based changes
+  const hasToolChanges = toolChanges && Object.keys(toolChanges).length > 0;
 
   // Calculate dollar cost from usage if available
   const dollarCost = useMemo(() => {
@@ -1002,7 +1057,7 @@ function MessageItem({
               ),
             }}
           >
-            {text}
+            {message.content}
           </ReactMarkdown>
         </div>
         {!isUser && (meta?.tokenCost !== undefined || meta?.isByok) && (
@@ -1023,35 +1078,22 @@ function MessageItem({
             )}
           </div>
         )}
-        {data && (
-          <div className="mt-4 rounded-xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-gray-700/50 overflow-hidden shadow-inner">
-            <div className="bg-gray-100/50 dark:bg-white/5 px-4 py-2 border-b border-gray-200 dark:border-gray-700/50 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                Proposed Changes
-              </span>
-            </div>
 
-            <div className="p-3 space-y-2">
-              <ChangeSummary data={data} />
-            </div>
-
-            <div className="p-3 bg-gray-100/50 dark:bg-white/5 border-t border-gray-200 dark:border-gray-700/50">
-              <button
-                onClick={() => onApplyChanges(data)}
-                className="w-full rounded-lg bg-green-600 hover:bg-green-500 text-white py-2 text-sm font-bold transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <DynamicIcon name="Check" className="w-4 h-4" />
-                Apply Changes
-              </button>
-            </div>
-          </div>
+        {/* Tool Results Display */}
+        {toolResults && toolResults.length > 0 && (
+          <ToolResultsDisplay
+            toolResults={toolResults}
+            toolChanges={toolChanges}
+            hasToolChanges={hasToolChanges}
+            onApplyChanges={onApplyChanges}
+          />
         )}
       </div>
     </div>
   );
 }
 
+// Keep ChangeSummary for potential backward compatibility but it's no longer used in MessageItem
 function ChangeSummary({
   data,
 }: {
@@ -1370,6 +1412,839 @@ function ChangeSummary({
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// Helper to get icon for tool category
+function getToolIcon(
+  toolName: string
+):
+  | "BarChart2"
+  | "Diamond"
+  | "Backpack"
+  | "Wand2"
+  | "Scroll"
+  | "Trophy"
+  | "Swords"
+  | "Users"
+  | "Variable"
+  | "Table"
+  | "GitBranch"
+  | "LayoutTemplate"
+  | "Target"
+  | "Settings"
+  | "TrendingUp"
+  | "Wrench" {
+  if (toolName.includes("stat")) return "BarChart2";
+  if (toolName.includes("resource")) return "Diamond";
+  if (toolName.includes("item") || toolName.includes("inventory"))
+    return "Backpack";
+  if (toolName.includes("ability")) return "Wand2";
+  if (toolName.includes("lore")) return "Scroll";
+  if (toolName.includes("achievement")) return "Trophy";
+  if (toolName.includes("quest")) return "Swords";
+  if (toolName.includes("relationship")) return "Users";
+  if (toolName.includes("variable")) return "Variable";
+  if (toolName.includes("table")) return "Table";
+  if (toolName.includes("skill_tree")) return "GitBranch";
+  if (toolName.includes("preset")) return "LayoutTemplate";
+  if (toolName.includes("starting_choice")) return "Target";
+  if (toolName.includes("basic_info") || toolName.includes("metadata"))
+    return "Settings";
+  if (toolName.includes("leveling") || toolName.includes("upgrade"))
+    return "TrendingUp";
+  return "Wrench";
+}
+
+// Helper to get action type from tool name
+function getActionType(toolName: string): {
+  type: "add" | "modify" | "remove";
+  color: string;
+  bgColor: string;
+} {
+  if (toolName.startsWith("add_") || toolName.startsWith("create_")) {
+    return {
+      type: "add",
+      color: "text-green-600 dark:text-green-400",
+      bgColor: "bg-green-100 dark:bg-green-900/30",
+    };
+  }
+  if (toolName.startsWith("remove_") || toolName.startsWith("delete_")) {
+    return {
+      type: "remove",
+      color: "text-red-600 dark:text-red-400",
+      bgColor: "bg-red-100 dark:bg-red-900/30",
+    };
+  }
+  return {
+    type: "modify",
+    color: "text-blue-600 dark:text-blue-400",
+    bgColor: "bg-blue-100 dark:bg-blue-900/30",
+  };
+}
+
+// Helper to format tool name nicely
+function formatToolName(toolName: string): string {
+  return toolName.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+// Format a value for display
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return value.toString();
+  if (typeof value === "string") {
+    if (value.length > 100) return value.substring(0, 100) + "...";
+    return value;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    return `[${value.length} items]`;
+  }
+  if (typeof value === "object") {
+    const keys = Object.keys(value);
+    return `{${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "..." : ""}}`;
+  }
+  return String(value);
+}
+
+// Render a detailed property display
+function PropertyDisplay({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: unknown;
+  icon?: string;
+}) {
+  const isLongText = typeof value === "string" && value.length > 50;
+  const displayValue = formatValue(value);
+
+  return (
+    <div className="flex items-start gap-2 py-1">
+      <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 w-20 shrink-0 pt-0.5">
+        {label}
+      </span>
+      <span
+        className={`text-xs text-gray-800 dark:text-gray-200 ${
+          isLongText ? "line-clamp-2" : ""
+        }`}
+      >
+        {displayValue}
+      </span>
+    </div>
+  );
+}
+
+// Extract and render the key details from tool args
+function ToolArgsDisplay({
+  toolName,
+  args,
+}: {
+  toolName: string;
+  args?: Record<string, unknown>;
+}) {
+  if (!args || Object.keys(args).length === 0) return null;
+
+  // Helper to safely check if a value exists and is truthy
+  const has = (val: unknown): val is string | number | boolean =>
+    val !== undefined && val !== null && val !== "";
+
+  // Different display based on tool type
+  if (toolName.includes("stat") || toolName.includes("resource")) {
+    // Handle arrays of stats/resources
+    const items = (args.stats ||
+      args.resources ||
+      args.modifications || [args]) as Record<string, unknown>[];
+    const arrayItems = Array.isArray(items) ? items : [items];
+
+    return (
+      <div className="mt-2 space-y-2">
+        {arrayItems.slice(0, 3).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              {has(item.symbol) && (
+                <span className="text-base">{String(item.symbol)}</span>
+              )}
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {String(item.name || item.new_name || "Unknown")}
+              </span>
+              {item.value !== undefined && (
+                <span className="ml-auto text-sm font-mono bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded">
+                  {String(item.value)}
+                  {item.maxValue !== undefined ? `/${item.maxValue}` : ""}
+                </span>
+              )}
+            </div>
+            {has(item.description) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                {String(item.description)}
+              </p>
+            )}
+          </div>
+        ))}
+        {arrayItems.length > 3 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            +{arrayItems.length - 3} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (toolName.includes("item") || toolName.includes("inventory")) {
+    const items = (args.items || args.modifications || [args]) as Record<
+      string,
+      unknown
+    >[];
+    const arrayItems = Array.isArray(items) ? items : [items];
+
+    return (
+      <div className="mt-2 space-y-2">
+        {arrayItems.slice(0, 3).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              {has(item.symbol) && (
+                <span className="text-base">{String(item.symbol)}</span>
+              )}
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {String(item.name || "Unknown")}
+              </span>
+              {has(item.quantity) && (
+                <span className="text-xs text-gray-500">
+                  x{String(item.quantity)}
+                </span>
+              )}
+              {has(item.grade) && (
+                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                  {String(item.grade)}
+                </span>
+              )}
+              {has(item.type) && (
+                <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                  {String(item.type)}
+                </span>
+              )}
+            </div>
+            {has(item.description) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                {String(item.description)}
+              </p>
+            )}
+          </div>
+        ))}
+        {arrayItems.length > 3 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            +{arrayItems.length - 3} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (toolName.includes("ability")) {
+    const items = (args.abilities || args.modifications || [args]) as Record<
+      string,
+      unknown
+    >[];
+    const arrayItems = Array.isArray(items) ? items : [items];
+
+    return (
+      <div className="mt-2 space-y-2">
+        {arrayItems.slice(0, 3).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              {has(item.symbol) && (
+                <span className="text-base">{String(item.symbol)}</span>
+              )}
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {String(item.name || "Unknown")}
+              </span>
+              {has(item.grade) && (
+                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+                  {String(item.grade)}
+                </span>
+              )}
+            </div>
+            {has(item.description) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                {String(item.description)}
+              </p>
+            )}
+            {(has(item.cost) || has(item.cooldown) || has(item.stat)) && (
+              <div className="flex gap-2 mt-1 text-[10px]">
+                {has(item.stat) && (
+                  <span className="text-blue-600 dark:text-blue-400">
+                    Stat: {String(item.stat)}
+                  </span>
+                )}
+                {has(item.cooldown) && (
+                  <span className="text-amber-600 dark:text-amber-400">
+                    CD: {String(item.cooldown)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+        {arrayItems.length > 3 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            +{arrayItems.length - 3} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (toolName.includes("lore")) {
+    const items = (args.lore_entries || args.lore || [args]) as Record<
+      string,
+      unknown
+    >[];
+    const arrayItems = Array.isArray(items) ? items : [items];
+
+    return (
+      <div className="mt-2 space-y-2">
+        {arrayItems.slice(0, 2).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <DynamicIcon
+                name="Scroll"
+                className="w-3.5 h-3.5 text-amber-500"
+              />
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {String(item.title || item.name || "Unknown")}
+              </span>
+              {item.secret === true && (
+                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300">
+                  Secret
+                </span>
+              )}
+            </div>
+            {has(item.content) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-3">
+                {String(item.content)}
+              </p>
+            )}
+          </div>
+        ))}
+        {arrayItems.length > 2 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            +{arrayItems.length - 2} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (toolName.includes("achievement")) {
+    const items = (args.achievements || [args]) as Record<string, unknown>[];
+    const arrayItems = Array.isArray(items) ? items : [items];
+
+    return (
+      <div className="mt-2 space-y-2">
+        {arrayItems.slice(0, 3).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-base">
+                {has(item.symbol) ? String(item.symbol) : "🏆"}
+              </span>
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {String(item.name || "Unknown")}
+              </span>
+              {has(item.xp) && (
+                <span className="ml-auto text-xs font-medium text-green-600 dark:text-green-400">
+                  +{String(item.xp)} XP
+                </span>
+              )}
+            </div>
+            {has(item.description) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                {String(item.description)}
+              </p>
+            )}
+          </div>
+        ))}
+        {arrayItems.length > 3 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            +{arrayItems.length - 3} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (toolName.includes("leveling") || toolName.includes("upgrade_settings")) {
+    const settingIcons: Record<string, string> = {
+      xpBase: "⚡",
+      levelCap: "🎯",
+      defaultUpgradesPerLevel: "⬆️",
+      useCustomCurve: "📈",
+      customCurve: "📊",
+      upgradeOverrides: "🔧",
+      startingUpgrades: "🌟",
+      pointsToLevelUp: "💎",
+      maxLevel: "🏆",
+      upgradePointsPerLevel: "📦",
+    };
+    const settingLabels: Record<string, string> = {
+      xpBase: "XP Base Multiplier",
+      levelCap: "Maximum Level",
+      defaultUpgradesPerLevel: "Upgrades Per Level",
+      useCustomCurve: "Custom XP Curve",
+      customCurve: "XP Requirements",
+      upgradeOverrides: "Level Overrides",
+      startingUpgrades: "Starting Upgrades",
+      pointsToLevelUp: "Points to Level Up",
+      maxLevel: "Max Level",
+      upgradePointsPerLevel: "Upgrade Points/Level",
+    };
+
+    const entries = Object.entries(args).filter(
+      ([, v]) => v !== undefined && v !== null
+    );
+    if (entries.length === 0) return null;
+
+    return (
+      <div className="mt-2 space-y-2">
+        {entries.map(([key, value]) => {
+          const icon = settingIcons[key] || "⚙️";
+          const label =
+            settingLabels[key] ||
+            key
+              .replace(/([A-Z])/g, " $1")
+              .replace(/_/g, " ")
+              .trim();
+
+          // Special handling for arrays (customCurve, upgradeOverrides)
+          if (Array.isArray(value)) {
+            const arr = value as Record<string, unknown>[];
+            return (
+              <div
+                key={key}
+                className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">{icon}</span>
+                  <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                    {label}
+                  </span>
+                  <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                    {arr.length} entries
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1 mt-1">
+                  {arr.slice(0, 6).map((item, i) => (
+                    <div
+                      key={i}
+                      className="text-[10px] bg-gray-100 dark:bg-gray-700/50 rounded px-1.5 py-0.5 text-center"
+                    >
+                      {key === "customCurve" ? (
+                        <span>
+                          Lvl {String(item.level)}:{" "}
+                          <strong>{String(item.cumulativeXP)}</strong> XP
+                        </span>
+                      ) : key === "upgradeOverrides" ? (
+                        <span>
+                          Lvl {String(item.level)}:{" "}
+                          <strong>{String(item.upgrades)}</strong> pts
+                        </span>
+                      ) : (
+                        <span>{JSON.stringify(item)}</span>
+                      )}
+                    </div>
+                  ))}
+                  {arr.length > 6 && (
+                    <div className="text-[10px] text-gray-500 text-center">
+                      +{arr.length - 6} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          // Special handling for objects (startingUpgrades)
+          if (typeof value === "object" && value !== null) {
+            const obj = value as Record<string, unknown>;
+            return (
+              <div
+                key={key}
+                className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">{icon}</span>
+                  <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                    {label}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {Object.entries(obj).map(([k, v]) => (
+                    <div
+                      key={k}
+                      className="text-[10px] bg-gray-100 dark:bg-gray-700/50 rounded px-2 py-1"
+                    >
+                      <span className="text-gray-500 dark:text-gray-400 capitalize">
+                        {k}:
+                      </span>
+                      <span className="ml-1 font-medium text-gray-800 dark:text-gray-200">
+                        {String(v)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+
+          // Simple values
+          return (
+            <div
+              key={key}
+              className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700 flex items-center gap-2"
+            >
+              <span className="text-base">{icon}</span>
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {label}
+              </span>
+              <span className="ml-auto text-sm font-mono bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded">
+                {typeof value === "boolean"
+                  ? value
+                    ? "✓ Enabled"
+                    : "✗ Disabled"
+                  : String(value)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Generic fallback for other tools
+  const entries = Object.entries(args).filter(
+    ([, v]) => v !== undefined && v !== null
+  );
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="mt-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700">
+      <div className="space-y-1">
+        {entries.slice(0, 5).map(([key, value]) => {
+          const label = key
+            .replace(/([A-Z])/g, " $1")
+            .replace(/_/g, " ")
+            .trim();
+          return <PropertyDisplay key={key} label={label} value={value} />;
+        })}
+        {entries.length > 5 && (
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 pt-1">
+            +{entries.length - 5} more properties...
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ToolResultsDisplay({
+  toolResults,
+  toolChanges,
+  hasToolChanges,
+  onApplyChanges,
+}: {
+  toolResults: CreatorToolResult[];
+  toolChanges?: CreatorChanges;
+  hasToolChanges?: boolean;
+  onApplyChanges: (
+    data: Partial<StoryData> & {
+      title?: string;
+      shortDescription?: string;
+      description?: string;
+    }
+  ) => void;
+}) {
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const successCount = toolResults.filter((r) => r.success).length;
+  const failCount = toolResults.length - successCount;
+
+  return (
+    <div className="mt-4 rounded-xl bg-linear-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-700/50 overflow-hidden shadow-lg">
+      {/* Header */}
+      <div className="bg-linear-to-r from-purple-100/80 to-indigo-100/80 dark:from-purple-900/40 dark:to-indigo-900/40 px-4 py-3 border-b border-purple-200 dark:border-purple-700/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-purple-500 to-indigo-500 flex items-center justify-center shadow-md">
+              <DynamicIcon name="Wrench" className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100">
+                Tool Actions
+              </h4>
+              <div className="flex items-center gap-2 text-xs">
+                {successCount > 0 && (
+                  <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <DynamicIcon name="CheckCircle" className="w-3 h-3" />
+                    {successCount} success
+                  </span>
+                )}
+                {failCount > 0 && (
+                  <span className="text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <DynamicIcon name="XCircle" className="w-3 h-3" />
+                    {failCount} failed
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tool Results - Always Expanded with Details */}
+      <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
+        {toolResults.map((result, idx) => {
+          const action = getActionType(result.toolName);
+          const icon = getToolIcon(result.toolName);
+          const isExpanded = expandedIdx === idx;
+
+          return (
+            <div
+              key={idx}
+              className={`rounded-lg border overflow-hidden transition-all ${
+                result.success
+                  ? "bg-white dark:bg-gray-800/50 border-gray-200 dark:border-gray-700"
+                  : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700/30"
+              }`}
+            >
+              {/* Header Row - Clickable */}
+              <div
+                className="flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                onClick={() => setExpandedIdx(isExpanded ? null : idx)}
+              >
+                {/* Icon */}
+                <div
+                  className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${action.bgColor}`}
+                >
+                  <DynamicIcon
+                    name={icon}
+                    className={`w-4 h-4 ${action.color}`}
+                  />
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                      {formatToolName(result.toolName)}
+                    </span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                        action.type === "add"
+                          ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
+                          : action.type === "remove"
+                          ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                          : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+                      }`}
+                    >
+                      {action.type}
+                    </span>
+                  </div>
+
+                  {/* Show preview of changes/args when collapsed */}
+                  {!isExpanded && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {/* Show args preview first if available */}
+                      {result.args && Object.keys(result.args).length > 0 ? (
+                        <>
+                          {Object.entries(result.args)
+                            .slice(0, 3)
+                            .map(([key, value], i) => {
+                              const label = key
+                                .replace(/([A-Z])/g, " $1")
+                                .replace(/_/g, " ")
+                                .trim();
+                              const displayValue =
+                                typeof value === "boolean"
+                                  ? value
+                                    ? "✓"
+                                    : "✗"
+                                  : typeof value === "number"
+                                  ? String(value)
+                                  : Array.isArray(value)
+                                  ? `${value.length} items`
+                                  : typeof value === "object" && value !== null
+                                  ? "configured"
+                                  : String(value).substring(0, 20);
+                              return (
+                                <span
+                                  key={i}
+                                  className="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded"
+                                >
+                                  <span className="text-gray-500 dark:text-gray-500">
+                                    {label}:
+                                  </span>{" "}
+                                  <span className="font-medium">
+                                    {displayValue}
+                                  </span>
+                                </span>
+                              );
+                            })}
+                          {Object.keys(result.args).length > 3 && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              +{Object.keys(result.args).length - 3} more
+                            </span>
+                          )}
+                        </>
+                      ) : result.changes && result.changes.length > 0 ? (
+                        <>
+                          {result.changes.slice(0, 2).map((change, i) => (
+                            <span
+                              key={i}
+                              className="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded"
+                            >
+                              {change.length > 40
+                                ? change.substring(0, 40) + "..."
+                                : change}
+                            </span>
+                          ))}
+                          {result.changes.length > 2 && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              +{result.changes.length - 2} more
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-500 dark:text-gray-400 italic">
+                          Click to see details
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Status & Expand */}
+                <div className="shrink-0 flex items-center gap-2">
+                  {result.success ? (
+                    <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                      <DynamicIcon
+                        name="Check"
+                        className="w-3.5 h-3.5 text-green-600 dark:text-green-400"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
+                      <DynamicIcon
+                        name="X"
+                        className="w-3.5 h-3.5 text-red-600 dark:text-red-400"
+                      />
+                    </div>
+                  )}
+                  <DynamicIcon
+                    name={isExpanded ? "ChevronUp" : "ChevronDown"}
+                    className="w-4 h-4 text-gray-400"
+                  />
+                </div>
+              </div>
+
+              {/* Expanded Details */}
+              {isExpanded && (
+                <div className="px-3 pb-3 border-t border-gray-100 dark:border-gray-700/50 pt-2">
+                  {/* Changes List */}
+                  {result.changes && result.changes.length > 0 && (
+                    <div className="mb-3">
+                      <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
+                        Changes Made
+                      </span>
+                      <ul className="mt-1 space-y-0.5">
+                        {result.changes.map((change, i) => (
+                          <li
+                            key={i}
+                            className="text-xs text-gray-700 dark:text-gray-300 flex items-start gap-1.5"
+                          >
+                            <span className="text-green-500 mt-0.5">•</span>
+                            {change}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Detailed Args Display */}
+                  {result.args && Object.keys(result.args).length > 0 && (
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
+                        Parameters
+                      </span>
+                      <ToolArgsDisplay
+                        toolName={result.toolName}
+                        args={result.args}
+                      />
+                    </div>
+                  )}
+
+                  {/* Raw JSON fallback when no formatted display */}
+                  {(!result.changes || result.changes.length === 0) &&
+                    (!result.args || Object.keys(result.args).length === 0) && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+                        Tool executed with default parameters
+                      </div>
+                    )}
+
+                  {/* Always show raw data toggle for debugging */}
+                  {result.args && Object.keys(result.args).length > 0 && (
+                    <details className="mt-3">
+                      <summary className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-400">
+                        Raw Data
+                      </summary>
+                      <pre className="mt-1 text-[10px] bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-x-auto text-gray-600 dark:text-gray-400 max-h-40 overflow-y-auto">
+                        {JSON.stringify(result.args, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Apply Button */}
+      {hasToolChanges && (
+        <div className="p-3 bg-linear-to-r from-purple-100/80 to-indigo-100/80 dark:from-purple-900/40 dark:to-indigo-900/40 border-t border-purple-200 dark:border-purple-700/50">
+          <button
+            onClick={() =>
+              onApplyChanges(
+                toolChanges as Partial<StoryData> & {
+                  title?: string;
+                  shortDescription?: string;
+                  description?: string;
+                }
+              )
+            }
+            className="w-full rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white py-2.5 text-sm font-bold transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            <DynamicIcon name="Check" className="w-4 h-4" />
+            Apply Tool Changes
+          </button>
+        </div>
+      )}
     </div>
   );
 }

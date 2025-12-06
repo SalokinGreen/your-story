@@ -82,6 +82,20 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **buildStoryCreatorMessages**: Builds prompts with story history (last 15 scene parts), recent memory context, and current game state. Returns messages array with Adventure-style output format.
   - **applyCreatorChangesToStoryData**: Applies AI-suggested changes (stats, resources, inventory, abilities, achievements, lore) to StoryData. Uses mergeArrayWithCommands() for array modifications.
   - **mergeArrayWithCommands**: Handles merge/replace/delete/add operations on array fields using `__merge`, `__command`, and `__id` markers.
+- app/misc/creator_tools.ts: **Creator AI Tool Definitions**. Exports 42 tool definitions for adventure editing via function calling.
+  - **CREATOR_TOOLS**: Array of tool definitions with OpenAI-compatible schemas.
+  - **getCreatorToolsForAPI()**: Converts tool definitions to API format.
+  - **Tool categories**: Stats (add/modify/remove), Resources, Items, Abilities, Lore, Achievements, Quests, Relationships, Variables, Presets, Skill Trees, Custom Tables, Starting Choices, Settings updates.
+- app/misc/creator_tool_executor.ts: **Creator AI Tool Executor**. Executes tool calls locally on frontend.
+  - **executeCreatorTool()**: Executes single tool call, returns result and changes.
+  - **executeCreatorTools()**: Executes multiple tool calls in sequence, merges changes.
+  - **CreatorToolCall**: { id, function: { name, arguments } } - matches AI response format.
+  - **CreatorToolResult**: { toolCallId, toolName, success, message, changes? }.
+  - **CreatorChanges**: Partial adventure data structure with all possible modifications.
+- app/misc/creator_ai.ts: **Creator AI Prompt Builder**. Two modes:
+  - **JSON mode (legacy)**: buildCreatorMessages() - Returns system prompt instructing AI to output JSON in code blocks.
+  - **Tool mode (recommended)**: buildCreatorMessagesWithTools() - Returns messages + tools array for function calling.
+  - **formatStoryDataAsMarkdown()**: Converts StoryData to readable markdown for AI context (replaces JSON.stringify).
 - app/misc/generation.ts: **Frontend generation orchestrator**. Exports generateStoryTurn() which handles the complete 3-stage generation flow:
   - Stage 1: Calls buildStoryPrompt(), streams story content via /api/generate-stream
   - Stage 2: Calls buildToolPrompt() in a loop, executes tools locally via executeTools(), supports multi-round tool calling

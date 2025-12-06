@@ -25,7 +25,12 @@ import {
   getMemoryContent,
 } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
-import { buildCreatorMessages, CreatorOutputData } from "@/app/misc/creator_ai";
+import {
+  buildCreatorMessages,
+  CreatorOutputData,
+  formatStoryDataAsMarkdown,
+} from "@/app/misc/creator_ai";
+import { getCreatorToolsForAPI } from "@/app/misc/creator_tools";
 
 export interface StoryCreatorAIInput {
   messages: ChatMessage[];
@@ -646,4 +651,110 @@ export function sanitizeSkillTrees(trees: SkillTree[]): SkillTree[] {
         : NODE_TYPE_ICONS[node.type] || "Circle",
     })),
   }));
+}
+
+/**
+ * Build messages for story creator with tool calling support.
+ * Combines story history context with the full creator tool system.
+ */
+export function buildStoryCreatorMessagesWithTools(
+  storyData: StoryData,
+  userRequest: string,
+  conversationHistory: ChatMessage[] = []
+): {
+  messages: ChatMessage[];
+  tools: ReturnType<typeof getCreatorToolsForAPI>;
+} {
+  // Get recent story history for context
+  const recentParts = storyData.scene?.parts?.slice(-15) || [];
+  const storyHistory = recentParts
+    .map((part) => {
+      // User messages show as "> choice text", assistant messages show content directly
+      if (part.user || part.role === "user") {
+        return `> ${part.content}`;
+      }
+      return part.content;
+    })
+    .filter(Boolean)
+    .join("\n\n---\n\n");
+
+  // Get recent memories
+  const recentMemories =
+    storyData.memory?.slice(-10).map(getMemoryContent) || [];
+
+  // Build system prompt with tools focus and story context
+  const systemPrompt = `You are an expert game master and story editor assistant. The player is currently in an active story/game and needs help modifying the game state, mechanics, or story elements.
+
+## YOUR ROLE
+You help players by using tools to make precise changes to their story's data. You have access to a comprehensive set of tools for modifying:
+- **Stats & Resources** - Character attributes, health, mana, etc.
+- **Inventory & Abilities** - Items, skills, spells, techniques
+- **Lore & Achievements** - World-building entries, unlockable achievements
+- **Quests & Relationships** - Active objectives, NPC relationships
+- **Variables & Conditions** - Story flags, character afflictions
+- **Game Settings** - RPG system, difficulty, etc.
+
+## TOOL USAGE GUIDELINES
+1. **Always use tools** to make changes - never output raw JSON
+2. **Be precise** - use exact names when modifying existing elements
+3. **Batch related changes** - make multiple tool calls in one response when logical
+4. **Confirm understanding** before making changes if the request is ambiguous
+5. **Explain what you did** after making changes
+
+## TOOL CATEGORIES
+### Stats & Resources
+- add_stat, modify_stat, remove_stat, rename_stat
+- add_resource, modify_resource, remove_resource, rename_resource
+
+### Inventory & Abilities  
+- add_item, modify_item, remove_item
+- add_ability, modify_ability, remove_ability
+
+### Lore & Story
+- add_lore, modify_lore, remove_lore
+- add_achievement, modify_achievement, remove_achievement
+- add_memory
+
+### Quests & Relationships
+- add_quest, modify_quest, remove_quest
+- add_relationship, modify_relationship, remove_relationship
+
+### Variables & Conditions
+- add_variable, modify_variable, remove_variable
+- add_condition, modify_condition, remove_condition
+
+### Game Configuration
+- update_settings (rpgSystem, difficulty, etc.)
+- update_leveling_settings, update_upgrade_settings
+
+## STORY CONTEXT
+The player is currently in an active story. Here's what's been happening recently:
+
+${storyHistory || "(No story history yet)"}
+
+${
+  recentMemories.length > 0
+    ? `## RECENT MEMORIES\n${recentMemories.map((m) => `- ${m}`).join("\n")}`
+    : ""
+}
+
+## CURRENT GAME STATE
+${formatStoryDataAsMarkdown(storyData)}
+
+## RESPONSE FORMAT
+1. If the request is clear, use the appropriate tools to make changes
+2. After tool execution, briefly confirm what was changed
+3. If the request is ambiguous, ask clarifying questions BEFORE using tools
+4. Keep responses concise and focused on the changes made`;
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: systemPrompt },
+    ...conversationHistory,
+    { role: "user", content: userRequest },
+  ];
+
+  return {
+    messages,
+    tools: getCreatorToolsForAPI(),
+  };
 }
