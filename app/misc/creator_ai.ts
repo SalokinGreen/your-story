@@ -405,54 +405,6 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     sections.push(levelingSection.join("\n"));
   }
 
-  // Upgrade Settings
-  if (data.upgradeSettings) {
-    const us = data.upgradeSettings;
-    const upgradeSection = ["## Upgrade Settings"];
-    upgradeSection.push(`- System Enabled: ${us.enabled ? "Yes" : "No"}`);
-    if (us.enabled) {
-      if (us.allowStatUpgrade)
-        upgradeSection.push(
-          `- Stat Upgrade: +${us.statUpgradeAmount} for ${us.statUpgradeCost} points`
-        );
-      if (us.allowResourceUpgrade)
-        upgradeSection.push(
-          `- Resource Upgrade: +${us.resourceUpgradeAmount} max for ${us.resourceUpgradeCost} points`
-        );
-      if (us.allowAddItem)
-        upgradeSection.push(`- Add Item Cost: ${us.addItemCost} points`);
-      if (us.statShopEnabled && us.statShop.length > 0) {
-        upgradeSection.push(
-          `- Stat Shop (${us.statShop.length} items): ${us.statShop
-            .map((s) => `${s.name} (${s.cost}pts)`)
-            .join(", ")}`
-        );
-      }
-      if (us.resourceShopEnabled && us.resourceShop.length > 0) {
-        upgradeSection.push(
-          `- Resource Shop (${us.resourceShop.length} items): ${us.resourceShop
-            .map((r) => `${r.name} (${r.cost}pts)`)
-            .join(", ")}`
-        );
-      }
-      if (us.itemShopEnabled && us.itemShop.length > 0) {
-        upgradeSection.push(
-          `- Item Shop (${us.itemShop.length} items): ${us.itemShop
-            .map((i) => `${i.name} (${i.cost}pts)`)
-            .join(", ")}`
-        );
-      }
-      if (us.abilityShopEnabled && us.abilityShop.length > 0) {
-        upgradeSection.push(
-          `- Ability Shop (${us.abilityShop.length} items): ${us.abilityShop
-            .map((a) => `${a.name} (${a.cost}pts)`)
-            .join(", ")}`
-        );
-      }
-    }
-    sections.push(upgradeSection.join("\n"));
-  }
-
   // Progress info
   const progress: string[] = [];
   if (data.points !== undefined)
