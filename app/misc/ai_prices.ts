@@ -1154,7 +1154,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     name: "GLM Creative",
     description: "GLM 4.6 for creative/NSFW writing - uses Coins",
     storyModel: "DeepInfra GLM 4.6",
-    toolsModel: "DeepInfra DeepSeek V3.1",
+    toolsModel: "DeepInfra DeepSeek V3.2",
     choicesModel: "DeepInfra Phi 4",
     estimatedCost: 2,
   },
