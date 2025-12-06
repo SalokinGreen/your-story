@@ -1575,56 +1575,102 @@ function ToolArgsDisplay({
 
   // Achievements display
   if (toolName.includes("achievement")) {
-    const items = (args.achievements || args.modifications || [args]) as Record<
-      string,
-      unknown
-    >[];
+    // Handle both array format and single achievement at top level
+    // AI might send: { achievements: [{title: "X"}] } OR { title: "X", ai_hint: "Y" }
+    let items: Record<string, unknown>[];
+    if (args.achievements && Array.isArray(args.achievements)) {
+      items = args.achievements as Record<string, unknown>[];
+    } else if (args.titles && Array.isArray(args.titles)) {
+      // For remove_achievements which uses "titles" array
+      items = (args.titles as string[]).map((t) => ({ title: t }));
+    } else if (args.title) {
+      // Single achievement at top level
+      items = [args as Record<string, unknown>];
+    } else {
+      items = [];
+    }
+
     const arrayItems = Array.isArray(items) ? items : [items];
+
+    // Handle case where achievements array is empty or undefined
+    if (
+      arrayItems.length === 0 ||
+      (arrayItems.length === 1 && Object.keys(arrayItems[0] || {}).length === 0)
+    ) {
+      return null;
+    }
 
     return (
       <div className="mt-2 space-y-2">
-        {arrayItems.slice(0, 3).map((item, idx) => (
-          <div
-            key={idx}
-            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              {has(item.symbol) && (
-                <span className="text-base">{String(item.symbol)}</span>
-              )}
-              <DynamicIcon
-                name="Trophy"
-                className="w-3.5 h-3.5 text-amber-500"
-              />
-              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                {String(item.title || item.name || item.new_title || "Unknown")}
-              </span>
-              {has(item.points) && (
-                <span className="ml-auto text-xs font-mono bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded">
-                  {String(item.points)} pts
+        {arrayItems.slice(0, 5).map((item, idx) => {
+          // Get the title - could be 'title' or for renames check both
+          // Debug: explicitly check each field
+          const titleVal = item.title;
+          const newTitleVal = item.new_title;
+          const displayTitle = titleVal
+            ? String(titleVal)
+            : newTitleVal
+            ? String(newTitleVal)
+            : "(No Title)";
+
+          return (
+            <div
+              key={idx}
+              className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                {has(item.symbol) && (
+                  <span className="text-base">{String(item.symbol)}</span>
+                )}
+                <DynamicIcon
+                  name="Trophy"
+                  className="w-3.5 h-3.5 text-amber-500"
+                />
+                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  {displayTitle}
                 </span>
+                {has(item.points) && (
+                  <span className="ml-auto text-xs font-mono bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded">
+                    {String(item.points)} pts
+                  </span>
+                )}
+                {item.hidden === true && (
+                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400">
+                    Hidden
+                  </span>
+                )}
+              </div>
+              {has(item.description) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                  {String(item.description)}
+                </p>
               )}
-              {item.hidden === true && (
-                <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400">
-                  Hidden
-                </span>
+              {has(item.ai_hint) && (
+                <p className="text-xs text-purple-600 dark:text-purple-400 line-clamp-2 mt-1 italic">
+                  AI Hint: {String(item.ai_hint)}
+                </p>
               )}
+              {/* Show what fields are being modified if it's a modify operation */}
+              {toolName === "modify_achievements" &&
+                !has(item.description) &&
+                !has(item.ai_hint) && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 italic">
+                    {Object.keys(item)
+                      .filter((k) => k !== "title")
+                      .map((k) =>
+                        k
+                          .replace(/_/g, " ")
+                          .replace(/\b\w/g, (l) => l.toUpperCase())
+                      )
+                      .join(", ") || "No changes specified"}
+                  </p>
+                )}
             </div>
-            {has(item.description) && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                {String(item.description)}
-              </p>
-            )}
-            {has(item.ai_hint) && (
-              <p className="text-xs text-purple-600 dark:text-purple-400 line-clamp-2 mt-1 italic">
-                AI Hint: {String(item.ai_hint)}
-              </p>
-            )}
-          </div>
-        ))}
-        {arrayItems.length > 3 && (
+          );
+        })}
+        {arrayItems.length > 5 && (
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-            +{arrayItems.length - 3} more...
+            +{arrayItems.length - 5} more...
           </p>
         )}
       </div>

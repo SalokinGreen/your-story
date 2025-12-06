@@ -2942,6 +2942,35 @@ function StoryPageContent() {
       });
     }
 
+    // Safety check: ensure skill_dc is numeric (handles legacy string values)
+    if (choice.skill_dc !== undefined && typeof choice.skill_dc !== "number") {
+      const tierNames = [
+        "trivial",
+        "easy",
+        "average",
+        "hard",
+        "very_hard",
+        "impossible",
+      ];
+      const dcString = String(choice.skill_dc).toLowerCase();
+      if (tierNames.includes(dcString)) {
+        const difficulty = storyData.difficulty || "medium";
+        choice.skill_dc = parseDCValue(
+          dcString as any,
+          rpgSystem.id as any,
+          difficulty
+        );
+        logger.action("Converted string DC to numeric", {
+          original: dcString,
+          converted: choice.skill_dc,
+        });
+      } else {
+        // Try parsing as number
+        const parsed = parseInt(String(choice.skill_dc), 10);
+        choice.skill_dc = isNaN(parsed) ? 0 : parsed;
+      }
+    }
+
     // YZE: If this choice has a skill check, show stress dice selection UI first
     if (
       rpgSystem.id === "yze" &&

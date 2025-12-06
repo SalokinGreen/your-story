@@ -257,18 +257,26 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
     if (metaMatch) {
       const metadata = metaMatch[1];
 
-      // Parse use_skill: name (DC number) or (X success(es) needed/required)
+      // Parse use_skill: name (DC number), (tier name), or (X success(es) needed/required)
+      // Supports: "Stealth (DC 15)", "Stealth (hard)", "Stealth (15)", "Combat (2 successes needed)"
       const skillMatch = metadata.match(
-        /use_skill:\s*([^(;]+?)(?:\s*\((?:DC\s*(\d+)|(?:needs?\s*)?(\d+)\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?)\))?(?:;|$)/i
+        /use_skill:\s*([^(;]+?)(?:\s*\((?:DC\s*)?(\d+|trivial|easy|average|hard|very_hard|impossible)(?:\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?)?\))?(?:;|$)/i
       );
       if (skillMatch) {
         const skillName = skillMatch[1].trim();
         if (skillName.toLowerCase() !== "none") {
           choice.skill_used = skillName;
-          // Try DC format first (group 2), then success count format (group 3)
-          const dc = skillMatch[2] || skillMatch[3];
-          if (dc) {
-            choice.skill_dc = parseInt(dc, 10);
+          const dcValue = skillMatch[2];
+          if (dcValue) {
+            // Check if it's a number or a tier name
+            const parsedNum = parseInt(dcValue, 10);
+            if (!isNaN(parsedNum)) {
+              choice.skill_dc = parsedNum;
+            } else {
+              // It's a tier name - store as skill_dc_tier
+              choice.skill_dc_tier =
+                dcValue.toLowerCase() as Choice["skill_dc_tier"];
+            }
           }
         }
       }
@@ -1251,7 +1259,7 @@ export async function analyzeAction(
   // Validate and fuzzy match the analysis against actual game state
   const validationWarnings: string[] = [];
 
-  // Validate skill_used
+  // Validate skill_used and skill_dc
   if (analysis.skill_used) {
     const matchResult = findStatMatch(analysis.skill_used, storyData.stats);
     if (matchResult) {
@@ -1267,6 +1275,43 @@ export async function analyzeAction(
       );
       analysis.skill_used = null;
       analysis.skill_dc = null;
+    }
+  }
+
+  // Validate skill_dc - ensure it's a number, not a tier string
+  // If AI returned a tier name (e.g., "easy"), convert it to a number
+  if (analysis.skill_dc !== null && analysis.skill_dc !== undefined) {
+    if (typeof analysis.skill_dc === "string") {
+      const tierNames = [
+        "trivial",
+        "easy",
+        "average",
+        "hard",
+        "very_hard",
+        "impossible",
+      ];
+      const lowerDc = (analysis.skill_dc as string).toLowerCase();
+      if (tierNames.includes(lowerDc)) {
+        // Import parseDCValue for tier conversion
+        const { parseDCValue } = await import("./rpgSystems");
+        const difficulty = storyData.difficulty || "medium";
+        const systemId = storyData.rpgSystem || "3d6";
+        analysis.skill_dc = parseDCValue(lowerDc, systemId, difficulty);
+        validationWarnings.push(
+          `Converted DC tier "${lowerDc}" → ${analysis.skill_dc} (${systemId}, ${difficulty} difficulty)`
+        );
+      } else {
+        // Try parsing as number
+        const parsed = parseInt(analysis.skill_dc as string, 10);
+        if (!isNaN(parsed)) {
+          analysis.skill_dc = parsed;
+        } else {
+          validationWarnings.push(
+            `Invalid skill_dc "${analysis.skill_dc}", defaulting to null`
+          );
+          analysis.skill_dc = null;
+        }
+      }
     }
   }
 

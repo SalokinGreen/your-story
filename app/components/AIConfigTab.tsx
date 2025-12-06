@@ -231,22 +231,22 @@ export default function AIConfigTab() {
 
   // Persist stage model selections to localStorage
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
       localStorage.setItem("aiModelStory", storyModel);
     }
-  }, [storyModel]);
+  }, [storyModel, hasLoadedSettings]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
       localStorage.setItem("aiModelTools", toolsModel);
     }
-  }, [toolsModel]);
+  }, [toolsModel, hasLoadedSettings]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
       localStorage.setItem("aiModelChoices", choicesModel);
     }
-  }, [choicesModel]);
+  }, [choicesModel, hasLoadedSettings]);
 
   // Persist NovelAI settings
   useEffect(() => {
@@ -338,6 +338,26 @@ export default function AIConfigTab() {
       (err) => console.error("Failed to sync AI config:", err)
     );
   };
+
+  // Auto-sync custom model selections to cloud when they change
+  // This effect runs AFTER initial cloud load (hasLoadedSettings) and only for custom preset
+  useEffect(() => {
+    if (hasLoadedSettings && user && currentPreset === "custom") {
+      // Debounce the sync to avoid too many requests
+      const timeoutId = setTimeout(() => {
+        syncAIConfig();
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    storyModel,
+    toolsModel,
+    choicesModel,
+    hasLoadedSettings,
+    currentPreset,
+    user,
+  ]);
 
   const handlePresetChange = (newPreset: string) => {
     if (typeof window !== "undefined") {

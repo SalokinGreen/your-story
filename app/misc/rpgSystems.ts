@@ -1603,13 +1603,15 @@ const DC_TIER_VALUES: Record<
     impossible: { easy: 26, medium: 30, hard: 34, expert: 38 },
   },
   // 1d20 system: roll range 1-20, average 10.5
+  // Stat 50 = +10 modifier, Stat 100 = +20 modifier
+  // For a stat-50 character: avg roll 10.5 + 10 = 20.5 total
   "1d20": {
-    trivial: { easy: 1, medium: 5, hard: 8, expert: 10 },
-    easy: { easy: 5, medium: 10, hard: 12, expert: 15 },
-    average: { easy: 10, medium: 15, hard: 18, expert: 20 },
-    hard: { easy: 15, medium: 18, hard: 22, expert: 25 },
-    very_hard: { easy: 18, medium: 22, hard: 25, expert: 28 },
-    impossible: { easy: 22, medium: 25, hard: 28, expert: 32 },
+    trivial: { easy: 5, medium: 5, hard: 8, expert: 10 }, // Auto-success for most
+    easy: { easy: 8, medium: 10, hard: 12, expert: 14 }, // ~75% with +5, ~95% with +10
+    average: { easy: 12, medium: 14, hard: 16, expert: 18 }, // ~50% with +5, ~80% with +10
+    hard: { easy: 15, medium: 17, hard: 19, expert: 21 }, // ~30% with +5, ~65% with +10
+    very_hard: { easy: 18, medium: 20, hard: 22, expert: 24 }, // ~15% with +5, ~50% with +10
+    impossible: { easy: 22, medium: 24, hard: 26, expert: 28 }, // Needs high stat + good roll
   },
   // 1d100 system: roll range 1-100
   "1d100": {
