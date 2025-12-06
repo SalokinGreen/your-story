@@ -822,12 +822,44 @@ function MessageItem({
   // Calculate dollar cost from usage if available
   const dollarCost = useMemo(() => {
     if (!meta?.usage || !meta?.modelName) return null;
-    const modelConfig = getModelConfig(meta.modelName);
+
+    const modelName = meta.modelName;
+
+    // Check if this is a custom model (UUID format)
+    const isUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        modelName
+      );
+
+    let inputPrice = 0;
+    let outputPrice = 0;
+
+    if (isUUID) {
+      // Try to get pricing from custom models in localStorage
+      try {
+        const stored = localStorage.getItem("customModels");
+        if (stored) {
+          const customModels: CustomModel[] = JSON.parse(stored);
+          const customModel = customModels.find((m) => m.id === modelName);
+          if (customModel) {
+            inputPrice = customModel.inputPrice || 0;
+            outputPrice = customModel.outputPrice || 0;
+          }
+        }
+      } catch {
+        // Ignore localStorage errors
+      }
+    } else {
+      const modelConfig = getModelConfig(modelName);
+      inputPrice = modelConfig.inputPrice;
+      outputPrice = modelConfig.outputPrice;
+    }
+
     const inputTokens = meta.usage.promptTokens || 0;
     const outputTokens = meta.usage.completionTokens || 0;
     return (
-      (modelConfig.inputPrice * inputTokens) / 1000000 +
-      (modelConfig.outputPrice * outputTokens) / 1000000
+      (inputPrice * inputTokens) / 1000000 +
+      (outputPrice * outputTokens) / 1000000
     );
   }, [meta]);
 
