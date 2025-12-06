@@ -834,8 +834,24 @@ DO NOT duplicate these changes. Only process NEW events from the STORY TEXT.
 - **Fail Forward:** If the narrative described a failure, ensure the *cost* of that failure is applied (lost resource, condition, etc.).
 
 ## LORE MANAGEMENT
-- If the narrative introduces a NEW permanent concept/faction/NPC not in the database, call \`create_lore\`.
-- If an existing hidden lore was triggered by a keyword, call \`show_lore\`.
+Lore entries are the adventure's world-building database. Your job is to keep it alive and evolving.
+
+**When to CREATE NEW LORE (\`create_lore\`):**
+- The narrative introduces a NEW named NPC
+- A new faction, organization, or group is mentioned for the first time
+- A significant location is discovered that the player might revisit
+- Important world lore is revealed (magic systems, history, prophecies, religions)
+- A secret or mystery is uncovered that should be tracked
+
+**When to UPDATE LORE (\`update_lore\`):**
+- New information is revealed about an existing entry (NPC's secret motives discovered, location's history learned)
+- An NPC's relationship with the player changes significantly
+- Circumstances change (faction alliance shifts, location is destroyed)
+
+**Lore Quality Guidelines:**
+- Lore should be DETAILED (2-4 paragraphs), not just one sentence
+- Include: physical description, personality, motivations, relationships, secrets, relevance to player
+- Think of lore as a "GM reference sheet" that will help future story generation
 
 ## SCENE CHALLENGES (Progress Clocks)
 Manage complex multi-step tasks using the Challenge Tools.
@@ -879,15 +895,7 @@ Allow players to rest and recover when narratively appropriate.
 **Long Rest Confirmation:**
 Long rests involve a time skip of several days. The AI should narratively describe the passage of time and what happens during the rest period.
 
-Think through the narrative sentence-by-sentence, then execute the required Tool Calls.
-
-${
-  commandResponses && commandResponses.length > 0
-    ? `\nPrevious Command Feedback:\n${formatResponsesForAI(
-        commandResponses
-      )}\n`
-    : ""
-}`;
+Think through the narrative sentence-by-sentence, then execute the required Tool Calls.`;
 
   const infoMessage = buildInfoMessage(storyData, embeddingContext);
 
