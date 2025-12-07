@@ -386,13 +386,13 @@ describe("Powered by the Apocalypse (PbtA) System", () => {
 
     it("should have correct DC values for advantage/disadvantage", () => {
       // DC represents advantage (negative) or disadvantage (positive)
-      // Simplified 3-tier system
+      // Simplified 3-tier system: easy=advantage, average/hard=normal, very_hard=disadvantage
       expect(SYSTEM_PBTA.dc.trivial).toBe(-1); // Advantage (same as easy)
       expect(SYSTEM_PBTA.dc.easy).toBe(-1); // Advantage
       expect(SYSTEM_PBTA.dc.medium).toBe(0); // Normal
-      expect(SYSTEM_PBTA.dc.hard).toBe(1); // Disadvantage
-      expect(SYSTEM_PBTA.dc.veryHard).toBe(1); // Disadvantage (same as hard)
-      expect(SYSTEM_PBTA.dc.impossible).toBe(1); // Disadvantage (same as hard)
+      expect(SYSTEM_PBTA.dc.hard).toBe(0); // Normal (same as average)
+      expect(SYSTEM_PBTA.dc.veryHard).toBe(1); // Disadvantage
+      expect(SYSTEM_PBTA.dc.impossible).toBe(1); // Disadvantage (same as very_hard)
     });
 
     it("should have correct success thresholds", () => {

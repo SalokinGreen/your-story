@@ -471,11 +471,11 @@ export const SYSTEM_PBTA: RPGSystem = {
     trivial: -1, // Advantage (roll 3d6 keep best 2) - use for easy tasks
     easy: -1, // Advantage (roll 3d6 keep best 2)
     medium: 0, // Normal (roll 2d6) - default for most tasks
-    hard: 1, // Disadvantage (roll 3d6 keep worst 2)
-    veryHard: 1, // Disadvantage (roll 3d6 keep worst 2) - use for hard tasks
+    hard: 0, // Normal (roll 2d6) - challenging but fair
+    veryHard: 1, // Disadvantage (roll 3d6 keep worst 2) - use for very hard tasks
     impossible: 1, // Disadvantage (roll 3d6 keep worst 2) - narrate impossibility instead
     description:
-      "PbtA uses DC for advantage/disadvantage: easy = advantage (3d6 keep best 2), average = normal (2d6), hard = disadvantage (3d6 keep worst 2). Thresholds are fixed: 10+ success, 7-9 partial, 6- failure.",
+      "PbtA uses DC for advantage/disadvantage: easy = advantage (3d6 keep best 2), average/hard = normal (2d6), very_hard = disadvantage (3d6 keep worst 2). Thresholds are fixed: 10+ success, 7-9 partial, 6- failure.",
   },
 
   resources: {
@@ -499,7 +499,7 @@ export const SYSTEM_PBTA: RPGSystem = {
     diceSystem:
       "The game uses Powered by the Apocalypse (PbtA) 2d6 system. Player rolls 2d6 (2-12) and adds a modifier (-2 to +3) derived from their 0-100 stat. Critical success on 12 (double 6s). DIFFICULTY is expressed through advantage/disadvantage dice, NOT variable thresholds.",
     dcGuidance:
-      "PbtA uses DC to set ADVANTAGE/DISADVANTAGE, not success thresholds. Thresholds are ALWAYS fixed (10+/7-9/6-). Set DC based on fictional difficulty: easy = advantage, average = normal, hard = disadvantage.",
+      "PbtA uses DC to set ADVANTAGE/DISADVANTAGE, not success thresholds. Thresholds are ALWAYS fixed (10+/7-9/6-). Set DC based on fictional difficulty: easy = advantage, average/hard = normal, very_hard = disadvantage.",
     challengeGuidance: `PbtA THREE-OUTCOME SYSTEM:
 
 **10+ FULL SUCCESS**: Player achieves their goal cleanly and completely. No complications, costs, or negative consequences. Describe what they wanted to accomplish happening successfully.
@@ -521,17 +521,17 @@ export const SYSTEM_PBTA: RPGSystem = {
   
 DIFFICULTY (3 tiers):
   • **easy**: Roll 3d6, keep best 2 (advantage) - favorable circumstances, friendly NPCs, prepared actions
-  • **average**: Roll 2d6 normally - default for most actions
-  • **hard**: Roll 3d6, keep worst 2 (disadvantage) - unfavorable circumstances, hostile NPCs, desperate actions
+  • **average/hard**: Roll 2d6 normally - default for most actions, including challenging ones
+  • **very_hard**: Roll 3d6, keep worst 2 (disadvantage) - desperate circumstances, hostile environment, severe time pressure
 
 EXAMPLES:
 "Roll Charm to persuade the friendly guard (easy)" → advantage
 "Roll Stealth to sneak past the guards (average)" → normal roll  
-"Roll Athletics to climb the slippery cliff in the rain (hard)" → disadvantage`,
+"Roll Athletics to climb the slippery cliff in a thunderstorm (very_hard)" → disadvantage`,
     choiceSyntax:
-      "- ...Prose <use_skill: skill name or none; skill_dc: easy/average/hard; use_resource: resource name or none; use_item: item name or none>\\nPbtA System - Use DC tier for difficulty (easy/average/hard). Results are always: 10+ = success, 7-9 = partial success, 6- = failure:\\nExample:\\n- You carefully sneak past the guards. <use_skill: Stealth; skill_dc: average; use_resource: none; use_item: none>\\n- You try to charm the friendly innkeeper. <use_skill: Charisma; skill_dc: easy; use_resource: none; use_item: none>",
+      "- ...Prose <use_skill: skill name or none; skill_dc: easy/average/hard/very_hard; use_resource: resource name or none; use_item: item name or none>\\nPbtA System - Use DC tier for difficulty (easy/average/hard/very_hard). Results are always: 10+ = success, 7-9 = partial success, 6- = failure:\\nExample:\\n- You carefully sneak past the guards. <use_skill: Stealth; skill_dc: average; use_resource: none; use_item: none>\\n- You try to charm the friendly innkeeper. <use_skill: Charisma; skill_dc: easy; use_resource: none; use_item: none>",
     dcGuidelines:
-      "POWERED BY THE APOCALYPSE - DC = ADVANTAGE/DISADVANTAGE (3 tiers):\\n- easy: Advantage (3d6 keep best 2) - favorable situation\\n- average: Normal roll (2d6) - standard situation\\n- hard: Disadvantage (3d6 keep worst 2) - unfavorable situation\\n\\nThresholds are FIXED: 10+ success, 7-9 partial, 6- failure.",
+      "POWERED BY THE APOCALYPSE - DC = ADVANTAGE/DISADVANTAGE (3 tiers):\\n- easy: Advantage (3d6 keep best 2) - favorable situation\\n- average/hard: Normal roll (2d6) - standard to challenging situation\\n- very_hard: Disadvantage (3d6 keep worst 2) - desperate situation\\n\\nThresholds are FIXED: 10+ success, 7-9 partial, 6- failure.",
   },
 
   conditionPenalties: {

@@ -134,11 +134,11 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 
 **DC = Advantage/Disadvantage** (difficulty affects dice pool, not thresholds):
 
-| DC Tier | Effect       | Dice             |
-| ------- | ------------ | ---------------- |
-| easy    | Advantage    | 3d6 keep best 2  |
-| average | Normal       | 2d6              |
-| hard    | Disadvantage | 3d6 keep worst 2 |
+| DC Tier      | Effect       | Dice             |
+| ------------ | ------------ | ---------------- |
+| easy         | Advantage    | 3d6 keep best 2  |
+| average/hard | Normal       | 2d6              |
+| very_hard    | Disadvantage | 3d6 keep worst 2 |
 
 **AI Context Examples**:
 
