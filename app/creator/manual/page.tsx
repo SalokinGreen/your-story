@@ -750,6 +750,7 @@ function AdventureCreatorContent() {
   const [selectedPreset, setSelectedPreset] = useState<string>("custom");
   const [presets, setPresets] = useState<Preset[]>([DEFAULT_PRESET]);
   const [showPresetForm, setShowPresetForm] = useState(false);
+  const [showPresetSwitcher, setShowPresetSwitcher] = useState(false);
   const [newPresetName, setNewPresetName] = useState("");
   const [newPresetDescription, setNewPresetDescription] = useState("");
   const [newPresetIcon, setNewPresetIcon] = useState("Star");
@@ -12985,6 +12986,112 @@ ${description || ""}`;
         </div>
       </div>
 
+      {/* Floating Preset Switcher - shown on relevant tabs when presets exist */}
+      {currentStep !== "preset" &&
+        currentStep !== "basic" &&
+        currentStep !== "preview" &&
+        presets.length > 1 && (
+          <div className="fixed bottom-20 right-4 z-30">
+            <div className="relative">
+              <button
+                onClick={() => setShowPresetSwitcher(!showPresetSwitcher)}
+                className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-full shadow-lg transition-all border border-purple-400/30"
+              >
+                <DynamicIcon
+                  name={
+                    presets.find((p) => p.id === selectedPreset)?.icon || "User"
+                  }
+                  className="w-4 h-4"
+                />
+                <span className="max-w-[120px] truncate">
+                  {presets.find((p) => p.id === selectedPreset)?.name ||
+                    "Custom"}
+                </span>
+                <DynamicIcon
+                  name={showPresetSwitcher ? "ChevronDown" : "ChevronUp"}
+                  className="w-3 h-3"
+                />
+              </button>
+
+              {/* Dropdown */}
+              {showPresetSwitcher && (
+                <div className="absolute bottom-full right-0 mb-2 w-64 bg-blue-950 border border-blue-700/50 rounded-xl shadow-2xl overflow-hidden">
+                  <div className="p-2 border-b border-blue-700/30">
+                    <p className="text-xs text-blue-300/60 font-medium">
+                      Switch Preset
+                    </p>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {presets.map((preset) => (
+                      <button
+                        key={preset.id}
+                        onClick={() => {
+                          if (preset.id !== selectedPreset) {
+                            setSelectedPreset(preset.id);
+                            if (preset.id !== "custom") {
+                              applyPreset(
+                                preset,
+                                setPlayerName,
+                                setPlayerSummary,
+                                setIntro,
+                                setStats,
+                                setResources,
+                                setInventory,
+                                setRelationships,
+                                setConditions,
+                                setAuthorNotes
+                              );
+                              addNotification(
+                                `Switched to ${preset.name}`,
+                                "success"
+                              );
+                            }
+                          }
+                          setShowPresetSwitcher(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                          selectedPreset === preset.id
+                            ? "bg-purple-600/30 text-white"
+                            : "text-blue-200 hover:bg-blue-800/40"
+                        }`}
+                      >
+                        <DynamicIcon
+                          name={preset.icon}
+                          className="w-5 h-5 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{preset.name}</p>
+                          <p className="text-xs text-blue-300/50 truncate">
+                            {preset.description}
+                          </p>
+                        </div>
+                        {selectedPreset === preset.id && (
+                          <DynamicIcon
+                            name="Check"
+                            className="w-4 h-4 text-purple-400 shrink-0"
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="p-2 border-t border-blue-700/30">
+                    <button
+                      onClick={() => {
+                        setCurrentStep("preset");
+                        setShowPresetSwitcher(false);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-purple-300 hover:bg-purple-600/20 rounded-lg transition-colors"
+                    >
+                      <DynamicIcon name="Settings" className="w-3 h-3" />
+                      Manage Presets
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         title={confirmDialog.title}
@@ -13301,53 +13408,11 @@ ${description || ""}`;
         </div>
       )}
 
-      {/* Pinned AI Panel - fixed to right side on desktop */}
-      {isAIPinned && isAIMenuOpen && (
-        <div className="hidden lg:block fixed top-16 right-0 bottom-0 w-[420px] z-40">
-          <CreatorAIChat
-            isOpen={isAIMenuOpen}
-            onClose={() => setIsAIMenuOpen(false)}
-            adventureId={editAdventureId || undefined}
-            currentStoryData={{
-              story_name: title,
-              premise,
-              player_name: playerName,
-              player_summary: playerSummary,
-              intro: intro,
-              author_notes: authorNotes,
-              stats,
-              resources,
-              inventory,
-              abilities,
-              lore,
-              achievements,
-              quests,
-              relationships,
-              variables,
-              presets,
-              upgradeSettings,
-              levelingSettings,
-              skillTrees,
-              agmtState: agmtEnabled ? agmtState : undefined,
-              customTables,
-            }}
-            adventureMetadata={{
-              title: title,
-              shortDescription: shortDescription,
-              description: description,
-              startingChoices: startingChoices,
-            }}
-            onApplyChanges={handleApplyAIChanges}
-            isPinned={true}
-            onPinToggle={handlePinToggle}
-          />
-        </div>
-      )}
-
-      {/* Modal AI Chat - for mobile or when unpinned */}
+      {/* AI Chat - Single instance handles both pinned drawer and modal modes */}
       <CreatorAIChat
-        isOpen={isAIMenuOpen && !isAIPinned}
+        isOpen={isAIMenuOpen}
         onClose={() => setIsAIMenuOpen(false)}
+        onOpen={() => setIsAIMenuOpen(true)}
         adventureId={editAdventureId || undefined}
         currentStoryData={{
           story_name: title,
@@ -13379,7 +13444,7 @@ ${description || ""}`;
           startingChoices: startingChoices,
         }}
         onApplyChanges={handleApplyAIChanges}
-        isPinned={false}
+        isPinned={isAIPinned}
         onPinToggle={handlePinToggle}
       />
     </div>

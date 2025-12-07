@@ -40,6 +40,7 @@ interface ChatThread {
 interface CreatorAIChatProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpen?: () => void;
   currentStoryData: Partial<StoryData>;
   adventureMetadata?: {
     title?: string;
@@ -73,6 +74,7 @@ function generateThreadName(index: number): string {
 export default function CreatorAIChat({
   isOpen,
   onClose,
+  onOpen,
   currentStoryData,
   adventureMetadata,
   adventureId,
@@ -729,262 +731,332 @@ export default function CreatorAIChat({
     }
   }, [isOpen, isPinned]);
 
+  // Touch/swipe state for drawer mode
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchDelta, setTouchDelta] = useState(0);
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.touches[0].clientX);
+    setTouchDelta(0);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStart === null) return;
+    const delta = e.touches[0].clientX - touchStart;
+    // Only track rightward swipes (positive delta)
+    if (delta > 0) {
+      setTouchDelta(delta);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    // If swiped more than 100px to the right, close the drawer
+    if (touchDelta > 100) {
+      onClose();
+    }
+    setTouchStart(null);
+    setTouchDelta(0);
+  };
+
+  // When pinned but closed, show a pull tab on the right edge to reopen
+  if (!isOpen && isPinned && onOpen) {
+    return (
+      <button
+        className="fixed top-1/2 -translate-y-1/2 right-0 z-40 bg-purple-500/90 hover:bg-purple-600 text-white p-2 rounded-l-lg shadow-lg transition-all pointer-events-auto"
+        onClick={onOpen}
+        title="Open AI Assistant"
+      >
+        <DynamicIcon name="ChevronLeft" className="w-4 h-4" />
+      </button>
+    );
+  }
+
   if (!isOpen) return null;
 
-  // Pinned side panel mode (desktop only)
+  // Pinned slide-in drawer mode
   if (isPinned) {
     return (
-      <div className="hidden lg:flex h-full w-[420px] flex-col overflow-hidden bg-white/95 dark:bg-gray-900/95 border-l border-gray-200 dark:border-gray-700">
-        {/* Header - Compact for pinned mode */}
-        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-4 py-3 backdrop-blur-sm">
-          <div className="flex items-center gap-2 min-w-0">
-            <DynamicIcon
-              name="Sparkles"
-              className="w-4 h-4 text-purple-500 shrink-0"
-            />
-            <span className="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">
-              AI Assistant
-            </span>
-            {/* Thread Selector - Compact */}
-            {adventureId && (
-              <div className="relative" data-thread-selector>
-                <button
-                  onClick={() => setShowThreadSelector(!showThreadSelector)}
-                  className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-400 transition-colors"
-                  title="Switch chat threads"
-                >
-                  <span className="max-w-[80px] truncate">
-                    {activeThread?.name || "New"}
-                  </span>
-                  <DynamicIcon
-                    name="ChevronDown"
-                    className={`w-3 h-3 transition-transform ${
-                      showThreadSelector ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-                {showThreadSelector && (
-                  <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
-                    <button
-                      onClick={handleNewThread}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 border-b border-gray-200 dark:border-gray-700 font-medium"
-                    >
-                      <DynamicIcon name="Plus" className="w-3.5 h-3.5" />
-                      New Thread
-                    </button>
-                    <div className="max-h-48 overflow-y-auto">
-                      {threads
-                        .slice()
-                        .reverse()
-                        .map((thread) => (
-                          <div
-                            key={thread.id}
-                            onClick={() => handleSwitchThread(thread.id)}
-                            className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 text-xs ${
-                              thread.id === activeThreadId
-                                ? "bg-purple-50 dark:bg-purple-900/20"
-                                : ""
-                            }`}
-                          >
-                            <span
-                              className={`truncate ${
-                                thread.id === activeThreadId
-                                  ? "font-medium text-purple-700 dark:text-purple-300"
-                                  : "text-gray-600 dark:text-gray-400"
-                              }`}
-                            >
-                              {thread.name}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {onPinToggle && (
-              <button
-                onClick={onPinToggle}
-                className="rounded p-1.5 text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
-                title="Unpin to modal"
-              >
-                <DynamicIcon name="PanelRightClose" className="w-4 h-4" />
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="rounded p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-              title="Close"
-            >
-              <DynamicIcon name="X" className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Compact Settings Bar */}
-        <div className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/80 px-3 py-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* BYOK/Coins Toggle - Compact */}
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
-              <span
-                className={`text-[10px] font-medium ${
-                  !byokMode ? "text-amber-500" : "text-gray-400"
-                }`}
-              >
-                🪙
-              </span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={byokMode}
-                  onChange={(e) => setByokMode(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-6 h-3 bg-amber-500 peer-focus:ring-1 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-2 after:w-2 after:transition-all peer-checked:bg-green-600" />
-              </label>
-              <span
-                className={`text-[10px] font-medium ${
-                  byokMode ? "text-green-500" : "text-gray-400"
-                }`}
-              >
-                🔑
-              </span>
-            </div>
-
-            {/* Model Selection - Compact */}
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="flex-1 min-w-0 bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 text-[10px] rounded px-1.5 py-1 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-purple-500 outline-none cursor-pointer truncate"
-            >
-              {filteredModels.map(([key, m]) => (
-                <option key={key} value={key}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-
-            {/* Output Size - Compact */}
-            <div className="flex items-center gap-1">
-              <input
-                type="range"
-                min={256}
-                max={modelConfig.maxOutputTokens}
-                step={256}
-                value={maxOutputTokens}
-                onChange={(e) => setMaxOutputTokens(Number(e.target.value))}
-                className="w-12 h-1 accent-purple-500"
-              />
-              <span className="text-[10px] text-gray-500 w-8">
-                {maxOutputTokens}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-linear-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-4">
+      <>
+        {/* Pull tab on left edge - closes the drawer */}
+        <button
+          className="fixed top-1/2 -translate-y-1/2 z-40 bg-purple-500/90 hover:bg-purple-600 text-white p-1.5 rounded-l-lg shadow-lg transition-all pointer-events-auto right-[320px] sm:right-[380px] md:right-[420px]"
+          style={
+            touchDelta > 0
+              ? {
+                  transform: `translateY(-50%) translateX(${touchDelta}px)`,
+                  transition: "none",
+                }
+              : undefined
+          }
+          onClick={onClose}
+          title="Close panel"
+        >
+          <DynamicIcon name="ChevronRight" className="w-4 h-4" />
+        </button>
+        <div
+          ref={drawerRef}
+          className="fixed top-14 right-0 z-40 h-[calc(100%-7.5rem)] w-[320px] sm:w-[380px] md:w-[420px] max-w-[85vw] flex flex-col overflow-hidden bg-white/95 dark:bg-gray-900/95 shadow-2xl border-l border-gray-200 dark:border-gray-700 animate-in slide-in-from-right duration-300 pointer-events-auto rounded-bl-xl"
+          style={{
+            transform:
+              touchDelta > 0 ? `translateX(${touchDelta}px)` : undefined,
+            transition: touchDelta > 0 ? "none" : undefined,
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Header - Compact for pinned mode */}
+          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-4 py-3 backdrop-blur-sm">
+            <div className="flex items-center gap-2 min-w-0">
               <DynamicIcon
                 name="Sparkles"
-                className="w-8 h-8 text-purple-400/50 mb-2"
+                className="w-4 h-4 text-purple-500 shrink-0"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Ask to add, modify, or remove content
-              </p>
-            </div>
-          ) : (
-            messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${
-                  message.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                <div
-                  className={`max-w-[90%] rounded-xl px-3 py-2 text-xs ${
-                    message.role === "user"
-                      ? "bg-purple-600 text-white"
-                      : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
-                  }`}
-                >
-                  {message.role === "assistant" ? (
-                    <div className="prose prose-xs dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-                      <ReactMarkdown>{message.content}</ReactMarkdown>
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">
+                AI Assistant
+              </span>
+              {/* Thread Selector - Compact */}
+              {adventureId && (
+                <div className="relative" data-thread-selector>
+                  <button
+                    onClick={() => setShowThreadSelector(!showThreadSelector)}
+                    className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-400 transition-colors"
+                    title="Switch chat threads"
+                  >
+                    <span className="max-w-20 truncate">
+                      {activeThread?.name || "New"}
+                    </span>
+                    <DynamicIcon
+                      name="ChevronDown"
+                      className={`w-3 h-3 transition-transform ${
+                        showThreadSelector ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  {showThreadSelector && (
+                    <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                      <button
+                        onClick={handleNewThread}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 border-b border-gray-200 dark:border-gray-700 font-medium"
+                      >
+                        <DynamicIcon name="Plus" className="w-3.5 h-3.5" />
+                        New Thread
+                      </button>
+                      <div className="max-h-48 overflow-y-auto">
+                        {threads
+                          .slice()
+                          .reverse()
+                          .map((thread) => (
+                            <div
+                              key={thread.id}
+                              onClick={() => handleSwitchThread(thread.id)}
+                              className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 text-xs ${
+                                thread.id === activeThreadId
+                                  ? "bg-purple-50 dark:bg-purple-900/20"
+                                  : ""
+                              }`}
+                            >
+                              <span
+                                className={`truncate ${
+                                  thread.id === activeThreadId
+                                    ? "font-medium text-purple-700 dark:text-purple-300"
+                                    : "text-gray-600 dark:text-gray-400"
+                                }`}
+                              >
+                                {thread.name}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
                     </div>
-                  ) : (
-                    <p className="whitespace-pre-wrap">{message.content}</p>
                   )}
                 </div>
+              )}
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {onPinToggle && (
+                <button
+                  onClick={onPinToggle}
+                  className="rounded p-1.5 text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                  title="Unpin to modal"
+                >
+                  <DynamicIcon name="PanelRightClose" className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="rounded p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                title="Close"
+              >
+                <DynamicIcon name="X" className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Compact Settings Bar */}
+          <div className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/80 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* BYOK/Coins Toggle - Compact */}
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
+                <span
+                  className={`text-[10px] font-medium ${
+                    !byokMode ? "text-amber-500" : "text-gray-400"
+                  }`}
+                >
+                  🪙
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={byokMode}
+                    onChange={(e) => setByokMode(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-6 h-3 bg-amber-500 peer-focus:ring-1 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-2 after:w-2 after:transition-all peer-checked:bg-green-600" />
+                </label>
+                <span
+                  className={`text-[10px] font-medium ${
+                    byokMode ? "text-green-500" : "text-gray-400"
+                  }`}
+                >
+                  🔑
+                </span>
               </div>
-            ))
-          )}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2">
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce"
-                    style={{ animationDelay: "0ms" }}
-                  />
-                  <div
-                    className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce"
-                    style={{ animationDelay: "150ms" }}
-                  />
-                  <div
-                    className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce"
-                    style={{ animationDelay: "300ms" }}
-                  />
-                </div>
+
+              {/* Model Selection - Compact */}
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="flex-1 min-w-0 bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 text-[10px] rounded px-1.5 py-1 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-purple-500 outline-none cursor-pointer truncate"
+              >
+                {filteredModels.map(([key, m]) => (
+                  <option key={key} value={key}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Output Size - Compact */}
+              <div className="flex items-center gap-1">
+                <input
+                  type="range"
+                  min={256}
+                  max={modelConfig.maxOutputTokens}
+                  step={256}
+                  value={maxOutputTokens}
+                  onChange={(e) => setMaxOutputTokens(Number(e.target.value))}
+                  className="w-12 h-1 accent-purple-500"
+                />
+                <span className="text-[10px] text-gray-500 w-8">
+                  {maxOutputTokens}
+                </span>
               </div>
             </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input Area - Compact */}
-        <div className="border-t border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 p-3">
-          <div className="flex gap-2">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Ask to edit..."
-              rows={2}
-              className="flex-1 resize-none rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
-            />
-            <button
-              onClick={handleSend}
-              disabled={loading || !input.trim()}
-              className="self-end px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-            >
-              <DynamicIcon name="Send" className="w-4 h-4" />
-            </button>
           </div>
-        </div>
 
-        {/* Confirm Dialog */}
-        <ConfirmDialog
-          isOpen={confirmDialog.isOpen}
-          title={confirmDialog.title}
-          message={confirmDialog.message}
-          icon={confirmDialog.icon}
-          confirmText={confirmDialog.confirmText}
-          confirmButtonClass={confirmDialog.confirmButtonClass}
-          onConfirm={confirmDialog.onConfirm}
-          onCancel={() =>
-            setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
-          }
-        />
-      </div>
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-linear-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                <DynamicIcon
+                  name="Sparkles"
+                  className="w-8 h-8 text-purple-400/50 mb-2"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Ask to add, modify, or remove content
+                </p>
+              </div>
+            ) : (
+              messages.map((message, index) => (
+                <div
+                  key={index}
+                  className={`flex ${
+                    message.role === "user" ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  <div
+                    className={`max-w-[90%] rounded-xl px-3 py-2 text-xs ${
+                      message.role === "user"
+                        ? "bg-purple-600 text-white"
+                        : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
+                    }`}
+                  >
+                    {message.role === "assistant" ? (
+                      <div className="prose prose-xs dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <div
+                      className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <div
+                      className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Area - Compact */}
+          <div className="border-t border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 p-3">
+            <div className="flex gap-2">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Ask to edit..."
+                rows={2}
+                className="flex-1 resize-none rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
+              />
+              <button
+                onClick={handleSend}
+                disabled={loading || !input.trim()}
+                className="self-end px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              >
+                <DynamicIcon name="Send" className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Confirm Dialog */}
+          <ConfirmDialog
+            isOpen={confirmDialog.isOpen}
+            title={confirmDialog.title}
+            message={confirmDialog.message}
+            icon={confirmDialog.icon}
+            confirmText={confirmDialog.confirmText}
+            confirmButtonClass={confirmDialog.confirmButtonClass}
+            onConfirm={confirmDialog.onConfirm}
+            onCancel={() =>
+              setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
+            }
+          />
+        </div>
+      </>
     );
   }
 
@@ -1116,12 +1188,12 @@ export default function CreatorAIChat({
                 <DynamicIcon name="Trash2" className="w-5 h-5" />
               </button>
             )}
-            {/* Pin button - desktop only */}
+            {/* Pin button */}
             {onPinToggle && (
               <button
                 onClick={onPinToggle}
-                className="hidden lg:block rounded-full p-2 text-gray-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
-                title="Pin to side panel"
+                className="rounded-full p-2 text-gray-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                title="Pin as drawer"
               >
                 <DynamicIcon name="PanelRightOpen" className="w-5 h-5" />
               </button>
