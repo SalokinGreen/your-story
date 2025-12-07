@@ -968,29 +968,12 @@ export default function CreatorAIChat({
                 </p>
               </div>
             ) : (
-              messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-[90%] rounded-xl px-3 py-2 text-xs ${
-                      message.role === "user"
-                        ? "bg-purple-600 text-white"
-                        : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
-                    }`}
-                  >
-                    {message.role === "assistant" ? (
-                      <div className="prose prose-xs dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="whitespace-pre-wrap">{message.content}</p>
-                    )}
-                  </div>
-                </div>
+              messages.map((msg, idx) => (
+                <MessageItem
+                  key={idx}
+                  message={msg as ChatMessage & { meta?: any }}
+                  onApplyChanges={onApplyChanges}
+                />
               ))
             )}
             {loading && (
