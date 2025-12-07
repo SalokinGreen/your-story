@@ -661,15 +661,7 @@ When an [ACTIVE CHALLENGE] is shown in the game state:
 - **No Mechanical Summaries:** Do NOT echo back the skill check results, item usage, or resource costs. Those are INPUT context - the player already saw the dice roll.
 - **Stop Marker:** End your response with [STOP] when the player needs to react, decide, or speak next.
 
-WRITE THE NARRATIVE RESPONSE ONLY!
-
-${
-  commandResponses && commandResponses.length > 0
-    ? `\nCommand Feedback from previous actions:\n${formatResponsesForAI(
-        commandResponses
-      )}\n`
-    : ""
-}`;
+WRITE THE NARRATIVE RESPONSE ONLY!`;
 
   const infoMessage = buildInfoMessage(storyData, embeddingContext);
   const cleanedSystemPrompt = cleanString(systemPrompt);

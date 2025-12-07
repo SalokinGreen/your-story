@@ -435,6 +435,77 @@ export const remove_abilities: ToolDefinition = {
 };
 
 // ============================================
+// PASSIVES TOOLS
+// ============================================
+
+export const add_passives: ToolDefinition = {
+  name: "add_passives",
+  description:
+    "Add passive effects/traits. Passives are story/RP traits that influence narrative, difficulty, and NPC reactions - NOT direct mechanical bonuses. Examples: 'Wolf Slayer' makes wolves easier to fight, 'Noble Blood' makes nobles treat you with respect.",
+  parameters: {
+    type: "object",
+    properties: {
+      passives: {
+        type: "array",
+        description: "Array of passives to add",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Passive name" },
+            description: {
+              type: "string",
+              description: "What the passive does/represents",
+            },
+          },
+          required: ["name", "description"],
+        },
+      },
+    },
+    required: ["passives"],
+  },
+};
+
+export const modify_passives: ToolDefinition = {
+  name: "modify_passives",
+  description: "Modify existing passives by name.",
+  parameters: {
+    type: "object",
+    properties: {
+      passives: {
+        type: "array",
+        description: "Array of passive modifications",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Name of passive to modify" },
+            new_name: { type: "string", description: "New name (if renaming)" },
+            description: { type: "string", description: "New description" },
+          },
+          required: ["name"],
+        },
+      },
+    },
+    required: ["passives"],
+  },
+};
+
+export const remove_passives: ToolDefinition = {
+  name: "remove_passives",
+  description: "Remove passives by name.",
+  parameters: {
+    type: "object",
+    properties: {
+      names: {
+        type: "array",
+        description: "Names of passives to remove",
+        items: { type: "string" },
+      },
+    },
+    required: ["names"],
+  },
+};
+
+// ============================================
 // LORE TOOLS
 // ============================================
 
@@ -1685,6 +1756,10 @@ export const CREATOR_TOOLS: ToolDefinition[] = [
   add_abilities,
   modify_abilities,
   remove_abilities,
+  // Passives
+  add_passives,
+  modify_passives,
+  remove_passives,
   // Lore
   add_lore,
   modify_lore,

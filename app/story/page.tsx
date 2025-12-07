@@ -2318,6 +2318,14 @@ function StoryPageContent() {
       updatedStoryData.resources = JSON.parse(JSON.stringify(preset.resources));
     if (preset.inventory?.length)
       updatedStoryData.inventory = JSON.parse(JSON.stringify(preset.inventory));
+    if (preset.relationships?.length)
+      updatedStoryData.relationships = JSON.parse(
+        JSON.stringify(preset.relationships)
+      );
+    if (preset.conditions?.length)
+      updatedStoryData.conditions = JSON.parse(
+        JSON.stringify(preset.conditions)
+      );
     if (preset.authorNotes) updatedStoryData.author_notes = preset.authorNotes;
 
     // Determine starting choices - use custom ones if available, otherwise default
@@ -5977,6 +5985,12 @@ function StoryPageContent() {
                               {preset.inventory.length} Items
                             </span>
                           )}
+                          {preset.conditions &&
+                            preset.conditions.length > 0 && (
+                              <span className="px-2 py-0.5 bg-rose-500/20 text-rose-300 text-xs rounded">
+                                {preset.conditions.length} Conditions
+                              </span>
+                            )}
                         </>
                       ) : (
                         <>

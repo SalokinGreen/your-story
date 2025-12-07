@@ -29,6 +29,7 @@ import {
   StartingChoice,
   ItemGrade,
   AbilityGrade,
+  NodeEffects,
 } from "@/app/misc/structs";
 import { getCumulativeXPForLevel } from "@/app/misc/leveling";
 
@@ -58,6 +59,7 @@ export interface CreatorChanges {
   resources?: Resource[];
   inventory?: InventoryItem[];
   abilities?: Ability[];
+  nodeEffects?: NodeEffects;
   lore?: StoryLore[];
   achievements?: Achievement[];
   quests?: Quest[];
@@ -436,6 +438,97 @@ export function executeCreatorTool(
         const removed = existingAbilities.length - remaining.length;
         changesList.push(`Removed ${removed} ability/abilities`);
         changes.abilities = remaining;
+        break;
+      }
+
+      // ============================================
+      // PASSIVES
+      // ============================================
+      case "add_passives": {
+        const passives = args.passives as Array<{
+          name: string;
+          description: string;
+        }>;
+        const existingNodeEffects = currentState.storyData.nodeEffects || {
+          statBonuses: [],
+          resourceBonuses: [],
+          passives: [],
+        };
+        const existingPassives = [...(existingNodeEffects.passives || [])];
+        for (const passive of passives) {
+          const existing = existingPassives.find(
+            (p) => p.name.toLowerCase() === passive.name.toLowerCase()
+          );
+          if (existing) {
+            changesList.push(
+              `Passive "${passive.name}" already exists, skipped`
+            );
+          } else {
+            existingPassives.push({
+              name: passive.name,
+              description: passive.description,
+              nodeId: "ai", // AI-added passives use "ai" as nodeId
+            });
+            changesList.push(`Added passive: ${passive.name}`);
+          }
+        }
+        changes.nodeEffects = {
+          ...existingNodeEffects,
+          passives: existingPassives,
+        };
+        break;
+      }
+
+      case "modify_passives": {
+        const modifications = args.passives as Array<{
+          name: string;
+          new_name?: string;
+          description?: string;
+        }>;
+        const existingNodeEffects = currentState.storyData.nodeEffects || {
+          statBonuses: [],
+          resourceBonuses: [],
+          passives: [],
+        };
+        const existingPassives = [...(existingNodeEffects.passives || [])];
+        for (const mod of modifications) {
+          const idx = existingPassives.findIndex(
+            (p) => p.name.toLowerCase() === mod.name.toLowerCase()
+          );
+          if (idx === -1) {
+            changesList.push(`Passive "${mod.name}" not found, skipped`);
+            continue;
+          }
+          if (mod.new_name !== undefined)
+            existingPassives[idx].name = mod.new_name;
+          if (mod.description !== undefined)
+            existingPassives[idx].description = mod.description;
+          changesList.push(`Modified passive: ${mod.name}`);
+        }
+        changes.nodeEffects = {
+          ...existingNodeEffects,
+          passives: existingPassives,
+        };
+        break;
+      }
+
+      case "remove_passives": {
+        const names = args.names as string[];
+        const existingNodeEffects = currentState.storyData.nodeEffects || {
+          statBonuses: [],
+          resourceBonuses: [],
+          passives: [],
+        };
+        const existingPassives = [...(existingNodeEffects.passives || [])];
+        const remaining = existingPassives.filter(
+          (p) => !names.some((n) => n.toLowerCase() === p.name.toLowerCase())
+        );
+        const removed = existingPassives.length - remaining.length;
+        changesList.push(`Removed ${removed} passive(s)`);
+        changes.nodeEffects = {
+          ...existingNodeEffects,
+          passives: remaining,
+        };
         break;
       }
 
@@ -969,6 +1062,7 @@ export function executeCreatorTool(
               inventory: preset.inventory || [],
               abilities: preset.abilities,
               relationships: preset.relationships || [],
+              conditions: preset.conditions || [],
             });
             changesList.push(`Added preset: ${preset.name}`);
           }

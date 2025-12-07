@@ -23,6 +23,7 @@ import {
   CreatorChanges,
 } from "@/app/misc/creator_tool_executor";
 import { DynamicIcon } from "./DynamicIcon";
+import ConfirmDialog from "./ConfirmDialog";
 import {
   AI_MODELS,
   getModelConfig,
@@ -30,6 +31,15 @@ import {
 } from "@/app/misc/ai_prices";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { CustomModel } from "@/app/misc/user_settings";
+
+// Chat thread type for multi-conversation support
+interface ChatThread {
+  id: string;
+  name: string;
+  messages: ChatMessage[];
+  createdAt: number;
+  updatedAt: number;
+}
 
 interface StoryCreativeAssistantProps {
   isOpen: boolean;
@@ -39,6 +49,15 @@ interface StoryCreativeAssistantProps {
   onApplyChanges: (updates: Partial<StoryData>) => void;
 }
 
+// Helper to generate thread names
+function generateThreadName(index: number): string {
+  const adjectives = ["New", "Fresh", "Quick", "Focused", "Creative"];
+  const nouns = ["Chat", "Thread", "Session", "Convo", "Discussion"];
+  return `${adjectives[index % adjectives.length]} ${
+    nouns[Math.floor(index / adjectives.length) % nouns.length]
+  } ${index + 1}`;
+}
+
 export default function StoryCreativeAssistant({
   isOpen,
   onClose,
@@ -46,25 +65,97 @@ export default function StoryCreativeAssistant({
   storyId,
   onApplyChanges,
 }: StoryCreativeAssistantProps) {
-  const chatKey = storyId ? `storyCreatorAiChat:${storyId}` : null;
+  const threadsKey = storyId ? `storyCreatorAiThreads:${storyId}` : null;
+  const activeThreadKey = storyId
+    ? `storyCreatorAiActiveThread:${storyId}`
+    : null;
   const { keys: apiKeys, hasKey } = useAPIKeys();
 
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    if (typeof window !== "undefined" && chatKey) {
-      const saved = localStorage.getItem(chatKey);
+  // Initialize threads from localStorage
+  const [threads, setThreads] = useState<ChatThread[]>(() => {
+    if (typeof window !== "undefined" && threadsKey) {
+      const saved = localStorage.getItem(threadsKey);
       if (saved) {
         try {
-          const parsed = JSON.parse(saved);
-          return parsed.filter(
-            (msg: ChatMessage) => msg.content && msg.content.trim()
-          );
+          return JSON.parse(saved);
         } catch (e) {
-          console.error("Failed to parse saved chat:", e);
+          console.error("Failed to parse saved threads:", e);
+        }
+      }
+      // Migrate old single-chat format to threads
+      const oldChatKey = `storyCreatorAiChat:${storyId}`;
+      const oldChat = localStorage.getItem(oldChatKey);
+      if (oldChat) {
+        try {
+          const oldMessages = JSON.parse(oldChat);
+          if (Array.isArray(oldMessages) && oldMessages.length > 0) {
+            const migratedThread: ChatThread = {
+              id: crypto.randomUUID(),
+              name: "Migrated Chat",
+              messages: oldMessages.filter(
+                (msg: ChatMessage) => msg.content && msg.content.trim()
+              ),
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+            localStorage.removeItem(oldChatKey); // Clean up old format
+            return [migratedThread];
+          }
+        } catch (e) {
+          console.error("Failed to migrate old chat:", e);
         }
       }
     }
     return [];
   });
+
+  // Active thread ID
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(() => {
+    if (typeof window !== "undefined" && activeThreadKey) {
+      const saved = localStorage.getItem(activeThreadKey);
+      return saved || null;
+    }
+    return null;
+  });
+
+  // Thread selector dropdown state
+  const [showThreadSelector, setShowThreadSelector] = useState(false);
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    icon?: string;
+    confirmText?: string;
+    confirmButtonClass?: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  // Get current thread's messages
+  const activeThread = threads.find((t) => t.id === activeThreadId);
+  const messages = activeThread?.messages || [];
+
+  // Update messages for the active thread
+  const setMessages = useCallback(
+    (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
+      setThreads((prevThreads) => {
+        if (!activeThreadId) return prevThreads;
+        return prevThreads.map((thread) => {
+          if (thread.id !== activeThreadId) return thread;
+          const newMessages =
+            typeof updater === "function" ? updater(thread.messages) : updater;
+          return { ...thread, messages: newMessages, updatedAt: Date.now() };
+        });
+      });
+    },
+    [activeThreadId]
+  );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -215,12 +306,23 @@ export default function StoryCreativeAssistant({
     return { coins: Math.max(1, coinCost), dollars: dollarCost };
   }, [storyData, modelConfig, maxOutputTokens, model]);
 
-  // Save chat history to localStorage
+  // Save threads to localStorage
   useEffect(() => {
-    if (typeof window !== "undefined" && chatKey && messages.length > 0) {
-      localStorage.setItem(chatKey, JSON.stringify(messages));
+    if (typeof window !== "undefined" && threadsKey && threads.length > 0) {
+      localStorage.setItem(threadsKey, JSON.stringify(threads));
     }
-  }, [messages, chatKey]);
+  }, [threads, threadsKey]);
+
+  // Save active thread ID to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined" && activeThreadKey) {
+      if (activeThreadId) {
+        localStorage.setItem(activeThreadKey, activeThreadId);
+      } else {
+        localStorage.removeItem(activeThreadKey);
+      }
+    }
+  }, [activeThreadId, activeThreadKey]);
 
   // Save preferences to localStorage
   useEffect(() => {
@@ -274,8 +376,34 @@ export default function StoryCreativeAssistant({
     }
   }, [isOpen, messages.length]);
 
+  // Close thread selector when clicking outside
+  useEffect(() => {
+    if (!showThreadSelector) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-thread-selector]")) {
+        setShowThreadSelector(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [showThreadSelector]);
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
+
+    // Auto-create a thread if none exists
+    if (!activeThreadId && storyId) {
+      const newThread: ChatThread = {
+        id: crypto.randomUUID(),
+        name: generateThreadName(threads.length),
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      setThreads((prev) => [...prev, newThread]);
+      setActiveThreadId(newThread.id);
+    }
 
     if (isNovelAISelected && !novelaiKey.trim()) {
       setMessages((prev) => [
@@ -416,7 +544,8 @@ export default function StoryCreativeAssistant({
       } = {
         role: "assistant",
         content:
-          content || "I've made the requested changes using the tools above.",
+          content ||
+          "Done! I've applied the changes you asked for. Let me know if you'd like to tweak anything!",
         meta,
         toolResults,
         toolChanges,
@@ -446,13 +575,79 @@ export default function StoryCreativeAssistant({
     }
   };
 
+  // Thread management functions
+  const handleNewThread = useCallback(() => {
+    const newThread: ChatThread = {
+      id: crypto.randomUUID(),
+      name: generateThreadName(threads.length),
+      messages: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    setThreads((prev) => [...prev, newThread]);
+    setActiveThreadId(newThread.id);
+    setShowThreadSelector(false);
+  }, [threads.length]);
+
+  const handleSwitchThread = useCallback((threadId: string) => {
+    setActiveThreadId(threadId);
+    setShowThreadSelector(false);
+  }, []);
+
+  const handleDeleteThread = useCallback(
+    (threadId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      const threadToDelete = threads.find((t) => t.id === threadId);
+      setConfirmDialog({
+        isOpen: true,
+        title: "Delete Chat Thread",
+        message: `Delete "${
+          threadToDelete?.name || "this thread"
+        }"? This cannot be undone.`,
+        icon: "Trash2",
+        confirmText: "Delete",
+        confirmButtonClass: "bg-red-600 hover:bg-red-700",
+        onConfirm: () => {
+          setThreads((prev) => {
+            const remaining = prev.filter((t) => t.id !== threadId);
+            // If we're deleting the active thread, switch to another or clear
+            if (activeThreadId === threadId) {
+              setActiveThreadId(
+                remaining.length > 0 ? remaining[remaining.length - 1].id : null
+              );
+            }
+            return remaining;
+          });
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        },
+      });
+    },
+    [activeThreadId, threads]
+  );
+
+  const handleRenameThread = useCallback(
+    (threadId: string, newName: string) => {
+      setThreads((prev) =>
+        prev.map((t) => (t.id === threadId ? { ...t, name: newName } : t))
+      );
+    },
+    []
+  );
+
   const handleClearChat = () => {
-    if (confirm("Clear chat history?")) {
-      setMessages([]);
-      if (typeof window !== "undefined" && chatKey) {
-        localStorage.removeItem(chatKey);
-      }
-    }
+    if (!activeThreadId) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: "Clear Chat History",
+      message: "Clear all messages in this thread? This cannot be undone.",
+      icon: "Trash2",
+      confirmText: "Clear",
+      confirmButtonClass: "bg-red-600 hover:bg-red-700",
+      onConfirm: () => {
+        setMessages([]);
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
   };
 
   const handleApplyChanges = (
@@ -500,20 +695,117 @@ export default function StoryCreativeAssistant({
       <div className="flex h-[95vh] sm:h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white/95 dark:bg-gray-900/95 shadow-2xl border border-white/20 dark:border-gray-700 ring-1 ring-black/5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-6 py-4 backdrop-blur-sm">
-          <div>
-            <h2 className="text-xl font-bold bg-linear-to-r from-purple-600 via-pink-600 to-orange-600 bg-clip-text text-transparent flex items-center gap-2">
-              <DynamicIcon
-                name="Sparkles"
-                className="w-5 h-5 text-purple-500"
-              />{" "}
-              Story Editor AI
-            </h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Edit your story with natural language
-            </p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h2 className="text-xl font-bold bg-linear-to-r from-purple-600 via-pink-600 to-orange-600 bg-clip-text text-transparent flex items-center gap-2">
+                <DynamicIcon
+                  name="Sparkles"
+                  className="w-5 h-5 text-purple-500"
+                />{" "}
+                Story Editor AI
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Edit your story with natural language
+              </p>
+            </div>
+            {/* Thread Selector */}
+            {storyId && (
+              <div className="relative ml-2" data-thread-selector>
+                <button
+                  onClick={() => setShowThreadSelector(!showThreadSelector)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 transition-colors border border-gray-200 dark:border-gray-600"
+                  title="Switch chat threads"
+                >
+                  <DynamicIcon name="MessageSquare" className="w-4 h-4" />
+                  <span className="max-w-[120px] truncate">
+                    {activeThread?.name || "New Chat"}
+                  </span>
+                  <DynamicIcon
+                    name="ChevronDown"
+                    className={`w-3.5 h-3.5 transition-transform ${
+                      showThreadSelector ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {showThreadSelector && (
+                  <div className="absolute top-full left-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                    {/* New Thread Button */}
+                    <button
+                      onClick={handleNewThread}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 border-b border-gray-200 dark:border-gray-700 font-medium"
+                    >
+                      <DynamicIcon name="Plus" className="w-4 h-4" />
+                      New Chat Thread
+                    </button>
+                    {/* Thread List */}
+                    <div className="max-h-60 overflow-y-auto">
+                      {threads.length === 0 ? (
+                        <p className="px-3 py-4 text-xs text-gray-500 dark:text-gray-400 text-center">
+                          No threads yet. Start a new chat!
+                        </p>
+                      ) : (
+                        threads
+                          .slice()
+                          .reverse()
+                          .map((thread) => (
+                            <div
+                              key={thread.id}
+                              onClick={() => handleSwitchThread(thread.id)}
+                              className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 group ${
+                                thread.id === activeThreadId
+                                  ? "bg-purple-50 dark:bg-purple-900/20"
+                                  : ""
+                              }`}
+                            >
+                              <DynamicIcon
+                                name={
+                                  thread.id === activeThreadId
+                                    ? "MessageSquareText"
+                                    : "MessageSquare"
+                                }
+                                className={`w-4 h-4 ${
+                                  thread.id === activeThreadId
+                                    ? "text-purple-500"
+                                    : "text-gray-400"
+                                }`}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p
+                                  className={`text-sm truncate ${
+                                    thread.id === activeThreadId
+                                      ? "font-medium text-purple-700 dark:text-purple-300"
+                                      : "text-gray-700 dark:text-gray-300"
+                                  }`}
+                                >
+                                  {thread.name}
+                                </p>
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                                  {thread.messages.length} messages •{" "}
+                                  {new Date(
+                                    thread.updatedAt
+                                  ).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <button
+                                onClick={(e) =>
+                                  handleDeleteThread(thread.id, e)
+                                }
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-gray-400 hover:text-red-500 transition-all"
+                                title="Delete thread"
+                              >
+                                <DynamicIcon name="X" className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {messages.length > 0 && (
+            {activeThread && messages.length > 0 && (
               <button
                 onClick={handleClearChat}
                 className="rounded-full p-2 text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
@@ -791,6 +1083,20 @@ export default function StoryCreativeAssistant({
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        icon={confirmDialog.icon}
+        confirmText={confirmDialog.confirmText}
+        confirmButtonClass={confirmDialog.confirmButtonClass}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() =>
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
+        }
+      />
     </div>
   );
 }
@@ -1062,12 +1368,14 @@ function getToolIcon(
   | "TrendingUp"
   | "Wrench"
   | "AlertCircle"
-  | "Brain" {
+  | "Brain"
+  | "Sparkles" {
   if (toolName.includes("stat")) return "BarChart2";
   if (toolName.includes("resource")) return "Diamond";
   if (toolName.includes("item") || toolName.includes("inventory"))
     return "Backpack";
   if (toolName.includes("ability")) return "Wand2";
+  if (toolName.includes("passive")) return "Sparkles";
   if (toolName.includes("lore")) return "Scroll";
   if (toolName.includes("achievement")) return "Trophy";
   if (toolName.includes("quest")) return "Swords";
@@ -1525,6 +1833,46 @@ function ToolArgsDisplay({
                   {String(item.grade)}
                 </span>
               )}
+            </div>
+            {has(item.description) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                {String(item.description)}
+              </p>
+            )}
+          </div>
+        ))}
+        {arrayItems.length > 3 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            +{arrayItems.length - 3} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Passives display
+  if (toolName.includes("passive")) {
+    const items = (args.passives || args.modifications || [args]) as Record<
+      string,
+      unknown
+    >[];
+    const arrayItems = Array.isArray(items) ? items : [items];
+
+    return (
+      <div className="mt-2 space-y-2">
+        {arrayItems.slice(0, 3).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <DynamicIcon
+                name="Sparkles"
+                className="w-3.5 h-3.5 text-violet-500"
+              />
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {String(item.name || "Unknown")}
+              </span>
             </div>
             {has(item.description) && (
               <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
@@ -2512,6 +2860,35 @@ function DetailsDisplay({
                     </span>
                   )}
                 </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Passives display
+    if (label === "Passives") {
+      return (
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2">
+                <DynamicIcon
+                  name="Sparkles"
+                  className="w-4 h-4 text-violet-500"
+                />
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                  {String(item.name || "Unknown")}
+                </span>
+              </div>
+              {has(item.description) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {String(item.description)}
+                </p>
               )}
             </div>
           ))}

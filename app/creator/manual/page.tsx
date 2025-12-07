@@ -14,6 +14,8 @@ import {
   Achievement,
   Quest,
   Relationship,
+  Condition,
+  ConditionTier,
   Preset,
   UpgradeSettings,
   DEFAULT_UPGRADE_SETTINGS,
@@ -95,6 +97,7 @@ type CreatorStep =
   | "passives"
   | "lore"
   | "relationships"
+  | "conditions"
   | "achievements"
   | "quests"
   | "agmt"
@@ -1592,6 +1595,7 @@ function AdventureCreatorContent() {
         setPassives(template.nodeEffects?.passives || []);
         setLore(template.lore || []);
         setRelationships(template.relationships || []);
+        setConditions(template.conditions || []);
         setAchievements(template.achievements || []);
         setQuests(template.quests || []);
         setCustomTables(template.customTables || []);
@@ -1750,6 +1754,7 @@ function AdventureCreatorContent() {
     if (Array.isArray(saved.lore)) setLore(saved.lore);
     if (Array.isArray(saved.relationships))
       setRelationships(saved.relationships);
+    if (Array.isArray(saved.conditions)) setConditions(saved.conditions);
     if (Array.isArray(saved.achievements)) setAchievements(saved.achievements);
     if (Array.isArray(saved.quests)) setQuests(saved.quests);
     if (Array.isArray(saved.customTables)) setCustomTables(saved.customTables);
@@ -1859,6 +1864,7 @@ function AdventureCreatorContent() {
           setPassives(template.nodeEffects?.passives || []);
           setLore(template.lore || []);
           setRelationships(template.relationships || []);
+          setConditions(template.conditions || []);
           setAchievements(template.achievements || []);
           setQuests(template.quests || []);
           setCustomTables(template.customTables || []);
@@ -2058,6 +2064,21 @@ function AdventureCreatorContent() {
   const [relationshipPage, setRelationshipPage] = useState(1);
   const relationshipItemsPerPage = 10;
 
+  // Conditions/Afflictions
+  const [conditions, setConditions] = useState<Condition[]>([]);
+  const [newCondition, setNewCondition] = useState<Partial<Condition>>({
+    name: "",
+    tier: 1,
+    description: "",
+    affects: [],
+    affectsAll: false,
+    permanent: false,
+  });
+  const [editingConditionIndex, setEditingConditionIndex] = useState<
+    number | null
+  >(null);
+  const [editCondition, setEditCondition] = useState<Partial<Condition>>({});
+
   // Advanced RPG Tools
   const [agmtEnabled, setAGMTEnabled] = useState(false);
   const [agmtState, setAGMTState] = useState<AGMTState>({
@@ -2192,6 +2213,7 @@ function AdventureCreatorContent() {
     { id: "passives", label: "Passive Effects", icon: "Sparkles" },
     { id: "lore", label: "Lore", icon: "Scroll" },
     { id: "relationships", label: "Relationships", icon: "Users" },
+    { id: "conditions", label: "Conditions", icon: "HeartPulse" },
     { id: "achievements", label: "Achievements", icon: "Trophy" },
     { id: "quests", label: "Quests", icon: "ClipboardList" },
     { id: "variables", label: "Variables", icon: "Variable" },
@@ -2329,6 +2351,7 @@ function AdventureCreatorContent() {
       passives,
       lore,
       relationships,
+      conditions,
       achievements,
       quests,
       customTables,
@@ -2380,6 +2403,7 @@ function AdventureCreatorContent() {
     passives,
     lore,
     relationships,
+    conditions,
     achievements,
     quests,
     customTables,
@@ -3366,6 +3390,7 @@ ${description || ""}`;
       achievements,
       lore,
       relationships,
+      conditions: conditions.length > 0 ? conditions : undefined,
       quests,
       customTables,
       variables,
@@ -3540,6 +3565,7 @@ ${description || ""}`;
         achievements,
         lore,
         relationships,
+        conditions: conditions.length > 0 ? conditions : undefined,
         quests,
         customTables,
         variables,
@@ -3690,6 +3716,7 @@ ${description || ""}`;
       achievements,
       lore,
       relationships,
+      conditions: conditions.length > 0 ? conditions : undefined,
       quests,
       customTables,
       variables,
@@ -4555,6 +4582,9 @@ ${description || ""}`;
                                     relationships: JSON.parse(
                                       JSON.stringify(relationships)
                                     ),
+                                    conditions: JSON.parse(
+                                      JSON.stringify(conditions)
+                                    ),
                                     authorNotes,
                                   }
                                 : p
@@ -4574,6 +4604,7 @@ ${description || ""}`;
                             resources,
                             inventory,
                             relationships,
+                            conditions,
                             authorNotes
                           );
                           setPresets([...presets, newPreset]);
@@ -4638,6 +4669,7 @@ ${description || ""}`;
                             setResources,
                             setInventory,
                             setRelationships,
+                            setConditions,
                             setAuthorNotes
                           );
                           addNotification(
@@ -4689,6 +4721,15 @@ ${description || ""}`;
                             <DynamicIcon name="Package" className="w-3 h-3" />{" "}
                             {preset.inventory?.length || 0} starting items
                           </div>
+                          {(preset.conditions?.length || 0) > 0 && (
+                            <div className="flex items-center gap-1 text-rose-300/60">
+                              <DynamicIcon
+                                name="HeartPulse"
+                                className="w-3 h-3"
+                              />{" "}
+                              {preset.conditions?.length} conditions
+                            </div>
+                          )}
                         </div>
                       )}
                     </button>
@@ -4792,6 +4833,7 @@ ${description || ""}`;
                               setResources,
                               setInventory,
                               setRelationships,
+                              setConditions,
                               setAuthorNotes
                             );
                             addNotification(
@@ -10241,6 +10283,494 @@ ${description || ""}`;
                     </>
                   );
                 })()
+              )}
+            </div>
+          </div>
+        );
+
+      case "conditions":
+        return (
+          <div className="space-y-6">
+            <div className="bg-rose-900/20 border border-rose-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>Tip:</strong> Conditions represent injuries,
+                  afflictions, or debuffs that penalize skill checks. Tier I is
+                  minor (sprain), Tier VI is permanent/fatal. Use these to give
+                  starting characters existing conditions or disabilities.
+                </span>
+              </p>
+            </div>
+
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">
+                Add Condition
+              </h3>
+              <div className="space-y-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-blue-200 mb-1">
+                      Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={newCondition.name || ""}
+                      onChange={(e) =>
+                        setNewCondition({
+                          ...newCondition,
+                          name: e.target.value,
+                        })
+                      }
+                      placeholder="e.g., Broken Arm, Poisoned, Cursed"
+                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-blue-200 mb-1">
+                      Severity Tier *
+                    </label>
+                    <select
+                      value={newCondition.tier || 1}
+                      onChange={(e) =>
+                        setNewCondition({
+                          ...newCondition,
+                          tier: parseInt(e.target.value) as ConditionTier,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    >
+                      <option value={1}>I - Minor (Sprain, Scratch)</option>
+                      <option value={2}>
+                        II - Moderate (Deep Cut, Fracture)
+                      </option>
+                      <option value={3}>
+                        III - Severe (Broken Bone, Infection)
+                      </option>
+                      <option value={4}>
+                        IV - Critical (Internal Bleeding)
+                      </option>
+                      <option value={5}>
+                        V - Life-Threatening (Organ Damage)
+                      </option>
+                      <option value={6}>VI - Permanent/Fatal</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Description *
+                  </label>
+                  <textarea
+                    value={newCondition.description || ""}
+                    onChange={(e) =>
+                      setNewCondition({
+                        ...newCondition,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Describe the condition and its effects..."
+                    rows={2}
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    Affects Stats
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() =>
+                        setNewCondition({
+                          ...newCondition,
+                          affectsAll: !newCondition.affectsAll,
+                          affects: newCondition.affectsAll
+                            ? newCondition.affects
+                            : [],
+                        })
+                      }
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                        newCondition.affectsAll
+                          ? "bg-rose-600 text-white"
+                          : "bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
+                      }`}
+                    >
+                      All Stats
+                    </button>
+                    {!newCondition.affectsAll &&
+                      stats.map((stat) => (
+                        <button
+                          key={stat.name}
+                          onClick={() => {
+                            const affects = newCondition.affects || [];
+                            if (affects.includes(stat.name)) {
+                              setNewCondition({
+                                ...newCondition,
+                                affects: affects.filter((a) => a !== stat.name),
+                              });
+                            } else {
+                              setNewCondition({
+                                ...newCondition,
+                                affects: [...affects, stat.name],
+                              });
+                            }
+                          }}
+                          className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                            (newCondition.affects || []).includes(stat.name)
+                              ? "bg-rose-600 text-white"
+                              : "bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
+                          }`}
+                        >
+                          {stat.name}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newCondition.permanent || false}
+                      onChange={(e) =>
+                        setNewCondition({
+                          ...newCondition,
+                          permanent: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 rounded border-blue-700/40 bg-blue-900/30 text-rose-600 focus:ring-rose-500"
+                    />
+                    <span className="text-sm text-blue-200">
+                      Permanent (cannot be healed)
+                    </span>
+                  </label>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (
+                    newCondition.name &&
+                    newCondition.description &&
+                    newCondition.tier
+                  ) {
+                    const condition: Condition = {
+                      id: `condition_${Date.now()}`,
+                      name: newCondition.name,
+                      tier: newCondition.tier as ConditionTier,
+                      description: newCondition.description,
+                      affects: newCondition.affectsAll
+                        ? []
+                        : newCondition.affects || [],
+                      affectsAll: newCondition.affectsAll || false,
+                      permanent: newCondition.permanent || false,
+                      createdAt: Date.now(),
+                    };
+                    setConditions([...conditions, condition]);
+                    setNewCondition({
+                      name: "",
+                      tier: 1,
+                      description: "",
+                      affects: [],
+                      affectsAll: false,
+                      permanent: false,
+                    });
+                  }
+                }}
+                disabled={
+                  !newCondition.name ||
+                  !newCondition.description ||
+                  !newCondition.tier
+                }
+                className="w-full px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+              >
+                Add Condition
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-lg font-bold text-white">
+                Starting Conditions ({conditions.length})
+              </h3>
+
+              {conditions.length === 0 ? (
+                <p className="text-blue-300/60 text-sm">
+                  No starting conditions added. Characters will begin healthy.
+                </p>
+              ) : (
+                conditions.map((condition, index) => (
+                  <div
+                    key={condition.id}
+                    className="p-4 bg-rose-900/20 rounded-lg border border-rose-800/50"
+                  >
+                    {editingConditionIndex === index ? (
+                      <div className="space-y-4">
+                        <h4 className="text-md font-bold text-rose-100 flex items-center gap-2">
+                          <DynamicIcon name="Edit2" className="w-4 h-4" />{" "}
+                          Editing Condition
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-blue-200 mb-1">
+                              Name *
+                            </label>
+                            <input
+                              type="text"
+                              value={editCondition.name || ""}
+                              onChange={(e) =>
+                                setEditCondition({
+                                  ...editCondition,
+                                  name: e.target.value,
+                                })
+                              }
+                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-blue-200 mb-1">
+                              Severity Tier *
+                            </label>
+                            <select
+                              value={editCondition.tier || 1}
+                              onChange={(e) =>
+                                setEditCondition({
+                                  ...editCondition,
+                                  tier: parseInt(
+                                    e.target.value
+                                  ) as ConditionTier,
+                                })
+                              }
+                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                            >
+                              <option value={1}>I - Minor</option>
+                              <option value={2}>II - Moderate</option>
+                              <option value={3}>III - Severe</option>
+                              <option value={4}>IV - Critical</option>
+                              <option value={5}>V - Life-Threatening</option>
+                              <option value={6}>VI - Permanent/Fatal</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-blue-200 mb-1">
+                            Description *
+                          </label>
+                          <textarea
+                            value={editCondition.description || ""}
+                            onChange={(e) =>
+                              setEditCondition({
+                                ...editCondition,
+                                description: e.target.value,
+                              })
+                            }
+                            rows={2}
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-blue-200 mb-2">
+                            Affects Stats
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() =>
+                                setEditCondition({
+                                  ...editCondition,
+                                  affectsAll: !editCondition.affectsAll,
+                                  affects: editCondition.affectsAll
+                                    ? editCondition.affects
+                                    : [],
+                                })
+                              }
+                              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                                editCondition.affectsAll
+                                  ? "bg-rose-600 text-white"
+                                  : "bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
+                              }`}
+                            >
+                              All Stats
+                            </button>
+                            {!editCondition.affectsAll &&
+                              stats.map((stat) => (
+                                <button
+                                  key={stat.name}
+                                  onClick={() => {
+                                    const affects = editCondition.affects || [];
+                                    if (affects.includes(stat.name)) {
+                                      setEditCondition({
+                                        ...editCondition,
+                                        affects: affects.filter(
+                                          (a) => a !== stat.name
+                                        ),
+                                      });
+                                    } else {
+                                      setEditCondition({
+                                        ...editCondition,
+                                        affects: [...affects, stat.name],
+                                      });
+                                    }
+                                  }}
+                                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                                    (editCondition.affects || []).includes(
+                                      stat.name
+                                    )
+                                      ? "bg-rose-600 text-white"
+                                      : "bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
+                                  }`}
+                                >
+                                  {stat.name}
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editCondition.permanent || false}
+                              onChange={(e) =>
+                                setEditCondition({
+                                  ...editCondition,
+                                  permanent: e.target.checked,
+                                })
+                              }
+                              className="w-4 h-4 rounded border-blue-700/40 bg-blue-900/30 text-rose-600 focus:ring-rose-500"
+                            />
+                            <span className="text-sm text-blue-200">
+                              Permanent
+                            </span>
+                          </label>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              if (
+                                editCondition.name &&
+                                editCondition.description &&
+                                editCondition.tier
+                              ) {
+                                const updated = [...conditions];
+                                updated[index] = {
+                                  ...conditions[index],
+                                  name: editCondition.name,
+                                  tier: editCondition.tier as ConditionTier,
+                                  description: editCondition.description,
+                                  affects: editCondition.affectsAll
+                                    ? []
+                                    : editCondition.affects || [],
+                                  affectsAll: editCondition.affectsAll || false,
+                                  permanent: editCondition.permanent || false,
+                                };
+                                setConditions(updated);
+                                setEditingConditionIndex(null);
+                                setEditCondition({});
+                              }
+                            }}
+                            disabled={
+                              !editCondition.name ||
+                              !editCondition.description ||
+                              !editCondition.tier
+                            }
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+                          >
+                            <DynamicIcon
+                              name="Save"
+                              className="inline-block w-4 h-4 mr-1"
+                            />
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingConditionIndex(null);
+                              setEditCondition({});
+                            }}
+                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-3">
+                        <div className="text-3xl shrink-0">
+                          <DynamicIcon
+                            name="HeartPulse"
+                            className={`w-8 h-8 ${
+                              condition.tier >= 5
+                                ? "text-red-500"
+                                : condition.tier >= 3
+                                ? "text-orange-500"
+                                : "text-yellow-500"
+                            }`}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-white flex items-center gap-2 flex-wrap">
+                            <span>{condition.name}</span>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                condition.tier >= 5
+                                  ? "bg-red-900/50 text-red-200"
+                                  : condition.tier >= 3
+                                  ? "bg-orange-900/50 text-orange-200"
+                                  : "bg-yellow-900/50 text-yellow-200"
+                              }`}
+                            >
+                              Tier {condition.tier}
+                            </span>
+                            {condition.permanent && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">
+                                Permanent
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-blue-300/60 mt-1">
+                            {condition.description}
+                          </p>
+                          <p className="text-xs text-blue-300/40 mt-1">
+                            Affects:{" "}
+                            {condition.affectsAll
+                              ? "All stats"
+                              : condition.affects?.length
+                              ? condition.affects.join(", ")
+                              : "None specified"}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditingConditionIndex(index);
+                              setEditCondition({
+                                name: condition.name,
+                                tier: condition.tier,
+                                description: condition.description,
+                                affects: condition.affects || [],
+                                affectsAll: condition.affectsAll || false,
+                                permanent: condition.permanent || false,
+                              });
+                            }}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                            title="Edit"
+                          >
+                            <DynamicIcon name="Edit2" className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setConditions(
+                                conditions.filter((_, i) => i !== index)
+                              )
+                            }
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                            title="Delete"
+                          >
+                            <DynamicIcon name="Trash2" className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
               )}
             </div>
           </div>

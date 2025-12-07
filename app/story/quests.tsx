@@ -209,7 +209,7 @@ export default function QuestsPage(storyData: StoryData) {
             </div>
           )}
 
-          {/* Inactive/Hidden Quests */}
+          {/* Inactive Quests */}
           {inactiveQuests.length > 0 && (
             <div>
               <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-white">
@@ -217,7 +217,7 @@ export default function QuestsPage(storyData: StoryData) {
                   name="EyeOff"
                   className="w-6 h-6 text-blue-300/60"
                 />
-                Hidden Quests ({inactiveQuests.length})
+                Inactive Quests ({inactiveQuests.length})
               </h3>
               <div className="space-y-3">
                 {inactiveQuests.map((quest) => {

@@ -1,6 +1,6 @@
 // Adventure character presets - author-created presets for their specific adventures
 
-import { Preset } from "./structs";
+import { Preset, Condition } from "./structs";
 
 // Default preset only - authors will create their own
 export const DEFAULT_PRESET: Preset = {
@@ -15,6 +15,7 @@ export const DEFAULT_PRESET: Preset = {
   resources: [],
   inventory: [],
   relationships: [],
+  conditions: [],
   authorNotes: "",
 };
 
@@ -38,6 +39,7 @@ export function createPresetFromCurrentSettings(
   resources: any[],
   inventory: any[],
   relationships: any[],
+  conditions: Condition[],
   authorNotes: string
 ): Preset {
   return {
@@ -52,6 +54,7 @@ export function createPresetFromCurrentSettings(
     resources: JSON.parse(JSON.stringify(resources)),
     inventory: JSON.parse(JSON.stringify(inventory)),
     relationships: JSON.parse(JSON.stringify(relationships)),
+    conditions: JSON.parse(JSON.stringify(conditions)),
     authorNotes,
   };
 }
@@ -66,6 +69,7 @@ export function applyPreset(
   setResources: (val: any[]) => void,
   setInventory: (val: any[]) => void,
   setRelationships: (val: any[]) => void,
+  setConditions: (val: Condition[]) => void,
   setAuthorNotes: (val: string) => void
 ) {
   if (preset.id === "custom") {
@@ -84,6 +88,7 @@ export function applyPreset(
   setResources(JSON.parse(JSON.stringify(preset.resources || [])));
   setInventory(JSON.parse(JSON.stringify(preset.inventory || [])));
   setRelationships(JSON.parse(JSON.stringify(preset.relationships || [])));
+  setConditions(JSON.parse(JSON.stringify(preset.conditions || [])));
 
   if (preset.authorNotes !== undefined) setAuthorNotes(preset.authorNotes);
 }
