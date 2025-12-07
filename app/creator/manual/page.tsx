@@ -936,6 +936,33 @@ function AdventureCreatorContent() {
 
   const [isAIMenuOpen, setIsAIMenuOpen] = useState(false);
 
+  // Pinned AI panel state (desktop only)
+  const [isAIPinned, setIsAIPinned] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("creatorAIPinned") === "true";
+    }
+    return false;
+  });
+
+  // Save pinned state to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("creatorAIPinned", isAIPinned ? "true" : "false");
+    }
+  }, [isAIPinned]);
+
+  // Handle pin toggle - when pinning, also open the panel
+  const handlePinToggle = () => {
+    if (!isAIPinned) {
+      // Pinning - also ensure it's open
+      setIsAIPinned(true);
+      setIsAIMenuOpen(true);
+    } else {
+      // Unpinning - keep it open as modal
+      setIsAIPinned(false);
+    }
+  };
+
   // Helper function to apply item changes with command support
   function applyItemChanges<
     T extends { name?: string; title?: string; id?: string; text?: string }
@@ -12605,7 +12632,11 @@ ${description || ""}`;
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 pt-16">
+    <div
+      className={`min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 pt-16 transition-all duration-300 ${
+        isAIPinned && isAIMenuOpen ? "lg:pr-[420px]" : ""
+      }`}
+    >
       <div className="max-w-6xl mx-auto p-3 sm:p-6">
         {/* Compact Header */}
         <div className="bg-blue-950/50 rounded-xl p-4 border border-blue-800/30 mb-4">
@@ -13270,8 +13301,52 @@ ${description || ""}`;
         </div>
       )}
 
+      {/* Pinned AI Panel - fixed to right side on desktop */}
+      {isAIPinned && isAIMenuOpen && (
+        <div className="hidden lg:block fixed top-16 right-0 bottom-0 w-[420px] z-40">
+          <CreatorAIChat
+            isOpen={isAIMenuOpen}
+            onClose={() => setIsAIMenuOpen(false)}
+            adventureId={editAdventureId || undefined}
+            currentStoryData={{
+              story_name: title,
+              premise,
+              player_name: playerName,
+              player_summary: playerSummary,
+              intro: intro,
+              author_notes: authorNotes,
+              stats,
+              resources,
+              inventory,
+              abilities,
+              lore,
+              achievements,
+              quests,
+              relationships,
+              variables,
+              presets,
+              upgradeSettings,
+              levelingSettings,
+              skillTrees,
+              agmtState: agmtEnabled ? agmtState : undefined,
+              customTables,
+            }}
+            adventureMetadata={{
+              title: title,
+              shortDescription: shortDescription,
+              description: description,
+              startingChoices: startingChoices,
+            }}
+            onApplyChanges={handleApplyAIChanges}
+            isPinned={true}
+            onPinToggle={handlePinToggle}
+          />
+        </div>
+      )}
+
+      {/* Modal AI Chat - for mobile or when unpinned */}
       <CreatorAIChat
-        isOpen={isAIMenuOpen}
+        isOpen={isAIMenuOpen && !isAIPinned}
         onClose={() => setIsAIMenuOpen(false)}
         adventureId={editAdventureId || undefined}
         currentStoryData={{
@@ -13304,6 +13379,8 @@ ${description || ""}`;
           startingChoices: startingChoices,
         }}
         onApplyChanges={handleApplyAIChanges}
+        isPinned={false}
+        onPinToggle={handlePinToggle}
       />
     </div>
   );

@@ -23,6 +23,7 @@ interface ChoicesModalProps {
     text: string
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
   onActionConfirm?: (choice: Choice) => void;
+  onRerollChoices?: () => void;
   loading: boolean;
   momentumMode: "none" | "advantage" | "guarantee";
   onMomentumModeChange: (mode: "none" | "advantage" | "guarantee") => void;
@@ -41,16 +42,13 @@ export default function ChoicesModal({
   onCustomInput,
   onActionSubmit,
   onActionConfirm,
+  onRerollChoices,
   loading,
   momentumMode,
   onMomentumModeChange,
   actionMode = false,
   onActionModeChange,
 }: ChoicesModalProps) {
-  const [customInput, setCustomInput] = useState("");
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [submittingCustom, setSubmittingCustom] = useState(false);
-
   // Action mode state
   const [actionText, setActionText] = useState("");
   const [analyzingAction, setAnalyzingAction] = useState(false);
@@ -82,8 +80,6 @@ export default function ChoicesModal({
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
-      setShowCustomInput(false);
-      setCustomInput("");
       setActionText("");
       setAnalyzingAction(false);
       setShowActionBuilder(false);
@@ -125,21 +121,6 @@ export default function ChoicesModal({
   const hasSkillCheck = selectedChoice?.skill_used !== undefined;
   const canUseAdvantage = storyData.momentum >= 1 && hasSkillCheck;
   const canUseGuarantee = storyData.momentum >= 3 && hasSkillCheck;
-
-  const handleSubmitCustom = async () => {
-    const text = customInput.trim();
-    if (!text || !onCustomInput) return;
-
-    setSubmittingCustom(true);
-    try {
-      await Promise.resolve(onCustomInput(text));
-      setCustomInput("");
-      setShowCustomInput(false);
-      onClose();
-    } finally {
-      setSubmittingCustom(false);
-    }
-  };
 
   const handleActionAnalyze = async (
     overrideText?: string,
@@ -562,63 +543,33 @@ export default function ChoicesModal({
                 );
               })}
 
-              {/* Custom Input Toggle */}
-              <button
-                onClick={() => setShowCustomInput(!showCustomInput)}
-                className={`w-full text-left p-4 sm:p-3 rounded-lg transition-all border border-dashed touch-manipulation ${
-                  showCustomInput
-                    ? "bg-blue-600/10 border-blue-500/50"
-                    : "bg-blue-900/20 border-blue-800/30 hover:border-blue-600/50 active:bg-blue-800/30"
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <DynamicIcon
-                    name={showCustomInput ? "X" : "PenLine"}
-                    className={`w-4 h-4 ${
-                      showCustomInput ? "text-blue-400" : "text-blue-200/60"
-                    }`}
-                  />
-                  <span
-                    className={`text-sm font-medium ${
-                      showCustomInput ? "text-blue-300" : "text-blue-200/60"
-                    }`}
-                  >
-                    {showCustomInput
-                      ? "Cancel Custom Action"
-                      : "Write Your Own Action"}
-                  </span>
-                </div>
-              </button>
-
-              {/* Custom Input Area */}
-              {showCustomInput && (
-                <div className="bg-blue-900/30 rounded-lg p-3 border border-blue-800/30 space-y-2">
-                  <textarea
-                    value={customInput}
-                    onChange={(e) => setCustomInput(e.target.value)}
-                    placeholder="Describe your action, dialogue, or narration..."
-                    rows={3}
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-800/30 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
-                  />
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-blue-200/40">
-                      {customInput.length} characters • No skill check
-                    </span>
-                    <button
-                      onClick={handleSubmitCustom}
-                      disabled={
-                        submittingCustom || loading || !customInput.trim()
-                      }
-                      className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-sm ${
-                        submittingCustom || loading || !customInput.trim()
-                          ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
-                          : "bg-blue-600 hover:bg-blue-700 text-white"
+              {/* Reroll Choices Button */}
+              {onRerollChoices && (
+                <button
+                  onClick={onRerollChoices}
+                  disabled={loading}
+                  className={`w-full text-left p-4 sm:p-3 rounded-lg transition-all border border-dashed touch-manipulation ${
+                    loading
+                      ? "bg-blue-900/10 border-blue-800/20 cursor-not-allowed"
+                      : "bg-blue-900/20 border-blue-800/30 hover:border-purple-500/50 hover:bg-purple-900/20 active:bg-purple-800/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <DynamicIcon
+                      name={loading ? "Loader2" : "RefreshCw"}
+                      className={`w-4 h-4 text-purple-300/60 ${
+                        loading ? "animate-spin" : ""
                       }`}
-                    >
-                      {submittingCustom ? "Submitting..." : "Submit Action"}
-                    </button>
+                    />
+                    <span className="text-sm font-medium text-purple-200/60">
+                      {loading
+                        ? "Generating..."
+                        : choices.choices.length === 0
+                        ? "Generate Choices"
+                        : "Reroll Choices"}
+                    </span>
                   </div>
-                </div>
+                </button>
               )}
             </>
           )}

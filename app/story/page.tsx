@@ -47,6 +47,7 @@ import MenuPage from "./menu";
 import UpgradesPage from "./upgrades";
 import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
+import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
 import { logger } from "../misc/logger";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
@@ -1659,6 +1660,23 @@ function StoryPageContent() {
     localPartCount: 0,
     serverPartCount: 0,
   });
+
+  // AI Story Editor state (lifted from menu so it persists across tabs)
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [isAIPinned, setIsAIPinned] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("storyAIPinned") === "true";
+    }
+    return false;
+  });
+
+  const handleAIPinToggle = () => {
+    setIsAIPinned((prev) => {
+      const next = !prev;
+      localStorage.setItem("storyAIPinned", String(next));
+      return next;
+    });
+  };
 
   // Helper to process multiple scene parts from API
   function processSceneParts(
@@ -5481,6 +5499,50 @@ function StoryPageContent() {
     await saveProgress(storyData);
   }
 
+  async function handleRerollChoices() {
+    if (!storyData || loading) return;
+
+    setLoading(true);
+    setLoadingStage("choices");
+
+    try {
+      const { choicesModel } = getModelsFromPreset();
+      const { generateChoicesOnly } = await import("../misc/generation");
+
+      const newChoices = await generateChoicesOnly(storyData, {
+        choicesModel,
+        openRouterKey,
+        deepseekKey,
+        googleKey,
+      });
+
+      // Update the last part with new choices
+      const lastPartIndex = storyData.scene.parts.length - 1;
+      if (lastPartIndex >= 0 && !storyData.scene.parts[lastPartIndex].user) {
+        storyData.scene.parts[lastPartIndex] = {
+          ...storyData.scene.parts[lastPartIndex],
+          choices: newChoices,
+        };
+      }
+
+      setChoices({ choices: newChoices });
+      setStoryData({ ...storyData });
+
+      // Save progress
+      await saveProgress(storyData);
+      addNotification("Choices regenerated!", "success");
+    } catch (error: any) {
+      console.error("Error regenerating choices:", error);
+      addNotification(
+        `Failed to regenerate choices: ${error.message}`,
+        "failure"
+      );
+    } finally {
+      setLoading(false);
+      setLoadingStage(null);
+    }
+  }
+
   // Handle level-up upgrades (no longer costs points - limited by level)
   async function handleUpgrade(callback: () => void) {
     if (!storyData) return;
@@ -6224,7 +6286,7 @@ function StoryPageContent() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-2">
+        <div className="relative z-30 bg-blue-950/50 rounded-xl border border-blue-800/30 p-2">
           <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-1">
             {[
               { state: StoryState.STORY, icon: "BookOpen", label: "Story" },
@@ -6270,6 +6332,7 @@ function StoryPageContent() {
             onCustomInput={handleCustomInput}
             onActionSubmit={handleActionSubmit}
             onActionConfirm={handleActionConfirm}
+            onRerollChoices={handleRerollChoices}
             onRetry={handleRetry}
             canRetry={canRetry}
             onUndo={handleUndo}
@@ -6298,6 +6361,7 @@ function StoryPageContent() {
             onUpdateStoryData={updateStoryData}
             onViewLogs={() => setCurrentState(StoryState.LOGS)}
             onViewContext={() => setCurrentState(StoryState.CONTEXT)}
+            onOpenAIAssistant={() => setShowAIAssistant(true)}
           />
         )}
         {currentState === StoryState.LOGS && <LogViewer />}
@@ -6305,6 +6369,21 @@ function StoryPageContent() {
           <ContextViewer storyData={storyData} />
         )}
       </main>
+
+      {/* AI Story Editor - Rendered at page level to persist across tabs */}
+      <StoryCreativeAssistant
+        isOpen={showAIAssistant}
+        onClose={() => setShowAIAssistant(false)}
+        onOpen={() => setShowAIAssistant(true)}
+        storyData={storyData}
+        storyId={storyDbId || undefined}
+        onApplyChanges={(updates) => {
+          updateStoryData(updates);
+          addNotification("Changes applied! Don't forget to save.", "success");
+        }}
+        isPinned={isAIPinned}
+        onPinToggle={handleAIPinToggle}
+      />
 
       {/*ConfirmDialog*/}
       <ConfirmDialog

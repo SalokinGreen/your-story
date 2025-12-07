@@ -25,6 +25,7 @@ interface StoryProps {
     text: string
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
   onActionConfirm?: (choice: Choice) => void;
+  onRerollChoices?: () => void;
   onRetry?: () => void;
   canRetry?: boolean;
   onUndo?: () => void;
@@ -52,6 +53,7 @@ export default function Story({
   onCustomInput,
   onActionSubmit,
   onActionConfirm,
+  onRerollChoices,
   onRetry,
   canRetry,
   onUndo,
@@ -594,6 +596,7 @@ export default function Story({
         onCustomInput={onCustomInput}
         onActionSubmit={onActionSubmit}
         onActionConfirm={onActionConfirm}
+        onRerollChoices={onRerollChoices}
         loading={loading}
         momentumMode={momentumMode}
         onMomentumModeChange={onMomentumModeChange}

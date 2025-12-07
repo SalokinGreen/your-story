@@ -194,7 +194,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-full min-w-[360px] bg-white dark:bg-blue-950 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[480px] flex flex-col">
+        <div className="absolute z-30 mt-1 w-full min-w-[360px] bg-white dark:bg-blue-950 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[480px] flex flex-col">
           {/* Search */}
           <div className="p-2 border-b border-gray-200 dark:border-gray-700 space-y-2">
             <input

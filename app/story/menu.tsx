@@ -51,7 +51,6 @@ import {
   getAbilityBonus,
 } from "../misc/abilitySystem";
 import { getRPGSystem, type RPGSystemType } from "../misc/rpgSystems";
-import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
 import { getCumulativeXPForLevel, calculateLevel } from "../misc/leveling";
 
 // Basic Settings Component
@@ -652,7 +651,7 @@ function StatsResourcesEditor({
                     placeholder="Stat name"
                     className="px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
-                  <div className="relative z-50">
+                  <div className="relative z-30">
                     <IconPicker
                       value={editStat.symbol || "Star"}
                       onChange={(icon) =>
@@ -816,7 +815,7 @@ function StatsResourcesEditor({
                     placeholder="Resource name"
                     className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
-                  <div className="relative z-50">
+                  <div className="relative z-30">
                     <IconPicker
                       value={editResource.symbol || "Gem"}
                       onChange={(icon) =>
@@ -993,7 +992,7 @@ function StatsResourcesEditor({
                     placeholder="Title"
                     className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
-                  <div className="relative z-50">
+                  <div className="relative z-30">
                     <IconPicker
                       value={editAchievement.symbol || "Trophy"}
                       onChange={(icon) =>
@@ -1645,7 +1644,7 @@ function InventoryEditor({
                   placeholder="Item name"
                   className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                 />
-                <div className="relative z-50">
+                <div className="relative z-30">
                   <IconPicker
                     value={editInventoryItem.symbol || "Package"}
                     onChange={(icon) =>
@@ -2122,7 +2121,7 @@ function AbilitiesEditor({
                   placeholder="Ability name"
                   className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                 />
-                <div className="relative z-50">
+                <div className="relative z-30">
                   <IconPicker
                     value={editAbility.symbol || "Sparkles"}
                     onChange={(icon) =>
@@ -5025,6 +5024,7 @@ interface MenuProps extends StoryData {
   onUpdateStoryData: (updates: Partial<StoryData>) => void;
   onViewLogs?: () => void;
   onViewContext?: () => void;
+  onOpenAIAssistant?: () => void;
 }
 
 export default function MenuPage({
@@ -5034,6 +5034,7 @@ export default function MenuPage({
   onUpdateStoryData,
   onViewLogs,
   onViewContext,
+  onOpenAIAssistant,
   ...storyData
 }: MenuProps) {
   const router = useRouter();
@@ -5089,7 +5090,6 @@ export default function MenuPage({
     | "tts"
     | "ai"
   >("basic");
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -5498,13 +5498,15 @@ export default function MenuPage({
       </div>
 
       {/* AI Editor Button */}
-      <button
-        onClick={() => setShowAIAssistant(true)}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-purple-600/80 to-pink-600/80 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-xl transition-all border border-purple-500/30"
-      >
-        <DynamicIcon name="Wand2" className="w-5 h-5" />
-        <span>AI Editor</span>
-      </button>
+      {onOpenAIAssistant && (
+        <button
+          onClick={onOpenAIAssistant}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-purple-600/80 to-pink-600/80 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-xl transition-all border border-purple-500/30"
+        >
+          <DynamicIcon name="Wand2" className="w-5 h-5" />
+          <span>AI Editor</span>
+        </button>
+      )}
 
       {/* Player Notes - Collapsible */}
       <div className="bg-[#0f1a2e] rounded-xl border border-blue-800/30 overflow-hidden">
@@ -6659,18 +6661,6 @@ export default function MenuPage({
         confirmButtonClass={confirmDialog.confirmButtonClass}
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
-      />
-
-      {/* AI Story Editor Modal */}
-      <StoryCreativeAssistant
-        isOpen={showAIAssistant}
-        onClose={() => setShowAIAssistant(false)}
-        storyData={storyData}
-        storyId={storyDbId || undefined}
-        onApplyChanges={(updates) => {
-          onUpdateStoryData(updates);
-          addNotification("Changes applied! Don't forget to save.", "success");
-        }}
       />
     </div>
   );
