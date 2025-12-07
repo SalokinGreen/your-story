@@ -369,33 +369,53 @@ describe("Powered by the Apocalypse (PbtA) System", () => {
     });
 
     it("should convert stat to modifier (-2 to +3)", () => {
-      expect(SYSTEM_PBTA.statToModifier(0)).toBe(-2); // 0-20
-      expect(SYSTEM_PBTA.statToModifier(21)).toBe(-1); // 21-40
-      expect(SYSTEM_PBTA.statToModifier(34)).toBe(-1); // 34-50
-      expect(SYSTEM_PBTA.statToModifier(61)).toBe(1); // 61-80
-      expect(SYSTEM_PBTA.statToModifier(67)).toBe(1); // 61-80
-      expect(SYSTEM_PBTA.statToModifier(81)).toBe(2); // 81-100
-      expect(SYSTEM_PBTA.statToModifier(92)).toBe(2); // 81-100
-      expect(SYSTEM_PBTA.statToModifier(101)).toBe(3); // 100+ for exceptional
+      // New ranges: 0-16=-2, 17-33=-1, 34-50=0, 51-67=+1, 68-84=+2, 85-100=+3
+      expect(SYSTEM_PBTA.statToModifier(0)).toBe(-2); // 0-16
+      expect(SYSTEM_PBTA.statToModifier(16)).toBe(-2); // 0-16
+      expect(SYSTEM_PBTA.statToModifier(17)).toBe(-1); // 17-33
+      expect(SYSTEM_PBTA.statToModifier(33)).toBe(-1); // 17-33
+      expect(SYSTEM_PBTA.statToModifier(34)).toBe(0); // 34-50
+      expect(SYSTEM_PBTA.statToModifier(50)).toBe(0); // 34-50
+      expect(SYSTEM_PBTA.statToModifier(51)).toBe(1); // 51-67
+      expect(SYSTEM_PBTA.statToModifier(67)).toBe(1); // 51-67
+      expect(SYSTEM_PBTA.statToModifier(68)).toBe(2); // 68-84
+      expect(SYSTEM_PBTA.statToModifier(84)).toBe(2); // 68-84
+      expect(SYSTEM_PBTA.statToModifier(85)).toBe(3); // 85-100
+      expect(SYSTEM_PBTA.statToModifier(100)).toBe(3); // 85-100
     });
 
-    it("should have correct DC thresholds", () => {
-      expect(SYSTEM_PBTA.dc.medium).toBe(10); // Full success
-      expect(SYSTEM_PBTA.success.partialThreshold).toBe(7); // Partial success
+    it("should have correct DC values for advantage/disadvantage", () => {
+      // DC represents advantage (negative) or disadvantage (positive)
+      // Simplified 3-tier system
+      expect(SYSTEM_PBTA.dc.trivial).toBe(-1); // Advantage (same as easy)
+      expect(SYSTEM_PBTA.dc.easy).toBe(-1); // Advantage
+      expect(SYSTEM_PBTA.dc.medium).toBe(0); // Normal
+      expect(SYSTEM_PBTA.dc.hard).toBe(1); // Disadvantage
+      expect(SYSTEM_PBTA.dc.veryHard).toBe(1); // Disadvantage (same as hard)
+      expect(SYSTEM_PBTA.dc.impossible).toBe(1); // Disadvantage (same as hard)
+    });
+
+    it("should have correct success thresholds", () => {
+      expect(SYSTEM_PBTA.success.partialThreshold).toBe(7); // Partial success 7-9
+      // Note: PbtA success threshold is checked against dc.medium in checkSuccess
+      // but the actual threshold is always 10+ for full success
     });
   });
 
   describe("checkSuccess for PbtA", () => {
     it("should succeed on 10+ (full success)", () => {
-      const result = checkSuccess(SYSTEM_PBTA, 8, 67, 10, 0); // Roll 8 + mod 1 = 9... wait
+      // New ranges: 51-67 = +1 modifier
+      // For PbtA, DC is 0 (average) - thresholds are fixed at 10/7
+      const result = checkSuccess(SYSTEM_PBTA, 9, 60, 0, 0); // Roll 9 + mod 1 = 10
 
-      // Let me recalculate: roll 8, stat 67 = modifier 1, total 9
-      expect(result.success).toBe(false); // 9 < 10
-      expect(result.partial).toBe(true); // 7-9
+      expect(result.success).toBe(true); // 10 >= 10
+      expect(result.partial).toBe(false);
     });
 
     it("should have partial success on 7-9", () => {
-      const result = checkSuccess(SYSTEM_PBTA, 7, 51, 10, 0); // Roll 7 + mod 0 = 7
+      // New ranges: 34-50 = 0 modifier
+      // DC doesn't affect thresholds - always 10+/7-9/6-
+      const result = checkSuccess(SYSTEM_PBTA, 7, 40, 0, 0); // Roll 7 + mod 0 = 7
 
       expect(result.success).toBe(false); // Not full success
       expect(result.partial).toBe(true); // 7-9 range
@@ -403,7 +423,8 @@ describe("Powered by the Apocalypse (PbtA) System", () => {
     });
 
     it("should fail on 6-", () => {
-      const result = checkSuccess(SYSTEM_PBTA, 5, 51, 10, 0); // Roll 5 + mod 0 = 5
+      // New ranges: 34-50 = 0 modifier
+      const result = checkSuccess(SYSTEM_PBTA, 5, 40, 0, 0); // Roll 5 + mod 0 = 5
 
       expect(result.success).toBe(false);
       expect(result.partial).toBe(false);
@@ -411,14 +432,16 @@ describe("Powered by the Apocalypse (PbtA) System", () => {
     });
 
     it("should detect critical success (12 on 2d6)", () => {
-      const result = checkSuccess(SYSTEM_PBTA, 12, 51, 10, 0); // Natural 12
+      // New ranges: 34-50 = 0 modifier
+      const result = checkSuccess(SYSTEM_PBTA, 12, 40, 0, 0); // Natural 12
 
       expect(result.success).toBe(true);
       expect(result.critical).toBe(true);
     });
 
     it("should handle modifiers correctly", () => {
-      const result = checkSuccess(SYSTEM_PBTA, 7, 84, 10, 0); // Roll 7 + mod 2 = 9
+      // New ranges: 68-84 = +2 modifier
+      const result = checkSuccess(SYSTEM_PBTA, 7, 75, 0, 0); // Roll 7 + mod 2 = 9
 
       expect(result.total).toBe(9);
       expect(result.partial).toBe(true);
@@ -426,11 +449,23 @@ describe("Powered by the Apocalypse (PbtA) System", () => {
     });
 
     it("should succeed on exactly 10", () => {
-      const result = checkSuccess(SYSTEM_PBTA, 9, 67, 10, 0); // Roll 9 + mod 1 = 10
+      // New ranges: 51-67 = +1 modifier
+      const result = checkSuccess(SYSTEM_PBTA, 9, 60, 0, 0); // Roll 9 + mod 1 = 10
 
       expect(result.success).toBe(true);
       expect(result.partial).toBe(false);
       expect(result.total).toBe(10);
+    });
+
+    it("should use fixed thresholds regardless of DC value", () => {
+      // DC only affects advantage/disadvantage dice, not success thresholds
+      // Even with DC -1 (advantage), thresholds are still 10+/7-9/6-
+      const resultWithAdvantage = checkSuccess(SYSTEM_PBTA, 7, 40, -1, 0); // Roll 7 + mod 0 = 7
+      expect(resultWithAdvantage.partial).toBe(true); // 7-9 range
+      expect(resultWithAdvantage.success).toBe(false);
+
+      const resultWithDisadvantage = checkSuccess(SYSTEM_PBTA, 10, 40, 1, 0); // Roll 10 + mod 0 = 10
+      expect(resultWithDisadvantage.success).toBe(true); // 10+ still succeeds
     });
   });
 });
@@ -580,8 +615,11 @@ describe("System Comparison", () => {
     // 1d20: Medium DCs (15-25 range)
     expect(SYSTEM_1D20.dc.medium).toBe(15);
 
-    // PbtA: Fixed thresholds (7, 10)
-    expect(SYSTEM_PBTA.dc.medium).toBe(10);
+    // PbtA: DC is for advantage/disadvantage, not thresholds
+    // medium = 0 (no advantage or disadvantage)
+    // Fixed thresholds: 10+ success, 7-9 partial
+    expect(SYSTEM_PBTA.dc.medium).toBe(0);
+    expect(SYSTEM_PBTA.success.successThreshold).toBe(10);
     expect(SYSTEM_PBTA.success.partialThreshold).toBe(7);
 
     // Fate: Ladder scale (0-4)

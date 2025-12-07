@@ -3528,10 +3528,13 @@ function StoryPageContent() {
     }
 
     // Apply stacking advantage/disadvantage system.
-    // - PbtA/Fate: each net advantage adds +1 to modifier; each net disadvantage adds -1 (no extra rolls).
+    // - Fate: each net advantage adds +1 to modifier; each net disadvantage adds -1 (no extra rolls).
+    // - PbtA: roll extra d6s and keep best/worst 2 (like Dungeon World)
+    // - 3d6: roll extra d6s and keep best/worst 3
     // - Other non-YZE/non-Explosive systems: roll extra sets equal to |netAdvantage| and pick best/worst.
     let pbtaPenalty = 0; // Negative for advantage (adds), positive for disadvantage (subtracts)
-    if (rpgSystem.id === "pbta" || rpgSystem.id === "fate") {
+    if (rpgSystem.id === "fate") {
+      // Fate: modifier shift (fiction-first approach)
       const netAdvantage = advantageCount - disadvantageCount;
       if (netAdvantage !== 0) {
         // Convert net advantage into modifier shift.
@@ -3545,16 +3548,81 @@ function StoryPageContent() {
             ? ` (x${Math.abs(netAdvantage)} stacked)`
             : "";
         addNotification(
-          `${isAdvantage ? "? Advantage" : "?? Disadvantage"}${stackText}: ${
+          `${isAdvantage ? "🎲 Advantage" : "⚠️ Disadvantage"}${stackText}: ${
             isAdvantage ? "+" : "-"
           }${Math.abs(netAdvantage)} modifier from ${sourcesList}`,
           isAdvantage ? "success" : "warning"
         );
-        logger.action("PbtA/Fate modifier shift from advantage/disadvantage", {
+        logger.action("Fate modifier shift from advantage/disadvantage", {
           netAdvantage,
           pbtaPenalty,
           sources: sourcesList,
         });
+      }
+    } else if (rpgSystem.id === "pbta") {
+      // PbtA: DC determines advantage/disadvantage (not items/abilities)
+      // DC values: trivial=-2, easy=-1, average=0, hard=1, very_hard=2, impossible=3
+      // Negative = advantage dice, Positive = disadvantage dice
+      const dc = choice.skill_dc || 0;
+      if (dc !== 0) {
+        const isAdvantage = dc < 0;
+        const extraDiceCount = Math.abs(dc); // number of additional dice beyond base 2
+        // Roll extra individual dice
+        const pool: number[] = [...diceResult.rolls]; // base 2 dice from initial roll
+        for (let i = 0; i < extraDiceCount; i++) {
+          const die = Math.floor(Math.random() * 6) + 1;
+          pool.push(die);
+        }
+        // Determine selected dice indices - keep best/worst 2
+        const sortedIndices = pool
+          .map((v, idx) => ({ v, idx }))
+          .sort((a, b) => (isAdvantage ? b.v - a.v : a.v - b.v))
+          .slice(0, 2) // keep best or worst 2
+          .map((o) => o.idx);
+        // Compute final total from selected dice
+        const selectedDice = sortedIndices.map((i) => pool[i]);
+        dice_roll = selectedDice.reduce((a, b) => a + b, 0);
+        // Overwrite diceResult.rolls with the chosen 2 for downstream success calc
+        diceResult.rolls = selectedDice;
+        // Store full pool (for visualization). Replace first entry in allDiceDetails.
+        allDiceDetails[0] = pool;
+        allDiceRolls[0] = dice_roll; // update displayed base roll value
+
+        // Determine difficulty label
+        const difficultyLabel =
+          dc <= -2
+            ? "trivial"
+            : dc === -1
+            ? "easy"
+            : dc === 1
+            ? "hard"
+            : dc === 2
+            ? "very hard"
+            : "impossible";
+
+        logger.action("PbtA DC-based advantage/disadvantage", {
+          dc,
+          isAdvantage,
+          extraDiceCount,
+          pool,
+          selectedDice,
+          finalTotal: dice_roll,
+          difficulty: difficultyLabel,
+        });
+        const stackText =
+          extraDiceCount > 1
+            ? ` (${extraDiceCount + 2}d6 keep ${
+                isAdvantage ? "best" : "worst"
+              } 2)`
+            : ` (3d6 keep ${isAdvantage ? "best" : "worst"} 2)`;
+        addNotification(
+          `${
+            isAdvantage ? "🎲 Advantage" : "⚠️ Disadvantage"
+          }${stackText}: ${difficultyLabel} difficulty - kept ${selectedDice.join(
+            ","
+          )} from [${pool.join(",")}]`,
+          isAdvantage ? "success" : "warning"
+        );
       }
     } else if (rpgSystem.id !== "yze" && rpgSystem.id !== "explosive") {
       const netAdvantage = advantageCount - disadvantageCount;
@@ -3598,7 +3666,7 @@ function StoryPageContent() {
             extraDiceCount > 1 ? ` (+${extraDiceCount} dice)` : " (+1 die)";
           addNotification(
             `${
-              isAdvantage ? "? Advantage" : "?? Disadvantage"
+              isAdvantage ? "🎲 Advantage" : "⚠️ Disadvantage"
             }${stackText}: kept ${selectedDice.join(",")} from [${pool.join(
               ","
             )}]`,

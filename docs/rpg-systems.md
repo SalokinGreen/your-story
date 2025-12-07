@@ -115,27 +115,35 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 
 **Dice**: Roll 2d6 + modifier (2-12)  
 **Distribution**: Bell curve  
-**Formula**: `2d6 + Modifier` (no DC comparison!)
+**Formula**: `2d6 + Modifier` (fixed thresholds!)
 
 **Stat Scaling**: 0-100 stat → -2 to +3 modifier
 
-- 0-20: -2
-- 21-40: -1
-- 41-60: 0
-- 61-80: +1
-- 81-100: +2
-- 100+: +3
+- 0-16: -2
+- 17-33: -1
+- 34-50: 0
+- 51-67: +1
+- 68-84: +2
+- 85-100: +3
 
-**Fixed Thresholds** (DO NOT VARY):
+**Fixed Thresholds** (NEVER VARY):
 
 - **10+**: Full Success - achieve goal cleanly
 - **7-9**: Partial Success - succeed with complication/cost/hard choice
 - **6-**: Failure - fail with consequences
 
+**DC = Advantage/Disadvantage** (difficulty affects dice pool, not thresholds):
+
+| DC Tier | Effect       | Dice             |
+| ------- | ------------ | ---------------- |
+| easy    | Advantage    | 3d6 keep best 2  |
+| average | Normal       | 2d6              |
+| hard    | Disadvantage | 3d6 keep worst 2 |
+
 **AI Context Examples**:
 
 - `[Charm: success]` (rolled 10+)
-- `[Stealth: partial success (7-9)]` (rolled 7-9)
+- `[Stealth: partial success (7-9)]` (rolled 7-9, hard difficulty)
 - `[Combat: failure]` (rolled 6-)
 
 **AI Behavior**:
@@ -150,9 +158,9 @@ Each RPG system provides different dice mechanics, success thresholds, and narra
 
 **Special Notes**:
 
-- AI should NEVER vary the 7/10 thresholds
-- Difficulty comes from consequences, not DC changes
-- Momentum can add +1 to roll
+- AI sets DC tier based on fictional difficulty
+- Thresholds are ALWAYS 10+/7-9/6- regardless of DC
+- Difficulty is expressed through advantage/disadvantage dice
 
 **Use Case**: Narrative-focused gameplay where partial successes drive story tension.
 

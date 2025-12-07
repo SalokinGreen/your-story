@@ -62,6 +62,7 @@ export interface RPGSystem {
     formula: string; // How to calculate success (for display)
     criticalThreshold?: number; // Optional: if roll >= this, it's a critical (or <= for roll-under)
     partialThreshold?: number; // Optional: threshold for partial success (PbtA systems)
+    successThreshold?: number; // Optional: fixed success threshold (PbtA: 10+)
     styleThreshold?: number; // Optional: margin for success with style (Fate systems)
   };
 
@@ -437,7 +438,7 @@ export const SYSTEM_PBTA: RPGSystem = {
   id: "pbta",
   name: "Powered by the Apocalypse",
   description:
-    "Roll 2d6+modifier for narrative-driven gameplay with partial success (10+ success, 7-9 partial, 6- failure)",
+    "Roll 2d6+modifier for narrative-driven gameplay with partial success (10+ success, 7-9 partial, 6- failure). Advantage: roll 3d6 keep best 2.",
 
   hasPartialSuccess: true,
 
@@ -448,32 +449,33 @@ export const SYSTEM_PBTA: RPGSystem = {
     max: 12,
   },
 
-  // Stat scaling: 0-100 stat → -2 to +3 modifier (PbtA standard range)
-  // 0-20 = -2, 21-40 = -1, 41-60 = 0, 61-80 = +1, 81-100 = +2, 100+ = +3
+  // Stat scaling: 0-100 stat → -2 to +3 modifier (expanded PbtA range)
+  // 0-16 = -2, 17-33 = -1, 34-50 = 0, 51-67 = +1, 68-84 = +2, 85-100 = +3
   statToModifier: (stat: number) => {
-    if (stat <= 20) return -2;
-    if (stat <= 40) return -1;
-    if (stat <= 60) return 0;
-    if (stat <= 80) return 1;
-    if (stat <= 100) return 2;
-    return 3; // 100+ for exceptional cases
+    if (stat <= 16) return -2;
+    if (stat <= 33) return -1;
+    if (stat <= 50) return 0;
+    if (stat <= 67) return 1;
+    if (stat <= 84) return 2;
+    return 3; // 85+
   },
 
   success: {
     formula: "2d6 + Modifier",
     criticalThreshold: 12, // Rolling double 6s
     partialThreshold: 7, // 7-9 = partial success
+    successThreshold: 10, // 10+ = full success (fixed, DC only affects advantage)
   },
 
   dc: {
-    trivial: 6, // Below partial threshold
-    easy: 7, // Partial threshold
-    medium: 10, // Success threshold
-    hard: 10, // Same as medium (difficulty comes from complications)
-    veryHard: 10, // Same (PbtA doesn't scale DCs, outcomes vary)
-    impossible: 13, // Above max roll+mod
+    trivial: -1, // Advantage (roll 3d6 keep best 2) - use for easy tasks
+    easy: -1, // Advantage (roll 3d6 keep best 2)
+    medium: 0, // Normal (roll 2d6) - default for most tasks
+    hard: 1, // Disadvantage (roll 3d6 keep worst 2)
+    veryHard: 1, // Disadvantage (roll 3d6 keep worst 2) - use for hard tasks
+    impossible: 1, // Disadvantage (roll 3d6 keep worst 2) - narrate impossibility instead
     description:
-      "PbtA doesn't use variable DCs. 10+ = success, 7-9 = partial success with complication, 6- = failure",
+      "PbtA uses DC for advantage/disadvantage: easy = advantage (3d6 keep best 2), average = normal (2d6), hard = disadvantage (3d6 keep worst 2). Thresholds are fixed: 10+ success, 7-9 partial, 6- failure.",
   },
 
   resources: {
@@ -495,9 +497,9 @@ export const SYSTEM_PBTA: RPGSystem = {
 
   aiInstructions: {
     diceSystem:
-      "The game uses Powered by the Apocalypse (PbtA) 2d6 system. Player rolls 2d6 (2-12) and adds a modifier (-2 to +3) derived from their 0-100 stat. Critical success on 12 (double 6s).",
+      "The game uses Powered by the Apocalypse (PbtA) 2d6 system. Player rolls 2d6 (2-12) and adds a modifier (-2 to +3) derived from their 0-100 stat. Critical success on 12 (double 6s). DIFFICULTY is expressed through advantage/disadvantage dice, NOT variable thresholds.",
     dcGuidance:
-      "⚠️ DO NOT SET VARIABLE DC VALUES! PbtA uses FIXED thresholds: 10+ = Full Success, 7-9 = Partial Success, 6- = Failure. Never change these numbers. The challenge comes from the outcomes, not the DC.",
+      "PbtA uses DC to set ADVANTAGE/DISADVANTAGE, not success thresholds. Thresholds are ALWAYS fixed (10+/7-9/6-). Set DC based on fictional difficulty: easy = advantage, average = normal, hard = disadvantage.",
     challengeGuidance: `PbtA THREE-OUTCOME SYSTEM:
 
 **10+ FULL SUCCESS**: Player achieves their goal cleanly and completely. No complications, costs, or negative consequences. Describe what they wanted to accomplish happening successfully.
@@ -517,24 +519,19 @@ export const SYSTEM_PBTA: RPGSystem = {
   • Deal damage (physical, resource, relationship)
   • Advance a threat or countdown
   
-RESOURCES: Only required when narratively appropriate. Missing resources gives -1 penalty, not automatic failure.
-
-MOMENTUM: When player spends momentum, add +1 to their roll (can turn partial into success).
-
-DIFFICULTY: Don't vary the DC. Instead:
-  • Make consequences more severe for dangerous actions
-  • Make partial success complications harsher for difficult tasks
-  • Require advantage (roll 3d6 drop lowest) for desperate acts
+DIFFICULTY (3 tiers):
+  • **easy**: Roll 3d6, keep best 2 (advantage) - favorable circumstances, friendly NPCs, prepared actions
+  • **average**: Roll 2d6 normally - default for most actions
+  • **hard**: Roll 3d6, keep worst 2 (disadvantage) - unfavorable circumstances, hostile NPCs, desperate actions
 
 EXAMPLES:
-"Roll Charm to persuade the guard (Charm: 65 = +1)"
-  • 11: "The guard is convinced and lets you pass without question."
-  • 8: "The guard agrees, but demands you owe him a favor later."
-  • 5: "The guard refuses and calls for backup - you hear footsteps approaching!"`,
+"Roll Charm to persuade the friendly guard (easy)" → advantage
+"Roll Stealth to sneak past the guards (average)" → normal roll  
+"Roll Athletics to climb the slippery cliff in the rain (hard)" → disadvantage`,
     choiceSyntax:
-      "- ...Prose <use_skill: skill name or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\\nPbtA System - No DC needed! Results are: 10+ = success, 7-9 = partial success, 6- = failure:\\nExample:\\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth; use_resource: none; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>\\n- You try to charm the guard. <use_skill: Charisma; use_resource: none; use_item: Fancy Clothes; agmt_check: Is he in a good mood? (50/50); agmt_table: none; custom_table: none>",
+      "- ...Prose <use_skill: skill name or none; skill_dc: easy/average/hard; use_resource: resource name or none; use_item: item name or none>\\nPbtA System - Use DC tier for difficulty (easy/average/hard). Results are always: 10+ = success, 7-9 = partial success, 6- = failure:\\nExample:\\n- You carefully sneak past the guards. <use_skill: Stealth; skill_dc: average; use_resource: none; use_item: none>\\n- You try to charm the friendly innkeeper. <use_skill: Charisma; skill_dc: easy; use_resource: none; use_item: none>",
     dcGuidelines:
-      "⚠️ POWERED BY THE APOCALYPSE - NO DC NEEDED:\\n- DO NOT specify DC values for PbtA! The system has fixed thresholds: 10+ success, 7-9 partial, 6- failure.\\n- Just specify which skill to use - the roll is 2d6 + stat modifier.\\n- Focus on making partial success (7-9) interesting with complications, costs, or hard choices.\\n- Failures (6-) should advance the story with consequences, not just block progress.",
+      "POWERED BY THE APOCALYPSE - DC = ADVANTAGE/DISADVANTAGE (3 tiers):\\n- easy: Advantage (3d6 keep best 2) - favorable situation\\n- average: Normal roll (2d6) - standard situation\\n- hard: Disadvantage (3d6 keep worst 2) - unfavorable situation\\n\\nThresholds are FIXED: 10+ success, 7-9 partial, 6- failure.",
   },
 
   conditionPenalties: {
@@ -1405,7 +1402,8 @@ export function checkSuccess(
     const modifier = system.statToModifier(statValue);
     const effectiveModifier = modifier - penalty;
     const total = roll + effectiveModifier;
-    const successThreshold = system.dc.medium; // 10+ for PbtA
+    // Use fixed successThreshold (10 for PbtA) - dc field is for advantage/disadvantage
+    const successThreshold = system.success.successThreshold || 10;
     const partialThreshold = system.success.partialThreshold || 7;
 
     const success = total >= successThreshold;
