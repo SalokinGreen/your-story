@@ -1123,6 +1123,14 @@ function AdventureCreatorContent() {
       });
     }
 
+    if (data.nodeEffects?.passives) {
+      data.nodeEffects.passives.forEach((p: any) => {
+        if (p._command === "delete") {
+          deletions.push(`Passive: ${p.name}`);
+        }
+      });
+    }
+
     if (data.presets) {
       data.presets.forEach((p: any) => {
         if (p._command === "delete") {
@@ -1288,6 +1296,31 @@ function AdventureCreatorContent() {
       setAbilities(
         applyItemChanges(abilities, data.abilities as any, "ability", "name")
       );
+    }
+
+    // Apply passives from nodeEffects
+    // Tool executor returns the final state (not command-based), so we set it directly
+    if (data.nodeEffects?.passives !== undefined) {
+      // Check if this is a command-based array or a direct replacement
+      const hasCommands = data.nodeEffects.passives.some(
+        (p: any) => p._command
+      );
+      if (hasCommands) {
+        setPassives(
+          applyItemChanges(
+            passives,
+            data.nodeEffects.passives as any,
+            "passive",
+            "name"
+          )
+        );
+      } else {
+        // Direct replacement (from tool executor)
+        setPassives(data.nodeEffects.passives);
+        console.log(
+          `[AI] Set passives directly: ${data.nodeEffects.passives.length} items`
+        );
+      }
     }
 
     // Apply upgrade shop settings
@@ -13425,6 +13458,11 @@ ${description || ""}`;
           resources,
           inventory,
           abilities,
+          nodeEffects: {
+            statBonuses: [],
+            resourceBonuses: [],
+            passives: passives,
+          },
           lore,
           achievements,
           quests,

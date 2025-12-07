@@ -449,6 +449,13 @@ export function executeCreatorTool(
           name: string;
           description: string;
         }>;
+
+        // Validate input
+        if (!passives || !Array.isArray(passives)) {
+          changesList.push("Invalid input: 'passives' must be an array");
+          break;
+        }
+
         const existingNodeEffects = currentState.storyData.nodeEffects || {
           statBonuses: [],
           resourceBonuses: [],
@@ -456,6 +463,16 @@ export function executeCreatorTool(
         };
         const existingPassives = [...(existingNodeEffects.passives || [])];
         for (const passive of passives) {
+          // Validate each passive entry
+          if (
+            !passive ||
+            typeof passive.name !== "string" ||
+            !passive.name.trim()
+          ) {
+            changesList.push("Skipped invalid passive: missing name");
+            continue;
+          }
+
           const existing = existingPassives.find(
             (p) => p.name.toLowerCase() === passive.name.toLowerCase()
           );
@@ -466,7 +483,7 @@ export function executeCreatorTool(
           } else {
             existingPassives.push({
               name: passive.name,
-              description: passive.description,
+              description: passive.description || "",
               nodeId: "ai", // AI-added passives use "ai" as nodeId
             });
             changesList.push(`Added passive: ${passive.name}`);
@@ -485,6 +502,13 @@ export function executeCreatorTool(
           new_name?: string;
           description?: string;
         }>;
+
+        // Validate input
+        if (!modifications || !Array.isArray(modifications)) {
+          changesList.push("Invalid input: 'passives' must be an array");
+          break;
+        }
+
         const existingNodeEffects = currentState.storyData.nodeEffects || {
           statBonuses: [],
           resourceBonuses: [],
@@ -492,6 +516,12 @@ export function executeCreatorTool(
         };
         const existingPassives = [...(existingNodeEffects.passives || [])];
         for (const mod of modifications) {
+          // Validate each modification entry
+          if (!mod || typeof mod.name !== "string" || !mod.name.trim()) {
+            changesList.push("Skipped invalid modification: missing name");
+            continue;
+          }
+
           const idx = existingPassives.findIndex(
             (p) => p.name.toLowerCase() === mod.name.toLowerCase()
           );
@@ -514,6 +544,13 @@ export function executeCreatorTool(
 
       case "remove_passives": {
         const names = args.names as string[];
+
+        // Validate input
+        if (!names || !Array.isArray(names)) {
+          changesList.push("Invalid input: 'names' must be an array");
+          break;
+        }
+
         const existingNodeEffects = currentState.storyData.nodeEffects || {
           statBonuses: [],
           resourceBonuses: [],
@@ -521,7 +558,12 @@ export function executeCreatorTool(
         };
         const existingPassives = [...(existingNodeEffects.passives || [])];
         const remaining = existingPassives.filter(
-          (p) => !names.some((n) => n.toLowerCase() === p.name.toLowerCase())
+          (p) =>
+            !names.some(
+              (n) =>
+                typeof n === "string" &&
+                n.toLowerCase() === p.name.toLowerCase()
+            )
         );
         const removed = existingPassives.length - remaining.length;
         changesList.push(`Removed ${removed} passive(s)`);
@@ -1613,6 +1655,7 @@ export function executeCreatorTool(
         toolName: name,
         success: false,
         message: `Error executing ${name}: ${error}`,
+        args, // Include args even on error for debugging
       },
       changes: {},
     };

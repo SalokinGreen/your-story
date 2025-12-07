@@ -939,29 +939,18 @@ export default function StoryCreativeAssistant({
                 </p>
               </div>
             ) : (
-              messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-[90%] rounded-xl px-3 py-2 text-xs ${
-                      message.role === "user"
-                        ? "bg-purple-600 text-white"
-                        : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
-                    }`}
-                  >
-                    {message.role === "assistant" ? (
-                      <div className="prose prose-xs dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="whitespace-pre-wrap">{message.content}</p>
-                    )}
-                  </div>
-                </div>
+              messages.map((msg, idx) => (
+                <MessageItem
+                  key={idx}
+                  message={
+                    msg as ChatMessage & {
+                      meta?: Record<string, unknown>;
+                      toolResults?: CreatorToolResult[];
+                      toolChanges?: CreatorChanges;
+                    }
+                  }
+                  onApplyChanges={handleApplyChanges}
+                />
               ))
             )}
             {loading && (
@@ -1979,6 +1968,17 @@ function ToolResultsDisplay({
               {/* Expanded Details */}
               {isExpanded && (
                 <div className="px-3 pb-3 border-t border-gray-100 dark:border-gray-700/50 pt-2">
+                  {/* Error Message for Failures */}
+                  {!result.success && result.message && (
+                    <div className="mb-3 p-2 rounded-lg bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-700/50">
+                      <span className="text-[10px] uppercase tracking-wider text-red-600 dark:text-red-400 font-medium">
+                        Error
+                      </span>
+                      <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                        {result.message}
+                      </p>
+                    </div>
+                  )}
                   {/* Changes List */}
                   {result.changes && result.changes.length > 0 && (
                     <div className="mb-3">
@@ -2205,6 +2205,37 @@ function ToolArgsDisplay({
 
   // Passives display
   if (toolName.includes("passive")) {
+    // Handle remove_passives which uses 'names' array of strings
+    if (args.names && Array.isArray(args.names)) {
+      const names = args.names as string[];
+      return (
+        <div className="mt-2 space-y-2">
+          {names.slice(0, 5).map((name, idx) => (
+            <div
+              key={idx}
+              className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2">
+                <DynamicIcon
+                  name="Sparkles"
+                  className="w-3.5 h-3.5 text-violet-500"
+                />
+                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  {name}
+                </span>
+              </div>
+            </div>
+          ))}
+          {names.length > 5 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+              +{names.length - 5} more...
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // Handle add_passives/modify_passives which use 'passives' array of objects
     const items = (args.passives || args.modifications || [args]) as Record<
       string,
       unknown

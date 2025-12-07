@@ -167,6 +167,17 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     sections.push(abilitiesSection.join("\n"));
   }
 
+  // Passives (from nodeEffects)
+  if (data.nodeEffects?.passives && data.nodeEffects.passives.length > 0) {
+    const passivesSection = ["## Passives"];
+    data.nodeEffects.passives.forEach((passive) => {
+      passivesSection.push(`- **${passive.name}**`);
+      if (passive.description)
+        passivesSection.push(`  - ${passive.description}`);
+    });
+    sections.push(passivesSection.join("\n"));
+  }
+
   // Achievements
   if (data.achievements && data.achievements.length > 0) {
     const achievementsSection = ["## Achievements"];
@@ -674,6 +685,10 @@ You can control how items in arrays are applied using the **_command** field:
   - currentCooldown: Current cooldown remaining (usually 0 for new abilities)
   - stat: Optional stat name this ability is associated with (for skill checks)
   - symbol: Icon name as words (e.g., "fireball", "sword-clash", "healing")
+- nodeEffects.passives (Array of { name, description, nodeId })
+  - name: Passive name (e.g., "Wolf Slayer", "Noble Blood", "Dragon Eye")
+  - description: What the passive does narratively (influences story, NPC reactions, difficulty)
+  - nodeId: Source of the passive - "manual" (user-created), "ai" (AI-created), or a skill tree node ID
 - lore (Array of { title, content, secrtet, on, alwaysOn, on_triggers, off_triggers, trigger_lores, untrigger_lores, var_on_triggers, var_off_triggers })
   - title: Lore entry title
   - content: Full lore text

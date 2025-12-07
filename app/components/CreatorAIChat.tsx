@@ -780,7 +780,7 @@ export default function CreatorAIChat({
       <>
         {/* Pull tab on left edge - closes the drawer */}
         <button
-          className="fixed top-1/2 -translate-y-1/2 z-40 bg-purple-500/90 hover:bg-purple-600 text-white p-1.5 rounded-l-lg shadow-lg transition-all pointer-events-auto right-[320px] sm:right-[380px] md:right-[420px]"
+          className="fixed top-1/2 -translate-y-1/2 z-40 bg-purple-500/90 hover:bg-purple-600 text-white p-1.5 rounded-l-lg shadow-lg transition-all pointer-events-auto right-80 sm:right-[380px] md:right-[420px]"
           style={
             touchDelta > 0
               ? {
@@ -2341,6 +2341,77 @@ function ToolArgsDisplay({
     );
   }
 
+  // Passives display
+  if (toolName.includes("passive")) {
+    // Handle remove_passives which uses 'names' array of strings
+    if (args.names && Array.isArray(args.names)) {
+      const names = args.names as string[];
+      return (
+        <div className="mt-2 space-y-2">
+          {names.slice(0, 5).map((name, idx) => (
+            <div
+              key={idx}
+              className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-2">
+                <DynamicIcon
+                  name="Sparkles"
+                  className="w-3.5 h-3.5 text-violet-500"
+                />
+                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  {name}
+                </span>
+              </div>
+            </div>
+          ))}
+          {names.length > 5 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+              +{names.length - 5} more...
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // Handle add_passives/modify_passives which use 'passives' array of objects
+    const items = (args.passives || args.modifications || [args]) as Record<
+      string,
+      unknown
+    >[];
+    const arrayItems = Array.isArray(items) ? items : [items];
+
+    return (
+      <div className="mt-2 space-y-2">
+        {arrayItems.slice(0, 3).map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <DynamicIcon
+                name="Sparkles"
+                className="w-3.5 h-3.5 text-violet-500"
+              />
+              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                {String(item.name || "Unknown")}
+              </span>
+            </div>
+            {has(item.description) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                {String(item.description)}
+              </p>
+            )}
+          </div>
+        ))}
+        {arrayItems.length > 3 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            +{arrayItems.length - 3} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+
   if (toolName.includes("lore")) {
     const items = (args.lore_entries || args.lore || [args]) as Record<
       string,
@@ -2800,6 +2871,17 @@ function ToolResultsDisplay({
               {/* Expanded Details */}
               {isExpanded && (
                 <div className="px-3 pb-3 border-t border-gray-100 dark:border-gray-700/50 pt-2">
+                  {/* Error Message for Failures */}
+                  {!result.success && result.message && (
+                    <div className="mb-3 p-2 rounded-lg bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-700/50">
+                      <span className="text-[10px] uppercase tracking-wider text-red-600 dark:text-red-400 font-medium">
+                        Error
+                      </span>
+                      <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                        {result.message}
+                      </p>
+                    </div>
+                  )}
                   {/* Changes List */}
                   {result.changes && result.changes.length > 0 && (
                     <div className="mb-3">
