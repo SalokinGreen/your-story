@@ -37,6 +37,7 @@ import { DynamicIcon } from "../components/DynamicIcon";
 import { IconPicker } from "../components/IconPicker";
 import { CustomTablesEditor } from "../components/CustomTablesEditor";
 import { DraggableScroll } from "../components/DraggableScroll";
+import LoreImageGenerator from "../components/LoreImageGenerator";
 import {
   GRADE_CONFIG,
   getMaxDurability,
@@ -2789,48 +2790,6 @@ function LoreEditor({
     onUpdate(updated);
   };
 
-  const handleLoreThumbnailUpload = async (index: number, file: File) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      addNotification("Please select an image file", "warning");
-      return;
-    }
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        addNotification("Not authenticated", "failure");
-        return;
-      }
-
-      const compressed = await compressImage(file, 320, 180, 0.8);
-
-      const ext = file.name.split(".").pop();
-      const fileName = `${Date.now()}-lore-thumb.${ext}`;
-      const filePath = `${session.user.id}/lore-thumbnails/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("adventure-images")
-        .upload(filePath, compressed, { cacheControl: "3600", upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from("adventure-images")
-        .getPublicUrl(filePath);
-
-      const updated = [...localLore];
-      updated[index] = { ...updated[index], thumbnailUrl: data.publicUrl };
-      setLocalLore(updated);
-      onUpdate(updated);
-      addNotification("Thumbnail uploaded!", "success");
-    } catch (err: any) {
-      console.error("Lore thumbnail upload failed:", err);
-      addNotification(err.message || "Upload failed", "failure");
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -2870,74 +2829,17 @@ function LoreEditor({
                   placeholder="Lore content (supports Markdown)"
                   className="w-full h-32 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-semibold text-blue-200 mb-2">
-                      Thumbnail URL (optional)
-                    </label>
-                    <input
-                      type="url"
-                      value={editLore.thumbnailUrl || ""}
-                      onChange={(e) =>
-                        setEditLore({
-                          ...editLore,
-                          thumbnailUrl: e.target.value,
-                        })
-                      }
-                      placeholder="https://..."
-                      className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
-                    />
-                    <p className="mt-1 text-xs text-blue-300/50">
-                      Shown in lore list and detail if provided (ideal
-                      ~320x180px, max 5MB).
-                    </p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <input
-                        id={`upload-lore-thumb-edit-${index}`}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) handleLoreThumbnailUpload(index, f);
-                        }}
-                      />
-                      <label
-                        htmlFor={`upload-lore-thumb-edit-${index}`}
-                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer text-sm"
-                      >
-                        <DynamicIcon
-                          name="Upload"
-                          className="inline-block w-4 h-4 mr-1"
-                        />
-                        Upload Thumbnail
-                      </label>
-                      {editLore.thumbnailUrl && (
-                        <button
-                          onClick={() =>
-                            setEditLore({ ...editLore, thumbnailUrl: "" })
-                          }
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center">
-                    {editLore.thumbnailUrl ? (
-                      <img
-                        src={editLore.thumbnailUrl}
-                        alt={editLore.title || ""}
-                        className="w-24 h-24 object-cover rounded border border-blue-700/40"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 rounded border-2 border-dashed border-blue-700/40 flex items-center justify-center text-xs text-blue-300/50">
-                        No Preview
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <LoreImageGenerator
+                  loreTitle={editLore.title}
+                  loreContent={editLore.content}
+                  currentThumbnailUrl={editLore.thumbnailUrl}
+                  onImageGenerated={(url) =>
+                    setEditLore({
+                      ...editLore,
+                      thumbnailUrl: url,
+                    })
+                  }
+                />
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 text-sm text-blue-200">
                     <input

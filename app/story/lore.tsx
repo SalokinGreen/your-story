@@ -4,10 +4,17 @@ import { StoryData, StoryLore } from "../misc/structs";
 import ReactMarkdown from "react-markdown";
 import { useState } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
+import LoreImageGenerator from "../components/LoreImageGenerator";
 
-export default function LorePage(storyData: StoryData) {
+interface LorePageProps extends StoryData {
+  onUpdateLore?: (updatedLore: StoryLore[]) => void;
+}
+
+export default function LorePage(props: LorePageProps) {
+  const { onUpdateLore, ...storyData } = props;
   const [selectedLore, setSelectedLore] = useState<StoryLore | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showImageGen, setShowImageGen] = useState(false);
 
   // Filter lore based on search term AND visibility (only show entries that are ON)
   const filteredLore = storyData.lore.filter((loreItem) => {
@@ -84,10 +91,10 @@ export default function LorePage(storyData: StoryData) {
         </div>
       </div>
 
-      {/* Main Content - Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Main Content - Two Column Layout (wider detail on xl) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-4">
         {/* Lore List */}
-        <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
+        <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 xl:col-span-2">
           <h3 className="text-base font-semibold text-white mb-3">
             Discovered Lore
           </h3>
@@ -195,7 +202,7 @@ export default function LorePage(storyData: StoryData) {
         </div>
 
         {/* Lore Detail */}
-        <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
+        <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 xl:col-span-3">
           <h3 className="text-base font-semibold text-white mb-3">
             Lore Details
           </h3>
@@ -246,8 +253,50 @@ export default function LorePage(storyData: StoryData) {
                   <img
                     src={selectedLore.thumbnailUrl}
                     alt={selectedLore.title}
-                    className="w-full h-40 sm:h-48 object-cover"
+                    className="w-full h-48 sm:h-56 xl:h-72 object-cover"
                   />
+                </div>
+              )}
+
+              {/* AI Image Generator - collapsible, shown when onUpdateLore is available */}
+              {onUpdateLore && (
+                <div className="border-t border-blue-800/30 pt-3">
+                  <button
+                    onClick={() => setShowImageGen(!showImageGen)}
+                    className="flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 transition-colors"
+                  >
+                    <DynamicIcon
+                      name={showImageGen ? "ChevronDown" : "ChevronRight"}
+                      className="w-4 h-4"
+                    />
+                    <DynamicIcon name="Sparkles" className="w-4 h-4" />
+                    {selectedLore.thumbnailUrl
+                      ? "Regenerate Image"
+                      : "Generate Image with AI"}
+                  </button>
+                  {showImageGen && (
+                    <div className="mt-3">
+                      <LoreImageGenerator
+                        loreTitle={selectedLore.title}
+                        loreContent={selectedLore.content}
+                        currentThumbnailUrl={selectedLore.thumbnailUrl}
+                        onImageGenerated={(url) => {
+                          // Update the lore array with the new thumbnail
+                          const updatedLore = storyData.lore.map((l) =>
+                            l.title === selectedLore.title
+                              ? { ...l, thumbnailUrl: url }
+                              : l
+                          );
+                          onUpdateLore(updatedLore);
+                          // Also update selectedLore to reflect the change immediately
+                          setSelectedLore({
+                            ...selectedLore,
+                            thumbnailUrl: url,
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 

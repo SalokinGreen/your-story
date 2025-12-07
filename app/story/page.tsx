@@ -6347,7 +6347,14 @@ function StoryPageContent() {
           />
         )}
         {currentState === StoryState.STATS && <StatsPage {...storyData} />}
-        {currentState === StoryState.LORE && <LorePage {...storyData} />}
+        {currentState === StoryState.LORE && (
+          <LorePage
+            {...storyData}
+            onUpdateLore={(updatedLore) =>
+              updateStoryData({ lore: updatedLore })
+            }
+          />
+        )}
         {currentState === StoryState.QUESTS && <QuestsPage {...storyData} />}
         {currentState === StoryState.UPGRADES && (
           <UpgradesPage storyData={storyData} onUpgrade={handleUpgrade} />

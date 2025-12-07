@@ -55,6 +55,7 @@ import { IconPicker } from "@/app/components/IconPicker";
 import { CustomTablesEditor } from "@/app/components/CustomTablesEditor";
 import { DraggableScroll } from "@/app/components/DraggableScroll";
 import { ClockCategorySelector } from "@/app/components/ClockCategorySelector";
+import LoreImageGenerator from "@/app/components/LoreImageGenerator";
 import {
   GRADE_CONFIG,
   getMaxDurability,
@@ -755,6 +756,19 @@ function AdventureCreatorContent() {
   const [newPresetDescription, setNewPresetDescription] = useState("");
   const [newPresetIcon, setNewPresetIcon] = useState("Star");
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+
+  // Store custom values before switching to a preset so we can restore them
+  const [savedCustomValues, setSavedCustomValues] = useState<{
+    playerName: string;
+    playerSummary: string;
+    intro: string;
+    stats: Stat[];
+    resources: Resource[];
+    inventory: InventoryItem[];
+    relationships: Relationship[];
+    conditions: Condition[];
+    authorNotes: string;
+  } | null>(null);
 
   // Upgrade Settings
   const [levelingSettings, setLevelingSettings] = useState<LevelingSettings>(
@@ -4717,6 +4731,24 @@ ${description || ""}`;
                         // Skip if already selected - don't re-apply preset
                         if (isSelected) return;
 
+                        // Save current custom values before switching to a preset
+                        if (
+                          selectedPreset === "custom" &&
+                          preset.id !== "custom"
+                        ) {
+                          setSavedCustomValues({
+                            playerName,
+                            playerSummary,
+                            intro,
+                            stats: [...stats],
+                            resources: [...resources],
+                            inventory: [...inventory],
+                            relationships: [...relationships],
+                            conditions: [...conditions],
+                            authorNotes,
+                          });
+                        }
+
                         setSelectedPreset(preset.id);
 
                         // Apply preset immediately (only when switching to a new preset)
@@ -4738,10 +4770,27 @@ ${description || ""}`;
                             "success"
                           );
                         } else {
-                          addNotification(
-                            "Custom preset selected - build from scratch!",
-                            "success"
-                          );
+                          // Restore saved custom values when switching back to custom
+                          if (savedCustomValues) {
+                            setPlayerName(savedCustomValues.playerName);
+                            setPlayerSummary(savedCustomValues.playerSummary);
+                            setIntro(savedCustomValues.intro);
+                            setStats(savedCustomValues.stats);
+                            setResources(savedCustomValues.resources);
+                            setInventory(savedCustomValues.inventory);
+                            setRelationships(savedCustomValues.relationships);
+                            setConditions(savedCustomValues.conditions);
+                            setAuthorNotes(savedCustomValues.authorNotes);
+                            addNotification(
+                              "Custom settings restored!",
+                              "success"
+                            );
+                          } else {
+                            addNotification(
+                              "Custom preset selected - build from scratch!",
+                              "success"
+                            );
+                          }
                         }
                       }}
                       className="text-left w-full"
@@ -8111,101 +8160,17 @@ ${description || ""}`;
                     </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Thumbnail (optional)
-                  </label>
-                  <div className="flex items-start gap-3">
-                    {newLore.thumbnailUrl ? (
-                      <div className="relative">
-                        <img
-                          src={newLore.thumbnailUrl}
-                          alt="Lore thumbnail"
-                          className="w-24 h-24 object-cover rounded border"
-                        />
-                        <button
-                          onClick={() =>
-                            setNewLore({ ...newLore, thumbnailUrl: "" })
-                          }
-                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center"
-                          title="Remove thumbnail"
-                        >
-                          <DynamicIcon name="X" className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="w-24 h-24 rounded border-2 border-dashed border-blue-700/40 flex items-center justify-center text-xs text-blue-300/50">
-                        No Preview
-                      </div>
-                    )}
-                    <div>
-                      <input
-                        id="new-lore-thumb"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          if (!file.type.startsWith("image/")) {
-                            addNotification(
-                              "Please select an image file",
-                              "warning"
-                            );
-                            return;
-                          }
-                          if (file.size > 5 * 1024 * 1024) {
-                            addNotification(
-                              "Image must be smaller than 5MB",
-                              "warning"
-                            );
-                            return;
-                          }
-                          try {
-                            const {
-                              data: { session },
-                            } = await supabase.auth.getSession();
-                            if (!session) throw new Error("Not authenticated");
-                            const ext = file.name.split(".").pop();
-                            const fileName = `${
-                              user!.id
-                            }-${Date.now()}-lore-thumb.${ext}`;
-                            const filePath = `lore-thumbnails/${fileName}`;
-                            const { error: uploadError } =
-                              await supabase.storage
-                                .from("adventure-images")
-                                .upload(filePath, file, {
-                                  cacheControl: "3600",
-                                  upsert: false,
-                                });
-                            if (uploadError) throw uploadError;
-                            const { data } = supabase.storage
-                              .from("adventure-images")
-                              .getPublicUrl(filePath);
-                            setNewLore({
-                              ...newLore,
-                              thumbnailUrl: data.publicUrl,
-                            });
-                            addNotification("Thumbnail uploaded!", "success");
-                          } catch (err: any) {
-                            console.error("Upload failed:", err);
-                            addNotification(
-                              err.message || "Upload failed",
-                              "failure"
-                            );
-                          }
-                        }}
-                      />
-                      <label
-                        htmlFor="new-lore-thumb"
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer inline-flex items-center gap-2"
-                      >
-                        <DynamicIcon name="Camera" className="w-4 h-4" /> Upload
-                        Thumbnail
-                      </label>
-                    </div>
-                  </div>
-                </div>
+                <LoreImageGenerator
+                  loreTitle={newLore.title}
+                  loreContent={newLore.content}
+                  currentThumbnailUrl={newLore.thumbnailUrl}
+                  onImageGenerated={(url) =>
+                    setNewLore({
+                      ...newLore,
+                      thumbnailUrl: url,
+                    })
+                  }
+                />
                 <div>
                   <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
                     <DynamicIcon
@@ -9075,118 +9040,17 @@ ${description || ""}`;
                                   </div>
                                 </div>
                               </div>
-                              <div>
-                                <label className="block text-sm font-semibold text-blue-200 mb-1">
-                                  Thumbnail
-                                </label>
-                                <div className="flex items-start gap-3">
-                                  {editLore.thumbnailUrl ? (
-                                    <div className="relative">
-                                      <img
-                                        src={editLore.thumbnailUrl}
-                                        alt="Lore thumb"
-                                        className="w-24 h-24 object-cover rounded border"
-                                      />
-                                      <button
-                                        onClick={() =>
-                                          setEditLore({
-                                            ...editLore,
-                                            thumbnailUrl: "",
-                                          })
-                                        }
-                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center"
-                                        title="Remove thumbnail"
-                                      >
-                                        <DynamicIcon
-                                          name="X"
-                                          className="w-4 h-4"
-                                        />
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <div className="w-24 h-24 rounded border-2 border-dashed border-blue-700/40 flex items-center justify-center text-xs text-blue-300/50">
-                                      No Preview
-                                    </div>
-                                  )}
-                                  <div>
-                                    <input
-                                      id={`edit-mode-lore-thumb-${index}`}
-                                      type="file"
-                                      accept="image/*"
-                                      className="hidden"
-                                      onChange={async (e) => {
-                                        const file = e.target.files?.[0];
-                                        if (!file) return;
-                                        if (!file.type.startsWith("image/")) {
-                                          addNotification(
-                                            "Please select an image file",
-                                            "warning"
-                                          );
-                                          return;
-                                        }
-                                        if (file.size > 5 * 1024 * 1024) {
-                                          addNotification(
-                                            "Image must be smaller than 5MB",
-                                            "warning"
-                                          );
-                                          return;
-                                        }
-                                        try {
-                                          const {
-                                            data: { session },
-                                          } = await supabase.auth.getSession();
-                                          if (!session)
-                                            throw new Error(
-                                              "Not authenticated"
-                                            );
-                                          const ext = file.name
-                                            .split(".")
-                                            .pop();
-                                          const fileName = `${
-                                            user!.id
-                                          }-${Date.now()}-lore-thumb.${ext}`;
-                                          const filePath = `lore-thumbnails/${fileName}`;
-                                          const { error: uploadError } =
-                                            await supabase.storage
-                                              .from("adventure-images")
-                                              .upload(filePath, file, {
-                                                cacheControl: "3600",
-                                                upsert: false,
-                                              });
-                                          if (uploadError) throw uploadError;
-                                          const { data } = supabase.storage
-                                            .from("adventure-images")
-                                            .getPublicUrl(filePath);
-                                          setEditLore({
-                                            ...editLore,
-                                            thumbnailUrl: data.publicUrl,
-                                          });
-                                          addNotification(
-                                            "Thumbnail uploaded!",
-                                            "success"
-                                          );
-                                        } catch (err: any) {
-                                          console.error("Upload failed:", err);
-                                          addNotification(
-                                            err.message || "Upload failed",
-                                            "failure"
-                                          );
-                                        }
-                                      }}
-                                    />
-                                    <label
-                                      htmlFor={`edit-mode-lore-thumb-${index}`}
-                                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer inline-block text-sm"
-                                    >
-                                      <DynamicIcon
-                                        name="Upload"
-                                        className="inline-block w-4 h-4 mr-1"
-                                      />
-                                      Upload Thumbnail
-                                    </label>
-                                  </div>
-                                </div>
-                              </div>
+                              <LoreImageGenerator
+                                loreTitle={editLore.title}
+                                loreContent={editLore.content}
+                                currentThumbnailUrl={editLore.thumbnailUrl}
+                                onImageGenerated={(url) =>
+                                  setEditLore({
+                                    ...editLore,
+                                    thumbnailUrl: url,
+                                  })
+                                }
+                              />
 
                               <div>
                                 <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center gap-1">
@@ -13060,6 +12924,24 @@ ${description || ""}`;
                         key={preset.id}
                         onClick={() => {
                           if (preset.id !== selectedPreset) {
+                            // Save current custom values before switching to a preset
+                            if (
+                              selectedPreset === "custom" &&
+                              preset.id !== "custom"
+                            ) {
+                              setSavedCustomValues({
+                                playerName,
+                                playerSummary,
+                                intro,
+                                stats: [...stats],
+                                resources: [...resources],
+                                inventory: [...inventory],
+                                relationships: [...relationships],
+                                conditions: [...conditions],
+                                authorNotes,
+                              });
+                            }
+
                             setSelectedPreset(preset.id);
                             if (preset.id !== "custom") {
                               applyPreset(
@@ -13078,6 +12960,27 @@ ${description || ""}`;
                                 `Switched to ${preset.name}`,
                                 "success"
                               );
+                            } else {
+                              // Restore saved custom values when switching back to custom
+                              if (savedCustomValues) {
+                                setPlayerName(savedCustomValues.playerName);
+                                setPlayerSummary(
+                                  savedCustomValues.playerSummary
+                                );
+                                setIntro(savedCustomValues.intro);
+                                setStats(savedCustomValues.stats);
+                                setResources(savedCustomValues.resources);
+                                setInventory(savedCustomValues.inventory);
+                                setRelationships(
+                                  savedCustomValues.relationships
+                                );
+                                setConditions(savedCustomValues.conditions);
+                                setAuthorNotes(savedCustomValues.authorNotes);
+                                addNotification(
+                                  "Custom settings restored!",
+                                  "success"
+                                );
+                              }
                             }
                           }
                           setShowPresetSwitcher(false);
