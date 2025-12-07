@@ -254,6 +254,12 @@ export interface Choice {
     dice: string; // Dice notation (e.g., "1d4", "2d6")
     description: string; // What the roll determines
   }[];
+  // Scene Challenge handling (from action analysis)
+  challenge_handling?: {
+    is_complex_event: boolean;
+    challenge_name: string | null;
+    contributes_to_challenge: boolean;
+  };
   // Legacy fields for backward compatibility (deprecated - use 'table' instead)
   agmt_table?: string;
   custom_table?: string;
@@ -832,6 +838,7 @@ export interface ActionAnalysis {
   challenge_handling?: {
     is_complex_event: boolean; // True if this implies a multi-step task
     challenge_name: string | null; // Name for new challenge (e.g., "Escape the burning inn")
+    contributes_to_challenge: boolean; // True if this action's skill check should count toward an active challenge
   };
   // Context rolls - dice rolled to determine situational details
   rolls?: {

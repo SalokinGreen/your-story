@@ -5,7 +5,7 @@ import { StoryData, getMemoryContents } from "../misc/structs";
 import {
   buildStoryPrompt,
   buildToolPrompt,
-  buildChoicesPrompt,
+  buildActionAnalysisPrompt,
   ChatMessage,
   buildInfoMessage,
   EmbeddingContext,
@@ -19,7 +19,7 @@ interface ContextViewerProps {
 
 export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [activeStage, setActiveStage] = useState<"story" | "tools" | "choices">(
+  const [activeStage, setActiveStage] = useState<"story" | "tools" | "actions">(
     "story"
   );
   const [contextString, setContextString] = useState("");
@@ -201,14 +201,12 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         });
         contextMessages = toolPrompt.messages;
         break;
-      case "choices":
-        const choicesPrompt = buildChoicesPrompt({
+      case "actions":
+        const actionsPrompt = buildActionAnalysisPrompt({
           storyData,
-          storyContent: "(Story content from previous stage would go here)",
-          embeddingContext: simulatedEmbeddingContext,
-          usePrefill: prefillSetting !== "false",
+          userAction: "(Player's freeform action text would go here)",
         });
-        contextMessages = choicesPrompt.messages;
+        contextMessages = actionsPrompt.messages;
         break;
     }
 
@@ -388,15 +386,15 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             Tools
           </button>
           <button
-            onClick={() => setActiveStage("choices")}
+            onClick={() => setActiveStage("actions")}
             className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-              activeStage === "choices"
-                ? "bg-white dark:bg-blue-950 text-blue-600 dark:text-blue-400 shadow"
+              activeStage === "actions"
+                ? "bg-white dark:bg-blue-950 text-cyan-600 dark:text-cyan-400 shadow"
                 : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
-            <DynamicIcon name="ListChecks" className="w-3 h-3 inline mr-1" />
-            Choices
+            <DynamicIcon name="Zap" className="w-3 h-3 inline mr-1" />
+            Actions
           </button>
         </div>
 
@@ -430,11 +428,11 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                   stats, memory, etc.).
                 </>
               )}
-              {activeStage === "choices" && (
+              {activeStage === "actions" && (
                 <>
-                  <strong>Choices Stage:</strong> Last 8 scene parts + new story
-                  content. AI generates player choices with skill checks and
-                  mechanics.
+                  <strong>Actions Stage:</strong> Recent story context sent to
+                  analyze player's freeform action. AI determines skill checks,
+                  items, resources, and challenge handling.
                 </>
               )}
             </div>
@@ -644,7 +642,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             <div className="text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
               <DynamicIcon name="Info" className="w-3 h-3 inline mr-1" />
               This shows the exact context sent to the AI for each generation
-              stage. Story stage includes all history; Tools/Choices stages are
+              stage. Story stage includes all history; Tools/Actions stages are
               truncated.
             </div>
 

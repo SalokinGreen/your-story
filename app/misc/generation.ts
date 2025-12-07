@@ -1551,6 +1551,7 @@ export function analysisToChoice(
     agmt_check: analysis.agmt_check || undefined,
     table: analysis.table || undefined,
     rolls: analysis.rolls || undefined,
+    challenge_handling: analysis.challenge_handling || undefined,
   };
 }
 

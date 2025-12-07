@@ -1529,7 +1529,8 @@ JSON STRUCTURE:
   "is_plain_action": Boolean (true = dialogue/looking/flavor, false = mechanic needed),
   "challenge_handling": {
     "is_complex_event": Boolean (true = multi-step task like combat with group, chase, heist),
-    "challenge_name": "Descriptive name" OR null (e.g., "Battle with the Bandits", "Escape the Collapsing Mine")
+    "challenge_name": "Descriptive name" OR null (e.g., "Battle with the Bandits", "Escape the Collapsing Mine"),
+    "contributes_to_challenge": Boolean (true = if there's an ACTIVE challenge, this action's skill check counts toward it)
   },
   "rolls": [ { "dice": "1d4", "description": "How many guards are present" } ] OR null (contextual dice rolls for the scene)
 }
@@ -1542,10 +1543,28 @@ DC TIER GUIDELINES:
 - "very_hard": Extreme difficulty, only skilled succeed
 - "impossible": Near-impossible, requires exceptional luck
 
-COMPLEX EVENTS VS SIMPLE ACTIONS:
-- If the player attempts something HUGE that cannot resolve in one roll (e.g., "Fight the whole bandit camp", "Climb the infinite tower", "Convince the King to abdicate"), do NOT resolve it in one roll.
-- Set \`challenge_handling.is_complex_event: true\` and provide a \`challenge_name\`.
-- If a Challenge is ALREADY ACTIVE (see game state), this action is just a "step" in that challenge - set \`is_complex_event: false\`.
+SCENE CHALLENGES (PROGRESS CLOCKS) - CRITICAL:
+⚠️ ALWAYS create a Challenge when the player engages in:
+1. **ANY COMBAT** - Fighting enemies, attacking creatures, battle with opponents (unless 1 weak enemy)
+2. **Chase/Escape** - Fleeing pursuers, racing against time
+3. **Heists/Infiltration** - Sneaking past multiple guards, breaking into secure areas
+4. **Complex Negotiations** - Convincing hostile parties, multi-stage persuasion
+5. **Survival Situations** - Navigating dangerous terrain, enduring harsh conditions
+6. **Multi-step Tasks** - Disarming complex traps, ritual magic, crafting under pressure
+
+CHALLENGE THRESHOLDS:
+- 1 enemy/obstacle = Single roll OK, but consider challenge if enemy is tough
+- 2+ enemies OR significant threat = ALWAYS a Challenge ("Battle with Zombies", "Fight in the Alley")
+- Named/Boss enemies = ALWAYS a Challenge
+- Player uses combat language ("fight", "attack", "battle") = Very likely a Challenge
+
+Set \`challenge_handling.is_complex_event: true\` and provide a descriptive \`challenge_name\`.
+
+CONTRIBUTING TO ACTIVE CHALLENGES:
+- If a Challenge is ALREADY ACTIVE (see game state below), this action is a "step" in that challenge
+- Set \`is_complex_event: false\` (don't start new challenge)
+- Set \`contributes_to_challenge: true\` → the skill check result will count as +1 success or +1 failure toward the challenge
+- Examples: Swinging sword at zombies during "Battle with Zombies" → contributes. Running away → does NOT contribute (would use cancel_challenge).
 
 STAT BONUS RULES:
 - Use \`stat_bonus\` when situational factors modify the character's effective skill level (NOT difficulty).
@@ -1562,49 +1581,86 @@ CONTEXT ROLLS:
 
 DECISION PRIORITY:
 1. Is this just dialogue or looking around? -> \`is_plain_action: true\`
-2. Is the player trying to overcome an obstacle or opponent? -> Set \`skill_used\` + \`skill_dc\`.
-3. Does the situation grant bonuses/penalties? -> Set \`stat_bonus\`.
-4. Does the scene need random context? -> Add to \`rolls\` array.
-5. Is it an AGMT (Oracle) question? (e.g., "Is the door locked?") -> Set \`agmt_check\`.
-6. Is it a random discovery? (e.g., "Loot the body") -> Set \`table\`.
-7. Is it a BIG multi-step task? -> Set \`challenge_handling.is_complex_event: true\`.
+2. Is this COMBAT or a DANGEROUS situation? -> **FIRST check if Challenge needed** (see rules above)
+3. Is the player trying to overcome an obstacle or opponent? -> Set \`skill_used\` + \`skill_dc\`.
+4. Does the situation grant bonuses/penalties? -> Set \`stat_bonus\`.
+5. Does the scene need random context? -> Add to \`rolls\` array.
+6. Is it an AGMT (Oracle) question? (e.g., "Is the door locked?") -> Set \`agmt_check\`.
+7. Is it a random discovery? (e.g., "Loot the body") -> Set \`table\`.
 
 AVAILABLE DATA:
-STATS (for skill_used - pick one for skill checks): ${
-    storyData.stats.map((s) => s.name).join(", ") || "None"
-  }
-RESOURCES (for resource_used - expendable pools): ${
-    storyData.resources
-      .map((r) => `${r.name} (${r.value}/${r.maxValue})`)
-      .join(", ") || "None"
-  }
-ITEMS (for item_used): ${
-    storyData.inventory.map((i) => i.name).join(", ") || "None"
-  }
-ABILITIES (for ability_used): ${
-    storyData.abilities?.length
-      ? storyData.abilities
-          .map((a) => {
-            const readyStatus =
-              (a.currentCooldown || 0) > 0
-                ? `(on cooldown ${a.currentCooldown}/${a.cooldown})`
-                : "(ready)";
-            const costInfo = a.cost?.length
-              ? ` [costs: ${a.cost
-                  .map((c) => `${c.amount} ${c.name}`)
-                  .join(", ")}]`
-              : "";
-            return `${a.name} ${readyStatus}${costInfo}`;
-          })
-          .join(", ")
-      : "None"
-  }
-PASSIVE TRAITS (influence DC): ${(() => {
-    const passivesList = getActivePassives(storyData);
-    return passivesList.length > 0
-      ? passivesList.map((p) => `${p.name} (${p.description})`).join(", ")
-      : "None";
-  })()}
+STATS (for skill_used - pick one for skill checks):
+${
+  storyData.stats.length > 0
+    ? storyData.stats
+        .map(
+          (s) =>
+            `  • ${s.name} (${s.value}): ${s.description || "No description"}`
+        )
+        .join("\n")
+    : "  None"
+}
+
+RESOURCES (for resource_used - expendable pools):
+${
+  storyData.resources.length > 0
+    ? storyData.resources
+        .map(
+          (r) =>
+            `  • ${r.name} (${r.value}/${r.maxValue}): ${
+              r.description || "No description"
+            }`
+        )
+        .join("\n")
+    : "  None"
+}
+
+ITEMS (for item_used):
+${
+  storyData.inventory.length > 0
+    ? storyData.inventory
+        .map((i) => {
+          const typeInfo = i.type ? ` [${i.type}]` : "";
+          const gradeInfo =
+            i.grade && i.grade !== "common" ? ` (${i.grade})` : "";
+          return `  • ${i.name}${gradeInfo}${typeInfo}: ${
+            i.description || "No description"
+          }`;
+        })
+        .join("\n")
+    : "  None"
+}
+
+ABILITIES (for ability_used):
+${
+  storyData.abilities?.length
+    ? storyData.abilities
+        .map((a) => {
+          const readyStatus =
+            (a.currentCooldown || 0) > 0
+              ? ` [on cooldown ${a.currentCooldown}/${a.cooldown}]`
+              : " [ready]";
+          const costInfo = a.cost?.length
+            ? ` (costs: ${a.cost
+                .map((c) => `${c.amount} ${c.name}`)
+                .join(", ")})`
+            : "";
+          return `  • ${a.name}${readyStatus}${costInfo}: ${
+            a.description || "No description"
+          }`;
+        })
+        .join("\n")
+    : "  None"
+}
+
+PASSIVE TRAITS (influence DC):
+${(() => {
+  const passivesList = getActivePassives(storyData);
+  return passivesList.length > 0
+    ? passivesList.map((p) => `  • ${p.name}: ${p.description}`).join("\n")
+    : "  None";
+})()}
+
 ACTIVE CHALLENGE: ${
     storyData.activeChallenge?.active
       ? `"${storyData.activeChallenge.name}" (Best of ${storyData.activeChallenge.rounds}: ${storyData.activeChallenge.currentSuccesses}-${storyData.activeChallenge.currentFailures})`

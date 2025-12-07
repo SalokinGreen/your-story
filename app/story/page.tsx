@@ -4391,6 +4391,59 @@ function StoryPageContent() {
       skillCheckLine += `${insufficientText}]`;
       choiceDetails.push(skillCheckLine);
 
+      // Auto-contribute to active challenge if action analysis flagged it
+      if (
+        storyData.activeChallenge?.active &&
+        choice.challenge_handling?.contributes_to_challenge &&
+        skillCheckResult
+      ) {
+        const challenge = storyData.activeChallenge;
+        const isSuccess =
+          skillCheckResult === "success" ||
+          skillCheckResult === "style" ||
+          skillCheckResult === "partial"; // Partial success still counts as progress
+
+        if (isSuccess) {
+          challenge.currentSuccesses++;
+        } else {
+          challenge.currentFailures++;
+        }
+
+        // Check if challenge is resolved
+        const majority = Math.ceil(challenge.rounds / 2);
+        let challengeResolved = false;
+
+        if (challenge.currentSuccesses >= majority) {
+          challenge.active = false;
+          challenge.result = "won";
+          challenge.pointsAwarded = challenge.pointsAwarded || 25;
+          storyData.points = (storyData.points || 0) + challenge.pointsAwarded;
+          challengeResolved = true;
+          addNotification(
+            `🏆 Challenge WON: ${challenge.name}! (+${challenge.pointsAwarded} XP)`,
+            "success"
+          );
+        } else if (challenge.currentFailures >= majority) {
+          challenge.active = false;
+          challenge.result = "lost";
+          challengeResolved = true;
+          addNotification(`💀 Challenge LOST: ${challenge.name}`, "failure");
+        }
+
+        // Add challenge progress to choice details
+        const scoreStr = `[${challenge.name}: ${challenge.currentSuccesses}-${
+          challenge.currentFailures
+        }${challengeResolved ? ` (${challenge.result})` : ""}]`;
+        choiceDetails.push(scoreStr);
+
+        logger.action("Challenge contribution from skill check", {
+          challenge: challenge.name,
+          result: isSuccess ? "success" : "failure",
+          score: `${challenge.currentSuccesses}-${challenge.currentFailures}`,
+          resolved: challengeResolved,
+        });
+      }
+
       // YZE: Add panic details if triggered
       if (
         rpgSystem.id === "yze" &&
