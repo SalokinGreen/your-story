@@ -191,7 +191,6 @@ async function callAI(
   }
 
   // For DeepSeek/DeepInfra/Mistral with tools: strip the prefill since these providers don't handle prefill well with function calling
-  // Mistral with tool_choice: "any" specifically rejects prefill
   let processedMessages = messages;
   if (
     (provider === "deepseek" ||
@@ -247,17 +246,7 @@ async function callAI(
 
   if (tools && tools.length > 0) {
     requestBody.tools = tools;
-    // Mistral with "auto" often describes tool calls instead of calling them
-    // Use "required" to force tool calling for Mistral (but only for tool stages)
-    // Other providers work fine with "auto"
-    requestBody.tool_choice = provider === "mistral" ? "required" : "auto";
-
-    // Debug: Log tools being sent
-    console.log(
-      `[API] Sending ${tools.length} tools to ${provider}:`,
-      tools.map((t) => t.function?.name || t.name).join(", ")
-    );
-    console.log(`[API] tool_choice: ${requestBody.tool_choice}`);
+    requestBody.tool_choice = "auto";
   }
 
   const response = await fetch(endpoint, {

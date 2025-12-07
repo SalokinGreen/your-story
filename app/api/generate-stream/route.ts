@@ -430,7 +430,6 @@ export async function POST(req: NextRequest) {
         }
 
         // For DeepSeek/DeepInfra/Mistral with tools: strip the prefill since these providers don't handle prefill well with function calling
-        // Mistral with tool_choice: "any" specifically rejects prefill
         let processedMessages = messages;
         if (
           (modelConfig.provider === "deepseek" ||
@@ -553,11 +552,7 @@ export async function POST(req: NextRequest) {
 
         if (tools && tools.length > 0) {
           requestBody.tools = tools;
-          // Mistral with "auto" often describes tool calls instead of calling them
-          // Use "required" to force tool calling for Mistral (but only for tool stages)
-          // Other providers work fine with "auto"
-          requestBody.tool_choice =
-            modelConfig.provider === "mistral" ? "required" : "auto";
+          requestBody.tool_choice = "auto";
         }
 
         // Add stop sequences if provided (supported by all providers)

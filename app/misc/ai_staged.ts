@@ -645,7 +645,7 @@ The Input will provide the "Action Result" (Success/Failure). You describe the o
 - **Failure (Fail Forward):** NEVER write "Nothing happens."
     - *Yes, but...* You succeed, but at a cost (injury, lost item, noise).
     - *No, and...* You fail, and the situation gets worse (guard alerted, weapon dropped).
-- **Hidden Text:** Use ||double pipes|| for DM notes, foreshadowing, or secret NPC motives.
+- **Hidden Text:** Use ||double pipes|| for DM notes, foreshadowing, or secret NPC motives. The user can't see this text.
 
 ## 5. PACING & TONE
 - **Combat/Action:** Fast, punchy, visceral. Focus on impact and movement.
@@ -836,6 +836,15 @@ Player messages may contain bracketed annotations like [Ability: Fireball], [Man
 **These indicate actions the GAME SYSTEM already processed** (dice rolled, resources deducted, items consumed).
 DO NOT duplicate these changes. Only process NEW events from the STORY TEXT.
 
+## CRITICAL: Existing Game Data
+The info message contains the CURRENT game state - these are entries that ALREADY EXIST:
+- **"## Lore"** = Lore entries that exist. Use \`update_lore\` to add info, NOT \`create_lore\`
+- **"### Threads"** = Quests/storylines that exist. Use \`update_thread\` to progress, NOT \`create_thread\`
+- **"## Relationships"** = NPCs that exist. Use \`update_relationship\`, NOT \`add_relationship\`
+- **"## Memory"** = Facts already saved. Don't duplicate them.
+
+Only use CREATE tools for GENUINELY NEW content not shown in the info message.
+
 ## ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 1. **Inventory Audit:** Did the narrative imply an item was consumed (e.g., "quaffed the potion"), broken, given away, or picked up? -> \`add_item\` / \`remove_item\`
 2. **Resource Delta:** Did the player do anything to lose or gain resources? -> \`update_resource\` (Eat/Bandage/Absorb Mana).
@@ -882,15 +891,19 @@ If the story is just exploration/atmosphere with no promises, secrets, or deadli
 ## LORE MANAGEMENT
 Lore entries are the adventure's world-building database. Your job is to keep it alive and evolving.
 
+⚠️ **CRITICAL: The "Lore" section in the info message shows EXISTING lore entries. Do NOT recreate them!**
+- If you see "## Lore" with entries like "The Old Church\\n..." - that lore ALREADY EXISTS
+- To add information to existing lore, use \`update_lore\` with the EXACT title
+- Only use \`create_lore\` for COMPLETELY NEW topics not already in the Lore section
+
 **When to CREATE NEW LORE (\`create_lore\`):**
-- The narrative introduces a NEW named NPC
-- A new faction, organization, or group is mentioned for the first time
-- A significant location is discovered that the player might revisit
-- Important world lore is revealed (magic systems, history, prophecies, religions)
-- A secret or mystery is uncovered that should be tracked
+- The narrative introduces a NEW named NPC **not already in the Lore section**
+- A new faction, organization, or group is mentioned **for the first time**
+- A significant location is discovered **that doesn't already have a lore entry**
+- Important world lore is revealed that has NO existing entry
 
 **When to UPDATE LORE (\`update_lore\`):**
-- New information is revealed about an existing entry (NPC's secret motives discovered, location's history learned)
+- New information is revealed about an entry **that already exists in the Lore section**
 - An NPC's relationship with the player changes significantly
 - Circumstances change (faction alliance shifts, location is destroyed)
 
@@ -940,12 +953,16 @@ Resources are NOT automatically recovered. You MUST specify which resources to r
 ## THREAD MANAGEMENT
 Track ongoing storylines, mysteries, quests, and plot hooks using threads.
 
+⚠️ **CRITICAL: The "Threads" section in the info message shows EXISTING threads. Do NOT recreate them!**
+- If you see "### Threads" with entries like "[Active] Find the lost artifact" - that thread ALREADY EXISTS
+- To update progress on an existing thread, use \`update_thread\` with the thread's ID
+- Only use \`create_thread\` for COMPLETELY NEW storylines not already tracked
+
 **When to CREATE a Thread (\`create_thread\`):**
-- A new main quest or objective emerges from the narrative
-- An unresolved mystery or question is introduced (Who killed the merchant? What's behind the sealed door?)
-- A significant NPC makes a request or gives a task
+- A new main quest or objective emerges **that isn't already in the Threads section**
+- An unresolved mystery or question is introduced **for the first time**
+- A significant NPC makes a request or gives a task **not already tracked**
 - A looming threat is revealed that will need to be addressed
-- The player expresses intent to pursue a long-term goal
 
 **Thread Priorities:**
 - **main:** Central story quests that drive the narrative forward
@@ -953,7 +970,7 @@ Track ongoing storylines, mysteries, quests, and plot hooks using threads.
 - **background:** Ambient world events, rumors, or distant threats
 
 **When to UPDATE a Thread (\`update_thread\`):**
-- New information is discovered that changes the thread's scope or direction
+- New information is discovered that changes an **existing** thread's scope or direction
 - Progress is made but the thread isn't resolved yet
 - The situation escalates or de-escalates
 
