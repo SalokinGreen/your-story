@@ -759,10 +759,16 @@ export async function generateStoryTurn(
             toolAbortController.abort();
           }, 55000); // 55 second timeout
 
+          // Debug: Log tools being sent from frontend
+          console.log(
+            `[Tool Stage] Sending ${TOOL_SCHEMAS.length} tools:`,
+            TOOL_SCHEMAS.map((t) => t.function?.name).join(", ")
+          );
+
           let toolResponse: Response;
           try {
-            // Add cache-busting timestamp to prevent edge caching issues
-            const toolUrl = `/api/generate-stream?t=${Date.now()}&stage=tools`;
+            // Use non-streaming endpoint for tools to get full response and debug
+            const toolUrl = `/api/generate?t=${Date.now()}&stage=tools`;
             toolResponse = await fetch(toolUrl, {
               method: "POST",
               headers: {
@@ -799,35 +805,29 @@ export async function generateStoryTurn(
             continue; // Try next model
           }
 
-          let hitRateLimit = false;
           let toolStageContent = ""; // Capture any text content from tool stage
 
           try {
-            for await (const event of parseSSEStream(toolResponse)) {
-              if (event.type === "error") {
-                const errorMsg = event.error || "Tool generation failed";
-                // Check if it's a rate limit error
-                if (
-                  errorMsg.includes("429") ||
-                  errorMsg.toLowerCase().includes("rate")
-                ) {
-                  hitRateLimit = true;
-                  lastError = new Error(errorMsg);
-                  break;
-                }
-                throw new Error(errorMsg);
-              }
-              if (event.type === "content" && event.content) {
-                toolStageContent += event.content;
-              }
-              if (event.type === "tool_calls" && event.toolCalls) {
-                newToolCalls = event.toolCalls;
-              }
-              if (event.type === "done" && event.meta) {
-                toolsMeta = event.meta;
-                totalTokenCost += event.meta.tokenCost;
-                finalBalance = event.meta.balance;
-              }
+            // Parse the JSON response directly (non-streaming)
+            const toolResult = await toolResponse.json();
+
+            // Log the RAW response for debugging
+            console.log(
+              "[Tool Stage] RAW API Response:",
+              JSON.stringify(toolResult, null, 2)
+            );
+
+            // Extract content and tool calls from response
+            if (toolResult.content) {
+              toolStageContent = toolResult.content;
+            }
+            if (toolResult.toolCalls && toolResult.toolCalls.length > 0) {
+              newToolCalls = toolResult.toolCalls;
+            }
+            if (toolResult.meta) {
+              toolsMeta = toolResult.meta;
+              totalTokenCost += toolResult.meta.tokenCost || 0;
+              finalBalance = toolResult.meta.balance;
             }
 
             // Log tool stage content for debugging
@@ -837,20 +837,9 @@ export async function generateStoryTurn(
                 toolStageContent
               );
             }
-          } catch (streamError: any) {
-            if (
-              streamError.message.includes("429") ||
-              streamError.message.toLowerCase().includes("rate")
-            ) {
-              hitRateLimit = true;
-              lastError = streamError;
-              continue; // Try next model
-            }
-            throw streamError; // Re-throw non-rate-limit errors
-          }
-
-          if (hitRateLimit) {
-            continue; // Try next model
+          } catch (parseError: any) {
+            console.error("[Tool Stage] Failed to parse response:", parseError);
+            throw parseError;
           }
 
           success = true;

@@ -318,6 +318,20 @@ export function executeTools(
         continue;
       }
 
+      // Special handling for skip_tools (no-op when no changes needed)
+      if (toolCall.function.name === "skip_tools") {
+        const reason = args.reason || "No changes needed";
+        logger.action(`Tool stage skipped: ${reason}`, { toolCallId: toolId });
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: `Skipped: ${reason}`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
       // Special handling for add_memory (direct array manipulation)
       if (toolCall.function.name === "add_memory") {
         logger.action("Special handling: add_memory", {

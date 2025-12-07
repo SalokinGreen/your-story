@@ -1290,17 +1290,38 @@ const addMemoryTool: ToolSchema = {
   function: {
     name: "add_memory",
     description:
-      "Add a new detailed memory entry to help the AI remember important story events. Be SPECIFIC with names, locations, consequences, and emotional context.",
+      "RARELY USED. Add memory ONLY for: debts/promises ('Owes blacksmith 50g'), codes ('Password: MOONRISE'), deadlines ('Must reach temple by dawn'). NEVER for descriptions, atmosphere, or story summaries. Most turns need ZERO memories. Use skip_tools instead.",
     parameters: {
       type: "object",
       properties: {
         entry: {
           type: "string",
           description:
-            "Detailed memory entry (e.g., 'Met Aldric, suspicious merchant in Darkwater who tried to sell cursed artifacts and fled when confronted')",
+            "Factual note only. GOOD: 'Mayor's daughter kidnapped by bandits'. BAD: 'The crow watches from the statue' (this is story text, not memory).",
         },
       },
       required: ["entry"],
+    },
+  },
+};
+
+// No-op Tool - for when no game state changes are needed
+const skipToolsTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "skip_tools",
+    description:
+      "Call this when NO game state changes are needed this turn. Use when the story segment is purely dialogue, travel narration, or atmospheric description with no mechanical consequences.",
+    parameters: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description:
+            "Brief reason why no changes needed (e.g., 'Purely atmospheric description' or 'Dialogue only, no state changes')",
+        },
+      },
+      required: ["reason"],
     },
   },
 };
@@ -2002,6 +2023,9 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
 
   // Rest System (1 tool)
   takeRestTool,
+
+  // No-op Tool (1 tool) - for when no changes are needed
+  skipToolsTool,
 
   // Advanced RPG Tools (9 tools)
   ...MYTHIC_TOOLS,

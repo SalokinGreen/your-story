@@ -39,11 +39,10 @@ export const TOOLS_AFFIRMATION = `Understood. I will audit the narrative for gam
 - **Accuracy:** I will use EXACT string matching for items, stats, and quest names.
 - **Challenges:** I will update active challenges based on the Action Result.
 - **Consequences:** I will apply \`add_condition\` or \`update_resource\` if the story implies injury or exertion.
-- **Syntax:** I will call the necessary tools step-by-step.
 
-Based on the narrative, here are the game state changes that should happen:
+⚠️ CRITICAL: I MUST call ALL necessary tools in THIS SINGLE RESPONSE. I will NOT stop after one tool - I will call 2, 3, 4, or more tools together if multiple changes are needed.
 
-1. **Inventory Audit:**`;
+Based on the narrative, here are the game state changes I will execute NOW (calling all tools in parallel):`;
 
 export const CHOICES_AFFIRMATION = `Understood. I will generate player choices following these rules:
 - **Format:** Plain list with dashes, one choice per line.
@@ -842,12 +841,13 @@ DO NOT duplicate these changes. Only process NEW events from the STORY TEXT.
     - Did the player FAIL a check resulting in injury? -> \`add_condition\` (Tier I-VI).
     - Did the player receive medical aid or rest? -> \`downgrade_condition\`.
     - *Note:* Do not add conditions for "flavor" pain. Only for tactical disadvantages described in the story.
-4. **Memory Management:** Use \`add_memory\` SPARINGLY for truly important information:
-    - **YES:** Promises made, debts owed, secrets learned, NPC names + key traits, plot-critical clues, passwords/codes, time-sensitive deadlines
-    - **NO:** Routine actions (explored a room, ate food), feelings/emotions, atmospheric descriptions, things already in Lore entries
-    - Memory is for ACTIONABLE information the player might need to recall later
-    - Keep memories SHORT (1-2 sentences max) - they're reference notes, not journal entries
-    - Do NOT add memories for every minor detail or every turn - focus on what will impact future choices
+4. **Memory Management:** ⚠️ MOST TURNS NEED ZERO MEMORIES. Only add memory for:
+    - Promises/debts: "Owes blacksmith 50 gold"
+    - Codes/passwords: "Vault password: MOONRISE"
+    - NPC facts: "Mayor's daughter is kidnapped"
+    - Deadlines: "Must reach temple by dawn"
+    - **DO NOT ADD** atmospheric details, descriptions, feelings, or story summaries
+5. **No Changes Needed:** If no game state changes are required, call \`skip_tools\` instead of making unnecessary tool calls.
 6. **NPC Management:** Did a new NPC appear or an existing NPC change significantly? -> \`add_npc\` and  \`add_relationship\` / \`modify_npc\`.
 7. **Relationship Delta:** Did an NPC react positively or negatively? -> \`update_relationship\` (Small increments: +1/-1 for chat, +5/-5 for major deeds).
 8. **Passive Traits:** Did the player gain or lose a defining trait through story events? -> \`add_passive\` / \`remove_passive\` / \`modify_passive\`.
@@ -860,9 +860,22 @@ DO NOT duplicate these changes. Only process NEW events from the STORY TEXT.
 12. **Rest System:** Did the player rest (quick/short/long)? -> \`take_rest\`.
 13. **Thread Management:** Did a new plotline/quest emerge or an existing one progress/conclude? -> \`create_thread\` / \`update_thread\` / \`resolve_thread\` / \`abandon_thread\`.
 
+## ⛔ MEMORY ANTI-PATTERNS (NEVER DO THESE)
+BAD: "A crow perches on the angel statue, watching with beady eyes" ← This is story text, not actionable
+BAD: "The graveyard is eerie and misty" ← Atmospheric, not useful
+BAD: "Samuel's grave has a wisp near it" ← Description, use lore instead
+BAD: "The statue is damaged with broken wings" ← Use lore for location details
+
+GOOD: "Samuel Veyne died 1847, grave in northeast corner" ← Specific fact player might need
+GOOD: "Wisps appear near graves of murdered children" ← Actionable pattern
+GOOD: "Crow seems to be following me since helicopter" ← Plot-relevant observation
+
+If the story is just exploration/atmosphere with no promises, secrets, or deadlines → call \`skip_tools\`
+
 ## TOOL USAGE GUIDELINES
 - **Exact Matching:** You must use exact string matching for Item/Stat/Quest names.
 - **Fail Forward:** If the narrative described a failure, ensure the *cost* of that failure is applied (lost resource, condition, etc.).
+- **Parallel Execution:** Call MULTIPLE tools in a SINGLE response when several independent changes are needed. Don't wait for confirmation between calls - batch them together (e.g., if the story shows the player getting an item AND taking damage, call both \`add_item\` and \`update_resource\` in the same response).
 
 ## LORE MANAGEMENT
 Lore entries are the adventure's world-building database. Your job is to keep it alive and evolving.

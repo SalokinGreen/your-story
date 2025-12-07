@@ -429,11 +429,13 @@ export async function POST(req: NextRequest) {
           headers["X-Title"] = "Your Story";
         }
 
-        // For DeepSeek/DeepInfra with tools: strip the prefill since these providers don't handle prefill well with function calling
+        // For DeepSeek/DeepInfra/Mistral with tools: strip the prefill since these providers don't handle prefill well with function calling
+        // Mistral with tool_choice: "any" specifically rejects prefill
         let processedMessages = messages;
         if (
           (modelConfig.provider === "deepseek" ||
-            modelConfig.provider === "deepinfra") &&
+            modelConfig.provider === "deepinfra" ||
+            modelConfig.provider === "mistral") &&
           hasTools &&
           hasPrefill
         ) {
@@ -468,13 +470,12 @@ export async function POST(req: NextRequest) {
               }));
             }
             if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
-            // For Mistral: if the last message is assistant (prefill), add prefix: true
-            // For DeepSeek: only add prefix: true for non-tool calls (story generation)
-            // DeepSeek's beta API doesn't support prefix + function calling together
+            // For Mistral/DeepSeek: only add prefix: true for non-tool calls (story generation)
+            // Mistral's tool_choice: "any" and DeepSeek's beta API don't support prefix + function calling together
             if (
               index === processedMessages.length - 1 &&
               m.role === "assistant" &&
-              (modelConfig.provider === "mistral" ||
+              ((modelConfig.provider === "mistral" && !hasTools) ||
                 (modelConfig.provider === "deepseek" && !hasTools))
             ) {
               msg.prefix = true;
@@ -552,7 +553,11 @@ export async function POST(req: NextRequest) {
 
         if (tools && tools.length > 0) {
           requestBody.tools = tools;
-          requestBody.tool_choice = "auto";
+          // Mistral with "auto" often describes tool calls instead of calling them
+          // Use "required" to force tool calling for Mistral (but only for tool stages)
+          // Other providers work fine with "auto"
+          requestBody.tool_choice =
+            modelConfig.provider === "mistral" ? "required" : "auto";
         }
 
         // Add stop sequences if provided (supported by all providers)
@@ -652,8 +657,19 @@ export async function POST(req: NextRequest) {
               }
 
               if (delta?.tool_calls) {
+                console.log(
+                  "[API] Raw delta.tool_calls chunk:",
+                  JSON.stringify(delta.tool_calls)
+                );
                 for (const tc of delta.tool_calls) {
                   const index = tc.index ?? 0;
+                  console.log(
+                    `[API] Processing tool call chunk - index: ${index}, id: ${
+                      tc.id
+                    }, name: ${
+                      tc.function?.name
+                    }, args chunk: ${tc.function?.arguments?.substring(0, 100)}`
+                  );
                   if (!toolCalls[index]) {
                     toolCalls[index] = {
                       id: tc.id || "",
@@ -668,6 +684,16 @@ export async function POST(req: NextRequest) {
                     toolCalls[index].function.arguments +=
                       tc.function.arguments;
                 }
+                console.log(
+                  "[API] Current toolCalls state:",
+                  JSON.stringify(
+                    toolCalls.map((tc) => ({
+                      id: tc?.id,
+                      name: tc?.function?.name,
+                      argsLen: tc?.function?.arguments?.length,
+                    }))
+                  )
+                );
               }
 
               // Capture usage from final chunk
@@ -696,6 +722,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Parse tool call arguments
+        console.log(
+          "[API] Final toolCalls before parsing:",
+          JSON.stringify(toolCalls)
+        );
         const parsedToolCalls = toolCalls
           .filter((tc) => tc && tc.function?.name)
           .map((tc) => {
@@ -714,6 +744,12 @@ export async function POST(req: NextRequest) {
               return tc;
             }
           });
+        console.log(
+          "[API] Parsed tool calls count:",
+          parsedToolCalls.length,
+          "names:",
+          parsedToolCalls.map((tc) => tc.function?.name)
+        );
 
         // Send tool calls if any
         if (parsedToolCalls.length > 0) {
