@@ -451,12 +451,18 @@ export async function generateStoryTurn(
     const useNovelAI = options.novelaiEnabled && options.novelaiKey;
     const storyModelName = useNovelAI ? "NovelAI GLM-4-6" : options.storyModel;
 
+    // Calculate actual max output for NovelAI or standard models
+    const storyMaxOutput = useNovelAI
+      ? options.customMaxOutput || 2000
+      : options.customMaxOutput || 4000;
+
     const storyPrompt = buildStoryPrompt({
       storyData,
       userChoice,
       commandResponses,
       modelName: storyModelName,
       customMaxContext: options.customMaxContext,
+      customMaxOutput: storyMaxOutput,
       embeddingContext,
       usePrefill: options.usePrefill !== false, // Default to true
     });
@@ -731,7 +737,7 @@ export async function generateStoryTurn(
           existingToolCalls: allToolCalls,
           existingToolResponses: allToolResponses,
           embeddingContext,
-          usePrefill: options.usePrefill !== false, // Default to true
+          usePrefill: options.usePrefill !== false, // Re-enabled with better prefill
         });
 
         // Try primary model first, then fallback on rate limit
@@ -768,7 +774,7 @@ export async function generateStoryTurn(
                 messages: toolPrompt.messages,
                 tools: TOOL_SCHEMAS,
                 model: currentModel,
-                maxTokens: Math.min(options.customMaxOutput || 6000, 6000), // Cap tools at 6K
+                maxTokens: 12000, // Fixed 12K for tool stage - needs room for thinking + tool calls
                 temperature: 0.3,
                 openRouterKey: options.openRouterKey,
                 deepseekKey: options.deepseekKey,
@@ -794,6 +800,7 @@ export async function generateStoryTurn(
           }
 
           let hitRateLimit = false;
+          let toolStageContent = ""; // Capture any text content from tool stage
 
           try {
             for await (const event of parseSSEStream(toolResponse)) {
@@ -810,6 +817,9 @@ export async function generateStoryTurn(
                 }
                 throw new Error(errorMsg);
               }
+              if (event.type === "content" && event.content) {
+                toolStageContent += event.content;
+              }
               if (event.type === "tool_calls" && event.toolCalls) {
                 newToolCalls = event.toolCalls;
               }
@@ -818,6 +828,14 @@ export async function generateStoryTurn(
                 totalTokenCost += event.meta.tokenCost;
                 finalBalance = event.meta.balance;
               }
+            }
+
+            // Log tool stage content for debugging
+            if (toolStageContent) {
+              console.log(
+                `[Tool Stage] AI generated text content (${toolStageContent.length} chars):\n`,
+                toolStageContent
+              );
             }
           } catch (streamError: any) {
             if (
@@ -850,6 +868,15 @@ export async function generateStoryTurn(
           });
           break;
         }
+
+        // Log the tool calls for debugging
+        console.log(
+          `[Tool Stage] AI called ${newToolCalls.length} tools:`,
+          newToolCalls.map((tc: any) => ({
+            name: tc.function?.name,
+            args: tc.function?.arguments,
+          }))
+        );
 
         // Execute tools LOCALLY on storyData
         logger.action("Executing tools locally", {

@@ -151,9 +151,32 @@ export default function AIConfigTab() {
     }
     return false;
   });
-  // Temporary input values for custom fields
-  const [customContextInput, setCustomContextInput] = useState("");
-  const [customOutputInput, setCustomOutputInput] = useState("");
+  // Temporary input values for custom fields - initialize from stored values if in custom mode
+  const [customContextInput, setCustomContextInput] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("customMaxContext");
+      const storedVal = stored ? parseInt(stored, 10) : 0;
+      // If stored value is not a preset, show it in custom input
+      if (
+        stored &&
+        ![8000, 16000, 36000, 72000, 120000, 200000].includes(storedVal)
+      ) {
+        return stored;
+      }
+    }
+    return "";
+  });
+  const [customOutputInput, setCustomOutputInput] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("customMaxOutput");
+      const storedVal = stored ? parseInt(stored, 10) : 0;
+      // If stored value is not a preset, show it in custom input
+      if (stored && ![1000, 2000, 4000, 8000].includes(storedVal)) {
+        return stored;
+      }
+    }
+    return "";
+  });
 
   // NovelAI settings
   const [novelaiEnabled, setNovelaiEnabled] = useState(() => {
@@ -294,6 +317,49 @@ export default function AIConfigTab() {
       localStorage.setItem("byokMode", byokMode.toString());
     }
   }, [byokMode]);
+
+  // Auto-save context settings to cloud when they change (after initial load)
+  useEffect(() => {
+    if (typeof window !== "undefined" && hasLoadedSettings && user) {
+      localStorage.setItem("customMaxContext", customMaxContext.toString());
+      // Debounced cloud sync - only save if user is logged in
+      const timeoutId = setTimeout(() => {
+        const aiConfig: AIConfig = {
+          currentPreset,
+          storyModel: storyModel || undefined,
+          toolsModel: toolsModel || undefined,
+          choicesModel: choicesModel || undefined,
+          customMaxContext:
+            customMaxContext !== 36000 ? customMaxContext : undefined,
+          customMaxOutput:
+            customMaxOutput !== 4000 ? customMaxOutput : undefined,
+        };
+        updateUserSettings(user.id, { ai_config: aiConfig }, supabase);
+      }, 1000); // Debounce 1 second
+      return () => clearTimeout(timeoutId);
+    }
+  }, [customMaxContext, hasLoadedSettings, user]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && hasLoadedSettings && user) {
+      localStorage.setItem("customMaxOutput", customMaxOutput.toString());
+      // Debounced cloud sync - only save if user is logged in
+      const timeoutId = setTimeout(() => {
+        const aiConfig: AIConfig = {
+          currentPreset,
+          storyModel: storyModel || undefined,
+          toolsModel: toolsModel || undefined,
+          choicesModel: choicesModel || undefined,
+          customMaxContext:
+            customMaxContext !== 36000 ? customMaxContext : undefined,
+          customMaxOutput:
+            customMaxOutput !== 4000 ? customMaxOutput : undefined,
+        };
+        updateUserSettings(user.id, { ai_config: aiConfig }, supabase);
+      }, 1000); // Debounce 1 second
+      return () => clearTimeout(timeoutId);
+    }
+  }, [customMaxOutput, hasLoadedSettings, user]);
 
   // Check if user has any AI keys configured
   const hasAnyAIKey = hasKey("openRouterKey") || hasKey("deepseekKey");

@@ -5043,6 +5043,7 @@ export default function MenuPage({
   const [savingAs, setSavingAs] = useState(false);
   const [showSaveCopyModal, setShowSaveCopyModal] = useState(false);
   const [saveCopyName, setSaveCopyName] = useState("");
+  const [jumpToNewSave, setJumpToNewSave] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -5199,8 +5200,10 @@ export default function MenuPage({
       const { story } = await response.json();
       addNotification(`Saved as "${copyName}"`, "success");
 
-      // Navigate to the new story
-      router.push(`/story?storyId=${story.id}`);
+      // Navigate to the new story if toggle is enabled
+      if (jumpToNewSave) {
+        router.push(`/story?storyId=${story.id}`);
+      }
     } catch (error) {
       console.error("Error saving as:", error);
       addNotification("Failed to create save", "failure");
@@ -6608,6 +6611,23 @@ export default function MenuPage({
                   }
                 }}
               />
+
+              {/* Jump to new save toggle */}
+              <label className="flex items-center gap-3 mt-4 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={jumpToNewSave}
+                    onChange={(e) => setJumpToNewSave(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-6 bg-[#1a2744] border border-blue-700/40 rounded-full peer-checked:bg-emerald-600/80 transition-colors"></div>
+                  <div className="absolute left-1 top-1 w-4 h-4 bg-blue-300/60 rounded-full peer-checked:translate-x-4 peer-checked:bg-white transition-all"></div>
+                </div>
+                <span className="text-sm text-blue-200 group-hover:text-white transition-colors">
+                  Jump to new save after creating
+                </span>
+              </label>
             </div>
             <div className="p-4 border-t border-blue-800/30 flex justify-end gap-3">
               <button

@@ -2705,6 +2705,7 @@ function StoryPageContent() {
           novelaiTemperature,
           openRouterKey,
           deepseekKey,
+          googleKey,
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
@@ -3710,13 +3711,15 @@ function StoryPageContent() {
 
           switch (penalty.type) {
             case "modifier":
-              conditionPenaltyModifier = penalty.value;
+              // penalty.value is negative (e.g., -4), but checkSuccess expects positive penalty to subtract
+              // So we negate it to store as positive (e.g., 4)
+              conditionPenaltyModifier = -penalty.value;
               disadvantageCount++;
               disadvantageSources.push(
                 `${highestTierCondition.name} (Tier ${tierLabel})`
               );
               addNotification(
-                `Condition penalty: ${highestTierCondition.name} (Tier ${tierLabel}) ? ${penalty.value} to roll`,
+                `Condition penalty: ${highestTierCondition.name} (Tier ${tierLabel}) → ${penalty.value} to roll`,
                 "warning"
               );
               break;
@@ -4708,6 +4711,12 @@ function StoryPageContent() {
       return;
     }
 
+    console.log(
+      "[page.tsx] About to call generateStoryTurn. actionChoice:",
+      !!actionChoice,
+      actionChoice?.text?.slice(0, 50)
+    );
+
     try {
       // Run generation and dice animation in parallel
       await Promise.all([
@@ -5056,6 +5065,7 @@ function StoryPageContent() {
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
+          skipChoices: true, // On retry, we already have choices from the previous generation
           novelaiEnabled: novelaiEnabled && !!novelaiKey,
           novelaiKey,
           novelaiTemperature,

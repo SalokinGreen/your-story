@@ -37,9 +37,13 @@ Here is the narrative:
 
 export const TOOLS_AFFIRMATION = `Understood. I will audit the narrative for game state changes:
 - **Accuracy:** I will use EXACT string matching for items, stats, and quest names.
-- **Challenges:** I will detect new conflicts to \`start_challenge\` and update existing ones based on the Action Result.
+- **Challenges:** I will update active challenges based on the Action Result.
 - **Consequences:** I will apply \`add_condition\` or \`update_resource\` if the story implies injury or exertion.
-- **Syntax:** I will call the necessary tools step-by-step.`;
+- **Syntax:** I will call the necessary tools step-by-step.
+
+Based on the narrative, here are the game state changes that should happen:
+
+1. **Inventory Audit:**`;
 
 export const CHOICES_AFFIRMATION = `Understood. I will generate player choices following these rules:
 - **Format:** Plain list with dashes, one choice per line.
@@ -574,6 +578,7 @@ export function buildStoryPrompt({
   commandResponses,
   modelName = "Deepseek Chat",
   customMaxContext,
+  customMaxOutput,
   embeddingContext,
   usePrefill = true,
 }: {
@@ -582,6 +587,7 @@ export function buildStoryPrompt({
   commandResponses?: CommandResponse[];
   modelName?: string;
   customMaxContext?: number;
+  customMaxOutput?: number;
   embeddingContext?: EmbeddingContext;
   usePrefill?: boolean;
 }): { messages: ChatMessage[]; prunedParts: number } {
@@ -600,7 +606,9 @@ export function buildStoryPrompt({
     effectiveMaxTokens = customMaxContext;
   }
 
-  const maxContextTokens = effectiveMaxTokens - modelConfig.maxOutputTokens;
+  // Use custom max output if provided, otherwise use model's default
+  const actualMaxOutput = customMaxOutput || modelConfig.maxOutputTokens;
+  const maxContextTokens = effectiveMaxTokens - actualMaxOutput;
 
   // Allocate 75% for story history, 25% for info (system prompt + info message)
   const storyBudget = Math.floor(maxContextTokens * 0.75);
@@ -613,7 +621,7 @@ The Input will provide the "Action Result" (Success/Failure). You describe the o
 ## 1. CORE WRITING PRINCIPLES
 - **Show, Don't Tell:** Ground abstract concepts in concrete sensory details (lighting, texture, smell, sound).
     - *Bad:* "You feel afraid."
-    - *Good:* "The hair on your arms stands up; the air tastes of ozone and copper."
+    - *Good:* "The hair on your arms stands up; the air tastes of milk and copper."
 - **Deep POV:** Write in strict SECOND PERSON ("You"). Immersive and immediate.
 - **Word Choice:** Use precise verbs. Avoid generic words.
     - *Banned Words:* Testament, tapestry, dance of death, shivers down spine, smirked.
@@ -644,6 +652,8 @@ The Input will provide the "Action Result" (Success/Failure). You describe the o
 - **Dialogue:** Give NPCs distinct voices/mannerisms. Use subtext.
 
 ## 6. SCENE CHALLENGES (Best of X)
+**IMPORTANT:** Challenges are PLAYER-MANAGED. You do NOT start challenges - the player will start them when ready.
+
 When an [ACTIVE CHALLENGE] is shown in the game state:
 - **Early Game (0-1 on each side):** Describe the initial clash or the magnitude of the obstacle. Do NOT conclude the scene - the battle/chase/negotiation is just beginning.
 - **Tense (close score, e.g., 2-2):** The outcome hangs in the balance. Build maximum tension - either side could win.
@@ -832,18 +842,23 @@ DO NOT duplicate these changes. Only process NEW events from the STORY TEXT.
     - Did the player FAIL a check resulting in injury? -> \`add_condition\` (Tier I-VI).
     - Did the player receive medical aid or rest? -> \`downgrade_condition\`.
     - *Note:* Do not add conditions for "flavor" pain. Only for tactical disadvantages described in the story.
-4. **Knowledge & Quests:** Did the player learn a name, a secret, or a location? -> \`add_memory\` / \`update_quest\`.
-5. **NPC Management:** Did a new NPC appear or an existing NPC change significantly? -> \`add_npc\` and  \`add_relationship\` / \`modify_npc\`.
-6. **Relationship Delta:** Did an NPC react positively or negatively? -> \`update_relationship\` (Small increments: +1/-1 for chat, +5/-5 for major deeds).
-7. **Passive Traits:** Did the player gain or lose a defining trait through story events? -> \`add_passive\` / \`remove_passive\` / \`modify_passive\`.
+4. **Memory Management:** Use \`add_memory\` SPARINGLY for truly important information:
+    - **YES:** Promises made, debts owed, secrets learned, NPC names + key traits, plot-critical clues, passwords/codes, time-sensitive deadlines
+    - **NO:** Routine actions (explored a room, ate food), feelings/emotions, atmospheric descriptions, things already in Lore entries
+    - Memory is for ACTIONABLE information the player might need to recall later
+    - Keep memories SHORT (1-2 sentences max) - they're reference notes, not journal entries
+    - Do NOT add memories for every minor detail or every turn - focus on what will impact future choices
+6. **NPC Management:** Did a new NPC appear or an existing NPC change significantly? -> \`add_npc\` and  \`add_relationship\` / \`modify_npc\`.
+7. **Relationship Delta:** Did an NPC react positively or negatively? -> \`update_relationship\` (Small increments: +1/-1 for chat, +5/-5 for major deeds).
+8. **Passive Traits:** Did the player gain or lose a defining trait through story events? -> \`add_passive\` / \`remove_passive\` / \`modify_passive\`.
     - Passives are story/RP traits that influence narrative (NOT mechanical bonuses)
     - Examples: "Wolf Slayer" (gained after defeating many wolves), "Cursed Blood" (gained through dark ritual), "Friend of the Forest" (earned trust of woodland creatures)
     - Only add passives for SIGNIFICANT character developments, not minor events
-8. **Variables:** Did the story introduce or change a variable (e.g., "The ancient mechanism is now active")? -> \`set_variable\`.
-9. **Advanced RPG Tools (AGMT only):** If using AGMT, did the chaos factor change or scene transitions occur? -> \`update_agmt_state\`.
-10. **Lore Management:** Did the story reveal new lore or update existing lore? -> \`create_lore\` / \`update_lore\`.
-11. **Rest System:** Did the player rest (quick/short/long)? -> \`take_rest\`.
-12. **Thread Management:** Did a new plotline/quest emerge or an existing one progress/conclude? -> \`create_thread\` / \`update_thread\` / \`resolve_thread\` / \`abandon_thread\`.
+9. **Variables:** Did the story introduce or change a variable (e.g., "The ancient mechanism is now active")? -> \`set_variable\`.
+10. **Advanced RPG Tools (AGMT only):** If using AGMT, did the chaos factor change or scene transitions occur? -> \`update_agmt_state\`.
+11. **Lore Management:** Did the story reveal new lore or update existing lore? -> \`create_lore\` / \`update_lore\`.
+12. **Rest System:** Did the player rest (quick/short/long)? -> \`take_rest\`.
+13. **Thread Management:** Did a new plotline/quest emerge or an existing one progress/conclude? -> \`create_thread\` / \`update_thread\` / \`resolve_thread\` / \`abandon_thread\`.
 
 ## TOOL USAGE GUIDELINES
 - **Exact Matching:** You must use exact string matching for Item/Stat/Quest names.
@@ -870,25 +885,17 @@ Lore entries are the adventure's world-building database. Your job is to keep it
 - Think of lore as a "GM reference sheet" that will help future story generation
 
 ## SCENE CHALLENGES (Progress Clocks)
-Manage complex multi-step tasks using the Challenge Tools.
+**IMPORTANT:** Challenges are PLAYER-MANAGED. Do NOT call \`start_challenge\` - the player starts challenges when ready.
 
-1. **Detecting New Challenges:**
-   - If the narrative describes the START of a significant conflict (combat with multiple foes, a heist, a chase, a complex negotiation) AND no challenge is active -> Call \`start_challenge\`.
-   - Guidelines:
-     - Simple action (single enemy, locked door, quick conversation): Do NOT start a challenge - use regular skill checks.
-     - Dangerous combat / chase / multi-step task: 3 successes / 3 failures.
-     - Boss fight / war / major heist: 5+ successes needed.
+**Updating Active Challenges (when a challenge IS active):**
+- If a Challenge is ACTIVE and this turn involved a skill check:
+  - Player succeeded at their action? -> \`update_challenge\` with \`successIncrement: 1\`
+  - Player failed at their action? -> \`update_challenge\` with \`failureIncrement: 1\`
+- Do NOT update if no skill check was made this turn.
 
-2. **Updating Active Challenges:**
-   - If a Challenge is ACTIVE and this turn involved a skill check:
-     - Player succeeded at their action? -> \`update_challenge\` with \`successIncrement: 1\`
-     - Player failed at their action? -> \`update_challenge\` with \`failureIncrement: 1\`
-   - Do NOT update if no skill check was made this turn.
-
-3. **Auto-Resolution (Best of X):**
-   - Challenges automatically resolve when either side reaches majority:
-     - First to \`Math.ceil(rounds / 2)\` wins. For Best of 5, first to 3.
-   - Use \`resolve_challenge\` only for non-standard endings (enemy surrenders, rescue arrives, player retreats).
+**Auto-Resolution:**
+- Challenges automatically resolve when either side reaches their target.
+- Use \`resolve_challenge\` only for non-standard endings (enemy surrenders, rescue arrives, player retreats).
 
 ## REST SYSTEM
 Allow players to rest and recover when narratively appropriate.
@@ -1032,6 +1039,25 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
       `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.`
     ),
   });
+
+  // Debug: Log tool context details
+  const totalTokens = messages.reduce(
+    (sum, m) => sum + estimateTokens(m.content),
+    0
+  );
+  console.log(`[buildToolPrompt] Context breakdown:`);
+  console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
+  console.log(`  - Info message: ${estimateTokens(infoMessage)} tokens`);
+  console.log(`  - Scene parts included: ${recentParts.length}`);
+  console.log(
+    `  - Scene parts tokens: ${recentParts.reduce(
+      (sum, p) => sum + estimateTokens(p.raw || p.content),
+      0
+    )} tokens`
+  );
+  console.log(`  - Story content: ${estimateTokens(storyContent)} tokens`);
+  console.log(`  - Total messages: ${messages.length}`);
+  console.log(`  - Total estimated tokens: ${totalTokens}`);
 
   // Add role affirmation (prefill) if enabled and no existing tool calls
   // For multi-round tool calling, we skip the affirmation after the first round
@@ -1609,6 +1635,19 @@ Analyze this action and return the JSON object.`;
     { role: "system", content: cleanString(systemPrompt) },
     { role: "user", content: cleanString(userMessage) },
   ];
+
+  // Debug: Log action analysis context
+  console.log(`[buildActionAnalysisPrompt] Context breakdown:`);
+  console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
+  console.log(`  - Scene parts included: ${recentParts.length}`);
+  console.log(`  - Recent context: ${estimateTokens(recentContext)} tokens`);
+  console.log(`  - User action: ${estimateTokens(userAction)} tokens`);
+  console.log(
+    `  - Total estimated tokens: ${messages.reduce(
+      (sum, m) => sum + estimateTokens(m.content),
+      0
+    )}`
+  );
 
   return { messages };
 }
