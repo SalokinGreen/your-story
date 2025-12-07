@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { DynamicIcon } from "./DynamicIcon";
 import { useAuth } from "@/app/misc/AuthContext";
@@ -13,6 +13,71 @@ import {
   type DeepInfraImageModelKey,
   type ImageModelKey,
 } from "@/app/misc/ai_prices";
+
+// LocalStorage keys for persisting settings
+const STORAGE_KEY_PROVIDER = "loreImageGen_provider";
+const STORAGE_KEY_MODEL = "loreImageGen_model";
+
+// Helper to get saved settings
+export function getSavedImageGenSettings(): {
+  provider: "deepinfra" | "openrouter";
+  model: string;
+} {
+  if (typeof window === "undefined") {
+    return { provider: "deepinfra", model: "Bria 3.2" };
+  }
+  const provider =
+    (localStorage.getItem(STORAGE_KEY_PROVIDER) as
+      | "deepinfra"
+      | "openrouter") || "deepinfra";
+  const model =
+    localStorage.getItem(STORAGE_KEY_MODEL) ||
+    (provider === "deepinfra" ? "Bria 3.2" : "Nano Banana");
+  return { provider, model };
+}
+
+// Helper to save settings
+export function saveImageGenSettings(
+  provider: "deepinfra" | "openrouter",
+  model: string
+) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY_PROVIDER, provider);
+  localStorage.setItem(STORAGE_KEY_MODEL, model);
+}
+
+// Helper to get model cost for display
+export function getImageModelCost(
+  provider: "deepinfra" | "openrouter",
+  model: string
+): { cost: number; isByok: boolean; display: string } {
+  if (provider === "deepinfra") {
+    const config =
+      DEEPINFRA_IMAGE_MODELS[model as keyof typeof DEEPINFRA_IMAGE_MODELS];
+    if (config) {
+      return {
+        cost: config.cost,
+        isByok: false,
+        display: config.cost === 0 ? "FREE" : `${config.cost} coins`,
+      };
+    }
+  } else {
+    const config =
+      OPENROUTER_IMAGE_MODELS[model as keyof typeof OPENROUTER_IMAGE_MODELS];
+    if (config) {
+      const isFlat = config.inputPrice === 0 && config.outputPrice === 0;
+      const displayCost = isFlat
+        ? model.includes("Flux 2 Pro")
+          ? "~$0.030"
+          : model.includes("Flux 2 Flex")
+          ? "~$0.015"
+          : "varies"
+        : `~$${(config.inputPrice || 0).toFixed(3)}`;
+      return { cost: 0, isByok: true, display: displayCost };
+    }
+  }
+  return { cost: 0, isByok: false, display: "unknown" };
+}
 
 interface LoreImageGeneratorProps {
   loreTitle?: string;
@@ -40,6 +105,26 @@ export default function LoreImageGenerator({
     "deepinfra" | "openrouter"
   >("deepinfra");
   const [imageModel, setImageModel] = useState<string>("Bria 3.2");
+
+  // Load saved settings on mount
+  useEffect(() => {
+    const saved = getSavedImageGenSettings();
+    setImageProvider(saved.provider);
+    setImageModel(saved.model);
+  }, []);
+
+  // Save settings when they change
+  const handleProviderChange = (newProvider: "deepinfra" | "openrouter") => {
+    const newModel = newProvider === "deepinfra" ? "Bria 3.2" : "Nano Banana";
+    setImageProvider(newProvider);
+    setImageModel(newModel);
+    saveImageGenSettings(newProvider, newModel);
+  };
+
+  const handleModelChange = (newModel: string) => {
+    setImageModel(newModel);
+    saveImageGenSettings(imageProvider, newModel);
+  };
 
   // Generate default prompt from lore content
   const getDefaultPrompt = useCallback(() => {
@@ -231,18 +316,11 @@ export default function LoreImageGenerator({
           <div className="flex flex-wrap gap-2 text-xs">
             <select
               value={imageProvider}
-              onChange={(e) => {
-                const newProvider = e.target.value as
-                  | "deepinfra"
-                  | "openrouter";
-                setImageProvider(newProvider);
-                // Set default model for provider
-                if (newProvider === "deepinfra") {
-                  setImageModel("Bria 3.2");
-                } else {
-                  setImageModel("Nano Banana");
-                }
-              }}
+              onChange={(e) =>
+                handleProviderChange(
+                  e.target.value as "deepinfra" | "openrouter"
+                )
+              }
               className="px-2 py-1 bg-blue-900/50 border border-blue-700/40 rounded text-white"
             >
               <option value="deepinfra">DeepInfra (Coins)</option>
@@ -251,7 +329,7 @@ export default function LoreImageGenerator({
 
             <select
               value={imageModel}
-              onChange={(e) => setImageModel(e.target.value)}
+              onChange={(e) => handleModelChange(e.target.value)}
               className="px-2 py-1 bg-blue-900/50 border border-blue-700/40 rounded text-white"
             >
               {imageProvider === "deepinfra"

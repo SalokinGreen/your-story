@@ -56,6 +56,7 @@ import { CustomTablesEditor } from "@/app/components/CustomTablesEditor";
 import { DraggableScroll } from "@/app/components/DraggableScroll";
 import { ClockCategorySelector } from "@/app/components/ClockCategorySelector";
 import LoreImageGenerator from "@/app/components/LoreImageGenerator";
+import MassLoreImageGenerator from "@/app/components/MassLoreImageGenerator";
 import {
   GRADE_CONFIG,
   getMaxDurability,
@@ -8627,6 +8628,11 @@ ${description || ""}`;
                 Add Lore Entry
               </button>
             </div>
+
+            {/* Mass Image Generation */}
+            {lore.length > 0 && (
+              <MassLoreImageGenerator lore={lore} onLoreUpdate={setLore} />
+            )}
 
             <div className="space-y-3">
               <div className="flex flex-col gap-3 mb-2">
