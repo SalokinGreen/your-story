@@ -1553,6 +1553,7 @@ function StoryPageContent() {
   );
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const hasLoadedStoryRef = useRef<string | null>(null); // Track loaded story ID to prevent re-fetching on tab focus
+  const generationAbortRef = useRef<AbortController | null>(null); // Abort controller for stopping generation
   const [choices, setChoices] = useState<Choices>({ choices: [] });
   const [input, setInput] = useState<Record<string, boolean>>({});
   const [storyText, setStoryText] = useState("");
@@ -2689,6 +2690,9 @@ function StoryPageContent() {
         }
       };
 
+      // Create abort controller for this generation
+      generationAbortRef.current = new AbortController();
+
       await generateStoryTurn(
         storyData,
         "", // Custom input already in storyData.scene.parts
@@ -2711,6 +2715,7 @@ function StoryPageContent() {
           embeddingThreshold,
           samplingSettings: getSamplingSettings(),
           usePrefill,
+          abortSignal: generationAbortRef.current.signal,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -4770,6 +4775,9 @@ function StoryPageContent() {
       actionChoice?.text?.slice(0, 50)
     );
 
+    // Create abort controller for this generation
+    generationAbortRef.current = new AbortController();
+
     try {
       // Run generation and dice animation in parallel
       await Promise.all([
@@ -4793,6 +4801,7 @@ function StoryPageContent() {
             deepseekKey,
             googleKey,
             storyId: storyDbId || undefined,
+            abortSignal: generationAbortRef.current.signal,
             enableEmbeddings: embeddingsEnabled,
             embeddingThreshold,
             samplingSettings: getSamplingSettings(),
@@ -5006,6 +5015,17 @@ function StoryPageContent() {
     setInput({ ...newInput });
   }
 
+  // Stop generation (abort ongoing requests)
+  function handleStop() {
+    if (generationAbortRef.current) {
+      generationAbortRef.current.abort();
+      generationAbortRef.current = null;
+    }
+    setLoading(false);
+    setLoadingStage(null);
+    addNotification("Generation stopped", "warning");
+  }
+
   async function handleRetry() {
     if (!storyData || loading) return;
 
@@ -5106,6 +5126,9 @@ function StoryPageContent() {
       }
     };
 
+    // Create abort controller for this generation
+    generationAbortRef.current = new AbortController();
+
     try {
       await generateStoryTurn(
         storyData,
@@ -5130,6 +5153,7 @@ function StoryPageContent() {
           embeddingThreshold,
           samplingSettings: getSamplingSettings(),
           usePrefill,
+          abortSignal: generationAbortRef.current.signal,
         },
         {
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -6182,6 +6206,7 @@ function StoryPageContent() {
             canRetry={canRetry}
             onUndo={handleUndo}
             canUndo={canUndo}
+            onStop={handleStop}
             onEdit={handleEdit}
             viewingPartIndex={viewingPartIndex}
             onNavigateLeft={handleNavigateLeft}

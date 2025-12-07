@@ -111,6 +111,8 @@ export interface GenerationOptions {
   samplingSettings?: SamplingSettings;
   // Role Affirmation (prefill) - primes model to follow output constraints
   usePrefill?: boolean; // Default: true
+  // Abort signal for cancelling generation
+  abortSignal?: AbortSignal;
 }
 
 export interface GenerationCallbacks {
@@ -503,6 +505,7 @@ export async function generateStoryTurn(
           maxTokens: options.customMaxOutput || 2000,
           temperature: options.novelaiTemperature ?? 1,
         }),
+        signal: options.abortSignal,
       });
     } else {
       // Use standard API (DeepSeek/OpenRouter/Mistral/DeepInfra)
@@ -532,6 +535,7 @@ export async function generateStoryTurn(
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(storyRequestBody),
+        signal: options.abortSignal,
       });
     }
 
@@ -753,11 +757,20 @@ export async function generateStoryTurn(
         for (const currentModel of modelsToTry) {
           if (success) break;
 
+          // Check if user cancelled
+          if (options.abortSignal?.aborted) {
+            throw new Error("Generation cancelled by user");
+          }
+
           // Add timeout to prevent infinite hanging
           const toolAbortController = new AbortController();
           const toolTimeout = setTimeout(() => {
             toolAbortController.abort();
           }, 55000); // 55 second timeout
+
+          // Link user abort signal to tool abort controller
+          const abortHandler = () => toolAbortController.abort();
+          options.abortSignal?.addEventListener("abort", abortHandler);
 
           // Debug: Log tools being sent from frontend
           console.log(
@@ -923,6 +936,7 @@ export async function generateStoryTurn(
           deepseekKey: options.deepseekKey,
           googleKey: options.googleKey,
         }),
+        signal: options.abortSignal,
       });
 
       if (!choicesResponse.ok) {

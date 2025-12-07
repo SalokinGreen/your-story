@@ -806,29 +806,18 @@ export function executeTools(
         continue;
       }
 
-      // Update thread
-      if (toolCall.function.name === "update_thread") {
+      // Update thread (AGMT version - uses threadId for AGMT state threads)
+      // Only handle if threadId is provided AND agmtState exists, otherwise fall through to regular threads
+      if (
+        toolCall.function.name === "update_thread" &&
+        args.threadId &&
+        storyData.agmtState
+      ) {
         const threadId = args.threadId;
         const description = args.description?.trim();
 
         if (!description || description.length < 10) {
           const errorMsg = "Thread description must be at least 10 characters";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/update_thread: ${threadId}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        if (!storyData.agmtState) {
-          const errorMsg = "Advanced RPG Tools not enabled";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
             toolName,
