@@ -102,9 +102,9 @@ export function buildNovelAIRequest(
 
 /**
  * NovelAI context size (in tokens)
- * GLM-4-6 supports ~28K context
+ * GLM-4-6 supports ~36K context (36864 confirmed via API error)
  */
-export const NOVELAI_CONTEXT_SIZE = 28000;
+export const NOVELAI_CONTEXT_SIZE = 36864;
 
 /**
  * Estimate token count from text (rough approximation: ~4 chars per token)

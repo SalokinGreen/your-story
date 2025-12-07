@@ -155,8 +155,8 @@ export const AI_MODELS = {
     name: "NovelAI GLM-4-6 (BYOK)",
     original_model: "glm-4-6",
     model: "glm-4-6",
-    maxTokens: 28000,
-    maxOutputTokens: 1000,
+    maxTokens: 36864, // Actual limit per NovelAI API
+    maxOutputTokens: 2048,
     provider: "novelai",
     supportsToolCalling: false,
     cost: 0,

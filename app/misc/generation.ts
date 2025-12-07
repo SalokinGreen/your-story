@@ -447,11 +447,15 @@ export async function generateStoryTurn(
     callbacks.onStoryStart?.();
     logger.action("Stage 1: Building story prompt");
 
+    // When NovelAI is enabled, use its model name for proper context sizing
+    const useNovelAI = options.novelaiEnabled && options.novelaiKey;
+    const storyModelName = useNovelAI ? "NovelAI GLM-4-6" : options.storyModel;
+
     const storyPrompt = buildStoryPrompt({
       storyData,
       userChoice,
       commandResponses,
-      modelName: options.storyModel,
+      modelName: storyModelName,
       customMaxContext: options.customMaxContext,
       embeddingContext,
       usePrefill: options.usePrefill !== false, // Default to true
@@ -475,8 +479,7 @@ export async function generateStoryTurn(
       );
     }
 
-    // Determine which API to use for story generation
-    const useNovelAI = options.novelaiEnabled && options.novelaiKey;
+    // useNovelAI already computed above for model name selection
 
     let storyResponse: Response;
     if (useNovelAI) {
