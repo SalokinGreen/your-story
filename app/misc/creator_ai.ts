@@ -469,14 +469,6 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     const agmtSection = ["## AGMT State (Advanced Game Master Tools)"];
     agmtSection.push(`- Chaos Factor: ${agmt.chaosFactor}`);
     agmtSection.push(`- Scene Count: ${agmt.sceneCount}`);
-    if (agmt.threads.length > 0) {
-      agmtSection.push(
-        `- Active Threads: ${agmt.threads
-          .filter((t) => t.status === "active")
-          .map((t) => t.description)
-          .join("; ")}`
-      );
-    }
     sections.push(agmtSection.join("\n"));
   }
 
