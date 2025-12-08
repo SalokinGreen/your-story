@@ -40,9 +40,9 @@ export default function AIConfigTab() {
 
   const [currentPreset, setCurrentPreset] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("aiPreset") || "main";
+      return localStorage.getItem("aiPreset") || "custom";
     }
-    return "main";
+    return "custom";
   });
 
   // Model configuration for custom preset

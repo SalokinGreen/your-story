@@ -84,8 +84,8 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     // Get current preset and custom model overrides from localStorage
     const currentPreset =
       typeof window !== "undefined"
-        ? localStorage.getItem("aiPreset") || "main"
-        : "main";
+        ? localStorage.getItem("aiPreset") || "custom"
+        : "custom";
 
     const customStoryModel =
       typeof window !== "undefined"
@@ -101,7 +101,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         : "";
 
     // Get preset config (fallback to main if invalid)
-    const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["main"];
+    const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["custom"];
 
     // Determine effective models - use custom only if preset is "custom" AND value is set
     const effectiveStoryModel =

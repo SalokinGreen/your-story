@@ -59,7 +59,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 // Helper function to get models from preset
 function getModelsFromPreset() {
   if (typeof window === "undefined") {
-    const preset = MODEL_PRESETS["main"];
+    const preset = MODEL_PRESETS["custom"];
     return {
       storyModel: preset.storyModel,
       toolsModel: preset.toolsModel,
@@ -70,8 +70,8 @@ function getModelsFromPreset() {
     };
   }
 
-  const currentPreset = localStorage.getItem("aiPreset") || "main";
-  const preset = MODEL_PRESETS[currentPreset];
+  const currentPreset = localStorage.getItem("aiPreset") || "custom";
+  const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["custom"];
 
   // NovelAI settings (BYOK for story stage only)
   const novelaiEnabled = localStorage.getItem("novelaiEnabled") === "true";
