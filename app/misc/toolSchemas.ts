@@ -1058,7 +1058,8 @@ const modifyRelationshipTool: ToolSchema = {
   type: "function",
   function: {
     name: "modify_relationship",
-    description: "Change an existing relationship value and/or description",
+    description:
+      "Change an existing relationship using narrative magnitude. The actual change is calculated based on difficulty and current relationship - enemies improve slowly, friends damage easily.",
     parameters: {
       type: "object",
       properties: {
@@ -1066,17 +1067,25 @@ const modifyRelationshipTool: ToolSchema = {
           type: "string",
           description: "Character name (fuzzy matching supported)",
         },
-        valueDelta: {
-          type: "number",
+        magnitude: {
+          type: "string",
+          enum: [
+            "greatly_damage",
+            "damage",
+            "slightly_damage",
+            "slightly_improve",
+            "improve",
+            "greatly_improve",
+          ],
           description:
-            "Change to relationship value (can be negative, capped at -100 to 100)",
+            "How much to change the relationship. Negative relationships are harder to improve, positive relationships are easier to damage.",
         },
         description: {
           type: "string",
           description: "New relationship description (optional)",
         },
       },
-      required: ["name", "valueDelta"],
+      required: ["name", "magnitude"],
     },
   },
 };

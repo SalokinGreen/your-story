@@ -37,6 +37,90 @@ import {
 } from "@/app/misc/rpgSystems";
 import { calculateLevel } from "@/app/misc/leveling";
 
+/**
+ * Calculate relationship value change based on magnitude, difficulty, and current value.
+ * Enemies are hard to befriend (small gains), friends are easy to lose (big losses).
+ */
+function calculateRelationshipDelta(
+  magnitude: string,
+  currentValue: number,
+  difficulty: AdventureDifficulty = "medium"
+): number {
+  // Base changes by magnitude
+  const baseMagnitudes: Record<string, number> = {
+    greatly_damage: -25,
+    damage: -15,
+    slightly_damage: -8,
+    slightly_improve: 8,
+    improve: 15,
+    greatly_improve: 25,
+  };
+
+  // Difficulty multipliers (harder = slower relationship gains, faster losses)
+  const difficultyMultipliers: Record<
+    AdventureDifficulty,
+    { gain: number; loss: number }
+  > = {
+    easy: { gain: 1.3, loss: 0.7 },
+    medium: { gain: 1.0, loss: 1.0 },
+    hard: { gain: 0.7, loss: 1.3 },
+    expert: { gain: 0.5, loss: 1.5 },
+  };
+
+  const baseChange = baseMagnitudes[magnitude] || 0;
+  const isImproving = baseChange > 0;
+  const diffMult =
+    difficultyMultipliers[difficulty] || difficultyMultipliers.medium;
+
+  // Current relationship affects how easy it is to change
+  // Negative relationships: hard to improve, easy to damage further
+  // Positive relationships: easy to improve more, hard to damage
+  let relationshipModifier = 1.0;
+
+  if (isImproving) {
+    // Improving relationships
+    if (currentValue <= -50) {
+      // Nemesis/enemy: very hard to improve (they hate you)
+      relationshipModifier = 0.3;
+    } else if (currentValue <= -25) {
+      // Hostile: hard to improve
+      relationshipModifier = 0.5;
+    } else if (currentValue <= 0) {
+      // Unfriendly/stranger: somewhat hard to improve
+      relationshipModifier = 0.7;
+    } else if (currentValue <= 50) {
+      // Acquaintance/friendly: normal improvement
+      relationshipModifier = 1.0;
+    } else {
+      // Already friends: diminishing returns
+      relationshipModifier = 0.8;
+    }
+  } else {
+    // Damaging relationships
+    if (currentValue >= 75) {
+      // Trusted friend/ally: takes a lot to damage
+      relationshipModifier = 0.6;
+    } else if (currentValue >= 50) {
+      // Friendly: somewhat resistant to damage
+      relationshipModifier = 0.8;
+    } else if (currentValue >= 0) {
+      // Acquaintance/stranger: normal damage
+      relationshipModifier = 1.0;
+    } else {
+      // Already negative: easy to damage further
+      relationshipModifier = 1.2;
+    }
+  }
+
+  const finalChange = Math.round(
+    baseChange *
+      (isImproving ? diffMult.gain : diffMult.loss) *
+      relationshipModifier
+  );
+
+  return finalChange;
+}
+
 export interface ToolCall {
   id?: string;
   type: "function";
@@ -558,23 +642,35 @@ export function executeTools(
         continue;
       }
 
-      // Special handling for modify_relationship with description
-      // Need to execute two commands: modify value, then update description
-      if (
-        toolCall.function.name === "modify_relationship" &&
-        args.description
-      ) {
-        logger.action(
-          "Special handling: modify_relationship with description",
-          {
-            toolCallId: toolId,
-            relationshipName: args.name,
-            valueDelta: args.valueDelta,
-          }
+      // Special handling for modify_relationship - calculate delta from magnitude
+      // Need to execute two commands if description provided: modify value, then update description
+      if (toolCall.function.name === "modify_relationship") {
+        // Find current relationship value for delta calculation
+        const relationships = storyData.relationships || [];
+        const existingRel = relationships.find(
+          (r) => r.name.toLowerCase() === args.name?.toLowerCase()
+        );
+        const currentValue = existingRel?.value ?? 0;
+        const difficulty = storyData.difficulty || "medium";
+
+        // Calculate actual delta from magnitude
+        const valueDelta = calculateRelationshipDelta(
+          args.magnitude || "slightly_improve",
+          currentValue,
+          difficulty as AdventureDifficulty
         );
 
+        logger.action("Special handling: modify_relationship with magnitude", {
+          toolCallId: toolId,
+          relationshipName: args.name,
+          magnitude: args.magnitude,
+          currentValue,
+          calculatedDelta: valueDelta,
+          difficulty,
+        });
+
         // First: modify the value
-        const valueCommand = `/modify_relationship: ${args.name} | ${args.valueDelta}`;
+        const valueCommand = `/modify_relationship: ${args.name} | ${valueDelta}`;
         logger.action(`Executing command: ${valueCommand}`, {
           toolCallId: toolId,
         });
@@ -598,6 +694,32 @@ export function executeTools(
             timestamp: Date.now(),
             toolCallId: toolCall.id,
           });
+          continue;
+        }
+
+        // If no description provided, we're done
+        if (!args.description) {
+          const magnitudeLabel = (args.magnitude || "slightly_improve").replace(
+            /_/g,
+            " "
+          );
+          const successMsg = `${valueResponse.message} (${magnitudeLabel})`;
+          logger.action(`Tool call succeeded: ${successMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: toolCall.function.name,
+            success: true,
+            message: successMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+
+          // Add state change for relationship modification
+          if (STATE_CHANGE_TOOLS.has(toolName)) {
+            stateChanges.push(successMsg);
+          }
           continue;
         }
 
@@ -2680,8 +2802,8 @@ function convertToolToCommand(
       return `/add_relationship: ${args.name} | ${args.value} | ${args.description}`;
 
     case "modify_relationship":
-      // Description handled separately in executeTools if provided
-      return `/modify_relationship: ${args.name} | ${args.valueDelta}`;
+      // Handled by special logic in executeTools (magnitude-based calculation)
+      return null;
 
     case "delete_relationship":
       return `/delete_relationship: ${args.name}`;

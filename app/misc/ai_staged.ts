@@ -158,6 +158,120 @@ function getChaosDescription(chaos: number): string {
   return "Extreme Chaos - Anything can happen!";
 }
 
+// Helper to convert stat percentage values to descriptive words
+function getStatDescriptor(value: number): string {
+  if (value <= 10) return "abysmal";
+  if (value <= 20) return "very low";
+  if (value <= 35) return "low";
+  if (value <= 45) return "below average";
+  if (value <= 55) return "average";
+  if (value <= 65) return "above average";
+  if (value <= 80) return "high";
+  if (value <= 90) return "very high";
+  return "exceptional";
+}
+
+// Helper to convert item durability to condition description
+function getItemCondition(
+  durability: number | undefined,
+  maxDurability: number | undefined,
+  type: string | undefined,
+  grade: string | undefined
+): string {
+  // Consumables don't have durability condition
+  if (type === "consumable") return "consumable";
+  // AGMT items are indestructible
+  if (grade === "agmt") return "indestructible";
+  // Story items don't break
+  if (type === "story") return "quest item";
+  // Misc items don't break
+  if (type === "misc") return "utility";
+
+  // If durability is not tracked, assume good condition
+  if (
+    durability === undefined ||
+    maxDurability === undefined ||
+    maxDurability === 0
+  ) {
+    return "good condition";
+  }
+
+  const percent = (durability / maxDurability) * 100;
+  if (percent >= 100) return "flawless";
+  if (percent >= 80) return "good condition";
+  if (percent >= 60) return "worn";
+  if (percent >= 40) return "damaged";
+  if (percent >= 20) return "badly damaged";
+  if (percent > 0) return "nearly broken";
+  return "broken";
+}
+
+// Helper to convert relationship value to descriptive label with behavioral hint
+function getRelationshipDescriptor(value: number): {
+  label: string;
+  behavior: string;
+} {
+  if (value <= -80)
+    return {
+      label: "nemesis",
+      behavior:
+        "Actively seeks to harm or destroy the player. Will betray, sabotage, or attack on sight.",
+    };
+  if (value <= -50)
+    return {
+      label: "enemy",
+      behavior:
+        "Hostile and antagonistic. Will obstruct, threaten, or fight the player given opportunity.",
+    };
+  if (value <= -25)
+    return {
+      label: "hostile",
+      behavior:
+        "Distrustful and unfriendly. Refuses help, may spread rumors or work against player's interests.",
+    };
+  if (value <= -10)
+    return {
+      label: "unfriendly",
+      behavior:
+        "Cold and dismissive. Reluctant to interact, offers no favors, may charge extra or deny services.",
+    };
+  if (value <= 10)
+    return {
+      label: "stranger",
+      behavior:
+        "Neutral and indifferent. Treats player like anyone else—no special treatment either way.",
+    };
+  if (value <= 25)
+    return {
+      label: "acquaintance",
+      behavior:
+        "Mildly positive. Willing to chat, may offer small tips or minor assistance if convenient.",
+    };
+  if (value <= 50)
+    return {
+      label: "friendly",
+      behavior:
+        "Warm and helpful. Offers discounts, shares useful information, willing to do reasonable favors.",
+    };
+  if (value <= 75)
+    return {
+      label: "trusted friend",
+      behavior:
+        "Loyal and supportive. Will go out of their way to help, keep secrets, and defend the player's reputation.",
+    };
+  if (value <= 90)
+    return {
+      label: "devoted ally",
+      behavior:
+        "Deeply loyal. Will take significant risks for the player, offer resources, and stand by them in crisis.",
+    };
+  return {
+    label: "beloved",
+    behavior:
+      "Unconditional bond. Will sacrifice greatly for the player, trust them implicitly, and prioritize their wellbeing.",
+  };
+}
+
 // Build info message - shared across all stages
 // Optional embeddingContext allows embedding-enhanced lore/memory retrieval
 export function buildInfoMessage(
@@ -171,7 +285,7 @@ export function buildInfoMessage(
     ? `## Stats\n${storyData.stats
         .map(
           (s) =>
-            `- ${s.name}: ${s.value}${
+            `- ${s.name}: ${getStatDescriptor(s.value)}${
               s.description ? ` (${s.description})` : ""
             }`
         )
@@ -190,20 +304,19 @@ export function buildInfoMessage(
         .join("\n")}`
     : "";
 
-  // Build inventory section with grade and durability info
+  // Build inventory section with condition description
   const inventorySection = storyData.inventory.length
     ? `## Inventory\n${storyData.inventory
         .map((i) => {
-          const typeLabel = i.type ? ` [${i.type}]` : "";
-          const gradeLabel = i.grade ? ` (${i.grade})` : "";
-          const durabilityInfo =
-            i.type !== "consumable" && i.grade !== "agmt"
-              ? ` [dur: ${i.durability ?? "?"}/${i.maxDurability ?? "?"}]`
-              : i.grade === "agmt"
-              ? " [dur: ∞]"
-              : "";
-          const desc = i.description ? ` - ${i.description}` : "";
-          return `- ${i.name}${gradeLabel}${typeLabel}${durabilityInfo} x${i.quantity}${desc}`;
+          const condition = getItemCondition(
+            i.durability,
+            i.maxDurability,
+            i.type,
+            i.grade
+          );
+          const desc = i.description ? `: ${i.description}` : "";
+          const qty = i.quantity > 1 ? ` x${i.quantity}` : "";
+          return `- ${i.name} (${condition})${qty}${desc}`;
         })
         .join("\n")}`
     : "## Inventory\nEmpty";
@@ -335,11 +448,12 @@ export function buildInfoMessage(
   // Build relationships section if any exist
   const relationshipsSection =
     storyData.relationships && storyData.relationships.length > 0
-      ? `## Relationships\n${storyData.relationships
-          .map(
-            (r) =>
-              `- ${r.name}: ${r.value} (${r.description || "No description"})`
-          )
+      ? `## Relationships\nNPC relationships influence how characters behave toward the player. Refer to each NPC's lore entry for detailed personality and motivations—the lore takes priority over generic relationship behavior.\n${storyData.relationships
+          .map((r) => {
+            const { label, behavior } = getRelationshipDescriptor(r.value);
+            const desc = r.description ? ` - ${r.description}` : "";
+            return `- ${r.name} (${label})${desc}\n  → ${behavior}`;
+          })
           .join("\n")}`
       : "";
 
@@ -408,14 +522,6 @@ ${
     .join("\n") || ""
 }`
     : "";
-
-  // Build custom tables section if any exist
-  const customTablesSection =
-    storyData.customTables && storyData.customTables.length > 0
-      ? `## Custom Tables\n${storyData.customTables
-          .map((t) => `- ${t.name}: ${t.description || "No description"}`)
-          .join("\n")}`
-      : "";
 
   // Build active challenge section if one exists
   const activeChallengeSection = storyData.activeChallenge?.active
@@ -547,7 +653,6 @@ ${
     restStateSection,
     threadsSection,
     agmtSection,
-    customTablesSection,
     storyData.author_notes
       ? `## Author Notes\n${cleanString(storyData.author_notes)}`
       : "",
@@ -860,7 +965,15 @@ Only use CREATE tools for GENUINELY NEW content not shown in the info message.
     - **DO NOT ADD** atmospheric details, descriptions, feelings, or story summaries
 5. **No Changes Needed:** If no game state changes are required, call \`skip_tools\` instead of making unnecessary tool calls.
 6. **NPC Management:** Did a new NPC appear or an existing NPC change significantly? -> \`add_npc\` and  \`add_relationship\` / \`modify_npc\`.
-7. **Relationship Delta:** Did an NPC react positively or negatively **to the PLAYER'S actions**? -> \`update_relationship\` (Small increments: +1/-1 for chat, +5/-5 for major deeds). ⚠️ ONLY change relationships based on what the PLAYER did - NOT external events, other NPCs' actions, or environmental circumstances the player didn't cause.
+7. **Relationship Changes:** Did an NPC react positively or negatively **to the PLAYER'S actions**? -> \`modify_relationship\` with magnitude:
+    - **greatly_damage:** Betrayal, violence against them, major offense
+    - **damage:** Insults, broken promises, significant rudeness
+    - **slightly_damage:** Minor slights, dismissiveness, small annoyances
+    - **slightly_improve:** Polite conversation, small kindnesses
+    - **improve:** Helpful actions, gifts, significant favors
+    - **greatly_improve:** Heroic deeds, saving their life, major sacrifices
+    ⚠️ ONLY change relationships based on what the PLAYER did - NOT external events or other NPCs' actions.
+    Note: The system automatically adjusts changes based on difficulty and current relationship - enemies are hard to befriend, friends are resilient to minor slights.
 8. **Passive Traits:** Did the player gain or lose a defining trait through story events? -> \`add_passive\` / \`remove_passive\` / \`modify_passive\`.
     - Passives are story/RP traits that influence narrative (NOT mechanical bonuses)
     - Examples: "Wolf Slayer" (gained after defeating many wolves), "Cursed Blood" (gained through dark ritual), "Friend of the Forest" (earned trust of woodland creatures)
