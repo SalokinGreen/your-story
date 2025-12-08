@@ -268,7 +268,7 @@ const repairItemTool: ToolSchema = {
   function: {
     name: "repair_item",
     description:
-      "Repair an item, restoring its durability. Use for narrative repairs (blacksmith, magic, resting, etc.)",
+      "Repair an item using narrative magnitude. The actual durability restored is calculated as a percentage of max durability, scaled by difficulty.",
     parameters: {
       type: "object",
       properties: {
@@ -276,11 +276,11 @@ const repairItemTool: ToolSchema = {
           type: "string",
           description: "Item name (fuzzy matching supported)",
         },
-        amount: {
-          type: "number",
+        magnitude: {
+          type: "string",
+          enum: ["patch", "repair", "fully_repair"],
           description:
-            "Amount of durability to restore. If omitted, fully repairs the item.",
-          minimum: 1,
+            "How much to repair the item. 'patch' = 10%, 'repair' = 25%, 'fully_repair' = 100% of max durability.",
         },
       },
       required: ["name"],
@@ -293,7 +293,7 @@ const damageItemTool: ToolSchema = {
   function: {
     name: "damage_item",
     description:
-      "Damage an item, reducing its durability. Use for narrative damage (acid, fire, wear, etc.). Item breaks if durability reaches 0.",
+      "Damage an item using narrative magnitude. The actual durability loss is calculated as a percentage of max durability, scaled by difficulty. Item breaks if durability reaches 0.",
     parameters: {
       type: "object",
       properties: {
@@ -301,13 +301,14 @@ const damageItemTool: ToolSchema = {
           type: "string",
           description: "Item name (fuzzy matching supported)",
         },
-        amount: {
-          type: "number",
-          description: "Amount of durability to remove",
-          minimum: 1,
+        magnitude: {
+          type: "string",
+          enum: ["scratch", "damage", "heavily_damage", "destroy"],
+          description:
+            "How much to damage the item. 'scratch' = 10%, 'damage' = 25%, 'heavily_damage' = 50%, 'destroy' = 100% of max durability.",
         },
       },
-      required: ["name", "amount"],
+      required: ["name", "magnitude"],
     },
   },
 };
@@ -624,7 +625,7 @@ const adjustResourceTool: ToolSchema = {
   function: {
     name: "adjust_resource",
     description:
-      "Modify a resource's current value and/or max value. Resources are capped at their max value.",
+      "Modify a resource's current value using narrative magnitude. The actual change is calculated as a percentage of max value, scaled by difficulty.",
     parameters: {
       type: "object",
       properties: {
@@ -633,35 +634,23 @@ const adjustResourceTool: ToolSchema = {
           description:
             "Resource name (fuzzy matching supported, e.g., Health, Stamina, Mana)",
         },
-        currentDelta: {
-          oneOf: [
-            { type: "number" },
-            {
-              type: "string",
-              enum: ["tiny", "small", "moderate", "large", "massive"],
-            },
+        magnitude: {
+          type: "string",
+          enum: [
+            "fully_deplete",
+            "greatly_drain",
+            "drain",
+            "slightly_drain",
+            "slightly_restore",
+            "restore",
+            "greatly_restore",
+            "fully_restore",
           ],
           description:
-            "Change tier for current value: tiny (1-2), small (2-5), moderate (3-10), large (5-15), massive (8-25). Or exact number.",
-        },
-        maxDelta: {
-          oneOf: [
-            { type: "number" },
-            {
-              type: "string",
-              enum: ["tiny", "small", "moderate", "large", "massive"],
-            },
-          ],
-          description:
-            "Change tier for max value (optional). Same tiers as currentDelta.",
-        },
-        isNegative: {
-          type: "boolean",
-          description:
-            "If true and using tiers, both changes are negative (decrease). Ignored if values are already numbers.",
+            "How much to change the resource. Drain reduces, restore increases. 'fully' = 100%, 'greatly' = 50%, normal = 25%, 'slightly' = 10% of max value.",
         },
       },
-      required: ["name", "currentDelta"],
+      required: ["name", "magnitude"],
     },
   },
 };
@@ -751,7 +740,7 @@ const adjustStatTool: ToolSchema = {
   function: {
     name: "adjust_stat",
     description:
-      "Modify a character stat by a delta amount. Stats are capped at 0-100.",
+      "Modify a character stat using narrative magnitude. Stats are capped at 0-100. The actual change is scaled by difficulty.",
     parameters: {
       type: "object",
       properties: {
@@ -760,24 +749,21 @@ const adjustStatTool: ToolSchema = {
           description:
             "Stat name (fuzzy matching supported, e.g., Strength, Stealth, Intelligence)",
         },
-        valueDelta: {
-          oneOf: [
-            { type: "number" },
-            {
-              type: "string",
-              enum: ["tiny", "small", "moderate", "large", "massive"],
-            },
+        magnitude: {
+          type: "string",
+          enum: [
+            "greatly_weaken",
+            "weaken",
+            "slightly_weaken",
+            "slightly_strengthen",
+            "strengthen",
+            "greatly_strengthen",
           ],
           description:
-            "Change tier: tiny (1-2), small (2-5), moderate (3-10), large (5-15), massive (8-25). Use negative number for decrease. Or exact number for legacy.",
-        },
-        isNegative: {
-          type: "boolean",
-          description:
-            "If true and using a tier, the change is negative (decrease). Ignored if valueDelta is already a number.",
+            "How much to change the stat. Weaken decreases, strengthen increases. 'greatly' = ~15, normal = ~10, 'slightly' = ~5 points.",
         },
       },
-      required: ["name", "valueDelta"],
+      required: ["name", "magnitude"],
     },
   },
 };

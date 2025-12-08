@@ -121,6 +121,137 @@ function calculateRelationshipDelta(
   return finalChange;
 }
 
+/**
+ * Calculate resource change based on magnitude, difficulty, and max value.
+ * Returns a percentage-based change scaled to the resource's max value.
+ */
+function calculateResourceDelta(
+  magnitude: string,
+  maxValue: number,
+  difficulty: AdventureDifficulty = "medium"
+): number {
+  // Base percentages of max value
+  const baseMagnitudes: Record<string, number> = {
+    // Negative (draining)
+    fully_deplete: -1.0, // 100%
+    greatly_drain: -0.5, // 50%
+    drain: -0.25, // 25%
+    slightly_drain: -0.1, // 10%
+    // Positive (charging)
+    slightly_restore: 0.1, // 10%
+    restore: 0.25, // 25%
+    greatly_restore: 0.5, // 50%
+    fully_restore: 1.0, // 100%
+  };
+
+  // Difficulty multipliers (harder = less recovery, more drain)
+  const difficultyMultipliers: Record<
+    AdventureDifficulty,
+    { gain: number; loss: number }
+  > = {
+    easy: { gain: 1.3, loss: 0.7 },
+    medium: { gain: 1.0, loss: 1.0 },
+    hard: { gain: 0.8, loss: 1.2 },
+    expert: { gain: 0.6, loss: 1.4 },
+  };
+
+  const basePercent = baseMagnitudes[magnitude] || 0;
+  const isRestoring = basePercent > 0;
+  const diffMult =
+    difficultyMultipliers[difficulty] || difficultyMultipliers.medium;
+
+  const multiplier = isRestoring ? diffMult.gain : diffMult.loss;
+  const finalChange = Math.round(basePercent * maxValue * multiplier);
+
+  return finalChange;
+}
+
+/**
+ * Calculate stat change based on magnitude and difficulty.
+ * Stats are 0-100 scale, so changes are absolute values.
+ */
+function calculateStatDelta(
+  magnitude: string,
+  difficulty: AdventureDifficulty = "medium"
+): number {
+  // Base changes (absolute values on 0-100 scale)
+  const baseMagnitudes: Record<string, number> = {
+    // Negative (weakening)
+    greatly_weaken: -15,
+    weaken: -10,
+    slightly_weaken: -5,
+    // Positive (strengthening)
+    slightly_strengthen: 5,
+    strengthen: 10,
+    greatly_strengthen: 15,
+  };
+
+  // Difficulty multipliers (harder = less gains, more losses)
+  const difficultyMultipliers: Record<
+    AdventureDifficulty,
+    { gain: number; loss: number }
+  > = {
+    easy: { gain: 1.2, loss: 0.8 },
+    medium: { gain: 1.0, loss: 1.0 },
+    hard: { gain: 0.8, loss: 1.2 },
+    expert: { gain: 0.6, loss: 1.4 },
+  };
+
+  const baseChange = baseMagnitudes[magnitude] || 0;
+  const isStrengthening = baseChange > 0;
+  const diffMult =
+    difficultyMultipliers[difficulty] || difficultyMultipliers.medium;
+
+  const multiplier = isStrengthening ? diffMult.gain : diffMult.loss;
+  const finalChange = Math.round(baseChange * multiplier);
+
+  return finalChange;
+}
+
+/**
+ * Calculate durability change based on magnitude and difficulty.
+ * Returns percentage-based change scaled to item's max durability.
+ */
+function calculateDurabilityDelta(
+  magnitude: string,
+  maxDurability: number,
+  difficulty: AdventureDifficulty = "medium"
+): number {
+  // Base percentages of max durability
+  const baseMagnitudes: Record<string, number> = {
+    // Negative (damaging)
+    destroy: -1.0, // 100%
+    heavily_damage: -0.5, // 50%
+    damage: -0.25, // 25%
+    scratch: -0.1, // 10%
+    // Positive (repairing)
+    patch: 0.1, // 10%
+    repair: 0.25, // 25%
+    fully_repair: 1.0, // 100%
+  };
+
+  // Difficulty multipliers (harder = more damage, less repair)
+  const difficultyMultipliers: Record<
+    AdventureDifficulty,
+    { gain: number; loss: number }
+  > = {
+    easy: { gain: 1.3, loss: 0.7 },
+    medium: { gain: 1.0, loss: 1.0 },
+    hard: { gain: 0.8, loss: 1.2 },
+    expert: { gain: 0.6, loss: 1.4 },
+  };
+
+  const basePercent = baseMagnitudes[magnitude] || 0;
+  const isRepairing = basePercent > 0;
+  const diffMult =
+    difficultyMultipliers[difficulty] || difficultyMultipliers.medium;
+
+  const multiplier = isRepairing ? diffMult.gain : diffMult.loss;
+  const finalChange = Math.round(basePercent * maxDurability * multiplier);
+
+  return finalChange;
+}
+
 export interface ToolCall {
   id?: string;
   type: "function";
@@ -764,6 +895,266 @@ export function executeTools(
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
+        continue;
+      }
+
+      // Special handling for adjust_resource - calculate delta from magnitude
+      if (toolCall.function.name === "adjust_resource") {
+        const resources = storyData.resources || [];
+        const existingResource = resources.find(
+          (r) => r.name.toLowerCase() === args.name?.toLowerCase()
+        );
+
+        if (!existingResource) {
+          const errorMsg = `Resource "${args.name}" not found`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const maxValue = existingResource.maxValue || 100;
+        const difficulty = storyData.difficulty || "medium";
+
+        // Calculate actual delta from magnitude and max value
+        const valueDelta = calculateResourceDelta(
+          args.magnitude || "slightly_restore",
+          maxValue,
+          difficulty as AdventureDifficulty
+        );
+
+        logger.action("Special handling: adjust_resource with magnitude", {
+          toolCallId: toolId,
+          resourceName: args.name,
+          magnitude: args.magnitude,
+          maxValue,
+          calculatedDelta: valueDelta,
+          difficulty,
+        });
+
+        const command = `/adjust_resource: ${args.name} | ${valueDelta}`;
+        logger.action(`Executing command: ${command}`, {
+          toolCallId: toolId,
+        });
+        const response = executeCommandWithResponse(command, storyData);
+
+        if (!response || !response.success) {
+          const errorMsg = response?.message || `Failed to adjust resource`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+            command,
+          });
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const magnitudeLabel = (args.magnitude || "slightly_restore").replace(
+          /_/g,
+          " "
+        );
+        const successMsg = `${response.message} (${magnitudeLabel})`;
+        logger.action(`Tool call succeeded: ${successMsg}`, {
+          toolCallId: toolId,
+          toolName,
+        });
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: successMsg,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+
+        if (STATE_CHANGE_TOOLS.has(toolName)) {
+          stateChanges.push(successMsg);
+        }
+        continue;
+      }
+
+      // Special handling for damage_item - calculate durability loss from magnitude
+      if (toolCall.function.name === "damage_item") {
+        const inventory = storyData.inventory || [];
+        const existingItem = inventory.find(
+          (i) => i.name.toLowerCase() === args.name?.toLowerCase()
+        );
+
+        if (!existingItem) {
+          const errorMsg = `Item "${args.name}" not found`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Items without durability tracking can't be damaged this way
+        const maxDurability = existingItem.maxDurability || 100;
+        const difficulty = storyData.difficulty || "medium";
+
+        // Calculate actual damage from magnitude
+        const damage = calculateDurabilityDelta(
+          args.magnitude || "damage",
+          maxDurability,
+          difficulty as AdventureDifficulty
+        );
+
+        logger.action("Special handling: damage_item with magnitude", {
+          toolCallId: toolId,
+          itemName: args.name,
+          magnitude: args.magnitude,
+          maxDurability,
+          calculatedDamage: damage,
+          difficulty,
+        });
+
+        // Use absolute value since /damage_item expects positive amount
+        const command = `/damage_item: ${args.name} | ${Math.abs(damage)}`;
+        logger.action(`Executing command: ${command}`, {
+          toolCallId: toolId,
+        });
+        const response = executeCommandWithResponse(command, storyData);
+
+        if (!response || !response.success) {
+          const errorMsg = response?.message || `Failed to damage item`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+            command,
+          });
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const magnitudeLabel = (args.magnitude || "damage").replace(/_/g, " ");
+        const successMsg = `${response.message} (${magnitudeLabel})`;
+        logger.action(`Tool call succeeded: ${successMsg}`, {
+          toolCallId: toolId,
+          toolName,
+        });
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: successMsg,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+
+        if (STATE_CHANGE_TOOLS.has(toolName)) {
+          stateChanges.push(successMsg);
+        }
+        continue;
+      }
+
+      // Special handling for repair_item - calculate durability restoration from magnitude
+      if (toolCall.function.name === "repair_item") {
+        const inventory = storyData.inventory || [];
+        const existingItem = inventory.find(
+          (i) => i.name.toLowerCase() === args.name?.toLowerCase()
+        );
+
+        if (!existingItem) {
+          const errorMsg = `Item "${args.name}" not found`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const maxDurability = existingItem.maxDurability || 100;
+        const difficulty = storyData.difficulty || "medium";
+
+        // Calculate actual repair amount from magnitude
+        const repair = calculateDurabilityDelta(
+          args.magnitude || "repair",
+          maxDurability,
+          difficulty as AdventureDifficulty
+        );
+
+        logger.action("Special handling: repair_item with magnitude", {
+          toolCallId: toolId,
+          itemName: args.name,
+          magnitude: args.magnitude,
+          maxDurability,
+          calculatedRepair: repair,
+          difficulty,
+        });
+
+        const command = `/repair_item: ${args.name} | ${repair}`;
+        logger.action(`Executing command: ${command}`, {
+          toolCallId: toolId,
+        });
+        const response = executeCommandWithResponse(command, storyData);
+
+        if (!response || !response.success) {
+          const errorMsg = response?.message || `Failed to repair item`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+            command,
+          });
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const magnitudeLabel = (args.magnitude || "repair").replace(/_/g, " ");
+        const successMsg = `${response.message} (${magnitudeLabel})`;
+        logger.action(`Tool call succeeded: ${successMsg}`, {
+          toolCallId: toolId,
+          toolName,
+        });
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: successMsg,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+
+        if (STATE_CHANGE_TOOLS.has(toolName)) {
+          stateChanges.push(successMsg);
+        }
         continue;
       }
 
@@ -2670,43 +3061,20 @@ function convertToolToCommand(
       return `/consume_item: ${args.name}`;
 
     case "repair_item":
-      // Amount is optional - omit for full repair
-      if (args.amount !== undefined) {
-        return `/repair_item: ${args.name} | ${args.amount}`;
-      }
-      return `/repair_item: ${args.name}`;
+      // Magnitude-based repair - handled in executeTools special handling
+      return null;
 
     case "damage_item":
-      return `/damage_item: ${args.name} | ${args.amount}`;
+      // Magnitude-based damage - handled in executeTools special handling
+      return null;
 
     case "upgrade_item":
       return `/upgrade_item: ${args.name} | ${args.newGrade}`;
 
     // Resource Management
-    case "adjust_resource": {
-      // currentDelta and maxDelta can be tier strings or numbers
-      // isNegative flag determines if the change is a loss/penalty
-      let currentDelta = parseStatChangeValue(
-        args.currentDelta ?? 0,
-        difficulty
-      );
-      let maxDelta =
-        args.maxDelta !== undefined
-          ? parseStatChangeValue(args.maxDelta, difficulty)
-          : 0;
-
-      // Apply isNegative flag if present
-      if (args.isNegative) {
-        currentDelta = -Math.abs(currentDelta);
-        maxDelta = -Math.abs(maxDelta);
-      }
-
-      // Use /adjust_resource for current value only, /modify_resource for both
-      if (maxDelta !== 0) {
-        return `/modify_resource: ${args.name} | ${currentDelta} | ${maxDelta}`;
-      }
-      return `/adjust_resource: ${args.name} | ${currentDelta}`;
-    }
+    case "adjust_resource":
+      // Magnitude-based resource change - handled in executeTools special handling
+      return null;
 
     case "set_resource":
       // Set resource values - use /modify_resource with deltas calculated from current values
@@ -2732,16 +3100,9 @@ function convertToolToCommand(
 
     // Stat Management
     case "adjust_stat": {
-      // valueDelta can be a tier string or number
-      // isNegative flag determines if the change is a penalty
-      let valueDelta = parseStatChangeValue(args.valueDelta ?? 0, difficulty);
-
-      // Apply isNegative flag if present
-      if (args.isNegative) {
-        valueDelta = -Math.abs(valueDelta);
-      }
-
-      return `/modify_stat: ${args.name} | ${valueDelta}`;
+      // Magnitude-based stat change
+      const delta = calculateStatDelta(args.magnitude, difficulty);
+      return `/modify_stat: ${args.name} | ${delta}`;
     }
 
     case "set_stat":

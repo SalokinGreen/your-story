@@ -135,9 +135,12 @@ export default function SkillTreeView({
   const containerHeight = containerSize.height;
   // Scale node size based on container width and zoom
   const baseNodeSize =
-    containerWidth < 350 ? 36 : containerWidth < 450 ? 42 : 48;
+    containerWidth < 350 ? 28 : containerWidth < 450 ? 34 : 44;
   const nodeSize = baseNodeSize * zoom;
-  const padding = (containerWidth < 400 ? 24 : 40) * zoom;
+  // Increase padding on mobile for more spacing between nodes
+  const basePadding =
+    containerWidth < 400 ? 55 : containerWidth < 500 ? 65 : 70;
+  const padding = basePadding * zoom;
 
   const nodePositions: NodePosition[] = tree.nodes.map((node) => ({
     node,
@@ -200,6 +203,11 @@ export default function SkillTreeView({
     (e: MouseEvent | TouchEvent) => {
       if (!isPanning) return;
 
+      // Prevent page scrolling on touch devices
+      if ("touches" in e) {
+        e.preventDefault();
+      }
+
       const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
       const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
 
@@ -218,6 +226,29 @@ export default function SkillTreeView({
   const handlePointerUp = useCallback(() => {
     setIsPanning(false);
   }, []);
+
+  // Touch start handler - needs to be attached with passive: false
+  const handleTouchStart = useCallback((e: TouchEvent) => {
+    // Start panning unless touching a node
+    if (!(e.target as HTMLElement).closest(".skill-node")) {
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  }, []);
+
+  // Attach touch start listener with passive: false to allow preventDefault
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    container.addEventListener("touchstart", handleTouchStart, {
+      passive: false,
+    });
+    return () => {
+      container.removeEventListener("touchstart", handleTouchStart);
+    };
+  }, [handleTouchStart]);
 
   // Add/remove event listeners for panning
   useEffect(() => {
@@ -289,22 +320,14 @@ export default function SkillTreeView({
       {/* Tree Visualization */}
       <div
         ref={containerRef}
-        className="relative bg-linear-to-br from-gray-900/80 to-blue-950/80 rounded-xl border border-blue-800/30 overflow-hidden w-full cursor-grab active:cursor-grabbing"
-        style={{ minHeight: "350px", aspectRatio: "8 / 5" }}
+        className="relative bg-linear-to-br from-gray-900/80 to-blue-950/80 rounded-xl border border-blue-800/30 overflow-hidden w-full cursor-grab active:cursor-grabbing touch-none"
+        style={{ minHeight: "400px", aspectRatio: "4 / 3" }}
         onMouseDown={(e) => {
           // Start panning unless clicking on a node
           if (!(e.target as HTMLElement).closest(".skill-node")) {
             e.preventDefault();
             setIsPanning(true);
             setPanStart({ x: e.clientX, y: e.clientY });
-          }
-        }}
-        onTouchStart={(e) => {
-          // Start panning unless touching a node
-          if (!(e.target as HTMLElement).closest(".skill-node")) {
-            e.preventDefault();
-            setIsPanning(true);
-            setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
           }
         }}
       >
@@ -465,10 +488,11 @@ export default function SkillTreeView({
       {/* Node Details Panel */}
       {selectedNode && (
         <div className="mt-4 p-4 bg-gray-900/80 rounded-lg border border-blue-800/30">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-4">
+            {/* Node info */}
             <div className="flex items-start gap-3">
               <div
-                className={`w-12 h-12 rounded-lg ${
+                className={`w-12 h-12 rounded-lg shrink-0 ${
                   NODE_COLORS[selectedNode.type].bg
                 } ${
                   NODE_COLORS[selectedNode.type].border
@@ -479,7 +503,7 @@ export default function SkillTreeView({
                   className="w-7 h-7 text-white"
                 />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <h4 className="text-lg font-bold text-white">
                   {selectedNode.name}
                 </h4>
@@ -554,47 +578,50 @@ export default function SkillTreeView({
               </div>
             </div>
 
-            <div className="flex flex-col gap-2">
+            {/* Prerequisites info */}
+            {selectedNode.prerequisites.length > 0 && (
+              <div className="pt-3 border-t border-gray-700">
+                <p className="text-xs text-gray-400">
+                  <span className="font-semibold">Requires:</span>{" "}
+                  {selectedNode.prerequisites
+                    .map(
+                      (id) => tree.nodes.find((n) => n.id === id)?.name || id
+                    )
+                    .join(", ")}
+                </p>
+              </div>
+            )}
+
+            {/* Action buttons - always at bottom, full width on mobile */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
               {!readOnly &&
                 getNodeState(storyData, tree, selectedNode) === "available" && (
                   <button
                     onClick={handleUnlock}
                     disabled={availableUpgrades <= 0}
-                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+                    className="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
                   >
-                    {availableUpgrades > 0 ? "Unlock" : "No Points"}
+                    {availableUpgrades > 0 ? "✓ Unlock" : "No Points"}
                   </button>
                 )}
               {getNodeState(storyData, tree, selectedNode) === "unlocked" && (
-                <span className="px-4 py-2 bg-green-600/50 text-green-300 font-semibold rounded-lg text-center">
+                <span className="flex-1 px-4 py-2 bg-green-600/50 text-green-300 font-semibold rounded-lg text-center">
                   ✓ Unlocked
                 </span>
               )}
               {getNodeState(storyData, tree, selectedNode) === "locked" && (
-                <span className="px-4 py-2 bg-gray-700/50 text-gray-400 font-semibold rounded-lg text-center">
+                <span className="flex-1 px-4 py-2 bg-gray-700/50 text-gray-400 font-semibold rounded-lg text-center">
                   🔒 Locked
                 </span>
               )}
               <button
                 onClick={() => setSelectedNode(null)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                className="flex-1 sm:flex-none px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               >
                 Close
               </button>
             </div>
           </div>
-
-          {/* Prerequisites info */}
-          {selectedNode.prerequisites.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-700">
-              <p className="text-xs text-gray-400">
-                <span className="font-semibold">Requires:</span>{" "}
-                {selectedNode.prerequisites
-                  .map((id) => tree.nodes.find((n) => n.id === id)?.name || id)
-                  .join(", ")}
-              </p>
-            </div>
-          )}
         </div>
       )}
 
