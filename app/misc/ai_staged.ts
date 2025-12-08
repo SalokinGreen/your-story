@@ -503,24 +503,7 @@ export function buildInfoMessage(
 - Chaos Factor: ${storyData.agmtState.chaosFactor}/9 (${getChaosDescription(
         storyData.agmtState.chaosFactor
       )})
-- Scene Count: ${storyData.agmtState.sceneCount}
-- Active Threads: ${
-        storyData.agmtState.threads.filter((t) => t.status === "active").length
-      }/${storyData.agmtState.threads.length}
-
-### Threads
-${
-  storyData.agmtState.threads
-    .filter((t) => t.status === "active")
-    .map((t) => `- [Active] ${t.description} (ID: ${t.id})`)
-    .join("\n") || "(none)"
-}
-${
-  storyData.agmtState.threads
-    .filter((t) => t.status === "closed")
-    .map((t) => `- [Closed] ${t.description} (ID: ${t.id})`)
-    .join("\n") || ""
-}`
+- Scene Count: ${storyData.agmtState.sceneCount}`
     : "";
 
   // Build active challenge section if one exists
@@ -603,6 +586,9 @@ ${
     storyData.threads?.filter(
       (t) => t.status === "resolved" || t.status === "abandoned"
     ) || [];
+  // Truncate thread descriptions to prevent context bloat (max 200 chars)
+  const truncateDesc = (desc: string, max = 200) =>
+    desc.length > max ? desc.slice(0, max).trim() + "..." : desc;
   const threadsSection =
     activeThreads.length || completedThreads.length
       ? `## Story Threads
@@ -610,7 +596,10 @@ ${
   activeThreads.length
     ? `### Active\n${activeThreads
         .map(
-          (t) => `- [${t.priority || "side"}] **${t.title}**: ${t.description}`
+          (t) =>
+            `- [${t.priority || "side"}] **${t.title}**: ${truncateDesc(
+              t.description
+            )}`
         )
         .join("\n")}`
     : ""
@@ -1066,9 +1055,15 @@ Resources are NOT automatically recovered. You MUST specify which resources to r
 ## THREAD MANAGEMENT
 Track ongoing storylines, mysteries, quests, and plot hooks using threads.
 
+⚠️ **CRITICAL: Threads are quest trackers, NOT story summaries!**
+- Keep descriptions to 1-2 sentences max
+- State ONLY the current objective and status
+- Do NOT recap story events - that's what memory is for
+- When updating, REPLACE the description entirely with a new concise summary
+
 ⚠️ **CRITICAL: The "Threads" section in the info message shows EXISTING threads. Do NOT recreate them!**
 - If you see "### Threads" with entries like "[Active] Find the lost artifact" - that thread ALREADY EXISTS
-- To update progress on an existing thread, use \`update_thread\` with the thread's ID
+- To update progress on an existing thread, use \`update_thread\` with the thread's title
 - Only use \`create_thread\` for COMPLETELY NEW storylines not already tracked
 
 **When to CREATE a Thread (\`create_thread\`):**
@@ -1086,6 +1081,7 @@ Track ongoing storylines, mysteries, quests, and plot hooks using threads.
 - New information is discovered that changes an **existing** thread's scope or direction
 - Progress is made but the thread isn't resolved yet
 - The situation escalates or de-escalates
+- ⚠️ Write a NEW summary - do not append to the existing description!
 
 **When to RESOLVE a Thread (\`resolve_thread\`):**
 - The objective is completed successfully

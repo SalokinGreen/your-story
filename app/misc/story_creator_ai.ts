@@ -19,7 +19,6 @@ import {
   Variable,
   Preset,
   CustomTable,
-  AGMTThread,
   SkillTree,
   getMemoryContent,
 } from "@/app/misc/structs";
@@ -304,18 +303,11 @@ export function applyCreatorChangesToStoryData(
   }
 
   if (changes.agmtState !== undefined) {
-    // Merge AGMT state carefully
+    // Merge AGMT state (threads deprecated, only chaos factor and scene count)
     if (storyData.agmtState && changes.agmtState) {
       updates.agmtState = {
         ...storyData.agmtState,
         ...changes.agmtState,
-        threads: changes.agmtState.threads
-          ? mergeArrayWithCommands(
-              storyData.agmtState.threads || [],
-              changes.agmtState.threads,
-              "description"
-            )
-          : storyData.agmtState.threads,
       };
     } else {
       updates.agmtState = changes.agmtState;

@@ -2895,238 +2895,56 @@ export function executeCommandWithResponse(
 
   // === Advanced RPG Tools COMMANDS ===
 
-  // /add_thread: description
+  // DEPRECATED: AGMT thread commands - use StoryThread tools instead
+  // These handlers return no-op success for backwards compatibility
   const addThreadMatch = trimmed.match(/^\/add_thread:\s*(.+)$/i);
   if (addThreadMatch) {
-    const description = addThreadMatch[1].trim();
-
-    if (!storyData.agmtState) {
-      storyData.agmtState = {
-        chaosFactor: 5,
-        threads: [],
-        sceneCount: 0,
-        skillCheckHistory: [],
-        currentStreak: 0,
-        lastChaosAdjustment: -999,
-      };
-    }
-
-    // Check for duplicate
-    const exists = storyData.agmtState.threads.some(
-      (t) => t.description.toLowerCase() === description.toLowerCase()
-    );
-    if (exists) {
-      return {
-        command: trimmed,
-        success: "partial",
-        message: `Thread "${description}" already exists`,
-        timestamp,
-      };
-    }
-
-    storyData.agmtState.threads.push({
-      id: crypto.randomUUID(),
-      description,
-      status: "active",
-      createdAt: Date.now(),
-    });
-
-    logger.action("Thread added via command response", { description });
-
     return {
       command: trimmed,
       success: true,
-      message: `Added thread: "${description}"`,
+      message: `AGMT threads deprecated - use create_thread for StoryThreads`,
       timestamp,
     };
   }
 
-  // /update_thread: old description → new description
   const updateThreadMatch = trimmed.match(
     /^\/update_thread:\s*(.+?)\s*→\s*(.+)$/i
   );
   if (updateThreadMatch) {
-    const oldDesc = updateThreadMatch[1].trim();
-    const newDesc = updateThreadMatch[2].trim();
-
-    if (!storyData.agmtState) {
-      return {
-        command: trimmed,
-        success: false,
-        message: "Advanced RPG Tools not enabled",
-        timestamp,
-      };
-    }
-
-    const thread = storyData.agmtState.threads.find(
-      (t) => t.description.toLowerCase() === oldDesc.toLowerCase()
-    );
-    if (!thread) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Thread "${oldDesc}" not found`,
-        timestamp,
-      };
-    }
-
-    thread.description = newDesc;
-
-    logger.action("Thread updated via command response", { oldDesc, newDesc });
-
     return {
       command: trimmed,
       success: true,
-      message: `Updated thread: "${oldDesc}" → "${newDesc}"`,
+      message: `AGMT threads deprecated - use update_thread for StoryThreads`,
       timestamp,
     };
   }
 
-  // /resolve_thread: description
   const resolveThreadMatch = trimmed.match(/^\/resolve_thread:\s*(.+)$/i);
   if (resolveThreadMatch) {
-    const description = resolveThreadMatch[1].trim();
-
-    if (!storyData.agmtState) {
-      return {
-        command: trimmed,
-        success: false,
-        message: "Advanced RPG Tools not enabled",
-        timestamp,
-      };
-    }
-
-    const thread = storyData.agmtState.threads.find(
-      (t) => t.description.toLowerCase() === description.toLowerCase()
-    );
-    if (!thread) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Thread "${description}" not found`,
-        timestamp,
-      };
-    }
-
-    if (thread.status === "closed") {
-      return {
-        command: trimmed,
-        success: "partial",
-        message: `Thread "${description}" was already closed`,
-        timestamp,
-      };
-    }
-
-    thread.status = "closed";
-
-    logger.action("Thread resolved via command response", { description });
-
     return {
       command: trimmed,
       success: true,
-      message: `Resolved thread: "${description}"`,
+      message: `AGMT threads deprecated - use resolve_thread for StoryThreads`,
       timestamp,
     };
   }
 
-  // /close_thread: threadId (from tool executor)
   const closeThreadMatch = trimmed.match(/^\/close_thread:\s*(.+)$/i);
   if (closeThreadMatch) {
-    const threadId = closeThreadMatch[1].trim();
-
-    if (!storyData.agmtState) {
-      return {
-        command: trimmed,
-        success: false,
-        message: "Advanced RPG Tools not enabled",
-        timestamp,
-      };
-    }
-
-    // Try to find by ID first, then by description
-    let thread = storyData.agmtState.threads.find((t) => t.id === threadId);
-    if (!thread) {
-      thread = storyData.agmtState.threads.find(
-        (t) => t.description.toLowerCase() === threadId.toLowerCase()
-      );
-    }
-
-    if (!thread) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Thread "${threadId}" not found`,
-        timestamp,
-      };
-    }
-
-    if (thread.status === "closed") {
-      return {
-        command: trimmed,
-        success: "partial",
-        message: `Thread "${thread.description}" was already closed`,
-        timestamp,
-      };
-    }
-
-    thread.status = "closed";
-
-    logger.action("Thread closed via command response", {
-      id: thread.id,
-      description: thread.description,
-    });
-
     return {
       command: trimmed,
       success: true,
-      message: `Closed thread: "${thread.description}"`,
+      message: `AGMT threads deprecated - use resolve_thread for StoryThreads`,
       timestamp,
     };
   }
 
-  // /reopen_thread: description (from tool executor)
   const reopenThreadMatch = trimmed.match(/^\/reopen_thread:\s*(.+)$/i);
   if (reopenThreadMatch) {
-    const description = reopenThreadMatch[1].trim();
-
-    if (!storyData.agmtState) {
-      return {
-        command: trimmed,
-        success: false,
-        message: "Advanced RPG Tools not enabled",
-        timestamp,
-      };
-    }
-
-    const thread = storyData.agmtState.threads.find(
-      (t) => t.description.toLowerCase() === description.toLowerCase()
-    );
-    if (!thread) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Thread "${description}" not found`,
-        timestamp,
-      };
-    }
-
-    if (thread.status === "active") {
-      return {
-        command: trimmed,
-        success: "partial",
-        message: `Thread "${description}" was already active`,
-        timestamp,
-      };
-    }
-
-    thread.status = "active";
-
-    logger.action("Thread reopened via command response", { description });
-
     return {
       command: trimmed,
       success: true,
-      message: `Reopened thread: "${description}"`,
+      message: `AGMT threads deprecated - StoryThreads don't support reopen`,
       timestamp,
     };
   }

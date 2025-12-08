@@ -12,7 +12,6 @@ import {
   Condition,
   ConditionTier,
   AGMTState,
-  AGMTThread,
   CustomTable,
   Variable,
   NumberVariable,
@@ -5770,9 +5769,6 @@ export default function MenuPage({
                 { id: "relationships", label: "Relationships", icon: "Users" },
                 { id: "conditions", label: "Conditions", icon: "HeartPulse" },
                 { id: "agmt", label: "AGMT", icon: "Sparkles" },
-                ...(storyData.agmtState
-                  ? [{ id: "threads", label: "Threads", icon: "ListTodo" }]
-                  : []),
                 { id: "story", label: "Story", icon: "BookOpen" },
               ].map((tab) => (
                 <button
@@ -5918,218 +5914,6 @@ export default function MenuPage({
                 </div>
               )}
 
-              {activeTab === "threads" && storyData.agmtState && (
-                <div className="mt-4 space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-lg font-bold text-white flex items-center gap-2">
-                      <DynamicIcon name="ListTodo" className="w-6 h-6" />
-                      Story Threads
-                    </h4>
-                    <button
-                      onClick={() => {
-                        const newThread: AGMTThread = {
-                          id: crypto.randomUUID(),
-                          description: "",
-                          status: "active",
-                          createdAt: Date.now(),
-                        };
-                        onUpdateStoryData({
-                          agmtState: {
-                            ...storyData.agmtState!,
-                            threads: [
-                              ...storyData.agmtState!.threads,
-                              newThread,
-                            ],
-                          },
-                        });
-                      }}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg flex items-center gap-2"
-                    >
-                      <DynamicIcon name="Plus" className="w-4 h-4" />
-                      New Thread
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h5 className="text-sm font-semibold text-blue-200">
-                      Active Threads (
-                      {
-                        storyData.agmtState.threads.filter(
-                          (t) => t.status === "active"
-                        ).length
-                      }
-                      )
-                    </h5>
-                    {storyData.agmtState.threads
-                      .filter((t) => t.status === "active")
-                      .map((thread) => (
-                        <div
-                          key={thread.id}
-                          className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800 space-y-3"
-                        >
-                          <textarea
-                            value={thread.description}
-                            onChange={(e) => {
-                              onUpdateStoryData({
-                                agmtState: {
-                                  ...storyData.agmtState!,
-                                  threads: storyData.agmtState!.threads.map(
-                                    (t) =>
-                                      t.id === thread.id
-                                        ? { ...t, description: e.target.value }
-                                        : t
-                                  ),
-                                },
-                              });
-                            }}
-                            placeholder="Thread description..."
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
-                            rows={2}
-                          />
-                          <div className="flex items-center justify-between text-xs text-blue-300/50">
-                            <span>
-                              Created{" "}
-                              {new Date(thread.createdAt).toLocaleDateString()}
-                            </span>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  onUpdateStoryData({
-                                    agmtState: {
-                                      ...storyData.agmtState!,
-                                      threads: storyData.agmtState!.threads.map(
-                                        (t) =>
-                                          t.id === thread.id
-                                            ? { ...t, status: "closed" }
-                                            : t
-                                      ),
-                                    },
-                                  });
-                                  addNotification("Thread resolved", "success");
-                                }}
-                                className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded"
-                              >
-                                Mark Resolved
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setConfirmDialog({
-                                    isOpen: true,
-                                    title: "Delete Thread",
-                                    message:
-                                      "Are you sure you want to delete this thread?",
-                                    icon: "Trash2",
-                                    onConfirm: () => {
-                                      onUpdateStoryData({
-                                        agmtState: {
-                                          ...storyData.agmtState!,
-                                          threads:
-                                            storyData.agmtState!.threads.filter(
-                                              (t) => t.id !== thread.id
-                                            ),
-                                        },
-                                      });
-                                      addNotification(
-                                        "Thread deleted",
-                                        "success"
-                                      );
-                                      setConfirmDialog({
-                                        ...confirmDialog,
-                                        isOpen: false,
-                                      });
-                                    },
-                                  });
-                                }}
-                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    {storyData.agmtState.threads.filter(
-                      (t) => t.status === "active"
-                    ).length === 0 && (
-                      <p className="text-sm text-blue-200/60 italic">
-                        No active threads. Click "New Thread" to add one.
-                      </p>
-                    )}
-                  </div>
-
-                  <details className="border border-blue-700/40 rounded-lg">
-                    <summary className="px-4 py-3 cursor-pointer font-semibold text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
-                      Closed Threads (
-                      {
-                        storyData.agmtState.threads.filter(
-                          (t) => t.status === "closed"
-                        ).length
-                      }
-                      )
-                    </summary>
-                    <div className="px-4 pb-4 space-y-3">
-                      {storyData.agmtState.threads
-                        .filter((t) => t.status === "closed")
-                        .map((thread) => (
-                          <div
-                            key={thread.id}
-                            className="p-3 bg-blue-900/20 rounded-lg border border-blue-800/30"
-                          >
-                            <p className="text-sm text-blue-200 line-through">
-                              {thread.description}
-                            </p>
-                            <div className="flex justify-end gap-2 mt-2">
-                              <button
-                                onClick={() => {
-                                  onUpdateStoryData({
-                                    agmtState: {
-                                      ...storyData.agmtState!,
-                                      threads: storyData.agmtState!.threads.map(
-                                        (t) =>
-                                          t.id === thread.id
-                                            ? { ...t, status: "active" }
-                                            : t
-                                      ),
-                                    },
-                                  });
-                                  addNotification("Thread reopened", "success");
-                                }}
-                                className="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded"
-                              >
-                                Reopen
-                              </button>
-                              <button
-                                onClick={() => {
-                                  onUpdateStoryData({
-                                    agmtState: {
-                                      ...storyData.agmtState!,
-                                      threads:
-                                        storyData.agmtState!.threads.filter(
-                                          (t) => t.id !== thread.id
-                                        ),
-                                    },
-                                  });
-                                  addNotification("Thread deleted", "success");
-                                }}
-                                className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      {storyData.agmtState.threads.filter(
-                        (t) => t.status === "closed"
-                      ).length === 0 && (
-                        <p className="text-sm text-blue-200/60 italic py-2">
-                          No closed threads yet.
-                        </p>
-                      )}
-                    </div>
-                  </details>
-                </div>
-              )}
-
               {activeTab === "agmt" && (
                 <div className="mt-4 space-y-6">
                   <h4 className="text-lg font-bold text-white flex items-center gap-2">
@@ -6159,7 +5943,6 @@ export default function MenuPage({
                               onUpdateStoryData({
                                 agmtState: {
                                   chaosFactor: 5,
-                                  threads: [],
                                   sceneCount: 0,
                                   skillCheckHistory: [],
                                   currentStreak: 0,
@@ -6396,34 +6179,6 @@ export default function MenuPage({
                           </div>
                         </div>
                       )}
-
-                      {/* Quick Stats */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                          <div className="text-2xl font-bold text-purple-600">
-                            {
-                              storyData.agmtState.threads.filter(
-                                (t) => t.status === "active"
-                              ).length
-                            }
-                          </div>
-                          <div className="text-sm text-blue-200/60">
-                            Active Threads
-                          </div>
-                        </div>
-                        <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
-                          <div className="text-2xl font-bold text-blue-200/60">
-                            {
-                              storyData.agmtState.threads.filter(
-                                (t) => t.status === "closed"
-                              ).length
-                            }
-                          </div>
-                          <div className="text-sm text-blue-200/60">
-                            Closed Threads
-                          </div>
-                        </div>
-                      </div>
                     </>
                   )}
                 </div>

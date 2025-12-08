@@ -1189,7 +1189,7 @@ const createThreadTool: ToolSchema = {
         description: {
           type: "string",
           description:
-            "Detailed description of the thread - what it involves, current state, known information",
+            "1-2 sentence summary of the objective and current state. Keep concise - this is a quest tracker, not a story recap.",
         },
         priority: {
           type: "string",
@@ -1208,7 +1208,7 @@ const updateThreadTool: ToolSchema = {
   function: {
     name: "update_thread",
     description:
-      "Update a thread's description or priority to reflect story developments. Use when new information is revealed or circumstances change.",
+      "Update a thread's description or priority when circumstances change. Replace the description with a new concise summary - do NOT append to it.",
     parameters: {
       type: "object",
       properties: {
@@ -1218,7 +1218,8 @@ const updateThreadTool: ToolSchema = {
         },
         description: {
           type: "string",
-          description: "New description reflecting current state (optional)",
+          description:
+            "New 1-2 sentence summary replacing the old one. State CURRENT objective/situation only - history is tracked elsewhere.",
         },
         priority: {
           type: "string",

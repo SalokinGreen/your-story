@@ -20,25 +20,32 @@ function createTestStory(
   difficulty: AdventureDifficulty = "medium"
 ): StoryData {
   return {
-    id: "test-story",
-    name: "Test Story",
-    userId: "test-user",
-    adventureId: "test-adventure",
-    state: "playing",
-    points: 0,
-    earnedPointsFromQuests: [],
-    lastPlayedAt: new Date(),
-    createdAt: new Date(),
+    story_name: "Test Story",
+    premise: "A test premise",
+    player_name: "Test Player",
+    player_summary: "A test character",
+    intro: "Test intro",
+    memory: [],
+    max_chapters: 10,
     currentChapter: 0,
     scene: {
-      title: "Test Scene",
       parts: [],
     },
     chapters: [],
     quests: [],
     stats: [
-      { name: "Strength", description: "Physical power", value: 50 },
-      { name: "Intelligence", description: "Mental acuity", value: 50 },
+      {
+        name: "Strength",
+        description: "Physical power",
+        value: 50,
+        symbol: "💪",
+      },
+      {
+        name: "Intelligence",
+        description: "Mental acuity",
+        value: 50,
+        symbol: "🧠",
+      },
     ],
     resources: [
       {
@@ -65,6 +72,7 @@ function createTestStory(
         grade: "common",
         durability: 80,
         maxDurability: 100,
+        symbol: "⚔️",
       },
       {
         name: "Steel Shield",
@@ -74,21 +82,43 @@ function createTestStory(
         grade: "uncommon",
         durability: 100,
         maxDurability: 100,
+        symbol: "🛡️",
       },
     ],
+    abilities: [],
     achievements: [],
     lore: [],
-    memory: [],
     momentum: 0,
     maxMomentum: 10,
+    points: 0,
+    level: 1,
+    upgradesSpent: 0,
+    earnedPointsFromChapters: [],
     relationships: [
-      { name: "Aldric", description: "A mysterious merchant", value: 0 },
-      { name: "Elena", description: "A friendly healer", value: 50 },
-      { name: "Viktor", description: "A rival warrior", value: -30 },
+      {
+        name: "Aldric",
+        description: "A mysterious merchant",
+        value: 0,
+        symbol: "🧔",
+      },
+      {
+        name: "Elena",
+        description: "A friendly healer",
+        value: 50,
+        symbol: "👩‍⚕️",
+      },
+      {
+        name: "Viktor",
+        description: "A rival warrior",
+        value: -30,
+        symbol: "⚔️",
+      },
     ],
+    conditions: [],
+    earnedPointsFromQuests: [],
     rpgSystem: "3d6",
     difficulty,
-  };
+  } as StoryData;
 }
 
 describe("Magnitude-Based Tools", () => {

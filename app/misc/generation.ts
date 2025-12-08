@@ -33,6 +33,7 @@ import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
 import { getAuthToken } from "@/app/misc/getAuthToken";
 import { logger } from "@/app/misc/logger";
+import { getModelConfig } from "@/app/misc/ai_prices";
 import {
   findStatMatch,
   findResourceMatch,
@@ -729,8 +730,25 @@ export async function generateStoryTurn(
       const maxToolLoops = options.maxToolLoops || 1;
       let toolLoopCount = 0;
 
-      // Fallback model for rate limits
-      const FALLBACK_TOOLS_MODEL = "MiniMax M2";
+      // Determine fallback model based on what keys are available
+      // If using DeepSeek, no fallback (DeepSeek is reliable)
+      // If using OpenRouter/Google, fall back to MiniMax M2
+      // If using Coins (Mistral/DeepInfra), fall back to DeepInfra MiniMax M2
+      const primaryModelConfig = getModelConfig(options.toolsModel);
+      let FALLBACK_TOOLS_MODEL: string | null = null;
+
+      if (
+        primaryModelConfig.provider === "openrouter" ||
+        primaryModelConfig.provider === "google"
+      ) {
+        FALLBACK_TOOLS_MODEL = "MiniMax M2"; // OpenRouter fallback
+      } else if (
+        primaryModelConfig.provider === "mistral" ||
+        primaryModelConfig.provider === "deepinfra"
+      ) {
+        FALLBACK_TOOLS_MODEL = "DeepInfra MiniMax M2"; // Coins fallback
+      }
+      // For DeepSeek, no fallback (user only has DeepSeek key)
 
       while (toolLoopCount < maxToolLoops) {
         toolLoopCount++;
@@ -746,7 +764,10 @@ export async function generateStoryTurn(
 
         // Try primary model first, then fallback on rate limit
         const modelsToTry = [options.toolsModel];
-        if (options.toolsModel !== FALLBACK_TOOLS_MODEL) {
+        if (
+          FALLBACK_TOOLS_MODEL &&
+          options.toolsModel !== FALLBACK_TOOLS_MODEL
+        ) {
           modelsToTry.push(FALLBACK_TOOLS_MODEL);
         }
 
@@ -777,11 +798,22 @@ export async function generateStoryTurn(
             `[Tool Stage] Sending ${TOOL_SCHEMAS.length} tools:`,
             TOOL_SCHEMAS.map((t) => t.function?.name).join(", ")
           );
+          console.log(
+            `[Tool Stage] Using model: "${currentModel}" (options.toolsModel: "${options.toolsModel}")`
+          );
 
           let toolResponse: Response;
           try {
             // Use non-streaming endpoint for tools to get full response and debug
             const toolUrl = `/api/generate?t=${Date.now()}&stage=tools`;
+
+            // Get model config to respect max output limits (DeepSeek is 8K, others vary)
+            const toolModelConfig = getModelConfig(currentModel);
+            const toolMaxTokens = Math.min(
+              12000,
+              toolModelConfig.maxOutputTokens || 8000
+            );
+
             toolResponse = await fetch(toolUrl, {
               method: "POST",
               headers: {
@@ -793,7 +825,7 @@ export async function generateStoryTurn(
                 messages: toolPrompt.messages,
                 tools: TOOL_SCHEMAS,
                 model: currentModel,
-                maxTokens: 12000, // Fixed 12K for tool stage - needs room for thinking + tool calls
+                maxTokens: toolMaxTokens,
                 temperature: 0.3,
                 openRouterKey: options.openRouterKey,
                 deepseekKey: options.deepseekKey,

@@ -2964,11 +2964,12 @@ function ChangeSummary({
     });
   }
   if (data.agmtState) {
-    const threads = data.agmtState.threads?.length || 0;
     changes.push({
       type: "Update",
       label: "AGMT State",
-      value: `${threads} thread${threads !== 1 ? "s" : ""}`,
+      value: `Chaos: ${data.agmtState.chaosFactor || 5}, Scene: ${
+        data.agmtState.sceneCount || 0
+      }`,
       details: data.agmtState,
       icon: "Brain",
     });

@@ -160,15 +160,27 @@ async function callAI(
     messages.length > 0 && messages[messages.length - 1].role === "assistant";
   const hasTools = tools && tools.length > 0;
 
+  // Debug logging
+  console.log(
+    `[callAI] provider: ${provider}, hasPrefill: ${hasPrefill}, hasTools: ${hasTools}, toolCount: ${
+      tools?.length || 0
+    }`
+  );
+
   let endpoint: string;
   if (provider === "deepseek") {
     // Use beta endpoint for prefill support (prefix: true requires beta API)
     // BUT: DeepSeek beta doesn't support prefix + function calling together
     // So only use beta for non-tool calls (story generation)
-    endpoint =
-      hasPrefill && !hasTools
-        ? "https://api.deepseek.com/beta/chat/completions"
-        : "https://api.deepseek.com/chat/completions";
+    const useBeta = hasPrefill && !hasTools;
+    endpoint = useBeta
+      ? "https://api.deepseek.com/beta/chat/completions"
+      : "https://api.deepseek.com/chat/completions";
+    console.log(
+      `[callAI] DeepSeek endpoint: ${
+        useBeta ? "BETA" : "REGULAR"
+      } - ${endpoint}`
+    );
   } else if (provider === "mistral") {
     endpoint = "https://api.mistral.ai/v1/chat/completions";
   } else if (provider === "deepinfra") {
@@ -257,6 +269,10 @@ async function callAI(
 
   if (!response.ok) {
     const errorText = await response.text();
+    console.error(
+      `[callAI] ${provider} API error: ${response.status} ${response.statusText}`,
+      errorText
+    );
     throw new Error(
       `AI API request failed: ${response.status} ${response.statusText} - ${errorText}`
     );
@@ -366,13 +382,23 @@ export async function POST(req: NextRequest) {
     const {
       messages,
       tools,
-      model = "Gemini 2.5 Flash",
+      model: rawModel,
       maxTokens = 4000,
       temperature = 0.7,
       openRouterKey,
       deepseekKey,
       googleKey,
     } = body;
+
+    // Use Coins-mode fallback only if model is truly undefined/empty
+    const model = rawModel && rawModel.trim() ? rawModel : "Ministral 8B";
+
+    // Log model for debugging
+    console.log(
+      `[API Generate] Received model: "${model}" (from request: ${
+        body.model ? `"${body.model}"` : "undefined/empty"
+      })`
+    );
 
     if (!messages || messages.length === 0) {
       return NextResponse.json(
@@ -530,6 +556,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: any) {
+    console.error("[API Generate] Error:", error.message, error.stack);
     logger.error("Generation API error", { error: error.message });
     return NextResponse.json(
       { error: error.message || "Internal server error" },

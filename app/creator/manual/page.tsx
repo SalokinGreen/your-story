@@ -22,7 +22,6 @@ import {
   LevelingSettings,
   Adventure,
   AGMTState,
-  AGMTThread,
   CustomTable,
   StartingChoice,
   Variable,
@@ -1453,25 +1452,6 @@ function AdventureCreatorContent() {
         newState.sceneCount = Math.max(0, ms.sceneCount);
       }
 
-      // Threads
-      if (ms.threads) {
-        const threadChanges = ms.threads as any[];
-        newState.threads = applyItemChanges(
-          agmtState.threads,
-          threadChanges,
-          "agmt thread",
-          "id"
-        ).map((thread: any) => {
-          // Auto-generate ID for new threads without one
-          if (!thread.id) {
-            thread.id = `thread-${Date.now()}-${Math.random()
-              .toString(36)
-              .substring(2, 9)}`;
-          }
-          return thread;
-        });
-      }
-
       setAGMTState(newState);
     }
 
@@ -2165,15 +2145,11 @@ function AdventureCreatorContent() {
   const [agmtEnabled, setAGMTEnabled] = useState(false);
   const [agmtState, setAGMTState] = useState<AGMTState>({
     chaosFactor: 5,
-    threads: [],
     sceneCount: 0,
     skillCheckHistory: [],
     currentStreak: 0,
     lastChaosAdjustment: -999,
   });
-  const [newThread, setNewThread] = useState("");
-  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
-  const [editThreadDescription, setEditThreadDescription] = useState("");
 
   // Achievements
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -11799,183 +11775,6 @@ ${description || ""}`;
                         </p>
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                {/* Starting Threads */}
-                <div className="p-6 rounded-lg bg-linear-to-br from-blue-900/20 to-gray-900/50 border border-blue-500/20">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-bold text-blue-400 flex items-center gap-2">
-                      <span>🧵</span>
-                      Starting Story Threads
-                      {agmtState.threads.length > 0 && (
-                        <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-300">
-                          {agmtState.threads.length}
-                        </span>
-                      )}
-                    </h4>
-                  </div>
-                  <div className="space-y-3 mb-4">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newThread}
-                        onChange={(e) => setNewThread(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && newThread.trim()) {
-                            setAGMTState({
-                              ...agmtState,
-                              threads: [
-                                ...agmtState.threads,
-                                {
-                                  id: crypto.randomUUID(),
-                                  description: newThread.trim(),
-                                  status: "active",
-                                  createdAt: Date.now(),
-                                },
-                              ],
-                            });
-                            setNewThread("");
-                          }
-                        }}
-                        placeholder="Add a story thread (e.g., Find the missing heir)"
-                        className="flex-1 px-3 py-2 border-2 border-gray-600 rounded-lg bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <button
-                        onClick={() => {
-                          if (newThread.trim()) {
-                            setAGMTState({
-                              ...agmtState,
-                              threads: [
-                                ...agmtState.threads,
-                                {
-                                  id: crypto.randomUUID(),
-                                  description: newThread.trim(),
-                                  status: "active",
-                                  createdAt: Date.now(),
-                                },
-                              ],
-                            });
-                            setNewThread("");
-                          }
-                        }}
-                        disabled={!newThread.trim()}
-                        className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 disabled:bg-gray-700 disabled:text-gray-500 text-blue-400 font-semibold rounded-lg transition-colors border border-blue-500/30 hover:border-blue-500/50"
-                      >
-                        + Add
-                      </button>
-                    </div>
-                    {agmtState.threads.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <p className="text-sm">No threads yet</p>
-                        <p className="text-xs mt-1">
-                          Threads track ongoing plotlines and mysteries
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {agmtState.threads.map((thread) => (
-                          <div
-                            key={thread.id}
-                            className="group p-4 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-blue-500/50 transition-all duration-200"
-                          >
-                            {editingThreadId === thread.id ? (
-                              <div className="flex gap-3">
-                                <span className="text-2xl">🧵</span>
-                                <input
-                                  type="text"
-                                  value={editThreadDescription}
-                                  onChange={(e) =>
-                                    setEditThreadDescription(e.target.value)
-                                  }
-                                  className="flex-1 px-2 py-1 border border-gray-600 rounded bg-gray-900 text-white"
-                                />
-                                <button
-                                  onClick={() => {
-                                    setAGMTState({
-                                      ...agmtState,
-                                      threads: agmtState.threads.map((t) =>
-                                        t.id === thread.id
-                                          ? {
-                                              ...t,
-                                              description:
-                                                editThreadDescription,
-                                            }
-                                          : t
-                                      ),
-                                    });
-                                    setEditingThreadId(null);
-                                    setEditThreadDescription("");
-                                  }}
-                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded"
-                                >
-                                  <DynamicIcon
-                                    name="Check"
-                                    className="w-4 h-4"
-                                  />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEditingThreadId(null);
-                                    setEditThreadDescription("");
-                                  }}
-                                  className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded"
-                                >
-                                  <DynamicIcon name="X" className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex gap-3">
-                                <span className="text-2xl">??</span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm text-gray-200 leading-relaxed">
-                                    {thread.description}
-                                  </p>
-                                  {thread.description.length < 10 &&
-                                    thread.description.length > 0 && (
-                                      <p className="text-xs text-red-400 mt-1">
-                                        Too short (min 10 characters)
-                                      </p>
-                                    )}
-                                </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={() => {
-                                      setEditingThreadId(thread.id);
-                                      setEditThreadDescription(
-                                        thread.description
-                                      );
-                                    }}
-                                    className="text-blue-400 hover:text-blue-300"
-                                  >
-                                    <DynamicIcon
-                                      name="Edit2"
-                                      className="w-4 h-4"
-                                    />
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      setAGMTState({
-                                        ...agmtState,
-                                        threads: agmtState.threads.filter(
-                                          (t) => t.id !== thread.id
-                                        ),
-                                      })
-                                    }
-                                    className="text-red-400 hover:text-red-300"
-                                  >
-                                    <DynamicIcon
-                                      name="Trash2"
-                                      className="w-4 h-4"
-                                    />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>

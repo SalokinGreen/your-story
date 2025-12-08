@@ -530,11 +530,11 @@ export interface StoryData {
 // Advanced RPG Tools state tracking
 export interface AGMTState {
   chaosFactor: number; // 1-9, default 5
-  threads: AGMTThread[]; // Active story threads
   sceneCount: number; // Number of scenes played
   skillCheckHistory: SkillCheckResult[]; // Recent skill check results
   currentStreak: number; // Positive = success streak, negative = failure streak
   lastChaosAdjustment: number; // Scene number of last chaos adjustment
+  threads?: never[]; // DEPRECATED: Use StoryThread[] at storyData.threads instead
 }
 
 export interface SkillCheckResult {
@@ -557,6 +557,7 @@ export interface StoryThread {
   resolvedAt?: number;
 }
 
+/** @deprecated Use StoryThread instead */
 export interface AGMTThread {
   id: string;
   description: string;

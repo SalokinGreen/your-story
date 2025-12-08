@@ -73,6 +73,13 @@ function getModelsFromPreset() {
   const currentPreset = localStorage.getItem("aiPreset") || "custom";
   const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["custom"];
 
+  // Debug logging
+  console.log(
+    `[getModelsFromPreset] currentPreset: "${currentPreset}", found preset: ${
+      preset ? preset.name : "null"
+    }, toolsModel: "${preset?.toolsModel}"`
+  );
+
   // NovelAI settings (BYOK for story stage only)
   const novelaiEnabled = localStorage.getItem("novelaiEnabled") === "true";
   const novelaiKey = localStorage.getItem("novelaiKey") || "";

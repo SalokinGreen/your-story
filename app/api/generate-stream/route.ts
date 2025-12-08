@@ -286,7 +286,7 @@ export async function POST(req: NextRequest) {
         const {
           messages,
           tools,
-          model = "Gemini 2.5 Flash",
+          model: rawModel,
           maxTokens = 4000,
           temperature = 0.7,
           openRouterKey,
@@ -295,6 +295,9 @@ export async function POST(req: NextRequest) {
           samplingSettings,
           stop,
         } = body;
+
+        // Use Coins-mode fallback only if model is truly undefined/empty
+        const model = rawModel && rawModel.trim() ? rawModel : "Ministral 8B";
 
         if (!messages || messages.length === 0) {
           controller.enqueue(
