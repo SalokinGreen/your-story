@@ -1191,12 +1191,14 @@ export default function AIConfigTab() {
                     ))}
                   {byokMode && customModels.length > 0 && (
                     <optgroup label="Custom Models">
-                      {customModels.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.name} (FREE,{" "}
-                          {(model.contextSize / 1000).toFixed(0)}K)
-                        </option>
-                      ))}
+                      {[...customModels]
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((model) => (
+                          <option key={model.id} value={model.id}>
+                            {model.name} (FREE,{" "}
+                            {(model.contextSize / 1000).toFixed(0)}K)
+                          </option>
+                        ))}
                     </optgroup>
                   )}
                 </select>
@@ -1230,12 +1232,14 @@ export default function AIConfigTab() {
                     ))}
                   {byokMode && customModels.length > 0 && (
                     <optgroup label="Custom Models">
-                      {customModels.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.name} (FREE,{" "}
-                          {(model.contextSize / 1000).toFixed(0)}K)
-                        </option>
-                      ))}
+                      {[...customModels]
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((model) => (
+                          <option key={model.id} value={model.id}>
+                            {model.name} (FREE,{" "}
+                            {(model.contextSize / 1000).toFixed(0)}K)
+                          </option>
+                        ))}
                     </optgroup>
                   )}
                 </select>
@@ -1269,12 +1273,14 @@ export default function AIConfigTab() {
                     ))}
                   {byokMode && customModels.length > 0 && (
                     <optgroup label="Custom Models">
-                      {customModels.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.name} (FREE,{" "}
-                          {(model.contextSize / 1000).toFixed(0)}K)
-                        </option>
-                      ))}
+                      {[...customModels]
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((model) => (
+                          <option key={model.id} value={model.id}>
+                            {model.name} (FREE,{" "}
+                            {(model.contextSize / 1000).toFixed(0)}K)
+                          </option>
+                        ))}
                     </optgroup>
                   )}
                 </select>
@@ -1311,126 +1317,128 @@ export default function AIConfigTab() {
               {/* Existing Custom Models */}
               {customModels.length > 0 && (
                 <div className="space-y-2">
-                  {customModels.map((model) => (
-                    <div
-                      key={model.id}
-                      className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
-                    >
-                      {editingModelId === model.id ? (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={newModelId}
-                            onChange={(e) => setNewModelId(e.target.value)}
-                            placeholder="Model ID"
-                            className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                          />
-                          <input
-                            type="text"
-                            value={newModelName}
-                            onChange={(e) => setNewModelName(e.target.value)}
-                            placeholder="Display Name"
-                            className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                          />
-                          <div className="grid grid-cols-2 gap-2">
+                  {[...customModels]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((model) => (
+                      <div
+                        key={model.id}
+                        className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+                      >
+                        {editingModelId === model.id ? (
+                          <div className="space-y-2">
                             <input
-                              type="number"
-                              value={newContextSize}
-                              onChange={(e) =>
-                                setNewContextSize(
-                                  parseInt(e.target.value) || 4096
-                                )
-                              }
-                              placeholder="Context Size"
-                              className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
+                              type="text"
+                              value={newModelId}
+                              onChange={(e) => setNewModelId(e.target.value)}
+                              placeholder="Model ID"
+                              className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
                             />
                             <input
-                              type="number"
-                              value={newMaxOutput}
-                              onChange={(e) =>
-                                setNewMaxOutput(
-                                  parseInt(e.target.value) || 1000
-                                )
-                              }
-                              placeholder="Max Output"
-                              className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
+                              type="text"
+                              value={newModelName}
+                              onChange={(e) => setNewModelName(e.target.value)}
+                              placeholder="Display Name"
+                              className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
                             />
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={newInputPrice}
-                              onChange={(e) =>
-                                setNewInputPrice(
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              placeholder="Input $/M tokens"
-                              className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                            />
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={newOutputPrice}
-                              onChange={(e) =>
-                                setNewOutputPrice(
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              placeholder="Output $/M tokens"
-                              className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={handleUpdateModel}
-                              className="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={handleCancelEdit}
-                              className="flex-1 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded text-xs font-medium"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {model.name}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              {model.modelId} • {model.contextSize} tokens
-                            </p>
-                          </div>
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => handleEditModel(model)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
-                            >
-                              <DynamicIcon
-                                name="Edit2"
-                                className="w-3.5 h-3.5"
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="number"
+                                value={newContextSize}
+                                onChange={(e) =>
+                                  setNewContextSize(
+                                    parseInt(e.target.value) || 4096
+                                  )
+                                }
+                                placeholder="Context Size"
+                                className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
                               />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteModel(model.id)}
-                              className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                            >
-                              <DynamicIcon
-                                name="Trash2"
-                                className="w-3.5 h-3.5"
+                              <input
+                                type="number"
+                                value={newMaxOutput}
+                                onChange={(e) =>
+                                  setNewMaxOutput(
+                                    parseInt(e.target.value) || 1000
+                                  )
+                                }
+                                placeholder="Max Output"
+                                className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
                               />
-                            </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={newInputPrice}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(",", ".");
+                                  const num = parseFloat(val);
+                                  setNewInputPrice(isNaN(num) ? 0 : num);
+                                }}
+                                placeholder="Input $/M tokens"
+                                className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
+                              />
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={newOutputPrice}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(",", ".");
+                                  const num = parseFloat(val);
+                                  setNewOutputPrice(isNaN(num) ? 0 : num);
+                                }}
+                                placeholder="Output $/M tokens"
+                                className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleUpdateModel}
+                                className="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="flex-1 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded text-xs font-medium"
+                              >
+                                Cancel
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                {model.name}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {model.modelId} • {model.contextSize} tokens
+                              </p>
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => handleEditModel(model)}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                              >
+                                <DynamicIcon
+                                  name="Edit2"
+                                  className="w-3.5 h-3.5"
+                                />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteModel(model.id)}
+                                className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                              >
+                                <DynamicIcon
+                                  name="Trash2"
+                                  className="w-3.5 h-3.5"
+                                />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                 </div>
               )}
 
@@ -1488,12 +1496,14 @@ export default function AIConfigTab() {
                         Input $/M tokens
                       </label>
                       <input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         value={newInputPrice}
-                        onChange={(e) =>
-                          setNewInputPrice(parseFloat(e.target.value) || 0)
-                        }
+                        onChange={(e) => {
+                          const val = e.target.value.replace(",", ".");
+                          const num = parseFloat(val);
+                          setNewInputPrice(isNaN(num) ? 0 : num);
+                        }}
                         className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
                       />
                     </div>
@@ -1502,12 +1512,14 @@ export default function AIConfigTab() {
                         Output $/M tokens
                       </label>
                       <input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         value={newOutputPrice}
-                        onChange={(e) =>
-                          setNewOutputPrice(parseFloat(e.target.value) || 0)
-                        }
+                        onChange={(e) => {
+                          const val = e.target.value.replace(",", ".");
+                          const num = parseFloat(val);
+                          setNewOutputPrice(isNaN(num) ? 0 : num);
+                        }}
                         className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
                       />
                     </div>

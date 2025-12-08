@@ -1676,9 +1676,10 @@ function AdventureCreatorContent() {
         setQuests(template.quests || []);
         setCustomTables(template.customTables || []);
         setVariables(template.variables || []);
-        setUpgradeSettings(
-          template.upgradeSettings || DEFAULT_UPGRADE_SETTINGS
-        );
+        setUpgradeSettings({
+          ...DEFAULT_UPGRADE_SETTINGS,
+          ...(template.upgradeSettings || {}),
+        });
         setLevelingSettings(cloneLevelingSettings(template.levelingSettings));
         setSkillTrees(template.skillTrees || []);
 
@@ -1835,7 +1836,11 @@ function AdventureCreatorContent() {
     if (Array.isArray(saved.quests)) setQuests(saved.quests);
     if (Array.isArray(saved.customTables)) setCustomTables(saved.customTables);
     if (Array.isArray(saved.variables)) setVariables(saved.variables);
-    if (saved.upgradeSettings) setUpgradeSettings(saved.upgradeSettings);
+    if (saved.upgradeSettings)
+      setUpgradeSettings({
+        ...DEFAULT_UPGRADE_SETTINGS,
+        ...saved.upgradeSettings,
+      });
     if (Array.isArray(saved.skillTrees)) setSkillTrees(saved.skillTrees);
     if (saved.agmtEnabled !== undefined) setAGMTEnabled(saved.agmtEnabled);
     if (saved.agmtState) setAGMTState(saved.agmtState);
@@ -1945,9 +1950,10 @@ function AdventureCreatorContent() {
           setQuests(template.quests || []);
           setCustomTables(template.customTables || []);
           setVariables(template.variables || []);
-          setUpgradeSettings(
-            template.upgradeSettings || DEFAULT_UPGRADE_SETTINGS
-          );
+          setUpgradeSettings({
+            ...DEFAULT_UPGRADE_SETTINGS,
+            ...(template.upgradeSettings || {}),
+          });
           setSkillTrees(template.skillTrees || []);
 
           // Load points and momentum
@@ -2354,7 +2360,11 @@ function AdventureCreatorContent() {
       if (Array.isArray(saved.customTables))
         setCustomTables(saved.customTables);
       if (Array.isArray(saved.variables)) setVariables(saved.variables);
-      if (saved.upgradeSettings) setUpgradeSettings(saved.upgradeSettings);
+      if (saved.upgradeSettings)
+        setUpgradeSettings({
+          ...DEFAULT_UPGRADE_SETTINGS,
+          ...saved.upgradeSettings,
+        });
       if (saved.levelingSettings)
         setLevelingSettings(cloneLevelingSettings(saved.levelingSettings));
       if (Array.isArray(saved.skillTrees)) setSkillTrees(saved.skillTrees);
@@ -10124,7 +10134,13 @@ ${description || ""}`;
                               // View mode
                               <div className="flex items-start gap-3">
                                 <div className="text-3xl shrink-0">
-                                  {rel.symbol}
+                                  <DynamicIcon
+                                    name={
+                                      rel.symbol ||
+                                      getRelationshipIcon(rel.value)
+                                    }
+                                    className="w-8 h-8"
+                                  />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="font-bold text-white flex items-center gap-2 flex-wrap">

@@ -860,7 +860,7 @@ Only use CREATE tools for GENUINELY NEW content not shown in the info message.
     - **DO NOT ADD** atmospheric details, descriptions, feelings, or story summaries
 5. **No Changes Needed:** If no game state changes are required, call \`skip_tools\` instead of making unnecessary tool calls.
 6. **NPC Management:** Did a new NPC appear or an existing NPC change significantly? -> \`add_npc\` and  \`add_relationship\` / \`modify_npc\`.
-7. **Relationship Delta:** Did an NPC react positively or negatively? -> \`update_relationship\` (Small increments: +1/-1 for chat, +5/-5 for major deeds).
+7. **Relationship Delta:** Did an NPC react positively or negatively **to the PLAYER'S actions**? -> \`update_relationship\` (Small increments: +1/-1 for chat, +5/-5 for major deeds). ⚠️ ONLY change relationships based on what the PLAYER did - NOT external events, other NPCs' actions, or environmental circumstances the player didn't cause.
 8. **Passive Traits:** Did the player gain or lose a defining trait through story events? -> \`add_passive\` / \`remove_passive\` / \`modify_passive\`.
     - Passives are story/RP traits that influence narrative (NOT mechanical bonuses)
     - Examples: "Wolf Slayer" (gained after defeating many wolves), "Cursed Blood" (gained through dark ritual), "Friend of the Forest" (earned trust of woodland creatures)

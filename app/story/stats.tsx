@@ -7,6 +7,7 @@ import {
   Variable,
   NumberVariable,
   BooleanVariable,
+  StringVariable,
   ListVariable,
   Ability,
 } from "../misc/structs";
@@ -1139,6 +1140,21 @@ export default function StatsPage(storyData: StoryData) {
                                   ` / ${
                                     (variable as ListVariable).maxSize
                                   } max`}
+                              </span>
+                            )}
+                            {variable.type === "string" && (
+                              <span
+                                className="font-medium text-xs text-blue-300 truncate max-w-[200px]"
+                                title={
+                                  (variable as StringVariable).value ||
+                                  "(empty)"
+                                }
+                              >
+                                {(variable as StringVariable).value || (
+                                  <span className="italic text-blue-300/50">
+                                    (empty)
+                                  </span>
+                                )}
                               </span>
                             )}
                           </div>

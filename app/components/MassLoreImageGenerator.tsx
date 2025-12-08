@@ -81,7 +81,74 @@ export default function MassLoreImageGenerator({
     return `Fantasy illustration for "${title}": ${truncatedContent}. Detailed digital art, atmospheric lighting, high quality.`;
   };
 
-  // Generate all images
+  // Process a single lore entry - returns the updated entry or null on failure
+  const processLoreEntry = async (
+    loreEntry: StoryLore,
+    index: number,
+    token: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    supabase: any
+  ): Promise<{ loreEntry: StoryLore; success: boolean }> => {
+    try {
+      const prompt = generatePromptForLore(loreEntry);
+
+      // Call image generation API
+      const response = await fetch("/api/creator/generate-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          prompt,
+          model: imageModel,
+          imageType: "thumbnail",
+          provider: imageProvider,
+          openRouterKey:
+            imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Image generation failed");
+      }
+
+      const { imageUrl } = await response.json();
+
+      // Upload to Supabase storage
+      const imageResponse = await fetch(imageUrl);
+      const imageBlob = await imageResponse.blob();
+
+      const fileName = `${Date.now()}-ai-lore-thumb-${index}-${Math.random()
+        .toString(36)
+        .slice(2, 7)}.webp`;
+      const filePath = `${user!.id}/lore-thumbnails/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("adventure-images")
+        .upload(filePath, imageBlob, { cacheControl: "3600", upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from("adventure-images")
+        .getPublicUrl(filePath);
+
+      return {
+        loreEntry: { ...loreEntry, thumbnailUrl: data.publicUrl },
+        success: true,
+      };
+    } catch (error) {
+      console.error(
+        `Failed to generate image for "${loreEntry.title}":`,
+        error
+      );
+      return { loreEntry, success: false };
+    }
+  };
+
+  // Generate all images in batches of 5
   const generateAll = useCallback(async () => {
     if (!user) {
       addNotification("Please sign in to generate images", "warning");
@@ -113,85 +180,62 @@ export default function MassLoreImageGenerator({
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase: any = createClient(supabaseUrl, supabaseKey);
 
     let successCount = 0;
     let failCount = 0;
     const updatedLore = [...lore];
+    const BATCH_SIZE = 5;
 
-    for (let i = 0; i < loreWithoutImages.length; i++) {
-      const loreEntry = loreWithoutImages[i];
-      const loreIndex = lore.findIndex((l) => l.title === loreEntry.title);
+    // Process in batches of 5
+    for (
+      let batchStart = 0;
+      batchStart < loreWithoutImages.length;
+      batchStart += BATCH_SIZE
+    ) {
+      const batch = loreWithoutImages.slice(
+        batchStart,
+        batchStart + BATCH_SIZE
+      );
+      const batchTitles = batch.map((l) => l.title || "Untitled").join(", ");
+      setCurrentLoreTitle(
+        `Batch: ${batchTitles.substring(0, 50)}${
+          batchTitles.length > 50 ? "..." : ""
+        }`
+      );
 
-      setCurrentLoreTitle(loreEntry.title || "Untitled");
-      setProgress({ current: i + 1, total: count });
+      // Process batch in parallel
+      const results = await Promise.all(
+        batch.map((loreEntry, i) =>
+          processLoreEntry(loreEntry, batchStart + i, token, supabase)
+        )
+      );
 
-      try {
-        const prompt = generatePromptForLore(loreEntry);
-
-        // Call image generation API
-        const response = await fetch("/api/creator/generate-image", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            prompt,
-            model: imageModel,
-            imageType: "thumbnail",
-            provider: imageProvider,
-            openRouterKey:
-              imageProvider === "openrouter"
-                ? apiKeys.openRouterKey
-                : undefined,
-          }),
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Image generation failed");
+      // Update results
+      for (const result of results) {
+        if (result.success) {
+          successCount++;
+          // Find and update the lore entry in updatedLore
+          const loreIndex = lore.findIndex(
+            (l) => l.title === result.loreEntry.title
+          );
+          if (loreIndex !== -1) {
+            updatedLore[loreIndex] = result.loreEntry;
+          }
+        } else {
+          failCount++;
         }
+      }
 
-        const { imageUrl } = await response.json();
+      setProgress({
+        current: Math.min(batchStart + BATCH_SIZE, count),
+        total: count,
+      });
 
-        // Upload to Supabase storage
-        const imageResponse = await fetch(imageUrl);
-        const imageBlob = await imageResponse.blob();
-
-        const fileName = `${Date.now()}-ai-lore-thumb-${i}.webp`;
-        const filePath = `${user.id}/lore-thumbnails/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("adventure-images")
-          .upload(filePath, imageBlob, { cacheControl: "3600", upsert: false });
-
-        if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage
-          .from("adventure-images")
-          .getPublicUrl(filePath);
-
-        // Update lore entry
-        if (loreIndex !== -1) {
-          updatedLore[loreIndex] = {
-            ...updatedLore[loreIndex],
-            thumbnailUrl: data.publicUrl,
-          };
-        }
-
-        successCount++;
-
-        // Small delay between requests to avoid rate limiting
-        if (i < loreWithoutImages.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
-      } catch (error) {
-        console.error(
-          `Failed to generate image for "${loreEntry.title}":`,
-          error
-        );
-        failCount++;
+      // Small delay between batches to avoid rate limiting
+      if (batchStart + BATCH_SIZE < loreWithoutImages.length) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
 
@@ -314,20 +358,20 @@ export default function MassLoreImageGenerator({
               <span className="font-medium text-white">
                 {costInfo.isByok ? (
                   <span className="text-green-400">
-                    BYOK - Your API key pays directly
+                    ~${(costInfo.dollarCost * count).toFixed(2)} via your API
+                    key
                   </span>
                 ) : totalCost === 0 ? (
                   <span className="text-green-400">FREE</span>
                 ) : (
                   <span>
-                    {count} × {costInfo.cost} ={" "}
                     <span className="text-yellow-400">{totalCost} coins</span>
                   </span>
                 )}
               </span>
             </div>
             <p className="text-xs text-blue-300/60 mt-1">
-              {count} lore entries × {costInfo.display} per image
+              {count} images × {costInfo.display} per image
             </p>
           </div>
 

@@ -50,7 +50,7 @@ export function saveImageGenSettings(
 export function getImageModelCost(
   provider: "deepinfra" | "openrouter",
   model: string
-): { cost: number; isByok: boolean; display: string } {
+): { cost: number; isByok: boolean; display: string; dollarCost: number } {
   if (provider === "deepinfra") {
     const config =
       DEEPINFRA_IMAGE_MODELS[model as keyof typeof DEEPINFRA_IMAGE_MODELS];
@@ -59,6 +59,7 @@ export function getImageModelCost(
         cost: config.cost,
         isByok: false,
         display: config.cost === 0 ? "FREE" : `${config.cost} coins`,
+        dollarCost: 0,
       };
     }
   } else {
@@ -66,17 +67,26 @@ export function getImageModelCost(
       OPENROUTER_IMAGE_MODELS[model as keyof typeof OPENROUTER_IMAGE_MODELS];
     if (config) {
       const isFlat = config.inputPrice === 0 && config.outputPrice === 0;
-      const displayCost = isFlat
-        ? model.includes("Flux 2 Pro")
-          ? "~$0.030"
-          : model.includes("Flux 2 Flex")
-          ? "~$0.015"
-          : "varies"
-        : `~$${(config.inputPrice || 0).toFixed(3)}`;
-      return { cost: 0, isByok: true, display: displayCost };
+      // Get actual dollar cost per image for flat-rate models
+      let dollarCost = 0;
+      let displayCost = "varies";
+      if (isFlat) {
+        if (model.includes("Flux 2 Pro")) {
+          dollarCost = 0.03;
+          displayCost = "~$0.030";
+        } else if (model.includes("Flux 2 Flex")) {
+          dollarCost = 0.015;
+          displayCost = "~$0.015";
+        }
+      } else {
+        // Token-based models - estimate ~$0.01-0.30 per image depending on model
+        dollarCost = (config.inputPrice / 1000) * 500; // Rough estimate: 500 input tokens
+        displayCost = `~$${(config.inputPrice || 0).toFixed(3)}`;
+      }
+      return { cost: 0, isByok: true, display: displayCost, dollarCost };
     }
   }
-  return { cost: 0, isByok: false, display: "unknown" };
+  return { cost: 0, isByok: false, display: "unknown", dollarCost: 0 };
 }
 
 interface LoreImageGeneratorProps {
