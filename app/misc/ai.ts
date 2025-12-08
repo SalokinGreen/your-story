@@ -370,8 +370,19 @@ Narrative Best Practices:
         };
 
         // Include tool calls if present
+        // Ensure each tool call has the required 'type: "function"' field (required by Mistral API)
         if (part.toolCalls && part.toolCalls.length > 0) {
-          assistantMessage.tool_calls = part.toolCalls;
+          assistantMessage.tool_calls = part.toolCalls.map(
+            (tc: {
+              id: string;
+              type?: string;
+              function: { name: string; arguments: string };
+            }) => ({
+              id: tc.id,
+              type: "function" as const,
+              function: tc.function,
+            })
+          );
         }
 
         context.push(assistantMessage);

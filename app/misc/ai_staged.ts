@@ -1130,10 +1130,21 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
       // Check if this assistant message had tool calls
       if (part.toolCalls && part.toolCalls.length > 0) {
         // Add assistant message WITH tool_calls array (preserves tool history)
+        // Ensure each tool call has the required 'type: "function"' field (required by Mistral API)
         messages.push({
           role: "assistant",
           content: cleanString(part.raw || part.content),
-          tool_calls: part.toolCalls,
+          tool_calls: part.toolCalls.map(
+            (tc: {
+              id: string;
+              type?: string;
+              function: { name: string; arguments: string };
+            }) => ({
+              id: tc.id,
+              type: "function" as const,
+              function: tc.function,
+            })
+          ),
         });
 
         // Add tool responses as separate "tool" role messages
@@ -1212,10 +1223,21 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
   // If we have existing tool calls, add them to history and prompt for more
   if (existingToolCalls && existingToolCalls.length > 0) {
     // Add assistant's previous tool calls
+    // Ensure each tool call has the required 'type: "function"' field (required by Mistral API)
     messages.push({
       role: "assistant",
       content: "Analyzing game state changes...",
-      tool_calls: existingToolCalls,
+      tool_calls: existingToolCalls.map(
+        (tc: {
+          id: string;
+          type?: string;
+          function: { name: string; arguments: string };
+        }) => ({
+          id: tc.id,
+          type: "function" as const,
+          function: tc.function,
+        })
+      ),
     });
 
     // Add tool responses
