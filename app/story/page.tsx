@@ -4688,16 +4688,15 @@ function StoryPageContent() {
       }
     }
 
-    //Assemblechoicetext
-    let text = "";
-    if (choiceDetails.length > 0) {
-      text = choiceDetails.join("\n") + "\n";
-    }
+    //Assemblechoicetext - Player action first, then skill check details
+    let text = ">" + choice.text;
     // Add STT disclaimer if voice input was used
     if (choice.stt_input) {
-      text += "[Voice Input - may contain transcription errors]\n";
+      text += "\n[Voice Input - may contain transcription errors]";
     }
-    text += ">" + choice.text;
+    if (choiceDetails.length > 0) {
+      text += "\n" + choiceDetails.join("\n");
+    }
     console.log("Final choice text:", text);
     //Resetmomentummodeafteruse
     setMomentumMode("none");

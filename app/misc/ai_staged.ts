@@ -52,6 +52,212 @@ export const CHOICES_AFFIRMATION = `Understood. I will generate player choices f
 
 Generating choices:`;
 
+// ============================================
+// FEW-SHOT EXAMPLES
+// ============================================
+// These example exchanges teach the model the expected format at the start of a story
+// when there's little context to learn from. We show a complete mini-playthrough.
+
+const FEW_SHOT_INFO_MESSAGE = `# Story: The Merchant's Gambit
+A cunning merchant navigates a dangerous bazaar.
+
+## Character
+**Name:** Khalid
+Agility: Good (+2)
+Persuasion: Average (+0)
+Perception: Fair (+1)
+
+## Resources
+Gold: 50/100
+
+## Inventory
+- Curved Dagger (normal, common)
+- Merchant's Robes (normal, common)
+
+## Relationships
+- Nazim (Street Urchin): +10 - A scrappy kid who knows the bazaar's secrets.`;
+
+const FEW_SHOT_STORY_EXAMPLE_1 = {
+  user: `>I'll check the merchant's stall for the stolen amulet.
+[Perception: success]`,
+  assistant: `The spice merchant's stall reeks of cinnamon and something fouler—old sweat, perhaps, or fear. You run your fingers along the edge of a brass tray, pretending to inspect the saffron threads while your eyes scan the shadows beneath the counter.
+
+*There.*
+
+A glint of silver catches the lamplight. The amulet—your client's family heirloom—lies half-hidden beneath a bolt of silk, its sapphire eye winking at you like a shared secret.
+
+The merchant notices your stillness. His smile doesn't reach his eyes. "Something catch your interest, friend?"
+
+Behind you, the crowd's murmur shifts. Two men in dark robes have stopped at the neighboring stall, their gazes too casual, too fixed.
+[STOP]`,
+  stateChanges: [
+    "Memory added: The stolen amulet is at Farouk's spice stall, hidden under silk",
+    "Lore updated: Added details about Farouk's suspicious behavior",
+  ],
+};
+
+const FEW_SHOT_STORY_EXAMPLE_2 = {
+  user: `>Distract the merchant and grab the amulet.
+[Persuasion: failure]`,
+  assistant: `"Those saffron threads," you say, gesturing to the upper shelf. "Are they from the southern provinces? The color seems—"
+
+Farouk's hand shoots out, faster than a striking cobra. His fingers close around your wrist like a vice.
+
+"You think me a fool?" His voice drops to a hiss. The crowd noise swallows his words, but his grip doesn't waver. "I know what you're reaching for, *thief*."
+
+The two robed figures are moving now, cutting through the crowd with purpose. One of them has a hand beneath his cloak.
+
+Your curved dagger presses against your hip. The exit is three stalls away, blocked by a cart of melons. The rooftops—if you could reach them—offer another path.
+
+Farouk's grip tightens. "Now. We talk price. Or we talk to the Caliph's men."
+[STOP]`,
+  stateChanges: [
+    "Condition added: Compromised Position (Tier I) - Farouk has you by the wrist",
+    "Relationship changed: Nazim slightly improved (he's watching from nearby, ready to help)",
+  ],
+};
+
+// Few-shot tool calls example (showing the tool calling format)
+const FEW_SHOT_TOOL_CALLS = [
+  {
+    id: "ex1",
+    type: "function" as const,
+    function: {
+      name: "add_memory",
+      arguments: JSON.stringify({
+        entry:
+          "The stolen amulet is hidden at Farouk's spice stall, beneath silk bolts",
+      }),
+    },
+  },
+  {
+    id: "ex2",
+    type: "function" as const,
+    function: {
+      name: "modify_relationship",
+      arguments: JSON.stringify({
+        name: "Nazim",
+        magnitude: "slightly_improve",
+        description:
+          "The street urchin noticed Khalid's predicament and is positioning himself to help.",
+      }),
+    },
+  },
+  {
+    id: "ex3",
+    type: "function" as const,
+    function: {
+      name: "add_condition",
+      arguments: JSON.stringify({
+        name: "Compromised Position",
+        tier: 1,
+        description:
+          "Farouk has grabbed your wrist, limiting your movement options.",
+        affects: ["Agility"],
+        source: "Failed distraction attempt",
+      }),
+    },
+  },
+];
+
+const FEW_SHOT_TOOL_RESPONSES = [
+  {
+    toolCallId: "ex1",
+    success: true,
+    message:
+      'Memory added: "The stolen amulet is hidden at Farouk\'s spice stall, beneath silk bolts"',
+  },
+  {
+    toolCallId: "ex2",
+    success: true,
+    message: "Relationship 'Nazim' improved from +10 to +15",
+  },
+  {
+    toolCallId: "ex3",
+    success: true,
+    message:
+      "Condition 'Compromised Position' (Tier I) added, affects: Agility",
+  },
+];
+
+/**
+ * Build few-shot example messages for the story stage
+ * Only used when there's little context (< 3 scene parts)
+ */
+export function buildStoryFewShotMessages(): ChatMessage[] {
+  return [
+    // Example info message
+    { role: "user", content: FEW_SHOT_INFO_MESSAGE },
+    // First turn
+    { role: "user", content: FEW_SHOT_STORY_EXAMPLE_1.user },
+    { role: "assistant", content: FEW_SHOT_STORY_EXAMPLE_1.assistant },
+    {
+      role: "assistant",
+      content: `[GM State Update]\n${FEW_SHOT_STORY_EXAMPLE_1.stateChanges
+        .map((s) => `• ${s}`)
+        .join("\n")}`,
+    },
+    // Second turn
+    { role: "user", content: FEW_SHOT_STORY_EXAMPLE_2.user },
+    { role: "assistant", content: FEW_SHOT_STORY_EXAMPLE_2.assistant },
+    {
+      role: "assistant",
+      content: `[GM State Update]\n${FEW_SHOT_STORY_EXAMPLE_2.stateChanges
+        .map((s) => `• ${s}`)
+        .join("\n")}`,
+    },
+    // Transition to new story
+    {
+      role: "user",
+      content:
+        "--- END OF EXAMPLE ---\nNow let's begin a NEW story. The following info message describes the actual adventure:",
+    },
+  ];
+}
+
+/**
+ * Build few-shot example messages for the tools stage
+ * Only used when there's little context (< 3 scene parts)
+ */
+export function buildToolsFewShotMessages(): ChatMessage[] {
+  return [
+    // Example info message
+    { role: "user", content: FEW_SHOT_INFO_MESSAGE },
+    // Example story text that needs tool processing
+    {
+      role: "user",
+      content: `Here is the latest story text to process:\n\n${FEW_SHOT_STORY_EXAMPLE_2.assistant}`,
+    },
+    // Example tool calls
+    {
+      role: "assistant",
+      content:
+        "Analyzing the narrative for game state changes:\n1. A memory should be added about the amulet's location\n2. Nazim noticed and is ready to help - relationship improves\n3. Player is in a compromised position - condition needed\n\nCalling tools:",
+      tool_calls: FEW_SHOT_TOOL_CALLS,
+    },
+    // Tool responses
+    ...FEW_SHOT_TOOL_RESPONSES.map((r) => ({
+      role: "tool" as const,
+      tool_call_id: r.toolCallId,
+      content: `${r.success ? "✓" : "✗"} ${r.message}`,
+    })),
+    // Acknowledgment
+    {
+      role: "assistant",
+      content: "Game state updated. All changes processed successfully.",
+    },
+    // Transition to actual story
+    {
+      role: "user",
+      content:
+        "--- END OF EXAMPLE ---\nNow process the ACTUAL story. The following info message shows the real game state:",
+    },
+  ];
+}
+
+// Threshold for using few-shot examples (when scene has fewer parts than this)
+export const FEW_SHOT_THRESHOLD = 5;
+
 /**
  * Context retrieved from embedding search
  */
@@ -784,12 +990,38 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: cleanedSystemPrompt },
-    { role: "user", content: cleanedInfoMessage },
   ];
+
+  // Add few-shot examples when there's low context (< 3 scene parts)
+  // This teaches the model the expected format before the actual story begins
+  const useFewShot = storyData.scene.parts.length < FEW_SHOT_THRESHOLD;
+  if (useFewShot) {
+    messages.push(...buildStoryFewShotMessages());
+    console.log(
+      `[buildStoryPrompt] Using few-shot examples (${storyData.scene.parts.length} parts < ${FEW_SHOT_THRESHOLD} threshold)`
+    );
+  }
+
+  // Add the actual info message
+  messages.push({ role: "user", content: cleanedInfoMessage });
 
   // Build story history messages (we'll prune from the front if needed)
   // Include GM state changes from previous turns so the AI knows what happened
   const historyMessages: ChatMessage[] = [];
+
+  // Count assistant (story) messages to determine which get [STOP] appended
+  // We append [STOP] to the last 5 story messages to train the model on stopping
+  const assistantIndices: number[] = [];
+  for (let i = 0; i < storyData.scene.parts.length; i++) {
+    if (!storyData.scene.parts[i].user) {
+      assistantIndices.push(i);
+    }
+  }
+  const stopThreshold =
+    assistantIndices.length > 5
+      ? assistantIndices[assistantIndices.length - 5]
+      : 0;
+
   for (let i = 0; i < storyData.scene.parts.length; i++) {
     const part = storyData.scene.parts[i];
     if (part.user) {
@@ -799,7 +1031,11 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
       });
     } else {
       // For story generation, include the narrative content
-      const assistantContent = part.raw || part.content;
+      let assistantContent = part.raw || part.content;
+      // Append [STOP] to last 5 assistant messages to train the model on stopping
+      if (i >= stopThreshold) {
+        assistantContent = assistantContent + "\n[STOP]";
+      }
       historyMessages.push({
         role: "assistant",
         content: cleanString(assistantContent),
@@ -1101,8 +1337,20 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
 
   const messages: ChatMessage[] = [
     { role: "system", content: cleanString(systemPrompt) },
-    { role: "user", content: cleanString(infoMessage) },
   ];
+
+  // Add few-shot examples when there's low context (< 3 scene parts)
+  // This teaches the model the expected tool calling format before the actual story begins
+  const useFewShot = storyData.scene.parts.length < FEW_SHOT_THRESHOLD;
+  if (useFewShot) {
+    messages.push(...buildToolsFewShotMessages());
+    console.log(
+      `[buildToolPrompt] Using few-shot examples (${storyData.scene.parts.length} parts < ${FEW_SHOT_THRESHOLD} threshold)`
+    );
+  }
+
+  // Add the actual info message
+  messages.push({ role: "user", content: cleanString(infoMessage) });
 
   // Add scene parts within token budget for context (INCLUDING PAST TOOL CALLS)
   const recentParts = getPartsWithinTokenBudget(

@@ -780,7 +780,7 @@ export default function CreatorAIChat({
       <>
         {/* Pull tab on left edge - closes the drawer */}
         <button
-          className="fixed top-1/2 -translate-y-1/2 z-40 bg-purple-500/90 hover:bg-purple-600 text-white p-1.5 rounded-l-lg shadow-lg transition-all pointer-events-auto right-80 sm:right-[380px] md:right-[420px]"
+          className="fixed top-1/2 -translate-y-1/2 z-40 bg-purple-500/90 hover:bg-purple-600 text-white p-1.5 rounded-l-lg shadow-lg transition-all pointer-events-auto right-80  sm:right-[380px] md:right-[420px]"
           style={
             touchDelta > 0
               ? {
