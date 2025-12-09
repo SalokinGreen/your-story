@@ -163,6 +163,7 @@ import {
 } from "../misc/fuzzyMatch";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn, analyzeAction } from "../misc/generation";
+import { GMToolResult, GMCheckResult } from "../misc/gmExecutor";
 import {
   canAffordAbility,
   deductAbilityCost,
@@ -1567,7 +1568,7 @@ function StoryPageContent() {
   const [storyText, setStoryText] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState<
-    "story" | "tools" | "choices" | null
+    "gm" | "story" | "tools" | "choices" | null
   >(null);
   const [momentumMode, setMomentumMode] = useState<
     "none" | "advantage" | "guarantee"
@@ -4966,6 +4967,69 @@ function StoryPageContent() {
             gmStageModel: toolsModel, // Use same model as tools stage
           },
           {
+            onGMStageStart: () => {
+              setLoadingStage("gm");
+              logger.action("GM stage started - determining mechanics");
+            },
+            onGMStageComplete: (gmResults, storyContext, usage) => {
+              logger.ai_response("GM stage complete", {
+                toolCount: gmResults.length,
+                tools: gmResults.map((r) => r.toolName),
+                contextLength: storyContext.length,
+                usage,
+              });
+
+              // Find skill_check or challenge_check results to show dice
+              const checkResult = gmResults.find(
+                (r) =>
+                  r.toolName === "skill_check" ||
+                  r.toolName === "challenge_check"
+              );
+
+              if (checkResult && checkResult.result) {
+                const result = checkResult.result as GMCheckResult;
+                const rpgSystemId = storyData.rpgSystem || "3d6";
+
+                // Trigger dice visualizer with GM stage roll data
+                setDiceRoll({
+                  show: true,
+                  rolls: result.rolls || [result.roll],
+                  finalRoll: result.roll,
+                  skillName: result.stat,
+                  skillBonus: result.statValue,
+                  dc: result.dc,
+                  isSuccess: result.success,
+                  isPartial: result.partialSuccess,
+                  isCritical:
+                    result.criticalSuccess || result.criticalFailure || false,
+                  hasAdvantage: false, // GM stage doesn't track advantage yet
+                  hasDisadvantage: false,
+                  diceRolls: [result.rolls || [result.roll]],
+                  rpgSystem: rpgSystemId as
+                    | "3d6"
+                    | "1d20"
+                    | "1d100"
+                    | "percentile"
+                    | "pbta"
+                    | "fate"
+                    | "yze"
+                    | "explosive"
+                    | "narrative",
+                  explosions: result.explosions,
+                  conditionPenalty: result.condition?.penalty,
+                  conditionName: result.condition?.name,
+                });
+
+                logger.action("Dice visualizer triggered from GM stage", {
+                  stat: result.stat,
+                  roll: result.roll,
+                  dc: result.dc,
+                  success: result.success,
+                });
+              }
+
+              setLoadingStage("story");
+            },
             onStoryContent: (chunk: string, fullContent: string) => {
               // Update partial part as content streams
               partialPart.content = fullContent;

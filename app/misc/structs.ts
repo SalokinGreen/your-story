@@ -142,6 +142,9 @@ export interface CommandResponse {
   toolCallId?: string; // Optional: links response to specific tool call for conversation coherency
 }
 
+// Lore types: "lore" is standard world-building, "mechanics" is game rules (prioritized in context)
+export type LoreType = "lore" | "mechanics";
+
 export interface StoryLore {
   title: string;
   content: string;
@@ -149,6 +152,7 @@ export interface StoryLore {
   relatedLocations: string[];
   secrtet: boolean;
   keys: string[];
+  type?: LoreType; // "lore" (default) or "mechanics" (rules - prioritized first in context)
   alwaysOn?: boolean; // If true, lore is always visible regardless of triggers
   enabled?: boolean; // If false, lore is never visible/checked. Defaults to true.
   on_triggers?: string[]; // Word triggers to turn lore on

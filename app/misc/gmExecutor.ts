@@ -67,8 +67,10 @@ export interface GMCheckResult {
   difficulty: string;
   dc: number;
   roll: number;
+  rolls: number[]; // Individual dice values for dice visualizer
   total: number;
   success: boolean;
+  explosions?: number; // For explosive dice system
   partialSuccess?: boolean;
   criticalSuccess?: boolean;
   criticalFailure?: boolean;
@@ -558,6 +560,8 @@ function executeSkillCheck(
       difficulty: tierName,
       dc,
       roll,
+      rolls: rollResult.rolls, // Individual dice values for visualizer
+      explosions: rollResult.explosions, // For explosive dice system
       total,
       success,
       partialSuccess,

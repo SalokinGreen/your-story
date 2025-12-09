@@ -577,9 +577,20 @@ export function buildInfoMessage(
   // Build lore section - use embeddings if available, otherwise fallback to trigger-based
   const currentPartIndex = storyData.scene.parts.length;
 
-  // Always-on lore is always included
+  // Separate mechanics lore (always included, prioritized first in context)
+  const mechanicsLore = storyData.lore.filter(
+    (l) => l.enabled !== false && l.type === "mechanics"
+  );
+  const mechanicsSection = mechanicsLore.length
+    ? `## Game Mechanics\nThese are the rules for this adventure. Follow them precisely.\n----\n${mechanicsLore
+        .map((l) => `### ${l.title}\n${cleanString(l.content)}`)
+        .join("\n----\n")}`
+    : "";
+
+  // Always-on lore is always included (excluding mechanics)
   const alwaysOnLore = storyData.lore.filter((l) => {
     if (l.enabled === false) return false;
+    if (l.type === "mechanics") return false; // Handled separately
     return l.alwaysOn === true;
   });
 
@@ -593,6 +604,7 @@ export function buildInfoMessage(
     const embeddingLore = storyData.lore.filter(
       (l) =>
         l.enabled !== false &&
+        l.type !== "mechanics" && // Mechanics handled separately
         !l.alwaysOn && // Not already in alwaysOnLore
         embeddingLoreTitles.has(l.title.toLowerCase())
     );
@@ -603,6 +615,7 @@ export function buildInfoMessage(
     // Start with always-on and manually revealed lore
     const baseLore = storyData.lore.filter((l) => {
       if (l.enabled === false) return false;
+      if (l.type === "mechanics") return false; // Mechanics handled separately
       if (l.alwaysOn) return true;
       const wasRevealed = storyData.scene.parts.some((p) =>
         p.revealedLore?.some(
@@ -614,6 +627,7 @@ export function buildInfoMessage(
 
     const triggerLore = storyData.lore.filter((l) => {
       if (l.enabled === false) return false;
+      if (l.type === "mechanics") return false; // Mechanics handled separately
       if (l.alwaysOn) return false; // Already in baseLore
       const wasRevealed = storyData.scene.parts.some((p) =>
         p.revealedLore?.some(
@@ -833,6 +847,7 @@ ${
     rpgSystem.id !== "3d6"
       ? `**RPG System:** ${rpgSystem.name} - ${rpgSystem.description}`
       : "",
+    mechanicsSection, // Mechanics lore entries - prioritized first
     statsSection,
     resourcesSection,
     inventorySection,
@@ -1079,6 +1094,12 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
     // Include GM stage context if provided (replaces ActionAnalysis annotations)
     if (gmStoryContext) {
       choiceMessage = `${choiceMessage}\n\n${gmStoryContext}`;
+      console.log(
+        `[buildStoryPrompt] Including GM stage context: ${gmStoryContext.slice(
+          0,
+          200
+        )}...`
+      );
     }
 
     historyMessages.push({
@@ -2252,16 +2273,11 @@ export function buildGMStagePrompt({
       ? passivesList.map((p) => `${p.name}: ${p.description}`).join("; ")
       : "None";
 
-  // Get recent story context
+  // Get recent story parts for context (like Tools stage)
   const recentParts = getPartsWithinTokenBudget(
     storyData.scene.parts,
     ACTION_ANALYSIS_TOKEN_BUDGET
   );
-  const recentContext = recentParts
-    .map((p) =>
-      p.user ? `Player: ${p.content}` : `Story: ${p.content.slice(0, 200)}...`
-    )
-    .join("\n");
 
   // Build active challenge context
   let challengeContext = "None";
@@ -2349,29 +2365,49 @@ ${rpgSystem.aiInstructions.dcGuidelines}
 - **If action continues a just-succeeded check, call no_check_needed.**
 - **Resource costs are determined by item/ability specs.** Just name them.`;
 
-  const userMessage = `## RECENT STORY CONTEXT
-${recentContext}
-
----
-
-## PLAYER'S ACTION
-"${userChoice}"
-
----
-
-Call the appropriate tool(s) to determine mechanics for this action.`;
-
   const messages: ChatMessage[] = [
     { role: "system", content: cleanString(systemPrompt) },
-    { role: "user", content: cleanString(userMessage) },
-    { role: "assistant", content: GM_STAGE_AFFIRMATION },
   ];
+
+  // Build chat history from scene parts (like Tools stage)
+  // This gives the GM better context about the ongoing story
+  for (const part of recentParts) {
+    if (part.user) {
+      messages.push({
+        role: "user",
+        content: cleanString(part.content),
+      });
+    } else {
+      // For assistant (story) messages, include a summary
+      // Full content would be too long, but we need narrative context
+      const storyContent =
+        part.content.length > 500
+          ? part.content.slice(0, 500) + "..."
+          : part.content;
+      messages.push({
+        role: "assistant",
+        content: cleanString(`[Story narration]\n${storyContent}`),
+      });
+    }
+  }
+
+  // Add the current player action as the final user message
+  messages.push({
+    role: "user",
+    content: cleanString(
+      `## PLAYER'S ACTION\n"${userChoice}"\n\nCall the appropriate tool(s) to determine mechanics for this action.`
+    ),
+  });
+
+  // Add prefill for tool calling
+  messages.push({ role: "assistant", content: GM_STAGE_AFFIRMATION });
 
   // Debug logging
   console.log(`[buildGMStagePrompt] Context breakdown:`);
   console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
-  console.log(`  - Recent context: ${recentParts.length} parts`);
+  console.log(`  - Chat history: ${recentParts.length} parts`);
   console.log(`  - User choice: ${estimateTokens(userChoice)} tokens`);
+  console.log(`  - Total messages: ${messages.length}`);
 
   return {
     messages,

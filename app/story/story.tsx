@@ -15,7 +15,7 @@ interface StoryProps {
   choices: Choices;
   input: Record<string, boolean>;
   loading: boolean;
-  loadingStage?: "story" | "tools" | "choices" | null;
+  loadingStage?: "gm" | "story" | "tools" | "choices" | null;
   momentumMode: "none" | "advantage" | "guarantee";
   onMomentumModeChange: (mode: "none" | "advantage" | "guarantee") => void;
   handleChoice: () => void;
@@ -554,7 +554,9 @@ export default function Story({
                   title="Cancel generation"
                 >
                   <div className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
-                  {loadingStage === "tools"
+                  {loadingStage === "gm"
+                    ? "Analyzing action..."
+                    : loadingStage === "tools"
                     ? "Updating game state..."
                     : loadingStage === "choices"
                     ? "Preparing choices..."

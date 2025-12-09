@@ -6,6 +6,7 @@ import {
   buildStoryPrompt,
   buildToolPrompt,
   buildActionAnalysisPrompt,
+  buildGMStagePrompt,
   ChatMessage,
   buildInfoMessage,
   EmbeddingContext,
@@ -19,9 +20,10 @@ interface ContextViewerProps {
 
 export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [activeStage, setActiveStage] = useState<"story" | "tools" | "actions">(
-    "story"
-  );
+  const [activeStage, setActiveStage] = useState<
+    "story" | "tools" | "actions" | "gm"
+  >("story");
+  const [gmStageEnabled, setGmStageEnabled] = useState(false);
   const [contextString, setContextString] = useState("");
   const [estimatedTokens, setEstimatedTokens] = useState(0);
   const [activeModelName, setActiveModelName] = useState("Deepseek Chat");
@@ -81,6 +83,13 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     // If not set, default to true
     setPrefillEnabled(prefillSetting !== "false");
 
+    // Check GM stage setting
+    const gmEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("gmStageEnabled") === "true"
+        : false;
+    setGmStageEnabled(gmEnabled);
+
     // Get current preset and custom model overrides from localStorage
     const currentPreset =
       typeof window !== "undefined"
@@ -121,7 +130,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     const currentModel =
       activeStage === "story"
         ? effectiveStoryModel
-        : activeStage === "tools"
+        : activeStage === "tools" || activeStage === "gm"
         ? effectiveToolsModel
         : effectiveChoicesModel;
     const modelConfig = getModelConfig(currentModel);
@@ -180,6 +189,11 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       };
     }
 
+    // Sample GM context to show what story stage would receive
+    const sampleGMContext = gmEnabled
+      ? "[Strength Check: SUCCESS | Roll: 14 + 65 (stat) = 79 vs DC 50 (Average)]\n[Stakes: Break down the door]\n[Intended consequence: Door splinters open, alerting guards]"
+      : undefined;
+
     switch (activeStage) {
       case "story":
         const storyPrompt = buildStoryPrompt({
@@ -188,6 +202,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           modelName: effectiveStoryModel,
           embeddingContext: simulatedEmbeddingContext,
           usePrefill: prefillSetting !== "false",
+          gmStoryContext: sampleGMContext, // Show GM context when enabled
         });
         contextMessages = storyPrompt.messages;
         prunedCount = storyPrompt.prunedParts;
@@ -200,6 +215,13 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           usePrefill: prefillSetting !== "false",
         });
         contextMessages = toolPrompt.messages;
+        break;
+      case "gm":
+        const gmPrompt = buildGMStagePrompt({
+          storyData,
+          userChoice: "(Player's action would go here)",
+        });
+        contextMessages = gmPrompt.messages;
         break;
       case "actions":
         const actionsPrompt = buildActionAnalysisPrompt({
@@ -385,17 +407,32 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             <DynamicIcon name="Wrench" className="w-3 h-3 inline mr-1" />
             Tools
           </button>
-          <button
-            onClick={() => setActiveStage("actions")}
-            className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-              activeStage === "actions"
-                ? "bg-white dark:bg-blue-950 text-cyan-600 dark:text-cyan-400 shadow"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            }`}
-          >
-            <DynamicIcon name="Zap" className="w-3 h-3 inline mr-1" />
-            Actions
-          </button>
+          {/* Show GM State tab when GM stage is enabled, otherwise show Actions */}
+          {gmStageEnabled ? (
+            <button
+              onClick={() => setActiveStage("gm")}
+              className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
+                activeStage === "gm"
+                  ? "bg-white dark:bg-blue-950 text-cyan-600 dark:text-cyan-400 shadow"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              <DynamicIcon name="Dices" className="w-3 h-3 inline mr-1" />
+              GM State
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveStage("actions")}
+              className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
+                activeStage === "actions"
+                  ? "bg-white dark:bg-blue-950 text-cyan-600 dark:text-cyan-400 shadow"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              <DynamicIcon name="Zap" className="w-3 h-3 inline mr-1" />
+              Actions
+            </button>
+          )}
         </div>
 
         {showInfo && (
@@ -433,6 +470,14 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                   <strong>Actions Stage:</strong> Recent story context sent to
                   analyze player's freeform action. AI determines skill checks,
                   items, resources, and challenge handling.
+                </>
+              )}
+              {activeStage === "gm" && (
+                <>
+                  <strong>GM Stage:</strong> Runs BEFORE story generation. AI
+                  determines what mechanical checks are needed and executes them
+                  via tool calls (skill_check, challenge_check, take_rest,
+                  etc.). Results are passed to the Story stage.
                 </>
               )}
             </div>
