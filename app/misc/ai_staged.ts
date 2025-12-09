@@ -256,7 +256,7 @@ export function buildToolsFewShotMessages(): ChatMessage[] {
 }
 
 // Threshold for using few-shot examples (when scene has fewer parts than this)
-export const FEW_SHOT_THRESHOLD = 5;
+export const FEW_SHOT_THRESHOLD = 10;
 
 /**
  * Context retrieved from embedding search
