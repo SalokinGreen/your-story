@@ -579,11 +579,11 @@ export default function StatsPage(storyData: StoryData) {
                       item.maxDurability || getMaxDurability(grade);
                     const durability = item.durability ?? maxDurability;
                     const durabilityPercent =
-                      grade === "agmt"
+                      grade === "mythic"
                         ? 100
                         : Math.round((durability / maxDurability) * 100);
                     const isLowDurability =
-                      durabilityPercent <= 33 && grade !== "agmt";
+                      durabilityPercent <= 33 && grade !== "mythic";
 
                     return (
                       <div
@@ -650,12 +650,12 @@ export default function StatsPage(storyData: StoryData) {
                                       : "text-blue-200/60"
                                   }
                                 >
-                                  {grade === "agmt"
+                                  {grade === "mythic"
                                     ? "∞"
                                     : `${durability}/${maxDurability}`}
                                 </span>
                               </div>
-                              {grade !== "agmt" && (
+                              {grade !== "mythic" && (
                                 <div className="h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
                                   <div
                                     className="h-full rounded-full transition-all"

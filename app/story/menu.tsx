@@ -42,6 +42,7 @@ import {
   getMaxDurability,
   ItemGrade,
   GRADE_ORDER,
+  safeGradeConfig,
 } from "../misc/itemSystem";
 import {
   ABILITY_GRADE_CONFIG,
@@ -1192,10 +1193,6 @@ function QuestEditor({
   );
   const [editQuest, setEditQuest] = useState<Quest | null>(null);
 
-  useEffect(() => {
-    onUpdate(localQuests);
-  }, [localQuests, onUpdate]);
-
   const addQuest = () => {
     const newQuest: Quest = {
       id: `quest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1207,11 +1204,15 @@ function QuestEditor({
       points: 10,
       createdAt: new Date(),
     };
-    setLocalQuests([...localQuests, newQuest]);
+    const updated = [...localQuests, newQuest];
+    setLocalQuests(updated);
+    onUpdate(updated);
   };
 
   const removeQuest = (index: number) => {
-    setLocalQuests(localQuests.filter((_, i) => i !== index));
+    const updated = localQuests.filter((_, i) => i !== index);
+    setLocalQuests(updated);
+    onUpdate(updated);
   };
 
   const startEditQuest = (index: number) => {
@@ -1224,6 +1225,7 @@ function QuestEditor({
       const updated = [...localQuests];
       updated[editingQuestIndex] = editQuest;
       setLocalQuests(updated);
+      onUpdate(updated);
       setEditingQuestIndex(null);
       setEditQuest(null);
     }
@@ -1242,6 +1244,7 @@ function QuestEditor({
         updated[index - 1],
       ];
       setLocalQuests(updated);
+      onUpdate(updated);
     }
   };
 
@@ -1253,6 +1256,7 @@ function QuestEditor({
         updated[index],
       ];
       setLocalQuests(updated);
+      onUpdate(updated);
     }
   };
 
@@ -1271,6 +1275,7 @@ function QuestEditor({
 
     setLocalQuests(updated);
     setDraggedQuestIndex(index);
+    onUpdate(updated);
   };
 
   const handleQuestDragEnd = () => {
@@ -1730,7 +1735,7 @@ function InventoryEditor({
                   <div>
                     <label className="block text-xs text-blue-200/60 mb-1">
                       Durability{" "}
-                      {editInventoryItem.grade === "agmt"
+                      {editInventoryItem.grade === "mythic"
                         ? "(∞)"
                         : `(max ${getMaxDurability(
                             (editInventoryItem.grade as ItemGrade) || "common"
@@ -1739,7 +1744,7 @@ function InventoryEditor({
                     <input
                       type="number"
                       value={
-                        editInventoryItem.grade === "agmt"
+                        editInventoryItem.grade === "mythic"
                           ? "∞"
                           : editInventoryItem.durability ??
                             getMaxDurability(
@@ -1761,7 +1766,7 @@ function InventoryEditor({
                           ),
                         })
                       }
-                      disabled={editInventoryItem.grade === "agmt"}
+                      disabled={editInventoryItem.grade === "mythic"}
                       placeholder="Durability"
                       className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white disabled:opacity-50"
                     />
@@ -1806,13 +1811,9 @@ function InventoryEditor({
                 draggedInventoryIndex === index ? "opacity-50" : ""
               }`}
               style={{
-                backgroundColor: `${
-                  GRADE_CONFIG[(item.grade as ItemGrade) || "common"].color
-                }15`,
+                backgroundColor: `${safeGradeConfig(item.grade).color}15`,
                 borderWidth: 1,
-                borderColor: `${
-                  GRADE_CONFIG[(item.grade as ItemGrade) || "common"].color
-                }30`,
+                borderColor: `${safeGradeConfig(item.grade).color}30`,
               }}
             >
               <span className="text-gray-400 select-none">
@@ -1824,9 +1825,7 @@ function InventoryEditor({
                     name={item.symbol}
                     className="w-5 h-5"
                     style={{
-                      color:
-                        GRADE_CONFIG[(item.grade as ItemGrade) || "common"]
-                          .color,
+                      color: safeGradeConfig(item.grade).color,
                     }}
                   />
                   <span>
@@ -1835,16 +1834,11 @@ function InventoryEditor({
                   <span
                     className="text-xs px-1.5 py-0.5 rounded"
                     style={{
-                      backgroundColor: `${
-                        GRADE_CONFIG[(item.grade as ItemGrade) || "common"]
-                          .color
-                      }30`,
-                      color:
-                        GRADE_CONFIG[(item.grade as ItemGrade) || "common"]
-                          .color,
+                      backgroundColor: `${safeGradeConfig(item.grade).color}30`,
+                      color: safeGradeConfig(item.grade).color,
                     }}
                   >
-                    {GRADE_CONFIG[(item.grade as ItemGrade) || "common"].label}
+                    {safeGradeConfig(item.grade).label}
                   </span>
                   {item.type && (
                     <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
@@ -1860,7 +1854,7 @@ function InventoryEditor({
                     <span className="text-xs text-blue-200/40">
                       Durability:
                     </span>
-                    {item.grade === "agmt" ? (
+                    {item.grade === "mythic" ? (
                       <span className="text-xs text-yellow-400">∞</span>
                     ) : (
                       <>
@@ -1878,10 +1872,8 @@ function InventoryEditor({
                                   )) *
                                 100
                               }%`,
-                              backgroundColor:
-                                GRADE_CONFIG[
-                                  (item.grade as ItemGrade) || "common"
-                                ].color,
+                              backgroundColor: safeGradeConfig(item.grade)
+                                .color,
                             }}
                           />
                         </div>

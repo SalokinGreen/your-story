@@ -77,7 +77,7 @@ export type ItemGrade =
   | "rare"
   | "epic"
   | "legendary"
-  | "agmt";
+  | "mythic";
 
 export interface InventoryItem {
   name: string;
