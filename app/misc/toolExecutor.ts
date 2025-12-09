@@ -121,51 +121,6 @@ function calculateRelationshipDelta(
 }
 
 /**
- * Calculate resource change based on magnitude, difficulty, and max value.
- * Returns a percentage-based change scaled to the resource's max value.
- */
-function calculateResourceDelta(
-  magnitude: string,
-  maxValue: number,
-  difficulty: AdventureDifficulty = "medium"
-): number {
-  // Base percentages of max value
-  const baseMagnitudes: Record<string, number> = {
-    // Negative (draining)
-    fully_deplete: -1.0, // 100%
-    greatly_drain: -0.5, // 50%
-    drain: -0.25, // 25%
-    slightly_drain: -0.1, // 10%
-    // Positive (charging)
-    slightly_restore: 0.1, // 10%
-    restore: 0.25, // 25%
-    greatly_restore: 0.5, // 50%
-    fully_restore: 1.0, // 100%
-  };
-
-  // Difficulty multipliers (harder = less recovery, more drain)
-  const difficultyMultipliers: Record<
-    AdventureDifficulty,
-    { gain: number; loss: number }
-  > = {
-    easy: { gain: 1.3, loss: 0.7 },
-    medium: { gain: 1.0, loss: 1.0 },
-    hard: { gain: 0.8, loss: 1.2 },
-    expert: { gain: 0.6, loss: 1.4 },
-  };
-
-  const basePercent = baseMagnitudes[magnitude] || 0;
-  const isRestoring = basePercent > 0;
-  const diffMult =
-    difficultyMultipliers[difficulty] || difficultyMultipliers.medium;
-
-  const multiplier = isRestoring ? diffMult.gain : diffMult.loss;
-  const finalChange = Math.round(basePercent * maxValue * multiplier);
-
-  return finalChange;
-}
-
-/**
  * Calculate stat change based on magnitude and difficulty.
  * Stats are 0-100 scale, so changes are absolute values.
  */
@@ -897,49 +852,10 @@ export function executeTools(
         continue;
       }
 
-      // Special handling for adjust_resource - calculate delta from magnitude
+      // Handle adjust_resource - use delta directly
       if (toolCall.function.name === "adjust_resource") {
-        const resources = storyData.resources || [];
-        const existingResource = resources.find(
-          (r) => r.name.toLowerCase() === args.name?.toLowerCase()
-        );
-
-        if (!existingResource) {
-          const errorMsg = `Resource "${args.name}" not found`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const maxValue = existingResource.maxValue || 100;
-        const difficulty = storyData.difficulty || "medium";
-
-        // Calculate actual delta from magnitude and max value
-        const valueDelta = calculateResourceDelta(
-          args.magnitude || "slightly_restore",
-          maxValue,
-          difficulty as AdventureDifficulty
-        );
-
-        logger.action("Special handling: adjust_resource with magnitude", {
-          toolCallId: toolId,
-          resourceName: args.name,
-          magnitude: args.magnitude,
-          maxValue,
-          calculatedDelta: valueDelta,
-          difficulty,
-        });
-
-        const command = `/adjust_resource: ${args.name} | ${valueDelta}`;
+        const delta = args.delta ?? 0;
+        const command = `/adjust_resource: ${args.name} | ${delta}`;
         logger.action(`Executing command: ${command}`, {
           toolCallId: toolId,
         });
@@ -962,25 +878,20 @@ export function executeTools(
           continue;
         }
 
-        const magnitudeLabel = (args.magnitude || "slightly_restore").replace(
-          /_/g,
-          " "
-        );
-        const successMsg = `${response.message} (${magnitudeLabel})`;
-        logger.action(`Tool call succeeded: ${successMsg}`, {
+        logger.action(`Tool call succeeded: ${response.message}`, {
           toolCallId: toolId,
           toolName,
         });
         responses.push({
           command: toolCall.function.name,
           success: true,
-          message: successMsg,
+          message: response.message,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
 
         if (STATE_CHANGE_TOOLS.has(toolName)) {
-          stateChanges.push(successMsg);
+          stateChanges.push(response.message);
         }
         continue;
       }
@@ -2805,12 +2716,19 @@ function convertToolToCommand(
       return `/delete_quest: ${args.title}`;
 
     // Item Management
-    case "add_item":
+    case "add_item": {
+      // Validate and normalize item type - AI sometimes uses invalid types like "utility"
+      const validTypes = ["normal", "consumable", "story", "misc"];
+      const itemType = validTypes.includes(args.type?.toLowerCase())
+        ? args.type.toLowerCase()
+        : "normal"; // Default to normal if invalid type
+
       // Include grade if specified
       if (args.grade) {
-        return `/add_item: ${args.name} | ${args.description} | ${args.type} | ${args.quantity} | ${args.grade}`;
+        return `/add_item: ${args.name} | ${args.description} | ${itemType} | ${args.quantity} | ${args.grade}`;
       }
-      return `/add_item: ${args.name} | ${args.description} | ${args.type} | ${args.quantity}`;
+      return `/add_item: ${args.name} | ${args.description} | ${itemType} | ${args.quantity}`;
+    }
 
     case "remove_item":
       return `/remove_item: ${args.name} | ${args.quantity}`;
@@ -2834,7 +2752,8 @@ function convertToolToCommand(
       return `/break_item: ${args.name}`;
 
     case "consume_item":
-      return `/consume_item: ${args.name}`;
+      // Use remove_item with quantity 1 to consume
+      return `/remove_item: ${args.name} | 1`;
 
     case "repair_item":
       // Magnitude-based repair - handled in executeTools special handling
@@ -2849,7 +2768,7 @@ function convertToolToCommand(
 
     // Resource Management
     case "adjust_resource":
-      // Magnitude-based resource change - handled in executeTools special handling
+      // Delta-based resource change - handled in executeTools
       return null;
 
     case "set_resource":

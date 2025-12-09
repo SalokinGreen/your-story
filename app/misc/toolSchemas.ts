@@ -625,7 +625,7 @@ const adjustResourceTool: ToolSchema = {
   function: {
     name: "adjust_resource",
     description:
-      "Modify a resource's current value using narrative magnitude. The actual change is calculated as a percentage of max value, scaled by difficulty.",
+      "Modify a resource's current value by an exact delta amount. Use positive numbers to restore, negative to drain.",
     parameters: {
       type: "object",
       properties: {
@@ -634,23 +634,13 @@ const adjustResourceTool: ToolSchema = {
           description:
             "Resource name (fuzzy matching supported, e.g., Health, Stamina, Mana)",
         },
-        magnitude: {
-          type: "string",
-          enum: [
-            "fully_deplete",
-            "greatly_drain",
-            "drain",
-            "slightly_drain",
-            "slightly_restore",
-            "restore",
-            "greatly_restore",
-            "fully_restore",
-          ],
+        delta: {
+          type: "integer",
           description:
-            "How much to change the resource. Drain reduces, restore increases. 'fully' = 100%, 'greatly' = 50%, normal = 25%, 'slightly' = 10% of max value.",
+            "The exact amount to change the resource by. Positive values restore (e.g., +10 heals 10 HP), negative values drain (e.g., -15 deals 15 damage). The result is clamped between 0 and maxValue.",
         },
       },
-      required: ["name", "magnitude"],
+      required: ["name", "delta"],
     },
   },
 };
