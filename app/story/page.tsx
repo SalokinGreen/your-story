@@ -2913,6 +2913,36 @@ function StoryPageContent() {
       return null;
     }
 
+    // Check if GM Stage is enabled - if so, skip action analysis
+    // The GM Stage will determine mechanics during generation
+    const gmStageEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("gmStageEnabled") === "true"
+        : false;
+
+    if (gmStageEnabled) {
+      logger.action("GM Stage enabled - skipping action analysis", {
+        actionText,
+      });
+      // Return a plain action analysis - GM Stage will determine mechanics
+      return {
+        analysis: {
+          action_summary: actionText,
+          skill_used: null,
+          skill_dc: null,
+          item_used: null,
+          ability_used: null,
+          resource_used: null,
+          agmt_check: null,
+          table: null,
+          is_plain_action: true,
+          stat_bonus: null,
+          rolls: undefined,
+        },
+        warnings: ["GM Stage will determine mechanics during generation"],
+      };
+    }
+
     logger.action("Analyzing freeform action", { actionText });
 
     try {

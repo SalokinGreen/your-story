@@ -472,70 +472,96 @@ export async function generateStoryTurn(
       callbacks.onGMStageStart?.();
       logger.action("Stage 0.5: Running GM stage for mechanics determination");
 
-      const gmModel = options.gmStageModel || options.toolsModel;
-      const gmPrompt = buildGMStagePrompt({ storyData, userChoice });
-
-      // Check if user cancelled
-      if (options.abortSignal?.aborted) {
-        throw new Error("Generation cancelled by user");
+      // Extract user choice - either from parameter or from last user scene part
+      let gmUserChoice = userChoice;
+      if (!gmUserChoice) {
+        // Find the last user message in scene parts
+        const lastUserPart = [...storyData.scene.parts]
+          .reverse()
+          .find((p) => p.user && p.content);
+        if (lastUserPart) {
+          // Strip the ">" prefix if present (custom input format)
+          gmUserChoice = lastUserPart.content.replace(/^>\s*/, "");
+        }
       }
 
-      const gmResponse = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          messages: gmPrompt.messages,
-          tools: gmPrompt.tools,
-          model: gmModel,
-          maxTokens: 2000,
-          temperature: 0.3, // Low temperature for deterministic mechanics
-          openRouterKey: options.openRouterKey,
-          deepseekKey: options.deepseekKey,
-          googleKey: options.googleKey,
-        }),
-        signal: options.abortSignal,
-      });
-
-      if (!gmResponse.ok) {
-        const errorText = await gmResponse.text().catch(() => "");
-        throw new Error(`GM stage failed: ${gmResponse.status} - ${errorText}`);
-      }
-
-      const gmResult = await gmResponse.json();
-      console.log(
-        "[GM Stage] Raw response:",
-        JSON.stringify(gmResult, null, 2)
-      );
-
-      if (gmResult.meta) {
-        gmMeta = gmResult.meta;
-        totalTokenCost += gmResult.meta.tokenCost || 0;
-        finalBalance = gmResult.meta.balance;
-      }
-
-      // Execute GM tool calls locally
-      if (gmResult.toolCalls && gmResult.toolCalls.length > 0) {
-        const gmExecution = await executeGMTools(gmResult.toolCalls, storyData);
-        gmResults = gmExecution.results;
-        gmStoryContext = gmExecution.storyContext;
-
-        // Update storyData with any modifications from GM tools (e.g., rest, challenge state)
-        Object.assign(storyData, gmExecution.modifiedStoryData);
-
-        logger.action("GM stage tools executed", {
-          toolCount: gmResult.toolCalls.length,
-          toolNames: gmResults.map((r) => r.toolName),
-          contextLength: gmStoryContext.length,
-        });
+      if (!gmUserChoice) {
+        logger.action("GM stage skipped - no user choice found");
+        gmStoryContext = "";
       } else {
-        logger.action(
-          "GM stage returned no tool calls (treating as no_check_needed)"
+        const gmModel = options.gmStageModel || options.toolsModel;
+        const gmPrompt = buildGMStagePrompt({
+          storyData,
+          userChoice: gmUserChoice,
+        });
+
+        // Check if user cancelled
+        if (options.abortSignal?.aborted) {
+          throw new Error("Generation cancelled by user");
+        }
+
+        const gmResponse = await fetch("/api/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            messages: gmPrompt.messages,
+            tools: gmPrompt.tools,
+            model: gmModel,
+            maxTokens: 2000,
+            temperature: 0.3, // Low temperature for deterministic mechanics
+            openRouterKey: options.openRouterKey,
+            deepseekKey: options.deepseekKey,
+            googleKey: options.googleKey,
+          }),
+          signal: options.abortSignal,
+        });
+
+        if (!gmResponse.ok) {
+          const errorText = await gmResponse.text().catch(() => "");
+          throw new Error(
+            `GM stage failed: ${gmResponse.status} - ${errorText}`
+          );
+        }
+
+        const gmResult = await gmResponse.json();
+        console.log(
+          "[GM Stage] Raw response:",
+          JSON.stringify(gmResult, null, 2)
         );
-        gmStoryContext =
-          "[No mechanical check needed - pure narrative/roleplay action]";
+
+        if (gmResult.meta) {
+          gmMeta = gmResult.meta;
+          totalTokenCost += gmResult.meta.tokenCost || 0;
+          finalBalance = gmResult.meta.balance;
+        }
+
+        // Execute GM tool calls locally
+        if (gmResult.toolCalls && gmResult.toolCalls.length > 0) {
+          const gmExecution = await executeGMTools(
+            gmResult.toolCalls,
+            storyData
+          );
+          gmResults = gmExecution.results;
+          gmStoryContext = gmExecution.storyContext;
+
+          // Update storyData with any modifications from GM tools (e.g., rest, challenge state)
+          Object.assign(storyData, gmExecution.modifiedStoryData);
+
+          logger.action("GM stage tools executed", {
+            toolCount: gmResult.toolCalls.length,
+            toolNames: gmResults.map((r) => r.toolName),
+            contextLength: gmStoryContext.length,
+          });
+        } else {
+          logger.action(
+            "GM stage returned no tool calls (treating as no_check_needed)"
+          );
+          gmStoryContext =
+            "[No mechanical check needed - pure narrative/roleplay action]";
+        }
       }
 
       callbacks.onGMStageComplete?.(
