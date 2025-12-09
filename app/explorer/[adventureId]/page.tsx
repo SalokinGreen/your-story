@@ -294,11 +294,17 @@ export default function AdventureDetailPage() {
           .toString(36)
           .substr(2, 9)}`;
 
+        // Get default user notes from settings
+        const defaultUserNotes = localStorage.getItem("defaultUserNotes") || "";
+
         const newStoryData = {
           ...adventure.storyTemplate,
           story_name: `${adventure.title} - ${new Date().toLocaleDateString()}`,
           player_name: user.user_metadata?.display_name || "Player",
           starting_choices: adventure.startingChoices,
+          // Add default user notes
+          player_notes:
+            defaultUserNotes || adventure.storyTemplate?.player_notes || "",
           // Don't reset points here - they contain starting allocation points for character creation
           // Points will be reset to 0 after character creation is complete
           level: 1,
@@ -321,6 +327,9 @@ export default function AdventureDetailPage() {
       }
 
       // Create a new story instance from the adventure template
+      // Get default user notes from settings
+      const defaultUserNotes = localStorage.getItem("defaultUserNotes") || "";
+
       const response = await fetch("/api/stories", {
         method: "POST",
         headers: {
@@ -334,6 +343,9 @@ export default function AdventureDetailPage() {
           storyData: {
             ...adventure.storyTemplate,
             starting_choices: adventure.startingChoices,
+            // Add default user notes
+            player_notes:
+              defaultUserNotes || adventure.storyTemplate?.player_notes || "",
             // Don't reset points here - they contain starting allocation points for character creation
             // Points will be reset to 0 after character creation is complete
             level: 1,

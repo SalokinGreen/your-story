@@ -546,30 +546,21 @@ export default function Story({
                 />
               )}
 
-              {/* Continue/Stop Button */}
+              {/* Continue/Cancel Button */}
               {loading || loadingStage ? (
-                <div className="flex-1 flex gap-2">
-                  {/* Status indicator */}
-                  <div className="flex-1 py-3.5 sm:py-2.5 text-base font-semibold rounded-lg bg-blue-800/50 text-blue-400 flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-blue-500 border-t-blue-300 rounded-full animate-spin" />
-                    {loadingStage === "tools"
-                      ? "Updating game state..."
-                      : loadingStage === "choices"
-                      ? "Preparing choices..."
-                      : "Generating..."}
-                  </div>
-                  {/* Stop button */}
-                  {onStop && (
-                    <button
-                      onClick={onStop}
-                      className="px-4 py-3.5 sm:py-2.5 text-base font-semibold rounded-lg bg-red-600 hover:bg-red-500 text-white transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation"
-                      title="Stop generation"
-                    >
-                      <DynamicIcon name="Square" className="w-4 h-4" />
-                      Stop
-                    </button>
-                  )}
-                </div>
+                <button
+                  onClick={onStop}
+                  className="flex-1 py-3.5 sm:py-2.5 text-base font-semibold rounded-lg bg-red-600/80 hover:bg-red-600 text-white transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation cursor-pointer"
+                  title="Cancel generation"
+                >
+                  <div className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
+                  {loadingStage === "tools"
+                    ? "Updating game state..."
+                    : loadingStage === "choices"
+                    ? "Preparing choices..."
+                    : "Generating..."}
+                  <DynamicIcon name="Square" className="w-4 h-4 ml-1" />
+                </button>
               ) : (
                 <button
                   onClick={() => setShowChoicesModal(true)}

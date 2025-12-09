@@ -32,7 +32,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
   const [showKeys, setShowKeys] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "config" | "llm" | "services" | "display"
+    "config" | "llm" | "services" | "display" | "game"
   >("config");
 
   // TTS Settings state (read from localStorage)
@@ -44,6 +44,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
   const [sttEnabled, setSttEnabled] = useState(true);
   const [showHiddenMessages, setShowHiddenMessages] = useState(false);
   const [customVoices, setCustomVoices] = useState<string[]>([]);
+  const [defaultUserNotes, setDefaultUserNotes] = useState("");
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -59,6 +60,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
       setShowHiddenMessages(
         localStorage.getItem("showHiddenMessages") === "true"
       );
+      setDefaultUserNotes(localStorage.getItem("defaultUserNotes") || "");
       try {
         const voices = localStorage.getItem("ttsCustomVoices");
         if (voices) setCustomVoices(JSON.parse(voices));
@@ -143,6 +145,19 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             <span className="flex items-center gap-2">
               <DynamicIcon name="Monitor" className="w-4 h-4" />
               Display
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab("game")}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === "game"
+                ? "border-purple-500 text-purple-600 dark:text-purple-400"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <DynamicIcon name="Gamepad2" className="w-4 h-4" />
+              Game
             </span>
           </button>
           <button
@@ -675,6 +690,42 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
                   </label>
+                </div>
+              </div>
+            </>
+          ) : activeTab === "game" ? (
+            <>
+              {/* Game Settings Tab */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                  <DynamicIcon name="Gamepad2" className="w-4 h-4" />
+                  Game Settings
+                </h3>
+
+                {/* Default User Notes */}
+                <div>
+                  <label className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
+                    Default User Notes
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    These notes will be automatically added to every new
+                    story&apos;s author notes. Use this to set persistent
+                    preferences like writing style, content boundaries, or
+                    character guidelines.
+                  </p>
+                  <textarea
+                    value={defaultUserNotes}
+                    onChange={(e) => {
+                      setDefaultUserNotes(e.target.value);
+                      localStorage.setItem("defaultUserNotes", e.target.value);
+                    }}
+                    placeholder="e.g., Always write in first person. Include vivid sensory details. Keep dialogue natural and character-driven..."
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y min-h-[120px]"
+                    rows={5}
+                  />
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    {defaultUserNotes.length} characters
+                  </p>
                 </div>
               </div>
             </>
