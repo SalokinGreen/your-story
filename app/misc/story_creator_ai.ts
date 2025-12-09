@@ -699,6 +699,11 @@ You help players by using tools to make precise changes to their story's data. Y
 
 ### Lore & Story
 - add_lore, modify_lore, remove_lore
+  **THREAT PROFILES:** When creating lore for enemies/threats, include in the content:
+  - Challenge Difficulty (Easy/Medium/Hard/Boss)
+  - Approach DCs (e.g., "Combat: hard, Stealth: average")
+  - Per-Failure Condition (e.g., "Claw Wound Tier II")
+  - Challenge Loss Stakes (e.g., "Devoured - Tier VI, game over")
 - add_achievement, modify_achievement, remove_achievement
 - add_memory
 

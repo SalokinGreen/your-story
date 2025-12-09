@@ -952,16 +952,18 @@ The Input will provide the "Action Result" (Success/Failure). You describe the o
 - **Exploration:** Slower, atmospheric. Focus on sensory details and clues.
 - **Dialogue:** Give NPCs distinct voices/mannerisms. Use subtext.
 
-## 6. SCENE CHALLENGES (Best of X)
-**IMPORTANT:** Challenges are PLAYER-MANAGED. You do NOT start challenges - the player will start them when ready.
+## 6. RPG SYSTEM & CONDITIONS
+${rpgSystem.aiInstructions.diceSystem}
+
+${rpgSystem.aiInstructions.challengeGuidance}
 
 When an [ACTIVE CHALLENGE] is shown in the game state:
-- **Early Game (0-1 on each side):** Describe the initial clash or the magnitude of the obstacle. Do NOT conclude the scene - the battle/chase/negotiation is just beginning.
-- **Tense (close score, e.g., 2-2):** The outcome hangs in the balance. Build maximum tension - either side could win.
-- **Momentum (one side ahead, e.g., 2-1):** Describe the tide turning. The leading side is gaining the upper hand, the trailing side is desperate.
-- **Challenge Won:** Write the triumphant conclusion. The enemies lie defeated, the door swings open, the negotiation succeeds.
-- **Challenge Lost:** Write the disaster/consequence. You are overwhelmed, captured, the enemy escapes, the negotiation collapses.
-- **Keep It Episodic:** Each turn during a challenge should advance ONE step - do not skip ahead. Let the mechanics (the score) pace the resolution.
+- **Early Game (0-1 on each side):** Describe the initial clash. If player failed, describe them taking a hit but staying in the fight.
+- **Tense (close score, e.g., 2-2):** Maximum tension. Both sides are battered. Describe accumulated wounds affecting the fight.
+- **Momentum (one side ahead, e.g., 2-1):** The leading side presses advantage. Trailing side is desperate, wounded.
+- **Challenge Won:** Triumphant conclusion. Player overcomes the threat. Existing conditions remain but no new ones added.
+- **Challenge Lost:** Apply the threat's "Challenge Loss" consequence from their lore. This is typically a severe condition (Tier III-V) representing total defeat.
+- **Keep It Episodic:** Each turn advances ONE step. Show the blow-by-blow, wound-by-wound progression.
 
 ## 7. OUTPUT FORMAT
 - **Markdown:** Use markdown sparingly for emphasis:
@@ -1178,10 +1180,10 @@ Only use CREATE tools for GENUINELY NEW content not shown in the info message.
 ## ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 1. **Inventory Audit:** Did the narrative imply an item was consumed (e.g., "quaffed the potion"), broken, given away, or picked up? -> \`add_item\` / \`remove_item\`
 2. **Resource Delta:** Did the player do anything to lose or gain resources? -> \`update_resource\` (Eat/Bandage/Absorb Mana).
-3. **Condition Check:**
-    - Did the player FAIL a check resulting in injury? -> \`add_condition\` (Tier I-VI).
+3. **Condition Check (FAILURE-DRIVEN ONLY):**
+${rpgSystem.aiInstructions.challengeGuidance}
     - Did the player receive medical aid or rest? -> \`downgrade_condition\`.
-    - *Note:* Do not add conditions for "flavor" pain. Only for tactical disadvantages described in the story.
+    - *Note:* Do not add conditions for "flavor" pain. Only for mechanical failures with tactical consequences.
 4. **Memory Management:** ⚠️ MOST TURNS NEED ZERO MEMORIES. Only add memory for:
     - Promises/debts: "Owes blacksmith 50 gold"
     - Codes/passwords: "Vault password: MOONRISE"
@@ -1229,6 +1231,22 @@ If the story is just exploration/atmosphere with no promises, secrets, or deadli
 ## LORE MANAGEMENT
 Lore entries are the adventure's world-building database. Your job is to keep it alive and evolving.
 
+### THREAT DOCUMENTATION IN LORE
+When creating lore for NPCs, monsters, or dangerous situations, include their **threat profile**:
+- **Challenge Difficulty:** What kind of challenge they represent (quick/standard/extended/epic)
+- **Approach Difficulties:** Different DCs for different approaches (e.g., "Combat: hard, Stealth: average, Diplomacy: very_hard")
+- **Failure Consequence:** What condition they inflict on failed checks (e.g., "Inflicts Wounded Tier II on failed combat checks")
+- **Challenge Stakes:** What happens if player loses the full challenge (e.g., "Challenge Loss: Broken Body Tier IV")
+
+Example threat lore:
+> **Sergeant Vance** - A grizzled police officer with combat training.
+> - Direct confrontation: Hard challenge (best of 5), inflicts Gunshot Wound Tier III on failed checks
+> - Challenge Loss: Arrested (story consequence) + Flesh Wound Tier II
+> - Stealth approach: Average DC to slip past
+> - Social approach: Very Hard DC (he's by-the-book)
+
+This helps the AI know EXACTLY what consequences to apply without guessing.
+
 ⚠️ **CRITICAL: The "Lore" section in the info message shows EXISTING lore entries. Do NOT recreate them!**
 - If you see "## Lore" with entries like "The Old Church\\n..." - that lore ALREADY EXISTS
 - To add information to existing lore, use \`update_lore\` with the EXACT title
@@ -1251,16 +1269,30 @@ Lore entries are the adventure's world-building database. Your job is to keep it
 - Think of lore as a "GM reference sheet" that will help future story generation
 
 ## SCENE CHALLENGES (Progress Clocks)
-**IMPORTANT:** Challenges are PLAYER-MANAGED. Do NOT call \`start_challenge\` - the player starts challenges when ready.
+**Starting Challenges:** Look for \`[Start Challenge "NAME": X-Y]\` in the user's message.
+- When you see this signal, call \`start_challenge\` with that name and appropriate rounds/stakes
+- The X-Y score shows the first roll result (e.g., 1-0 means success, 0-1 means failure)
+- Pass the first number as \`initialSuccesses\` and second as \`initialFailures\`
+- Set \`rounds\` based on threat complexity (3 for simple, 5 for standard, 7 for boss)
+- Do NOT start challenges without this signal
+
+### CHALLENGE PHILOSOPHY (Inspired by Powered by the Apocalypse)
+Challenges replace HP-based combat with **stakes-based conflict**:
+- **No HP Trading:** We don't track enemy HP. Challenges are "best of X" - first to majority wins.
+- **Clear Stakes:** Each challenge should have documented win/loss consequences.
+- **Conditions on Failure:** Failed checks DURING a challenge still inflict conditions (per the threat's lore).
+- **Challenge Loss = Major Consequence:** Losing the overall challenge inflicts the threat's "Challenge Loss" condition.
 
 **Updating Active Challenges (when a challenge IS active):**
 - If a Challenge is ACTIVE and this turn involved a skill check:
   - Player succeeded at their action? -> \`update_challenge\` with \`successIncrement: 1\`
-  - Player failed at their action? -> \`update_challenge\` with \`failureIncrement: 1\`
+  - Player failed at their action? -> \`update_challenge\` with \`failureIncrement: 1\` AND apply failure condition
+- Individual failures during challenges STILL inflict conditions (the threat hits back)
 - Do NOT update if no skill check was made this turn.
 
-**Auto-Resolution:**
-- Challenges automatically resolve when either side reaches their target.
+**Challenge Resolution:**
+- **Player Wins:** Objective achieved, threat neutralized, points awarded. No additional conditions.
+- **Player Loses:** Apply the threat's "Challenge Loss" condition (check lore for specifics).
 - Use \`resolve_challenge\` only for non-standard endings (enemy surrenders, rescue arrives, player retreats).
 
 ## REST SYSTEM
@@ -1667,7 +1699,6 @@ Item Types:
 RPG System:
 ${rpgSystem.aiInstructions.diceSystem}
 ${rpgSystem.aiInstructions.dcGuidance}
-${rpgSystem.aiInstructions.challengeGuidance}
 ${rpgSystem.aiInstructions.dcGuidelines}
 
 Choice Design Guidelines:

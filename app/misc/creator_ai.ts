@@ -683,7 +683,7 @@ You can control how items in arrays are applied using the **_command** field:
   - nodeId: Source of the passive - "manual" (user-created), "ai" (AI-created), or a skill tree node ID
 - lore (Array of { title, content, secrtet, on, alwaysOn, on_triggers, off_triggers, trigger_lores, untrigger_lores, var_on_triggers, var_off_triggers })
   - title: Lore entry title
-  - content: Full lore text
+  - content: Full lore text (see THREAT PROFILES below for combat encounters)
   - secrtet: If true, lore starts hidden and must be revealed
   - on: Whether lore is currently visible (true = visible to AI/player, false = hidden)
   - alwaysOn: If true, lore is always visible and ignores all triggers
@@ -693,6 +693,28 @@ You can control how items in arrays are applied using the **_command** field:
   - untrigger_lores: Array of lore titles - when those lores become visible, this lore becomes hidden
   - var_on_triggers: Array of boolean variable names - when variable is true, lore becomes visible
   - var_off_triggers: Array of boolean variable names - when variable is true, lore becomes hidden
+
+  **THREAT PROFILES IN LORE (IMPORTANT):**
+  When creating lore entries for enemies, monsters, or dangerous NPCs, include a **Threat Profile** section that documents:
+  1. **Challenge Difficulty**: How hard is this threat overall? (Easy/Medium/Hard/Boss)
+  2. **Approach DCs**: What skills work against this threat and at what difficulty?
+     - Example: "Combat (hard), Persuasion (very_hard), Stealth (average)"
+  3. **Per-Failure Condition**: What condition does the threat inflict on failed checks?
+     - Name the condition and its tier: "Slash Wound (Tier II)", "Psychic Trauma (Tier III)"
+  4. **Challenge Loss Stakes**: If player loses an extended challenge, what happens?
+     - Example: "Defeat inflicts Broken Body (Tier IV) and capture"
+  
+  **Example Threat Lore Entry:**
+  Title: "Guard Captain Marcus"
+  Content: "Marcus is the ruthless captain of the city guard, known for his brutal efficiency...
+  
+  **Threat Profile:**
+  - Challenge Difficulty: Hard (best of 5)
+  - Combat DC: hard, Persuasion DC: very_hard, Stealth DC: average (to avoid)
+  - Per-Failure Condition: Sword Wound (Tier II) - upgrades to Tier III, IV on repeated failures
+  - Challenge Loss: Deep Wound (Tier IV) + arrested and imprisoned"
+  
+  This allows the AI narrator to consistently apply consequences during gameplay.
 - relationships (Array of { name, value, description, symbol })
   - name: Character, faction, or organization name
   - value: Relationship level from -100 (hostile enemy) to +100 (strong ally)
@@ -1625,6 +1647,11 @@ When the user asks you to create or modify parts of the scenario (like "create a
 
 **Story Content:**
 - add_lore, modify_lore, remove_lore - Manage world-building entries with triggers
+  **THREAT PROFILES:** When creating lore for enemies/threats, include in the content:
+  - Challenge Difficulty (Easy/Medium/Hard/Boss)
+  - Approach DCs (e.g., "Combat: hard, Stealth: average")
+  - Per-Failure Condition (e.g., "Claw Wound Tier II")
+  - Challenge Loss Stakes (e.g., "Devoured - Tier VI, game over")
 - add_achievements, modify_achievements, remove_achievements - Manage unlockables
 - add_quests, modify_quests, remove_quests - Manage objectives
 

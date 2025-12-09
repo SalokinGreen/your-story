@@ -4540,6 +4540,30 @@ function StoryPageContent() {
           score: `${challenge.currentSuccesses}-${challenge.currentFailures}`,
           resolved: challengeResolved,
         });
+      } else if (
+        // Signal tool stage to start a NEW challenge when action analysis detected complex event
+        !storyData.activeChallenge?.active &&
+        choice.challenge_handling?.is_complex_event &&
+        choice.challenge_handling?.challenge_name &&
+        skillCheckResult
+      ) {
+        // Determine if this first roll counts as success
+        const isSuccess =
+          skillCheckResult === "success" ||
+          skillCheckResult === "style" ||
+          skillCheckResult === "partial";
+
+        const challengeName = choice.challenge_handling.challenge_name;
+        const initialScore = isSuccess ? "1-0" : "0-1";
+
+        choiceDetails.push(
+          `[Start Challenge "${challengeName}": ${initialScore}]`
+        );
+
+        logger.action("New challenge signaled from action analysis", {
+          challenge: challengeName,
+          firstRoll: isSuccess ? "success" : "failure",
+        });
       }
 
       // YZE: Add panic details if triggered

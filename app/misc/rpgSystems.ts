@@ -178,8 +178,33 @@ export const SYSTEM_3D6: RPGSystem = {
       "The game uses a 3d6 system (rolls 3 six-sided dice, result is 3-18). Average roll is 10-11, creating a bell curve where extreme values are rare. This makes outcomes more predictable than 1d20.",
     dcGuidance:
       "Use TIER NAMES for difficulty (trivial, easy, average, hard, very_hard, impossible). The system automatically converts these to appropriate numbers based on adventure difficulty. Example: use_skill: Stealth (hard)",
-    challengeGuidance:
-      "⚠️ IMPORTANT: Challenge the player! Use 'hard' or 'very_hard' for dramatic moments, 'average' for standard challenges. Only use 'trivial' or 'easy' for narrative flavor checks. The 3d6 system creates consistent results, so higher difficulty is needed for real challenge.",
+    challengeGuidance: `3d6 System CONDITION MECHANICS:
+
+**CORE PHILOSOPHY:** Failures inflict CONDITIONS. Conditions ESCALATE. Success is clean.
+
+**FAILURE CONSEQUENCES:**
+When player fails (roll + stat < DC):
+1. **INFLICT A CONDITION** appropriate to the threat (check lore for threat profile)
+2. Condition tier scales with DC tier: easy=I, average=II, hard=III, very_hard=IV, impossible=V
+3. **If player already has the condition, UPGRADE IT** (e.g., "Wounded II" → "Wounded III")
+4. Describe the failure dramatically
+
+**SUCCESS:**
+- Clean success, no conditions - describe accomplishment vividly
+
+**CONDITION ESCALATION (CRITICAL):**
+- Each threat's lore specifies what condition they inflict
+- If player fails against same threat type, UPGRADE existing condition
+- Example: Has "Scorched II" from fire → fails vs fire again → "Scorched III"
+- Tier 6 = auto-fail or game over
+
+**CHALLENGES (Extended Conflicts):**
+- Best of X format (e.g., best of 5 = first to 3 wins)
+- Each failed check during challenge inflicts per-turn condition
+- Losing overall challenge inflicts "Challenge Loss" condition from threat's lore
+- The 3d6 bell curve creates consistent results - use higher difficulty for real challenge
+
+Challenge the player! Use 'hard' or 'very_hard' for dramatic moments.`,
     choiceSyntax:
       "- ...Prose <use_skill: skill name (tier) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\n\nDC TIERS (use these instead of numbers):\n- trivial: Routine task, almost automatic\n- easy: Simple challenge, most succeed\n- average: Standard difficulty, 50/50 chance\n- hard: Significant challenge, skill required\n- very_hard: Extreme difficulty, only skilled succeed\n- impossible: Near-impossible, requires exceptional luck\n\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (hard); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>\n- You approach the mysterious door. <use_skill: none; use_resource: none; use_item: none; agmt_check: Is it locked? (50/50); agmt_table: none; custom_table: none>",
     dcGuidelines:
@@ -255,8 +280,37 @@ export const SYSTEM_1D20: RPGSystem = {
       "The game uses a 1d20 system (rolls 1 twenty-sided die, result is 1-20). Every number has equal probability (5% each), creating high variance and dramatic swings - you might roll a 1 or 20 at any time!",
     dcGuidance:
       "Use TIER NAMES for difficulty (trivial, easy, average, hard, very_hard, impossible). The system automatically converts these to appropriate numbers based on adventure difficulty. Example: use_skill: Stealth (hard)",
-    challengeGuidance:
-      "⚠️ IMPORTANT: Challenge the player! Use 'hard' or 'very_hard' for dramatic moments, 'average' for standard challenges. The 1d20 system is swingy - even with low stats, extreme rolls can change outcomes.",
+    challengeGuidance: `1d20 System CONDITION MECHANICS:
+
+**CORE PHILOSOPHY:** Failures inflict CONDITIONS. Conditions ESCALATE. Success is clean.
+
+**FAILURE CONSEQUENCES:**
+When player fails (roll + stat < DC):
+1. **INFLICT A CONDITION** appropriate to the threat (check lore for threat profile)
+2. Condition tier scales with DC tier: easy=I, average=II, hard=III, very_hard=IV, impossible=V
+3. **If player already has the condition, UPGRADE IT** (e.g., "Wounded II" → "Wounded III")
+4. Describe the failure dramatically
+
+**NATURAL 1 and 20:**
+- Natural 1: Always failure + inflict condition at one tier higher than normal
+- Natural 20: Always success + may remove/reduce an existing condition
+
+**SUCCESS:**
+- Clean success, no conditions - describe accomplishment vividly
+
+**CONDITION ESCALATION (CRITICAL):**
+- Each threat's lore specifies what condition they inflict
+- If player fails against same threat type, UPGRADE existing condition
+- Conditions give penalties (-2 to -10 based on tier)
+- Tier 6 = auto-fail
+
+**CHALLENGES (Extended Conflicts):**
+- Best of X format (e.g., best of 5 = first to 3 wins)
+- Each failed check during challenge inflicts per-turn condition
+- Losing overall challenge inflicts "Challenge Loss" condition from threat's lore
+- The 1d20 is swingy - even with low stats, extreme rolls can change outcomes
+
+Challenge the player! Use 'hard' or 'very_hard' for dramatic moments.`,
     choiceSyntax:
       "- ...Prose <use_skill: skill name (tier) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\n\nDC TIERS (use these instead of numbers):\n- trivial: Routine task, almost automatic\n- easy: Simple challenge, most succeed\n- average: Standard difficulty, 50/50 chance\n- hard: Significant challenge, skill required\n- very_hard: Extreme difficulty, only skilled succeed\n- impossible: Near-impossible, requires exceptional luck\n\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (hard); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>",
     dcGuidelines:
@@ -332,8 +386,33 @@ export const SYSTEM_1D100: RPGSystem = {
       "The game uses a 1d100 system (rolls 1 hundred-sided die, result is 1-100). Every number has equal probability (1% each), providing maximum granularity for precise difficulty tuning.",
     dcGuidance:
       "Use TIER NAMES for difficulty (trivial, easy, average, hard, very_hard, impossible). The system automatically converts these to appropriate numbers based on adventure difficulty. Example: use_skill: Stealth (hard)",
-    challengeGuidance:
-      "⚠️ IMPORTANT: Challenge the player! Use 'hard' or 'very_hard' for dramatic moments, 'average' for standard challenges. The 1d100 system offers granular control - difficulty is automatically scaled appropriately.",
+    challengeGuidance: `1d100 System CONDITION MECHANICS:
+
+**CORE PHILOSOPHY:** Failures inflict CONDITIONS. Conditions ESCALATE. Success is clean.
+
+**FAILURE CONSEQUENCES:**
+When player fails (roll + stat < DC):
+1. **INFLICT A CONDITION** appropriate to the threat (check lore for threat profile)
+2. Condition tier scales with DC tier: easy=I, average=II, hard=III, very_hard=IV, impossible=V
+3. **If player already has the condition, UPGRADE IT** (e.g., "Wounded II" → "Wounded III")
+4. Describe the failure dramatically
+
+**SUCCESS:**
+- Clean success, no conditions - describe accomplishment vividly
+
+**CONDITION ESCALATION (CRITICAL):**
+- Each threat's lore specifies what condition they inflict
+- If player fails against same threat type, UPGRADE existing condition
+- Conditions give penalties (-10 to -50 based on tier)
+- Tier 6 = auto-fail
+
+**CHALLENGES (Extended Conflicts):**
+- Best of X format (e.g., best of 5 = first to 3 wins)
+- Each failed check during challenge inflicts per-turn condition
+- Losing overall challenge inflicts "Challenge Loss" condition from threat's lore
+- The 1d100 offers granular control - difficulty is scaled appropriately
+
+Challenge the player! Use 'hard' or 'very_hard' for dramatic moments.`,
     choiceSyntax:
       "- ...Prose <use_skill: skill name (tier) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\n\nDC TIERS (use these instead of numbers):\n- trivial: Routine task, almost automatic\n- easy: Simple challenge, most succeed\n- average: Standard difficulty, 50/50 chance\n- hard: Significant challenge, skill required\n- very_hard: Extreme difficulty, only skilled succeed\n- impossible: Near-impossible, requires exceptional luck\n\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (hard); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>",
     dcGuidelines:
@@ -411,8 +490,33 @@ export const SYSTEM_PERCENTILE: RPGSystem = {
       "The game uses a ROLL-UNDER d100 system. Player rolls 1d100 and tries to roll EQUAL TO OR BELOW their stat value. Lower rolls are better! Critical success on 1-5, critical failure on 96-100.",
     dcGuidance:
       "⚠️ DO NOT SET DC VALUES! This is a roll-under system. Success = Roll ≤ Stat Value. The challenge comes from the stat itself. If a character has 70 in a skill, they need to roll 70 or below on d100 to succeed (70% chance).",
-    challengeGuidance:
-      "Challenge comes from stat values, not DCs. Use /modify_stat commands to adjust difficulty. Higher stats = easier tasks. For resource-based challenges, use /modify_resource instead. Never mention DC in narrative - say 'roll against your [Stat]' instead.",
+    challengeGuidance: `Percentile Roll-Under CONDITION MECHANICS:
+
+**CORE PHILOSOPHY:** Failures inflict CONDITIONS. Conditions ESCALATE. Success is clean.
+
+**FAILURE CONSEQUENCES:**
+When player fails (roll > stat):
+1. **INFLICT A CONDITION** appropriate to the threat (check lore for threat profile)
+2. Condition tier scales with how bad the failure margin is: close=I-II, clear=III, severe=IV+
+3. **If player already has the condition, UPGRADE IT** (e.g., "Wounded II" → "Wounded III")
+4. Critical failures (96-100) inflict condition at one tier higher
+
+**SUCCESS:**
+- Roll ≤ stat = clean success, no conditions
+- Critical success (1-5) may reduce existing condition by one tier
+
+**CONDITION ESCALATION (CRITICAL):**
+- Each threat's lore specifies what condition they inflict
+- If player fails against same threat type, UPGRADE existing condition
+- Conditions reduce effective stat (-10 to -50 based on tier)
+- Tier 6 = auto-fail
+
+**CHALLENGES (Extended Conflicts):**
+- Best of X format (e.g., best of 5 = first to 3 wins)
+- Each failed check during challenge inflicts per-turn condition
+- Losing overall challenge inflicts "Challenge Loss" condition from threat's lore
+
+Challenge comes from stat values, not DCs. Never mention DC - say 'roll against your [Stat]' instead.`,
     choiceSyntax:
       "- ...Prose <use_skill: skill name or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\nPercentile Roll-Under System - No DC needed! Success = roll ≤ stat value:\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth; use_resource: none; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>\n- You approach the mysterious door. <use_skill: none; use_resource: none; use_item: none; agmt_check: Is it locked? (50/50); agmt_table: none; custom_table: none>",
     dcGuidelines:
@@ -500,29 +604,44 @@ export const SYSTEM_PBTA: RPGSystem = {
       "The game uses Powered by the Apocalypse (PbtA) 2d6 system. Player rolls 2d6 (2-12) and adds a modifier (-2 to +3) derived from their 0-100 stat. Critical success on 12 (double 6s). DIFFICULTY is expressed through advantage/disadvantage dice, NOT variable thresholds.",
     dcGuidance:
       "PbtA uses DC to set ADVANTAGE/DISADVANTAGE, not success thresholds. Thresholds are ALWAYS fixed (10+/7-9/6-). Set DC based on fictional difficulty: easy = advantage, average/hard = normal, very_hard = disadvantage.",
-    challengeGuidance: `PbtA THREE-OUTCOME SYSTEM:
+    challengeGuidance: `PbtA THREE-OUTCOME SYSTEM (Conditions from Failures Only):
 
-**10+ FULL SUCCESS**: Player achieves their goal cleanly and completely. No complications, costs, or negative consequences. Describe what they wanted to accomplish happening successfully.
+**CORE PHILOSOPHY:** No HP! Failures inflict CONDITIONS. Conditions ESCALATE on repeated failures.
+
+**10+ FULL SUCCESS**: Player achieves their goal cleanly and completely. No complications, costs, or negative consequences. NO CONDITION.
 
 **7-9 PARTIAL SUCCESS** (MOST IMPORTANT): Player succeeds BUT you MUST add ONE of these:
-  • Success with a cost (lose resource, take damage, equipment breaks, spend momentum)
+  • Success with a cost (lose resource, take minor condition Tier I, equipment breaks, spend momentum)
   • Success with a complication (alert enemies, leave evidence, create new problem, time pressure)
   • Hard choice between two outcomes (save ally OR complete objective, sneak past OR speed, full effect OR quiet)
   • Lesser effect (break door loudly instead of quietly, intimidate but make enemy, persuade but owe favor)
   
   NEVER give full success on 7-9! Always include a drawback, complication, or hard choice.
 
-**6- FAILURE**: Player fails AND you make a hard move:
+**6- FAILURE**: Player fails AND takes consequences:
+  • **INFLICT A CONDITION** appropriate to the threat (check lore for threat profile)
+  • Condition tier scales with difficulty: Easy=I-II, Average=II-III, Hard=III-IV, Very Hard=IV-V
+  • **If player already has the condition, UPGRADE IT** (e.g., Wounded II → Wounded III)
   • Their action backfires or makes things worse
-  • Introduce immediate danger or complication  
-  • Reveal an unwelcome truth
-  • Deal damage (physical, resource, relationship)
   • Advance a threat or countdown
+
+**CONDITION ESCALATION (CRITICAL):**
+- Conditions are named injuries/afflictions tied to threats (e.g., "Slash Wound", "Broken Ribs", "Shaken")
+- Each threat's lore should specify what condition they inflict
+- If player already has that condition, UPGRADE the tier instead of adding new
+- Example: Player has "Battered II", fails against boxer → "Battered III"
+- Tier 6 = permanent or game-ending
+
+**CHALLENGES (Extended Conflicts):**
+- Best of X format (e.g., best of 5 = first to 3 wins)
+- Each failed check during challenge STILL inflicts the per-turn condition
+- Losing the overall challenge inflicts the "Challenge Loss" condition from threat's lore
+- This creates escalating tension: each failure makes the next harder
   
 DIFFICULTY (3 tiers):
-  • **easy**: Roll 3d6, keep best 2 (advantage) - favorable circumstances, friendly NPCs, prepared actions
-  • **average/hard**: Roll 2d6 normally - default for most actions, including challenging ones
-  • **very_hard**: Roll 3d6, keep worst 2 (disadvantage) - desperate circumstances, hostile environment, severe time pressure
+  • **easy**: Roll 3d6, keep best 2 (advantage) - favorable circumstances
+  • **average/hard**: Roll 2d6 normally - default for most actions
+  • **very_hard**: Roll 3d6, keep worst 2 (disadvantage) - desperate circumstances
 
 EXAMPLES:
 "Roll Charm to persuade the friendly guard (easy)" → advantage
@@ -659,71 +778,46 @@ DON'T call for rolls when:
 • It would slow down the narrative momentum
 
 ACTIVE OPPOSITION: When facing NPCs, their skill level = opposition (guards with Good (+3) Awareness, noble with Superb (+5) Will, etc.)`,
-    challengeGuidance: `Fate FOUR-OUTCOME SYSTEM (based on margin):
+    challengeGuidance: `Fate FOUR-OUTCOME SYSTEM (Conditions from Failures):
 
-**FAIL** (Roll < Opposition): Player fails to achieve goal.
+**CORE PHILOSOPHY:** Failures inflict CONDITIONS (called Consequences in Fate). Conditions ESCALATE.
+
+**FAIL** (Roll < Opposition): Player fails AND takes a consequence.
+  • **INFLICT A CONDITION** appropriate to the threat (check lore for threat profile)
+  • Condition tier scales with opposition: Fair=I-II, Great=III, Superb+=IV-V
+  • **If player already has the condition, UPGRADE IT** (e.g., "Wounded II" → "Wounded III")
   • Describe failure with narrative consequence
   • Advance threat, introduce complication
-  • Offer minor success with major cost (if appropriate)
-  • Use /deal_damage for stress/consequences
-  • Can spend Fate Point to reroll (if player has resource)
 
 **TIE** (Roll = Opposition): Neither side wins cleanly.
-  • Success at cost: achieve goal but pay price (lose resource, take stress, create complication)
-  • Partial success: achieve lesser effect or introduce complication
+  • Success at cost: achieve goal but take MINOR condition (Tier I)
+  • Or: achieve lesser effect with complication
   • "Yes, but..." outcomes
-  • Player can spend Fate Point for full success (if they have resource)
 
 **SUCCESS** (Roll > Opposition by 1-2): Player achieves goal clearly.
-  • Clean success without complications
+  • Clean success without complications - NO CONDITION
   • Describe accomplishment vividly
-  • Achieve stated intent fully
   • May gain minor bonus (reveal aspect, gain advantage)
 
 **SUCCESS WITH STYLE** (Roll exceeds Opposition by 3+): Overwhelming victory!
-  • MANDATORY BONUS: Player must get one of:
-    - Automatic boost/advantage for next action (like momentum)
-    - Extra effect beyond intent (break weapon AND disarm, intimidate ALL guards)
-    - Reduce incoming harm (negate stress/consequence)
-    - Discover useful aspect/information
+  • MANDATORY BONUS: boost for next action, extra effect, reduce existing condition, or discover info
   • Describe spectacular, memorable success
-  • Never just "you succeed really well" - always include tangible bonus
+  • Can downgrade an existing condition by 1 tier
 
-ASPECTS (Inventory Items):
-  • Can invoke aspect for +2 bonus (costs 1 Fate Point from resource)
-  • Compels create complications for 1 Fate Point reward
-  • Always mention relevant aspects in checks
+**CONDITION ESCALATION (CRITICAL):**
+- Conditions are named (e.g., "Broken Ribs", "Rattled", "Exhausted") tied to threat type
+- Each threat's lore specifies what condition they inflict
+- If player already has that condition, UPGRADE the tier instead of adding new
+- Example: Player has "Wounded II", fails against swordsman → "Wounded III"
+- Tier 6 = Taken Out (removed from scene/captured/killed)
 
-FATE POINTS (Special Resource):
-  • Spend to: invoke aspect (+2), reroll dice, refuse compel
-  • Earn by: accepting compel, conceding conflict, style success
-  • Starting pool usually 3-5
+**CHALLENGES (Extended Conflicts):**
+- Best of X format (e.g., best of 5 = first to 3 wins)
+- Each failed check during challenge STILL inflicts the per-turn condition
+- Losing the overall challenge inflicts the "Challenge Loss" condition from threat's lore
+- Escalating conditions make each subsequent roll harder
 
-STRESS & CONSEQUENCES (HP System):
-  • Physical/Mental stress boxes (1-4 levels)
-  • Consequences: Mild(2), Moderate(4), Severe(6), Extreme(8)
-  • Use /deal_damage but frame as stress/consequences
-  • Taken out = defeated, not dead
-
-MOMENTUM: Treat as free invoke (add +2 to roll)
-
-EXAMPLES:
-"Roll Athletics (+3) to leap the chasm (Opposition: Fair +2)"
-  • Total 6: "SUCCESS WITH STYLE! You soar across gracefully AND grab the rope, swinging to kick the guard off the far side!"
-  • Total 3: "SUCCESS! You land safely on the far side, ready for action."
-  • Total 2: "TIE! You make it across but stumble - lose 1 Physical Stress from the hard landing."
-  • Total 0: "FAIL! You miss the far side. Spend Fate Point to catch the edge, or take Moderate Consequence 'Dangling Desperately'."
-
-Remember: Success with Style MUST include a meaningful bonus, not just flavor. Ties MUST have a cost or complication. Use The Ladder names in narration ("That's a Great result!").
-
-⚠️ CREATING DRAMATIC TENSION:
-Fate thrives on contested actions and uncertain outcomes. Structure scenes around:
-• OBSTACLES: Physical barriers (locked doors, chasms, guards) require rolls to overcome
-• CONFLICTS: Social/physical confrontations (arguments, fights, chases) need active opposition
-• CHALLENGES: Multi-step problems (investigations, heists, journeys) broken into skill checks
-• DISCOVERIES: Finding clues, spotting danger, reading people - all opportunities for rolls
-
-When players take ACTION, convert it to a roll. When they declare INTENT, ask which skill and set opposition. Keep the dice moving to maintain energy and stakes.`,
+Remember: Use The Ladder names in narration ("That's a Great result!"). Ties MUST have a cost.`,
     choiceSyntax:
       "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\\nFate Core System - Present meaningful obstacles and opposition that require rolls. DC is the ladder level (use Fair +2 as default, Great +4 for serious challenges):\\nExample:\\n- You carefully sneak past the alert guards (Awareness: Great +4). <use_skill: Stealth (DC 4); use_resource: none; use_item: none; agmt_check: none; agmt_table: sounds; custom_table: none>\\n- You try to convince the skeptical merchant (Will: Good +3). <use_skill: Rapport (DC 3); use_resource: none; use_item: none; agmt_check: Is he desperate? (Unlikely); agmt_table: none; custom_table: none>\\n- You scale the treacherous cliff face. <use_skill: Athletics (DC 4); use_resource: Stamina; use_item: Climbing Gear; agmt_check: none; agmt_table: terrain; custom_table: none>",
     dcGuidelines:
@@ -955,76 +1049,54 @@ export const SYSTEM_YZE: RPGSystem = {
 5+ Successes: Nearly impossible, legendary
 
 Don't use variable DCs - use success count. A character with 60 stat rolls 3 base dice.`,
-    challengeGuidance: `Year Zero Engine STRESS MECHANICS:
+    challengeGuidance: `Year Zero Engine STRESS & CONDITION MECHANICS:
 
-**STRESS DICE**:
+**CORE PHILOSOPHY:** Failures inflict CONDITIONS. Conditions ESCALATE. Stress amplifies danger.
+
+**FAILURE CONSEQUENCES:**
+When player fails a roll (0 successes):
+1. **INFLICT A CONDITION** appropriate to the threat (check lore for threat profile)
+2. Condition tier scales with required successes: 1 req=Tier I-II, 2 req=III, 3+ req=IV+
+3. **If player already has the condition, UPGRADE IT** (e.g., "Wounded II" → "Wounded III")
+4. Add +1 stress on top of condition
+5. Describe the failure cinematically
+
+**STRESS DICE (Voluntary Risk):**
 Players can add extra d6s (stress dice) before rolling:
-- Each stress die = +1 stress to character (cap: 5 dice or 10-stress remaining)
-- Stress dice count 6s as successes (increasing chance to pass)
-- BUT: Rolling 1s on stress dice triggers PANIC (even if you succeed!)
-- More stress dice = more power but more danger
+- Each stress die = +1 stress (cap: remaining to 10)
+- Stress dice count 6s as successes
+- BUT: Rolling 1s on stress dice triggers PANIC (even on success!)
+- Important: Stress dice are VOLUNTARY power boosts, CONDITIONS are involuntary consequences
 
-**PANIC SYSTEM**:
-When ANY stress die shows a 1, character panics:
-- Roll 1d6 + current stress level on panic table
-- Results range from nervous twitch (7) to fatal shock (25+)
-- Higher stress = worse panic effects
-- Panic happens even on successful rolls!
-- Use /deal_damage and /modify_resource to apply panic effects
+**PANIC SYSTEM:**
+When ANY stress die shows a 1:
+- Roll 1d6 + current stress on panic table
+- Higher stress = worse effects (7-9 minor, 14-16 severe, 21+ catastrophic)
+- Panic effects are SEPARATE from conditions (both can compound)
 
-Common Panic Effects:
-- 1-6: Shaken (-1 to rolls)
-- 7-9: Drop item, tremble, freeze
-- 10-13: Seek cover, scream, flee
-- 14-16: Berserk, catatonic, uncontrollable shaking
-- 17-20: Hallucinations, breakdown, heart attack
-- 21+: Total breakdown, suicidal, homicidal, death
+**PUSH MECHANIC:**
+After FAILED roll, player can PUSH (reroll once):
+- Reroll all non-6 dice, +1 stress automatically
+- Risk breaking/consuming a random item
 
-**PUSH MECHANIC**:
-After a FAILED roll, player can PUSH (reroll once):
-- Reroll all non-6 dice
-- Take +1 stress automatically
-- Risk breaking/consuming a random item (NOT story items)
-- Use /modify_resource Stress +1
-- Use /consume_item or /break_item for item loss
+**CONDITION ESCALATION (CRITICAL):**
+- Conditions are threat-specific (e.g., "Radiation Sickness", "Broken Limb", "Traumatized")
+- If player fails against same threat type, UPGRADE existing condition
+- Example: Has "Wounded II" from alien → fails vs alien again → "Wounded III"
+- Tier 5 = 0 dice pool (auto-fail), Tier 6 = game over
 
-**STRESS MANAGEMENT**:
-- Current stress: Check character's Stress resource (0-10)
-- Stress relief on STRONG SUCCESS: If player gets 3+ successes beyond requirement, -1 stress
-- Rest/downtime: -1 stress per rest
-- Story moments: Comfort from allies, achieving goals
-- Use /modify_resource Stress -1 for relief
+**CHALLENGES (Extended Conflicts):**
+- Best of X format (e.g., best of 5 = first to 3 wins)
+- Each failed check during challenge inflicts per-turn condition + stress
+- Losing overall challenge inflicts "Challenge Loss" condition from threat's lore
+- High-stress situations: 3+ req successes = Hard challenge = Tier IV conditions
 
-**DIFFICULTY EXAMPLES**:
-"Roll to hack the terminal (Hacking 60 = 3 base dice)"
-- Need 2 successes (challenging)
-- Player can add 0-5 stress dice for better odds
-- If stress dice show 1s, panic even if hack succeeds
+**STRESS vs CONDITIONS:**
+- STRESS: Player's voluntary risk-taking, causes panic on 1s
+- CONDITIONS: Involuntary consequence of failures, reduce dice pool
+- Both can spiral: More conditions → need stress dice → more panic → more failures
 
-"Roll to shoot the alien (Combat 80 = 4 base dice)"
-- Need 1 success (simple shot)
-- Player adds 2 stress dice (6d6 total, +2 stress)
-- Rolls: [6][3][2][6][1][4] = 2 successes (pass!) but 1 on stress die
-- Success! But also: Roll panic (1d6+stress) → 8 = Tremble (-2 to manual dexterity)
-
-**KEY PRINCIPLES**:
-- Base pool = stat ÷ 20 (60 stat = 3 dice, 80 stat = 4 dice)
-- Only 6s count as successes
-- Stress dice are tempting power BUT panic is dangerous
-- More stress = worse panic effects
-- Managing stress vs pushing for success is core gameplay
-- Describe stress building: sweating, shaking, racing heart, fear
-- Panic creates drama: successful shot followed by dropping weapon, etc.
-
-**ALWAYS OFFER STRESS DICE**:
-Before each roll, remind player they can add stress dice:
-"You can add up to [X] stress dice (currently at [Y]/10 stress). Each die adds +1 stress but increases success chance. Risk panic on 1s."
-
-**PUSH OPPORTUNITY**:
-After failed rolls (and only after fails):
-"You can PUSH this roll: Reroll non-6s for +1 stress and risk breaking an item. Desperate times?"
-
-Remember: Stress creates tension, panic creates drama, pushing creates desperation. This is survival horror gaming!`,
+Remember: Stress creates tension, conditions create lasting consequences.`,
     choiceSyntax:
       "- ...Prose <use_skill: skill name (DC Number) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\\nYZE System - DC is the number of successes needed (count 6s on d6 pool):\\nExample:\\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (DC 2); use_resource: none; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>\\n- You pick the complex lock. <use_skill: Mechanics (DC 3); use_resource: none; use_item: Lockpicks; agmt_check: none; agmt_table: none; custom_table: none>",
     dcGuidelines:
@@ -1114,8 +1186,46 @@ export const SYSTEM_EXPLOSIVE: RPGSystem = {
       "The game uses an EXPLODING DICE system. Each stat (0-100) determines die size: 0-16=d4, 17-33=d6, 34-50=d8, 51-66=d10, 67-83=d12, 84-100=d20. Roll the die vs DC. When you roll the MAXIMUM (4 on d4, 20 on d20), the die EXPLODES - roll again and ADD it to the total! Explosions chain infinitely. A lucky d4 roller can beat a d20 through explosions!",
     dcGuidance:
       "Use TIER NAMES for difficulty (trivial, easy, average, hard, very_hard, impossible). The system automatically converts these to appropriate numbers. Example: use_skill: Stealth (hard). Remember: even a d4 can explode for heroic victories!",
-    challengeGuidance:
-      "⚠️ IMPORTANT: Challenge the player! Use 'hard' or 'very_hard' for dramatic moments. Remember: even a d4 can explode multiple times for heroic victories! Explosions are RARE but EXCITING - a d10 has only 10% chance to explode. This creates dramatic tension where the underdog can win through luck.",
+    challengeGuidance: `Exploding Dice CONDITION SYSTEM:
+
+**CORE PHILOSOPHY:** Failures inflict CONDITIONS. Conditions ESCALATE. Explosions create drama.
+
+**FAILURE CONSEQUENCES:**
+When player fails (roll < DC):
+1. **INFLICT A CONDITION** appropriate to the threat (check lore for threat profile)
+2. Condition tier scales with DC: easy=I, average=II, hard=III, very_hard=IV, impossible=V
+3. **If player already has the condition, UPGRADE IT** (e.g., "Wounded II" → "Wounded III")
+4. Describe the failure dramatically
+
+**SUCCESS:**
+- Clean success, no conditions
+- Describe accomplishment vividly
+
+**EXPLOSIVE SUCCESS:**
+When dice explode (especially multiple times):
+- Spectacular success worthy of legend
+- May reduce existing condition by 1 tier
+- Grant narrative bonus or advantage
+
+**CONDITION ESCALATION (CRITICAL):**
+- Conditions reduce die size (d8→d6→d4)
+- Each threat's lore specifies what condition they inflict
+- If player fails against same threat type, UPGRADE existing condition
+- Example: Has "Scorched II" from dragon → fails vs dragon again → "Scorched III"
+- Tier 5 = auto-fail, Tier 6 = game over
+
+**CHALLENGES (Extended Conflicts):**
+- Best of X format (e.g., best of 5 = first to 3 wins)
+- Each failed check during challenge inflicts per-turn condition
+- Losing overall challenge inflicts "Challenge Loss" condition from threat's lore
+- Even d4 can explode for comeback victories!
+
+**EXPLOSION DRAMA:**
+- Explosions are RARE (10% per die) but EXCITING
+- When dice explode, narrate the dramatic moment: "Your die explodes! Roll again..."
+- Multiple explosions = legendary achievement, consider removing a condition tier
+
+Remember: Challenge the player! Use 'hard' or 'very_hard' for dramatic moments. Underdogs can win through explosive luck.`,
     choiceSyntax:
       "- ...Prose <use_skill: skill name (tier) or none; use_resource: resource name or none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\n\nDC TIERS (use these instead of numbers):\n- trivial: Routine task, almost automatic\n- easy: Simple challenge, most succeed\n- average: Standard difficulty, 50/50 chance\n- hard: Significant challenge, skill required\n- very_hard: Extreme difficulty, only skilled succeed\n- impossible: Near-impossible, requires explosive luck!\n\nExample:\n- You carefully sneak past the sleeping dragon. <use_skill: Stealth (hard); use_resource: Stamina; use_item: none; agmt_check: Is the dragon asleep? (Likely); agmt_table: sounds; custom_table: none>",
     dcGuidelines:
@@ -1192,50 +1302,58 @@ export const SYSTEM_NARRATIVE: RPGSystem = {
       "This adventure uses a NARRATIVE system with NO DICE ROLLS. Do not include skill checks, DCs, or mechanical resolution. All outcomes are determined by character choices, dramatic logic, and collaborative storytelling.",
     dcGuidance:
       "⚠️ DO NOT USE DICE OR DCS! This is a pure narrative system. Never ask for rolls. Determine outcomes based on: character abilities, dramatic appropriateness, story momentum, and player choices.",
-    challengeGuidance: `NARRATIVE SYSTEM - NO DICE ROLLS:
+    challengeGuidance: `NARRATIVE SYSTEM - CONDITIONS WITHOUT DICE:
 
-This system emphasizes **collaborative storytelling** over mechanical resolution.
+**CORE PHILOSOPHY:** Even without dice, failures inflict CONDITIONS. Conditions ESCALATE.
 
 **DETERMINING OUTCOMES:**
 - Character competence: A skilled character succeeds at things within their expertise
 - Dramatic logic: What makes the best story? Success, failure, or complication?
 - Player agency: Honor bold choices with meaningful consequences
-- Stakes: Low-stakes actions usually succeed; high-stakes moments create tension through consequences, not dice
+- Stakes: Low-stakes actions usually succeed; high-stakes create tension through CONDITIONS
+
+**CONDITION INFLICTION (No Dice):**
+When narrative logic dictates failure or cost:
+1. **INFLICT A CONDITION** appropriate to the threat (check lore for threat profile)
+2. Condition tier scales with stakes: minor=I-II, significant=III, major=IV-V
+3. **If player already has the condition, UPGRADE IT** (e.g., "Wounded II" → "Wounded III")
+4. "Yes, but..." outcomes can inflict Tier I conditions as the cost
 
 **CREATING TENSION WITHOUT DICE:**
 - Present dilemmas with no perfect answer
-- Offer success at a cost
+- Offer success at a cost (condition)
 - Use time pressure and competing priorities
-- Create moral complexity
-- Let failure lead to interesting complications, not dead ends
+- Let failure lead to interesting complications via conditions, not dead ends
 
-**WHEN TO SUCCEED:**
+**WHEN TO SUCCEED (No Condition):**
 - Action is within character's established competence
 - Success creates interesting story developments
 - Player made thoughtful, creative choices
 
-**WHEN TO COMPLICATE:**
-- Success would be too easy/boring
-- Character is attempting something risky
-- Drama calls for tension
-- Add "Yes, but..." or "No, and..." outcomes
+**WHEN TO COMPLICATE (Minor Condition):**
+- Success would be too easy/boring - add Tier I condition as cost
+- "Yes, but..." with a scratch, exhaustion, or minor setback
 
-**WHEN TO FAIL:**
-- Failure creates more interesting story than success
+**WHEN TO FAIL (Full Condition):**
 - Character is clearly outmatched
 - Player took unreasonable risks
-- Always make failure interesting, never a dead end
+- Failure creates more interesting story - inflict threat's condition
+- Always make failure interesting via meaningful conditions
+
+**CONDITION ESCALATION (CRITICAL):**
+- Each threat's lore specifies what condition they inflict and at what tier
+- If player faces consequences from same threat type, UPGRADE existing condition
+- Tier 6 = game over (even in narrative system)
+- Use conditions to track character deterioration narratively
+
+**CHALLENGES (Extended Conflicts):**
+- Multi-step conflicts resolved through narrative beats
+- Each "loss" in the exchange inflicts per-turn condition
+- Overall loss inflicts challenge's stated consequence
+- Winning requires clever approaches that avoid condition accumulation
 
 **RESOURCES & STATS:**
-Stats and resources exist for character definition but don't mechanically affect outcomes. Use them as narrative guides:
-- High stat = character is competent in this area
-- Low resource = character is strained, desperate
-- Use /modify_resource for dramatic effect, not mechanical penalty
-
-**EXAMPLE CHOICES:**
-- "You slip through the shadows toward the guard..." (no roll needed - describe outcome based on character skill and situation)
-- "The locked door stands before you. Your lockpicking skills are modest - this will take time and make noise, or you could try another approach."
-- "Your words hang in the air. The king's expression is unreadable. What do you say next?"`,
+Stats and resources guide narrative - high stat = competent, low resource = desperate.`,
     choiceSyntax:
       "- ...Prose <use_skill: none; use_resource: none; use_item: item name or none; agmt_check: question (likelihood) or none; agmt_table: category or none; custom_table: table name or none>\n\nNARRATIVE SYSTEM - No skill checks! Outcomes flow from character choices and story logic:\nExample:\n- You slip through the shadows, using your training to avoid detection. <use_skill: none; use_resource: none; use_item: none; agmt_check: none; agmt_table: none; custom_table: none>\n- You confront the villain with the evidence you've gathered. <use_skill: none; use_resource: none; use_item: Evidence Folder; agmt_check: Does he try to flee? (Likely); agmt_table: none; custom_table: none>",
     dcGuidelines:
