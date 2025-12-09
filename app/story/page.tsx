@@ -2704,6 +2704,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("usePrefill") !== "false"
           : true;
+      const gmStageEnabled =
+        typeof window !== "undefined"
+          ? localStorage.getItem("gmStageEnabled") === "true"
+          : false;
 
       // Track parallel completion of tools and choices
       let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -2740,6 +2744,8 @@ function StoryPageContent() {
           embeddingThreshold,
           samplingSettings: getSamplingSettings(),
           usePrefill,
+          enableGMStage: gmStageEnabled,
+          gmStageModel: toolsModel, // Use same model as tools stage
           abortSignal: generationAbortRef.current.signal,
         },
         {
@@ -4792,6 +4798,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("usePrefill") !== "false"
         : true;
+    const gmStageEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("gmStageEnabled") === "true"
+        : false;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -4922,6 +4932,8 @@ function StoryPageContent() {
             embeddingThreshold,
             samplingSettings: getSamplingSettings(),
             usePrefill,
+            enableGMStage: gmStageEnabled,
+            gmStageModel: toolsModel, // Use same model as tools stage
           },
           {
             onStoryContent: (chunk: string, fullContent: string) => {
@@ -5231,6 +5243,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("usePrefill") !== "false"
         : true;
+    const gmStageEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("gmStageEnabled") === "true"
+        : false;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -5269,6 +5285,8 @@ function StoryPageContent() {
           embeddingThreshold,
           samplingSettings: getSamplingSettings(),
           usePrefill,
+          enableGMStage: gmStageEnabled,
+          gmStageModel: toolsModel, // Use same model as tools stage
           abortSignal: generationAbortRef.current.signal,
         },
         {

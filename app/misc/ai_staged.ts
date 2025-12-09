@@ -881,6 +881,7 @@ export function buildStoryPrompt({
   customMaxOutput,
   embeddingContext,
   usePrefill = true,
+  gmStoryContext,
 }: {
   storyData: StoryData;
   userChoice?: string;
@@ -890,6 +891,7 @@ export function buildStoryPrompt({
   customMaxOutput?: number;
   embeddingContext?: EmbeddingContext;
   usePrefill?: boolean;
+  gmStoryContext?: string; // Context from GM stage (replaces ActionAnalysis annotations)
 }): { messages: ChatMessage[]; prunedParts: number } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
@@ -1072,6 +1074,11 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
         .map((a) => `• ${a}`)
         .join("\n")}`;
       choiceMessage = `${actionsNote}\n\n${choiceMessage}`;
+    }
+
+    // Include GM stage context if provided (replaces ActionAnalysis annotations)
+    if (gmStoryContext) {
+      choiceMessage = `${choiceMessage}\n\n${gmStoryContext}`;
     }
 
     historyMessages.push({
@@ -2158,4 +2165,219 @@ Analyze this action and return the JSON object.`;
   );
 
   return { messages };
+}
+
+// ============================================
+// GM STAGE PROMPT BUILDER
+// ============================================
+
+export const GM_STAGE_AFFIRMATION = `Understood. I am the Game Master, deciding what mechanical checks and consequences apply.
+
+My responsibilities:
+- Determine if a skill check is needed and set appropriate difficulty
+- Start challenges for complex multi-step tasks (combat, chases, negotiations)
+- Call for opposed checks when player faces active NPC resistance
+- Use take_rest when player rests (if no active challenge)
+- Call no_check_needed for trivial actions that auto-succeed
+
+I will now call the appropriate tool(s):`;
+
+/**
+ * Build the GM stage prompt for determining game mechanics
+ * This stage runs BEFORE the story stage and uses tool calls instead of JSON output
+ */
+export function buildGMStagePrompt({
+  storyData,
+  userChoice,
+}: {
+  storyData: StoryData;
+  userChoice: string;
+}): { messages: ChatMessage[]; tools: any[] } {
+  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+  const difficulty = storyData.difficulty || "medium";
+
+  // Import GM tools dynamically to avoid circular deps
+  const { GM_TOOL_SCHEMAS } = require("./gmTools");
+
+  // Build stat list
+  const statList = (storyData.stats || [])
+    .map((s) => `${s.name}: ${s.value}`)
+    .join(", ");
+
+  // Build resource list
+  const resourceList = (storyData.resources || [])
+    .map((r) => `${r.name}: ${r.value}/${r.maxValue}`)
+    .join(", ");
+
+  // Build inventory list (only items that could be used in checks)
+  const usableItems = (storyData.inventory || [])
+    .filter((i) => i.type !== "misc" && i.quantity > 0)
+    .map((i) => {
+      const parts = [i.name];
+      if (i.grade && i.grade !== "common") parts.push(`(${i.grade})`);
+      if (i.durability !== undefined && i.maxDurability)
+        parts.push(`[${i.durability}/${i.maxDurability}]`);
+      return parts.join(" ");
+    })
+    .join(", ");
+
+  // Build ability list (only ready abilities)
+  const readyAbilities = (storyData.abilities || [])
+    .filter((a) => !a.currentCooldown || a.currentCooldown === 0)
+    .map((a) => {
+      const parts = [a.name];
+      if (a.grade && a.grade !== "novice") parts.push(`(${a.grade})`);
+      if (a.cost && a.cost.length > 0) {
+        const costs = a.cost.map((c) => `${c.amount} ${c.name}`).join(", ");
+        parts.push(`[costs: ${costs}]`);
+      }
+      return parts.join(" ");
+    })
+    .join(", ");
+
+  // Build condition list (affects checks)
+  const conditions = (storyData.conditions || [])
+    .map(
+      (c) =>
+        `${c.name} (Tier ${c.tier}: affects ${
+          c.affectsAll ? "ALL" : c.affects.join(", ")
+        })`
+    )
+    .join(", ");
+
+  // Build passive list
+  const passivesList = getActivePassives(storyData);
+  const passives =
+    passivesList.length > 0
+      ? passivesList.map((p) => `${p.name}: ${p.description}`).join("; ")
+      : "None";
+
+  // Get recent story context
+  const recentParts = getPartsWithinTokenBudget(
+    storyData.scene.parts,
+    ACTION_ANALYSIS_TOKEN_BUDGET
+  );
+  const recentContext = recentParts
+    .map((p) =>
+      p.user ? `Player: ${p.content}` : `Story: ${p.content.slice(0, 200)}...`
+    )
+    .join("\n");
+
+  // Build active challenge context
+  let challengeContext = "None";
+  if (storyData.activeChallenge?.active) {
+    const ch = storyData.activeChallenge;
+    const requiredToWin = Math.floor(ch.rounds / 2) + 1;
+    challengeContext = `"${ch.name}" - Need ${requiredToWin} successes (current: ${ch.currentSuccesses} wins, ${ch.currentFailures} losses)`;
+  }
+
+  const systemPrompt = `You are the GAME MASTER for a ${rpgSystem.name} (${
+    rpgSystem.id
+  }) game at ${difficulty} difficulty.
+
+Your role is to DETERMINE MECHANICS before the story is written. You decide:
+1. Whether the player's action requires a skill check
+2. What stat, difficulty, items, and abilities apply
+3. Whether to start/continue a challenge
+4. Stakes and consequences
+
+## RPG SYSTEM: ${rpgSystem.name}
+${rpgSystem.aiInstructions.diceSystem}
+
+## DIFFICULTY GUIDELINES
+${rpgSystem.aiInstructions.dcGuidelines}
+
+## CURRENT GAME STATE
+
+**Stats:** ${statList || "None"}
+**Resources:** ${resourceList || "None"}
+**Usable Items:** ${usableItems || "None"}
+**Ready Abilities:** ${readyAbilities || "None"}
+**Conditions:** ${conditions || "None"}
+**Passives:** ${passives}
+**Active Challenge:** ${challengeContext}
+
+## REST LIMITS
+- Quick rests used: ${storyData.restState?.quickRestsUsed || 0}/${
+    REST_CONFIG[difficulty].maxQuickRests
+  }
+- Short rests used: ${storyData.restState?.shortRestsUsed || 0}/${
+    REST_CONFIG[difficulty].maxShortRests
+  }
+
+## DECISION FRAMEWORK
+
+**ALWAYS call a tool.** Choose ONE of:
+
+1. **skill_check** - Player attempts something with meaningful risk
+   - Match stat to action type
+   - Set difficulty based on circumstances
+   - Include items/abilities if player implies using them
+   - Set stakes based on danger level
+
+2. **challenge_check** - There's an ACTIVE challenge; this action counts toward it
+   - Use when continuing a fight, chase, or multi-step task
+   - Can override stat/difficulty for this specific check
+
+3. **start_challenge** - This action begins a complex multi-step task
+   - Combat against multiple enemies = 3-5 rounds
+   - Dangerous chase = 3 rounds
+   - Boss fight = 5-7 rounds
+   - After starting, ALSO call challenge_check for the first action
+
+4. **opposed_check** - Player vs NPC in direct contest
+   - Haggling, arm wrestling, stealth vs perception
+   - Set opponent skill (30=novice, 50=competent, 70=skilled, 90=master)
+
+5. **roll_dice** - Random determination needed (not a skill check)
+   - NPC reactions, encounter tables, loot quality
+
+6. **take_rest** - Player is resting
+   - Cannot rest during active challenge
+   - Check rest limits before allowing
+
+7. **no_check_needed** - Action is trivial or pure roleplay
+   - Walking, talking, looking around
+   - Continuing a successful action without new risk
+   - Player already succeeded at this exact thing
+
+## IMPORTANT RULES
+
+- **Passives provide narrative advantages, not mechanical bonuses.** Example: "Wolf Slayer" makes fighting wolves EASIER narratively (lower difficulty tier) but doesn't add +X to rolls.
+- **Item/Ability bonuses are calculated by the frontend.** Just specify what's used.
+- **Challenges are "Best of X".** Winner = first to majority. Don't end challenge early.
+- **If action continues a just-succeeded check, call no_check_needed.**
+- **Resource costs are determined by item/ability specs.** Just name them.`;
+
+  const userMessage = `## RECENT STORY CONTEXT
+${recentContext}
+
+---
+
+## PLAYER'S ACTION
+"${userChoice}"
+
+---
+
+Call the appropriate tool(s) to determine mechanics for this action.`;
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: cleanString(systemPrompt) },
+    { role: "user", content: cleanString(userMessage) },
+    { role: "assistant", content: GM_STAGE_AFFIRMATION },
+  ];
+
+  // Debug logging
+  console.log(`[buildGMStagePrompt] Context breakdown:`);
+  console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
+  console.log(`  - Recent context: ${recentParts.length} parts`);
+  console.log(`  - User choice: ${estimateTokens(userChoice)} tokens`);
+
+  return {
+    messages,
+    tools: GM_TOOL_SCHEMAS.map((t: any) => ({
+      type: "function",
+      function: t.function,
+    })),
+  };
 }

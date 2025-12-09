@@ -23,12 +23,15 @@ import {
   buildToolPrompt,
   buildChoicesPrompt,
   buildActionAnalysisPrompt,
+  buildGMStagePrompt,
   ChatMessage,
   EmbeddingContext,
   STORY_AFFIRMATION,
   TOOLS_AFFIRMATION,
   CHOICES_AFFIRMATION,
+  GM_STAGE_AFFIRMATION,
 } from "@/app/misc/ai_staged";
+import { executeGMTools, GMToolResult } from "@/app/misc/gmExecutor";
 import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
 import { getAuthToken } from "@/app/misc/getAuthToken";
@@ -108,6 +111,9 @@ export interface GenerationOptions {
   storyId?: string; // Required for embedding search
   enableEmbeddings?: boolean; // Whether to use embedding-based context
   embeddingThreshold?: number; // Similarity threshold (0.1-0.5, default 0.25)
+  // GM Stage (new architecture: AI determines mechanics via tool calls)
+  enableGMStage?: boolean; // Use GM stage instead of ActionAnalysis JSON
+  gmStageModel?: string; // Model to use for GM stage (defaults to toolsModel)
   // Sampling settings (for story stage only, Coins mode)
   samplingSettings?: SamplingSettings;
   // Role Affirmation (prefill) - primes model to follow output constraints
@@ -129,6 +135,12 @@ export interface GenerationCallbacks {
   ) => void;
   onChoicesStart?: () => void;
   onChoicesComplete?: (choices: Choice[], usage: TokenUsage) => void;
+  onGMStageStart?: () => void;
+  onGMStageComplete?: (
+    results: GMToolResult[],
+    storyContext: string,
+    usage: TokenUsage
+  ) => void;
   onComplete?: (result: GenerationResult) => void;
   onError?: (error: Error) => void;
 }
@@ -156,10 +168,14 @@ export interface GenerationResult {
   stateChanges: string[];
   choices: Choice[];
   scenePart: ScenePart;
+  // GM Stage results (when enableGMStage is true)
+  gmResults?: GMToolResult[];
+  gmStoryContext?: string;
   meta: {
     storyMeta?: GenerationMeta;
     toolsMeta?: GenerationMeta;
     choicesMeta?: GenerationMeta;
+    gmMeta?: GenerationMeta;
     totalTokenCost: number;
     balance: number;
   };
@@ -445,6 +461,95 @@ export async function generateStoryTurn(
     }
 
     // ========================================
+    // STAGE 0.5: GM Stage (if enabled)
+    // AI determines mechanics via tool calls instead of ActionAnalysis JSON
+    // ========================================
+    let gmResults: GMToolResult[] = [];
+    let gmStoryContext = "";
+    let gmMeta: GenerationMeta | undefined;
+
+    if (options.enableGMStage) {
+      callbacks.onGMStageStart?.();
+      logger.action("Stage 0.5: Running GM stage for mechanics determination");
+
+      const gmModel = options.gmStageModel || options.toolsModel;
+      const gmPrompt = buildGMStagePrompt({ storyData, userChoice });
+
+      // Check if user cancelled
+      if (options.abortSignal?.aborted) {
+        throw new Error("Generation cancelled by user");
+      }
+
+      const gmResponse = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          messages: gmPrompt.messages,
+          tools: gmPrompt.tools,
+          model: gmModel,
+          maxTokens: 2000,
+          temperature: 0.3, // Low temperature for deterministic mechanics
+          openRouterKey: options.openRouterKey,
+          deepseekKey: options.deepseekKey,
+          googleKey: options.googleKey,
+        }),
+        signal: options.abortSignal,
+      });
+
+      if (!gmResponse.ok) {
+        const errorText = await gmResponse.text().catch(() => "");
+        throw new Error(`GM stage failed: ${gmResponse.status} - ${errorText}`);
+      }
+
+      const gmResult = await gmResponse.json();
+      console.log(
+        "[GM Stage] Raw response:",
+        JSON.stringify(gmResult, null, 2)
+      );
+
+      if (gmResult.meta) {
+        gmMeta = gmResult.meta;
+        totalTokenCost += gmResult.meta.tokenCost || 0;
+        finalBalance = gmResult.meta.balance;
+      }
+
+      // Execute GM tool calls locally
+      if (gmResult.toolCalls && gmResult.toolCalls.length > 0) {
+        const gmExecution = await executeGMTools(gmResult.toolCalls, storyData);
+        gmResults = gmExecution.results;
+        gmStoryContext = gmExecution.storyContext;
+
+        // Update storyData with any modifications from GM tools (e.g., rest, challenge state)
+        Object.assign(storyData, gmExecution.modifiedStoryData);
+
+        logger.action("GM stage tools executed", {
+          toolCount: gmResult.toolCalls.length,
+          toolNames: gmResults.map((r) => r.toolName),
+          contextLength: gmStoryContext.length,
+        });
+      } else {
+        logger.action(
+          "GM stage returned no tool calls (treating as no_check_needed)"
+        );
+        gmStoryContext =
+          "[No mechanical check needed - pure narrative/roleplay action]";
+      }
+
+      callbacks.onGMStageComplete?.(
+        gmResults,
+        gmStoryContext,
+        gmMeta?.usage || {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        }
+      );
+    }
+
+    // ========================================
     // STAGE 1: Story Generation
     // ========================================
     callbacks.onStoryStart?.();
@@ -468,6 +573,7 @@ export async function generateStoryTurn(
       customMaxOutput: storyMaxOutput,
       embeddingContext,
       usePrefill: options.usePrefill !== false, // Default to true
+      gmStoryContext: gmStoryContext || undefined, // GM stage context (replaces ActionAnalysis annotations)
     });
 
     // Clear pending player actions after they've been included in the prompt
@@ -1102,10 +1208,13 @@ export async function generateStoryTurn(
       stateChanges: allStateChanges,
       choices,
       scenePart,
+      gmResults: gmResults.length > 0 ? gmResults : undefined,
+      gmStoryContext: gmStoryContext || undefined,
       meta: {
         storyMeta,
         toolsMeta,
         choicesMeta,
+        gmMeta,
         totalTokenCost,
         balance: finalBalance,
       },
