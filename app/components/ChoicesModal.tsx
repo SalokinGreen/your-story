@@ -259,7 +259,7 @@ export default function ChoicesModal({
     // AGMT check
     if (choice.agmt_check) {
       details.push(
-        <div key="agmt" className="flex items-center gap-2 text-purple-400">
+        <div key="mythic" className="flex items-center gap-2 text-purple-400">
           <DynamicIcon name="Sparkles" className="w-4 h-4" />
           <span className="text-sm">Fate Check</span>
         </div>

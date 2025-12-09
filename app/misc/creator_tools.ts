@@ -239,7 +239,14 @@ export const add_items: ToolDefinition = {
             },
             grade: {
               type: "string",
-              enum: ["common", "uncommon", "rare", "epic", "legendary", "agmt"],
+              enum: [
+                "common",
+                "uncommon",
+                "rare",
+                "epic",
+                "legendary",
+                "mythic",
+              ],
               description: "Item rarity/grade",
             },
             stat: { type: "string", description: "Associated stat (optional)" },
@@ -275,7 +282,14 @@ export const modify_items: ToolDefinition = {
             },
             grade: {
               type: "string",
-              enum: ["common", "uncommon", "rare", "epic", "legendary", "agmt"],
+              enum: [
+                "common",
+                "uncommon",
+                "rare",
+                "epic",
+                "legendary",
+                "mythic",
+              ],
             },
             stat: { type: "string", description: "New associated stat" },
             symbol: { type: "string", description: "New symbol" },

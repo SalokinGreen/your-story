@@ -101,7 +101,7 @@ type CreatorStep =
   | "conditions"
   | "achievements"
   | "quests"
-  | "agmt"
+  | "mythic"
   | "variables"
   | "tables"
   | "upgrades"
@@ -2276,7 +2276,7 @@ function AdventureCreatorContent() {
     { id: "quests", label: "Quests", icon: "ClipboardList" },
     { id: "variables", label: "Variables", icon: "Variable" },
     { id: "tables", label: "Custom Tables", icon: "Dices" },
-    { id: "agmt", label: "Advanced RPG Tools", icon: "Sparkles" },
+    { id: "mythic", label: "Advanced RPG Tools", icon: "Sparkles" },
     { id: "upgrades", label: "Upgrade Settings", icon: "ArrowUpCircle" },
     { id: "preview", label: "Preview", icon: "Eye" },
   ];
@@ -6897,7 +6897,7 @@ ${description || ""}`;
                         <div>
                           <label className="block text-xs font-semibold text-blue-300 mb-1">
                             Durability{" "}
-                            {editInventoryItem.grade === "agmt"
+                            {editInventoryItem.grade === "mythic"
                               ? "(∞)"
                               : `(max ${getMaxDurability(
                                   (editInventoryItem.grade as ItemGrade) ||
@@ -6911,7 +6911,7 @@ ${description || ""}`;
                               (editInventoryItem.grade as ItemGrade) || "common"
                             )}
                             value={
-                              editInventoryItem.grade === "agmt"
+                              editInventoryItem.grade === "mythic"
                                 ? ""
                                 : editInventoryItem.durability ??
                                   getMaxDurability(
@@ -6934,9 +6934,9 @@ ${description || ""}`;
                                 ),
                               })
                             }
-                            disabled={editInventoryItem.grade === "agmt"}
+                            disabled={editInventoryItem.grade === "mythic"}
                             placeholder={
-                              editInventoryItem.grade === "agmt"
+                              editInventoryItem.grade === "mythic"
                                 ? "∞"
                                 : "Durability"
                             }
@@ -7041,7 +7041,7 @@ ${description || ""}`;
                             <span className="text-xs text-blue-200/40">
                               Durability:
                             </span>
-                            {item.grade === "agmt" ? (
+                            {item.grade === "mythic" ? (
                               <span className="text-xs text-yellow-400">∞</span>
                             ) : (
                               <>
@@ -11703,7 +11703,7 @@ ${description || ""}`;
           />
         );
 
-      case "agmt":
+      case "mythic":
         return (
           <div className="space-y-6">
             {/* Header Card */}

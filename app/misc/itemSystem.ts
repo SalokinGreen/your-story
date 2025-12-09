@@ -189,11 +189,11 @@ export function getGradeConfig(
 }
 
 /**
- * Safely get grade config - handles legacy grades like "agmt"
+ * Safely get grade config - handles legacy grades like "mythic"
  */
 export function safeGradeConfig(grade: string | undefined): GradeConfig {
   // Map legacy grades to new ones
-  if (grade === "agmt") {
+  if (grade === "mythic") {
     return GRADE_CONFIG.mythic;
   }
   return getGradeConfig(grade);

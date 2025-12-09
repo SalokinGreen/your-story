@@ -1208,44 +1208,22 @@ REQUIRED LORE CATEGORIES (distribute entries across all):
 1. KEY NPCs (at least 3-4 entries):
    - Important characters the player will meet or hear about
    - Include their appearance, personality, motivations, secrets, and relationship to the main plot
-   - **THREAT PROFILE (for hostile/potentially hostile NPCs):**
-     * Challenge type and size (e.g., "Standard challenge - best of 5")
-     * Approach difficulties (e.g., "Combat: hard, Stealth: average, Diplomacy: very_hard")
-     * Failure condition (e.g., "Inflicts Slash Wound Tier II on failed combat checks")
-     * Challenge loss stakes (e.g., "Challenge Loss: Beaten Bloody Tier IV")
 
 2. LOCATIONS (at least 3-4 entries):
    - Major places in the world (cities, dungeons, landmarks)
    - Describe atmosphere, notable features, dangers, and history
-   - **ENVIRONMENTAL HAZARDS:** If dangerous, include threat profile:
-     * Hazard type (poison gas, traps, extreme weather)
-     * Failure condition (e.g., "Failed navigation: Exhausted Tier I, escalates each failure")
 
 3. FACTIONS & ORGANIZATIONS (at least 2-3 entries):
    - Groups with power and influence in the world
    - Their goals, methods, leaders, symbols, and relationship to other factions
-   - **FACTION THREAT LEVEL:** General danger when opposing them
 
 4. HISTORY & PAST EVENTS (at least 2-3 entries):
    - Important historical events that shaped the current world
    - Ancient wars, fallen kingdoms, legendary heroes, catastrophes
 
-5. THREATS & MONSTERS (at least 2-3 entries):
-   - Dangerous creatures, enemies, or challenges the player may face
-   - **MANDATORY THREAT PROFILE:**
-     * Challenge difficulty: quick (3 rounds), standard (5), extended (7), epic (9)
-     * Approach difficulties for different strategies
-     * Per-failure condition (what happens when player fails a check DURING combat)
-     * Challenge loss stakes (what severe condition they inflict on total defeat)
-   - Example:
-     > **The Ironclad Knight** - A heavily armored warrior guarding the eastern gate.
-     > THREAT PROFILE:
-     > - Challenge: Standard (best of 5)
-     > - Combat approach: Hard DC
-     > - Stealth approach: Very Hard DC (keen senses)
-     > - Social approach: Average DC (honorable, can be reasoned with)
-     > - Per-failure: Battered Tier II (his heavy blows leave you reeling)
-     > - Challenge Loss: Broken Body Tier IV (beaten into submission)
+5. UPCOMING THREATS & EVENTS (at least 2-3 entries):
+   - Looming dangers or prophecies about the future
+   - Set these as secret=true for dramatic reveals
 
 6. WORLD LORE (remaining entries):
    - Magic systems, religions, customs, creatures, artifacts

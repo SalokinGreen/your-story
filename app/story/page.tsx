@@ -1962,7 +1962,7 @@ function StoryPageContent() {
       hasLoadedStoryRef.current = storyId;
 
       // Migrate AGMT state to include new performance tracking fields
-      // Also migrate "mythic" item grades to "agmt" for backward compatibility
+      // Also migrate "mythic" item grades to "mythic" for backward compatibility
       import("@/app/misc/mythicChaos").then(
         ({ migrateAGMTState, migrateItemGrades }) => {
           if (loadedStoryData.agmtState) {
@@ -1970,7 +1970,7 @@ function StoryPageContent() {
               loadedStoryData.agmtState!
             );
           }
-          // Migrate item grades from "mythic" to "agmt"
+          // Migrate item grades from "mythic" to "mythic"
           migrateItemGrades(loadedStoryData);
         }
       );

@@ -480,7 +480,7 @@ export function executeCommandWithResponse(
       | "rare"
       | "epic"
       | "legendary"
-      | "agmt";
+      | "mythic";
 
     // Get max durability based on grade
     const gradeMaxDurability: Record<string, number> = {
@@ -535,7 +535,7 @@ export function executeCommandWithResponse(
       command: trimmed,
       success: true,
       message: `Added ${quantity} ${gradeLabel} ${itemName} to inventory${
-        grade !== "agmt" ? ` (${maxDurability} durability)` : " (unbreakable)"
+        grade !== "mythic" ? ` (${maxDurability} durability)` : " (unbreakable)"
       }`,
       timestamp,
     };
@@ -754,7 +754,7 @@ export function executeCommandWithResponse(
     }
 
     // Can't repair agmt items (they have infinite durability)
-    if (item.grade === "agmt") {
+    if (item.grade === "mythic") {
       return {
         command: trimmed,
         success: "partial" as const,
@@ -836,7 +836,7 @@ export function executeCommandWithResponse(
     }
 
     // Can't damage agmt items
-    if (item.grade === "agmt") {
+    if (item.grade === "mythic") {
       return {
         command: trimmed,
         success: "partial" as const,
@@ -914,7 +914,7 @@ export function executeCommandWithResponse(
       | "rare"
       | "epic"
       | "legendary"
-      | "agmt";
+      | "mythic";
 
     const matchResult = findItemMatch(itemName, storyData.inventory);
     const item = matchResult?.item;
@@ -934,7 +934,7 @@ export function executeCommandWithResponse(
       "rare",
       "epic",
       "legendary",
-      "agmt",
+      "mythic",
     ];
     const currentGradeIndex = gradeOrder.indexOf(item.grade || "common");
     const newGradeIndex = gradeOrder.indexOf(newGrade);
@@ -968,7 +968,7 @@ export function executeCommandWithResponse(
     const durabilityRatio =
       oldMaxDurability > 0 ? currentDurability / oldMaxDurability : 1;
     const newDurability =
-      newGrade === "agmt"
+      newGrade === "mythic"
         ? Infinity
         : Math.ceil(newMaxDurability * durabilityRatio);
 
@@ -996,7 +996,7 @@ export function executeCommandWithResponse(
       command: trimmed,
       success: true,
       message: `Upgraded ${item.name} to ${newGradeLabel}!${
-        newGrade !== "agmt"
+        newGrade !== "mythic"
           ? ` Max durability: ${newMaxDurability}`
           : " (now unbreakable)"
       }${fuzzyNote}`,
@@ -1024,7 +1024,7 @@ export function executeCommandWithResponse(
       };
     }
 
-    if (item.grade === "agmt") {
+    if (item.grade === "mythic") {
       return {
         command: trimmed,
         success: "partial" as const,

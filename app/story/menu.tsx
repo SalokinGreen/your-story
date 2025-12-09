@@ -4978,7 +4978,7 @@ export default function MenuPage({
     | "variables"
     | "tables"
     | "threads"
-    | "agmt"
+    | "mythic"
     | "story"
     | "tts"
     | "ai"
@@ -5760,7 +5760,7 @@ export default function MenuPage({
                 { id: "tables", label: "Tables", icon: "Dices" },
                 { id: "relationships", label: "Relationships", icon: "Users" },
                 { id: "conditions", label: "Conditions", icon: "HeartPulse" },
-                { id: "agmt", label: "AGMT", icon: "Sparkles" },
+                { id: "mythic", label: "mythic", icon: "Sparkles" },
                 { id: "story", label: "Story", icon: "BookOpen" },
               ].map((tab) => (
                 <button
@@ -5906,7 +5906,7 @@ export default function MenuPage({
                 </div>
               )}
 
-              {activeTab === "agmt" && (
+              {activeTab === "mythic" && (
                 <div className="mt-4 space-y-6">
                   <h4 className="text-lg font-bold text-white flex items-center gap-2">
                     <DynamicIcon name="Sparkles" className="w-6 h-6" />

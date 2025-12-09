@@ -387,7 +387,7 @@ function getItemCondition(
   // Consumables don't have durability condition
   if (type === "consumable") return "consumable";
   // AGMT items are indestructible
-  if (grade === "agmt") return "indestructible";
+  if (grade === "mythic") return "indestructible";
   // Story items don't break
   if (type === "story") return "quest item";
   // Misc items don't break

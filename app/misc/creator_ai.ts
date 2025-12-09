@@ -662,7 +662,7 @@ You can control how items in arrays are applied using the **_command** field:
   - description: Item description
   - type: "normal" (advantage, breaks on fail), "consumable" (advantage, consumed on use), "story" (advantage, never breaks/consumed), "misc" (prevents disadvantage, never breaks/consumed)
   - symbol: Icon name as words (e.g., "sword", "potion", "shield", "scroll")
-  - grade: Item quality tier - "common" (dur 8, +0 bonus), "uncommon" (dur 13, +1), "rare" (dur 20, +2), "epic" (dur 30, +3), "legendary" (dur 50, +4), "agmt" (infinite dur, +5)
+  - grade: Item quality tier - "common" (dur 8, +0 bonus), "uncommon" (dur 13, +1), "rare" (dur 20, +2), "epic" (dur 30, +3), "legendary" (dur 50, +4), "mythic" (infinite dur, +5)
   - durability: Current durability points (auto-set from grade if omitted)
   - maxDurability: Maximum durability (auto-set from grade if omitted)
 - abilities (Array of { name, description, grade, cost, cooldown, currentCooldown, stat, symbol })
@@ -772,7 +772,7 @@ You can control how items in arrays are applied using the **_command** field:
     - symbol: Emoji/icon representing the item
     - quantity: How many of this item to grant
     - cost: Progression points required to purchase
-    - grade: Optional item grade - "common", "uncommon", "rare", "epic", "legendary", "agmt" (default: "common")
+    - grade: Optional item grade - "common", "uncommon", "rare", "epic", "legendary", "mythic" (default: "common")
   - abilityShop: Array of { name, description, grade, cost, abilityCost, cooldown, stat, symbol } - abilities players can unlock
     - name: Ability name
     - description: What the ability does
@@ -1691,7 +1691,7 @@ When the user asks you to create or modify parts of the scenario (like "create a
    - "Done! Your stamina system is ready to go. I set the regen rate pretty low since you mentioned wanting resource management to feel tense."
 
 7. **Grades & Tiers:**
-   - Items: "common" (+0), "uncommon" (+1), "rare" (+2), "epic" (+3), "legendary" (+4), "agmt" (+5)
+   - Items: "common" (+0), "uncommon" (+1), "rare" (+2), "epic" (+3), "legendary" (+4), "mythic" (+5)
    - Abilities: "novice" (+0), "apprentice" (+1), "adept" (+2), "expert" (+3), "master" (+4), "legendary" (+5)
 
 7. **Stat values:** 1-100 scale where 50 is average human.
