@@ -38,7 +38,8 @@ Here is the narrative:
 export const TOOLS_AFFIRMATION = `Understood. I will audit the narrative for game state changes:
 - **Accuracy:** I will use EXACT string matching for items, stats, and quest names.
 - **Challenges:** I will update active challenges based on the Action Result.
-- **Consequences:** I will apply \`add_condition\` or \`update_resource\` if the story implies injury or exertion.
+- **Conditions:** I will ONLY add/upgrade conditions when the player FAILED a skill check or lost a challenge. Never for successful actions or "flavor" damage.
+- **Already Applied:** Bracketed annotations like [Item Used: X], [Mana: -10], [Health: -15] mean those changes ALREADY HAPPENED. I will NOT duplicate them.
 
 ⚠️ CRITICAL: I MUST call ALL necessary tools in THIS SINGLE RESPONSE. I will NOT stop after one tool - I will call 2, 3, 4, or more tools together if multiple changes are needed.
 
@@ -1163,10 +1164,15 @@ Your role is to read the latest narrative output and ensure the Game Database ma
 
 User will not see your output. Use your message content to "Think Step-by-Step" before calling tools.
 
-## CRITICAL: Already-Processed Actions
-Player messages may contain bracketed annotations like [Ability: Fireball], [Mana: -10], [Item: Health Potion], [Stealth: success].
-**These indicate actions the GAME SYSTEM already processed** (dice rolled, resources deducted, items consumed).
-DO NOT duplicate these changes. Only process NEW events from the STORY TEXT.
+## CRITICAL: Already-Processed State Changes
+Player messages contain bracketed annotations showing what the GAME SYSTEM already processed:
+- \`[Skill: success]\` or \`[Skill: failure]\` = Dice already rolled
+- \`[Item Used: X; x2 → 1]\` = Item already consumed/damaged
+- \`[Resource: -10]\` = Resource already deducted
+- \`[Ability: Fireball]\` = Ability already used, cooldown already started
+- \`[Momentum: -1]\` = Momentum already spent
+
+**DO NOT DUPLICATE THESE.** They are informational only. Only process NEW events from the STORY TEXT.
 
 ## CRITICAL: Existing Game Data
 The info message contains the CURRENT game state - these are entries that ALREADY EXIST:
@@ -1181,9 +1187,13 @@ Only use CREATE tools for GENUINELY NEW content not shown in the info message.
 1. **Inventory Audit:** Did the narrative imply an item was consumed (e.g., "quaffed the potion"), broken, given away, or picked up? -> \`add_item\` / \`remove_item\`
 2. **Resource Delta:** Did the player do anything to lose or gain resources? -> \`update_resource\` (Eat/Bandage/Absorb Mana).
 3. **Condition Check (FAILURE-DRIVEN ONLY):**
+    ⚠️ **CONDITIONS ARE CONSEQUENCES OF FAILURE, NOT FLAVOR.**
+    - ONLY add/upgrade conditions when the player **FAILED a skill check** (look for "failure" or "fail" in the action result)
+    - ONLY add conditions when the player **LOST a challenge** (challenge result = "lost")
+    - Successful actions NEVER cause conditions, even if the story describes effort or strain
+    - DO NOT add conditions because the player "looks tired" or "feels pain" - that's narrative flavor, not mechanical failure
 ${rpgSystem.aiInstructions.challengeGuidance}
     - Did the player receive medical aid or rest? -> \`downgrade_condition\`.
-    - *Note:* Do not add conditions for "flavor" pain. Only for mechanical failures with tactical consequences.
 4. **Memory Management:** ⚠️ MOST TURNS NEED ZERO MEMORIES. Only add memory for:
     - Promises/debts: "Owes blacksmith 50 gold"
     - Codes/passwords: "Vault password: MOONRISE"
