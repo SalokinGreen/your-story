@@ -1169,6 +1169,18 @@ export const modify_presets: ToolDefinition = {
             inventory: { type: "array" },
             abilities: { type: "array" },
             relationships: { type: "array" },
+            characterData: {
+              type: "object",
+              description:
+                "Character schema data including values. Use to modify list fields like inventory, equipment, etc.",
+              properties: {
+                values: {
+                  type: "object",
+                  description:
+                    "Field values - keys are field IDs, values can be numbers, strings, arrays (for list fields), or {current, max} objects for resources",
+                },
+              },
+            },
           },
           required: [],
         },

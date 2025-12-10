@@ -35,6 +35,7 @@ export interface SkillCheckParams {
     failure?: string;
     partial?: string; // For PbtA/Fate systems
   };
+  show_to_player?: boolean; // Show dice animation to player (default true)
 }
 
 export interface ChallengeCheckParams {
@@ -50,6 +51,7 @@ export interface ChallengeCheckParams {
     failure?: string;
     partial?: string;
   };
+  show_to_player?: boolean; // Show dice animation to player (default true)
 }
 
 export interface StartChallengeParams {
@@ -79,6 +81,7 @@ export interface OpposedCheckParams {
     opponent_wins?: string;
     tie?: string;
   };
+  show_to_player?: boolean; // Show dice animation to player (default true)
 }
 
 export interface RollDiceParams {
@@ -125,6 +128,7 @@ export interface FormulaRollParams {
     success?: string;
     failure?: string;
   };
+  show_to_player?: boolean; // Show dice animation to player (default true)
 }
 
 /**
@@ -144,6 +148,7 @@ export interface OpposedFormulaParams {
     opponent_wins?: string;
     tie?: string;
   };
+  show_to_player?: boolean; // Show dice animation to player (default true)
 }
 
 /**
@@ -159,6 +164,7 @@ export interface FormulaChallengeCheckParams {
     success?: string;
     failure?: string;
   };
+  show_to_player?: boolean; // Show dice animation to player (default true)
 }
 
 // ============================================
@@ -319,6 +325,11 @@ STAKES determine condition tier on failure:
               description: "PbtA/Fate: success with complication",
             },
           },
+        },
+        show_to_player: {
+          type: "boolean",
+          description:
+            "Show dice roll animation to player? Default true for player rolls. Set false for DM/enemy/hidden rolls.",
         },
       },
       required: ["stat", "difficulty", "reason"],
@@ -513,6 +524,11 @@ Use for:
             opponent_wins: { type: "string" },
             tie: { type: "string" },
           },
+        },
+        show_to_player: {
+          type: "boolean",
+          description:
+            "Show dice roll animation to player? Default true for player rolls. Set false for DM/hidden rolls.",
         },
       },
       required: ["player_stat", "opponent_name", "opponent_skill", "reason"],
@@ -709,6 +725,11 @@ Example formulas:
             failure: { type: "string", description: "What happens on failure" },
           },
         },
+        show_to_player: {
+          type: "boolean",
+          description:
+            "Show dice roll animation to player? Default true for player rolls. Set false for DM/enemy/hidden rolls.",
+        },
       },
       required: ["formula", "reason"],
     },
@@ -769,6 +790,11 @@ Examples:
             tie: { type: "string" },
           },
         },
+        show_to_player: {
+          type: "boolean",
+          description:
+            "Show dice roll animation to player? Default true for player rolls. Set false for DM/hidden rolls.",
+        },
       },
       required: [
         "player_formula",
@@ -820,6 +846,11 @@ This tool updates challenge progress (successes/failures) based on the roll resu
             success: { type: "string" },
             failure: { type: "string" },
           },
+        },
+        show_to_player: {
+          type: "boolean",
+          description:
+            "Show dice roll animation to player? Default true for player rolls. Set false for DM/hidden rolls.",
         },
       },
       required: ["formula", "dc", "description"],

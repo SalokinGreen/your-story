@@ -5,6 +5,115 @@
  * Adventure authors define their own fields, formulas, and character sheet layouts.
  */
 
+import { isGameIcon, searchGameIcons, getGameIconPath } from "./gameIcons";
+import { icons } from "lucide-react";
+
+// ============================================
+// ICON RESOLUTION
+// ============================================
+
+/** All available Lucide icon names */
+const LUCIDE_ICON_NAMES = Object.keys(icons);
+
+/**
+ * Resolve an icon name to an actual icon identifier.
+ * Tries exact match first, then fuzzy matching against game-icons and Lucide icons.
+ * Returns the best match or a fallback.
+ */
+export function resolveIconName(name: string): string {
+  if (!name) return "circle";
+
+  const normalized = name.toLowerCase().trim();
+
+  // Check if it's already a valid icon (game-icon or emoji)
+  if (isGameIcon(normalized)) return normalized;
+  if (isGameIcon(name)) return name;
+
+  // Check if it's an emoji
+  if (/\p{Extended_Pictographic}/u.test(name)) return name;
+
+  // Check Lucide icons (PascalCase)
+  const pascalName = normalized
+    .split(/[-_\s]+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+  if (pascalName in icons) return pascalName;
+
+  // Fuzzy search game-icons first (they have better RPG coverage)
+  const gameMatches = searchGameIcons(normalized, 5);
+  if (gameMatches.length > 0) {
+    // Prefer exact substring matches
+    const exactMatch = gameMatches.find(
+      (id) => id === normalized || id.includes(normalized)
+    );
+    if (exactMatch) return exactMatch;
+    return gameMatches[0];
+  }
+
+  // Fuzzy search Lucide icons
+  const lucideMatch = LUCIDE_ICON_NAMES.find((iconName) =>
+    iconName.toLowerCase().includes(normalized)
+  );
+  if (lucideMatch) return lucideMatch;
+
+  // Try common mappings
+  const iconMappings: Record<string, string> = {
+    sword: "crossed-swords",
+    swords: "crossed-swords",
+    weapon: "crossed-swords",
+    shield: "round-shield",
+    armor: "breastplate",
+    health: "heart-beats",
+    hp: "heart-beats",
+    mana: "burning-embers",
+    magic: "magic-swirl",
+    spell: "spell-book",
+    book: "book-cover",
+    potion: "potion-ball",
+    gold: "two-coins",
+    coin: "two-coins",
+    money: "two-coins",
+    inventory: "knapsack",
+    bag: "knapsack",
+    backpack: "knapsack",
+    belt: "belt",
+    combat: "crossed-swords",
+    attack: "sword-brandish",
+    defense: "shield",
+    skill: "skills",
+    ability: "skills",
+    person: "person",
+    user: "person",
+    character: "person",
+    quest: "treasure-map",
+    map: "treasure-map",
+    warning: "hazard-sign",
+    danger: "hazard-sign",
+    fire: "fire",
+    water: "drop",
+    earth: "stone-pile",
+    air: "wind-slap",
+    light: "sun",
+    dark: "moon",
+    death: "skull",
+    life: "heart-beats",
+    time: "hourglass",
+    star: "star-formation",
+    eye: "eye-target",
+    hand: "hand",
+    foot: "footprint",
+    arrow: "arrow-cluster",
+    bow: "pocket-bow",
+  };
+
+  if (iconMappings[normalized]) {
+    return iconMappings[normalized];
+  }
+
+  // Final fallback
+  return "circle";
+}
+
 // ============================================
 // FIELD TYPES
 // ============================================
@@ -14,7 +123,7 @@ export type SchemaFieldType =
   | "derived" // Calculated from formula (e.g., STR_mod = floor((Strength - 10) / 2))
   | "resource" // Current/max value (e.g., HP: 45/50)
   | "text" // String value (e.g., character name, backstory)
-  | "list" // Array of strings (e.g., known languages)
+  | "list" // Array of strings or objects (e.g., known languages, inventory items)
   | "boolean" // True/false flag (e.g., isConcentrating)
   | "select"; // Single choice from options (e.g., class: "Fighter")
 
@@ -87,12 +196,14 @@ export interface TextField extends SchemaFieldBase {
 
 export interface ListField extends SchemaFieldBase {
   type: "list";
-  /** Default items */
-  defaultValue?: string[];
+  /** Default items (strings or objects) */
+  defaultValue?: (string | ListItemObject)[];
   /** Max number of items */
   maxItems?: number;
   /** Predefined options to choose from (if restricted) */
   options?: string[];
+  /** Whether list items are objects (with name, emoji, description, etc.) */
+  objectItems?: boolean;
 }
 
 export interface BooleanField extends SchemaFieldBase {
@@ -204,11 +315,22 @@ export interface CharacterData {
   values: Record<string, CharacterFieldValue>;
 }
 
+/** Item in an object list - flexible structure for inventory-like lists */
+export interface ListItemObject {
+  name: string;
+  emoji?: string;
+  description?: string;
+  quantity?: number;
+  [key: string]: string | number | boolean | undefined;
+}
+
 export type CharacterFieldValue =
   | number
   | string
   | boolean
   | string[]
+  | ListItemObject[]
+  | (string | ListItemObject)[]
   | { current: number; max: number };
 
 // ============================================
@@ -534,32 +656,26 @@ export function processTemplate(
 ): string {
   let result = template;
 
-  // Helper to evaluate comparison expressions
-  const evalCompare = (
-    fieldId: string,
-    op: string,
-    compareValue: string
-  ): boolean => {
-    const value = getNumericValue(values, fieldId);
-    const compare = parseFloat(compareValue) || 0;
+  // Icon resolution: #icon(name) - resolves to best-matching icon and renders inline SVG
+  // This allows AI-generated templates to use readable icon names that get
+  // fuzzy-matched to actual icons from our icon database
+  result = result.replace(/#icon\(([^)]+)\)/g, (_, iconName) => {
+    const resolved = resolveIconName(iconName.trim());
 
-    switch (op) {
-      case "==":
-        return value === compare;
-      case "!=":
-        return value !== compare;
-      case ">":
-        return value > compare;
-      case "<":
-        return value < compare;
-      case ">=":
-        return value >= compare;
-      case "<=":
-        return value <= compare;
-      default:
-        return false;
+    // Check if it's an emoji
+    if (/\p{Extended_Pictographic}/u.test(resolved)) {
+      return `<span style="font-size: 1em; line-height: 1;">${resolved}</span>`;
     }
-  };
+
+    // Check if it's a game-icon and render inline SVG
+    const iconPath = getGameIconPath(resolved);
+    if (iconPath) {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width: 1em; height: 1em; display: inline-block; vertical-align: -0.125em; fill: currentColor;"><path d="${iconPath}"/></svg>`;
+    }
+
+    // Fallback: return a placeholder circle
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 1em; height: 1em; display: inline-block; vertical-align: -0.125em; fill: none; stroke: currentColor; stroke-width: 2;"><circle cx="12" cy="12" r="10"/></svg>`;
+  });
 
   // Resource URL substitution: {{resource:id}}
   result = result.replace(/\{\{resource:([a-zA-Z0-9_-]+)\}\}/g, (_, id) => {
@@ -567,7 +683,112 @@ export function processTemplate(
     return resource?.url ?? "";
   });
 
+  // Helper to resolve a value reference like "fieldId", "fieldId.current", "fieldId.max"
+  const resolveValueRef = (
+    ref: string,
+    contextValues: Record<string, CharacterFieldValue> = values
+  ): number | string => {
+    const parts = ref.split(".");
+    const fieldId = parts[0];
+    const prop = parts[1];
+
+    const value = contextValues[fieldId];
+    if (value === undefined) return 0;
+
+    if (prop) {
+      if (
+        typeof value === "object" &&
+        value !== null &&
+        "current" in value &&
+        (prop === "current" || prop === "max")
+      ) {
+        return value[prop as "current" | "max"];
+      }
+      // For object items in arrays (this.property)
+      if (typeof value === "object" && value !== null && prop in value) {
+        return (value as Record<string, unknown>)[prop] as number | string;
+      }
+      return 0;
+    }
+
+    if (typeof value === "number") return value;
+    if (typeof value === "object" && "current" in value) return value.current;
+    if (typeof value === "string") return value;
+    return 0;
+  };
+
+  // Helper to evaluate simple expressions like (div a b), (mul a b), etc.
+  const evalExpression = (
+    expr: string,
+    contextValues: Record<string, CharacterFieldValue> = values
+  ): number => {
+    // Match (func arg1 arg2)
+    const funcMatch = expr.match(/^\((\w+)\s+([^\s]+)\s+([^\s)]+)\)$/);
+    if (funcMatch) {
+      const [, func, arg1, arg2] = funcMatch;
+      const val1 =
+        typeof resolveValueRef(arg1, contextValues) === "number"
+          ? (resolveValueRef(arg1, contextValues) as number)
+          : parseFloat(arg1) || 0;
+      const val2 =
+        typeof resolveValueRef(arg2, contextValues) === "number"
+          ? (resolveValueRef(arg2, contextValues) as number)
+          : parseFloat(arg2) || 0;
+
+      switch (func) {
+        case "div":
+          return val2 !== 0 ? Math.floor(val1 / val2) : 0;
+        case "mul":
+          return val1 * val2;
+        case "add":
+          return val1 + val2;
+        case "sub":
+          return val1 - val2;
+        case "mod":
+          return val2 !== 0 ? val1 % val2 : 0;
+        case "min":
+          return Math.min(val1, val2);
+        case "max":
+          return Math.max(val1, val2);
+        default:
+          return 0;
+      }
+    }
+    // Not an expression, try to resolve as value reference or parse as number
+    const resolved = resolveValueRef(expr, contextValues);
+    return typeof resolved === "number" ? resolved : parseFloat(expr) || 0;
+  };
+
+  // Enhanced evalCompare that supports field.property refs and expressions
+  const evalCompareEnhanced = (
+    leftExpr: string,
+    op: string,
+    rightExpr: string,
+    contextValues: Record<string, CharacterFieldValue> = values
+  ): boolean => {
+    const left = evalExpression(leftExpr, contextValues);
+    const right = evalExpression(rightExpr, contextValues);
+
+    switch (op) {
+      case "==":
+        return left === right;
+      case "!=":
+        return left !== right;
+      case ">":
+        return left > right;
+      case "<":
+        return left < right;
+      case ">=":
+        return left >= right;
+      case "<=":
+        return left <= right;
+      default:
+        return false;
+    }
+  };
+
   // Process {{#each fieldId}}...{{/each}} blocks
+  // Supports both simple string arrays ({{this}}) and object arrays ({{this.property}})
   result = result.replace(
     /\{\{#each\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}([\s\S]*?)\{\{\/each\}\}/g,
     (_, fieldId, content) => {
@@ -576,7 +797,43 @@ export function processTemplate(
       return value
         .map((item, index) => {
           let itemContent = content;
-          itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
+
+          // Handle object arrays: {{this.property}}
+          if (typeof item === "object" && item !== null) {
+            const objItem = item as Record<string, unknown>;
+            // Replace {{this.property}} with actual values
+            itemContent = itemContent.replace(
+              /\{\{this\.([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g,
+              (_match: string, prop: string) => {
+                const propValue = objItem[prop];
+                if (propValue === undefined || propValue === null) return "";
+                return String(propValue);
+              }
+            );
+            // Handle {{#if this.property}}...{{/if}} for object properties
+            itemContent = itemContent.replace(
+              /\{\{#if\s+this\.([a-zA-Z_][a-zA-Z0-9_]*)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+              (_match: string, prop: string, ifContent: string) => {
+                const propValue = objItem[prop];
+                const isTruthy =
+                  propValue !== undefined &&
+                  propValue !== null &&
+                  propValue !== false &&
+                  propValue !== 0 &&
+                  propValue !== "";
+                return isTruthy ? ifContent : "";
+              }
+            );
+            // For {{this}} on objects, use the 'name' property or JSON representation
+            itemContent = itemContent.replace(
+              /\{\{this\}\}/g,
+              objItem.name ? String(objItem.name) : JSON.stringify(item)
+            );
+          } else {
+            // Handle simple string/number arrays: {{this}}
+            itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
+          }
+
           itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
           return itemContent;
         })
@@ -584,56 +841,65 @@ export function processTemplate(
     }
   );
 
-  // Process {{#compare fieldId "op" value}}...{{/compare}} blocks
+  // Process {{#compare expr "op" expr}}...{{/compare}} blocks
+  // Supports field.property references and (func arg1 arg2) expressions
   result = result.replace(
-    /\{\{#compare\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"]+)"\s+"?([^"}\s]+)"?\}\}([\s\S]*?)\{\{\/compare\}\}/g,
-    (_, fieldId, op, compareValue, content) => {
-      return evalCompare(fieldId, op, compareValue) ? content : "";
+    /\{\{#compare\s+([^\s"]+)\s+"([^"]+)"\s+([^}]+)\}\}([\s\S]*?)\{\{\/compare\}\}/g,
+    (_, leftExpr, op, rightExpr, content) => {
+      return evalCompareEnhanced(leftExpr.trim(), op, rightExpr.trim())
+        ? content
+        : "";
     }
   );
 
   // Process {{#if (compare fieldId "op" value)}}...{{/if}} - nested comparison syntax
   result = result.replace(
-    /\{\{#if\s+\(compare\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"]+)"\s+"?([^")}\s]+)"?\)\}\}([\s\S]*?)\{\{\/if\}\}/g,
-    (_, fieldId, op, compareValue, content) => {
-      return evalCompare(fieldId, op, compareValue) ? content : "";
+    /\{\{#if\s+\(compare\s+([^\s"]+)\s+"([^"]+)"\s+([^)]+)\)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+    (_, leftExpr, op, rightExpr, content) => {
+      return evalCompareEnhanced(leftExpr.trim(), op, rightExpr.trim())
+        ? content
+        : "";
     }
   );
 
   // Process {{#if fieldId}}...{{/if}} blocks (simple truthy check)
   result = result.replace(
-    /\{\{#if\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+    /\{\{#if\s+([a-zA-Z_][a-zA-Z0-9_.]*)\}\}([\s\S]*?)\{\{\/if\}\}/g,
     (_, fieldId, content) => {
-      const value = values[fieldId];
-      const isTruthy =
-        value !== undefined &&
-        value !== false &&
-        value !== 0 &&
-        value !== "" &&
-        !(Array.isArray(value) && value.length === 0);
+      // Support field.property syntax in if checks
+      // First check raw values for booleans/arrays before resolving
+      const rawValue = values[fieldId.split(".")[0]];
+      if (rawValue === false) return "";
+      if (Array.isArray(rawValue) && rawValue.length === 0) return "";
+
+      const resolved = resolveValueRef(fieldId);
+      const isTruthy = resolved !== 0 && resolved !== "";
       return isTruthy ? content : "";
     }
   );
 
   // Process {{#unless (compare fieldId "op" value)}}...{{/unless}} - nested comparison syntax
   result = result.replace(
-    /\{\{#unless\s+\(compare\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"]+)"\s+"?([^")}\s]+)"?\)\}\}([\s\S]*?)\{\{\/unless\}\}/g,
-    (_, fieldId, op, compareValue, content) => {
-      return !evalCompare(fieldId, op, compareValue) ? content : "";
+    /\{\{#unless\s+\(compare\s+([^\s"]+)\s+"([^"]+)"\s+([^)]+)\)\}\}([\s\S]*?)\{\{\/unless\}\}/g,
+    (_, leftExpr, op, rightExpr, content) => {
+      return !evalCompareEnhanced(leftExpr.trim(), op, rightExpr.trim())
+        ? content
+        : "";
     }
   );
 
   // Process {{#unless fieldId}}...{{/unless}} blocks
   result = result.replace(
-    /\{\{#unless\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}([\s\S]*?)\{\{\/unless\}\}/g,
+    /\{\{#unless\s+([a-zA-Z_][a-zA-Z0-9_.]*)\}\}([\s\S]*?)\{\{\/unless\}\}/g,
     (_, fieldId, content) => {
-      const value = values[fieldId];
-      const isTruthy =
-        value !== undefined &&
-        value !== false &&
-        value !== 0 &&
-        value !== "" &&
-        !(Array.isArray(value) && value.length === 0);
+      // Support field.property syntax in unless checks
+      // First check raw values for booleans/arrays before resolving
+      const rawValue = values[fieldId.split(".")[0]];
+      if (rawValue === false) return content; // unless falsy = show content
+      if (Array.isArray(rawValue) && rawValue.length === 0) return content;
+
+      const resolved = resolveValueRef(fieldId);
+      const isTruthy = resolved !== 0 && resolved !== "";
       return !isTruthy ? content : "";
     }
   );

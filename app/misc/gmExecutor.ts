@@ -89,6 +89,7 @@ export interface GMCheckResult {
   rolls: number[]; // Individual dice values for dice visualizer
   total: number;
   success: boolean;
+  showToPlayer?: boolean; // Show dice animation to player (default true)
   explosions?: number; // For explosive dice system
   partialSuccess?: boolean;
   criticalSuccess?: boolean;
@@ -161,6 +162,7 @@ export interface GMOpposedResult {
   opponentTotal: number;
   winner: "player" | "opponent" | "tie";
   margin: number;
+  showToPlayer?: boolean; // Show dice animation to player (default true)
   item?: {
     name: string;
     used: boolean;
@@ -234,6 +236,7 @@ export interface GMFormulaRollResult {
   margin?: number;
   reason: string;
   displayName?: string;
+  showToPlayer?: boolean; // Show dice animation to player (default true)
   stakes?: string;
   consequences?: {
     success?: string;
@@ -258,6 +261,7 @@ export interface GMOpposedFormulaResult {
   margin: number;
   reason: string;
   displayName?: string;
+  showToPlayer?: boolean; // Show dice animation to player (default true)
   stakes?: string;
   consequences?: {
     player_wins?: string;
@@ -277,6 +281,7 @@ export interface GMFormulaChallengeResult {
   margin: number;
   description: string;
   displayName?: string;
+  showToPlayer?: boolean; // Show dice animation to player (default true)
   consequences?: {
     success?: string;
     failure?: string;
@@ -795,6 +800,7 @@ function executeSkillCheck(
       modifier: modifierResult,
       stakes: params.stakes,
       consequences: params.consequences,
+      showToPlayer: params.show_to_player !== false, // Default true
     } as GMCheckResult,
     contextForStory,
   };
@@ -843,6 +849,7 @@ function executeChallengeCheck(
     modifier: params.modifier,
     modifier_reason: params.modifier_reason,
     consequences: params.consequences,
+    show_to_player: params.show_to_player, // Pass through visibility flag
   };
 
   const skillResult = executeSkillCheck(
@@ -1112,6 +1119,7 @@ function executeOpposedCheck(
       ability: abilityResult,
       stakes: params.stakes,
       consequences: params.consequences,
+      showToPlayer: params.show_to_player !== false, // Default true
     } as GMOpposedResult,
     contextForStory,
   };
@@ -1684,6 +1692,7 @@ function executeFormulaRoll(
       stakes: params.stakes,
       consequences: params.consequences,
       breakdown: rollResult.breakdown,
+      showToPlayer: params.show_to_player !== false, // Default true
     } as GMFormulaRollResult,
     contextForStory,
   };
@@ -1829,6 +1838,7 @@ function executeOpposedFormula(
       displayName: params.display_name,
       stakes: params.stakes,
       consequences: params.consequences,
+      showToPlayer: params.show_to_player !== false, // Default true
     } as GMOpposedFormulaResult,
     contextForStory,
   };
@@ -1963,6 +1973,7 @@ function executeFormulaChallengeCheck(
       description: params.description,
       displayName: params.display_name,
       consequences: params.consequences,
+      showToPlayer: params.show_to_player !== false, // Default true
       challengeProgress: {
         name: challenge.name,
         successes: challenge.currentSuccesses,

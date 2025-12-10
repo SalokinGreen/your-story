@@ -365,6 +365,7 @@ export interface Preset {
   relationships: Relationship[];
   conditions?: Condition[]; // Starting conditions/afflictions for this preset
   variables?: Variable[]; // Starting variables for this preset
+  characterData?: import("./characterSchema").CharacterData; // Character schema values for this preset
   authorNotes: string;
 }
 

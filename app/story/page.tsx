@@ -4973,15 +4973,21 @@ function StoryPageContent() {
               }
 
               // Find skill_check, challenge_check, or formula_roll results to show dice
+              // Only show dice if showToPlayer is true (default)
               const checkResult = gmResults.find(
                 (r) =>
-                  r.toolName === "skill_check" ||
-                  r.toolName === "challenge_check"
+                  (r.toolName === "skill_check" ||
+                    r.toolName === "challenge_check") &&
+                  (r.result as GMCheckResult)?.showToPlayer !== false
               );
 
-              // Also check for formula_roll results
+              // Also check for formula_roll results (only if showToPlayer is true)
               const formulaResult = gmResults.find(
-                (r) => r.toolName === "formula_roll"
+                (r) =>
+                  r.toolName === "formula_roll" &&
+                  (
+                    r.result as import("@/app/misc/gmExecutor").GMFormulaRollResult
+                  )?.showToPlayer !== false
               );
 
               const rpgSystemId = storyData.rpgSystem || "3d6";

@@ -3047,7 +3047,15 @@ function executeCharacterFieldTool(
       }
 
       const currentList = Array.isArray(data.values[id])
-        ? (data.values[id] as string[])
+        ? (data.values[id] as (
+            | string
+            | {
+                name: string;
+                emoji?: string;
+                description?: string;
+                quantity?: number;
+              }
+          )[])
         : [];
       const listField = field as { maxItems?: number };
 
@@ -3063,16 +3071,26 @@ function executeCharacterFieldTool(
         };
       }
 
-      const newList = [...currentList, args.item];
+      // Handle both string and object items
+      const itemToAdd = args.item;
+      const newList = [...currentList, itemToAdd];
       data.values[id] = newList;
 
-      logger.action(`Added to list: ${field.name} += "${args.item}"`, {
+      // Build display string for the message
+      const itemDisplay =
+        typeof itemToAdd === "string"
+          ? itemToAdd
+          : itemToAdd.emoji
+          ? `${itemToAdd.emoji} ${itemToAdd.name}`
+          : itemToAdd.name;
+
+      logger.action(`Added to list: ${field.name} += "${itemDisplay}"`, {
         toolId,
       });
       return {
         command: toolName,
         success: true,
-        message: `✓ Added "${args.item}" to ${field.name} (${newList.length} items)`,
+        message: `✓ Added "${itemDisplay}" to ${field.name} (${newList.length} items)`,
         timestamp: Date.now(),
       };
     }

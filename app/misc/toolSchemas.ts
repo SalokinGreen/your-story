@@ -687,7 +687,7 @@ const addListItemTool: ToolSchema = {
   function: {
     name: "add_list_item",
     description:
-      "Add an item to a list field in the character sheet. Only works with list-type fields.",
+      "Add an item to a list field in the character sheet. Supports both simple strings and structured objects with name, emoji, description, and quantity.",
     parameters: {
       type: "object",
       properties: {
@@ -696,8 +696,39 @@ const addListItemTool: ToolSchema = {
           description: "List field name from character schema",
         },
         item: {
-          type: "string",
-          description: "Item to add to the list",
+          oneOf: [
+            {
+              type: "string",
+              description: "Simple string item",
+            },
+            {
+              type: "object",
+              description:
+                "Structured item object with name and optional emoji/description/quantity",
+              properties: {
+                name: {
+                  type: "string",
+                  description: "Item name (required)",
+                },
+                emoji: {
+                  type: "string",
+                  description:
+                    "Single emoji representing the item (e.g., ⚔️, 📜, 💎, 🧪)",
+                },
+                description: {
+                  type: "string",
+                  description: "Item description",
+                },
+                quantity: {
+                  type: "number",
+                  description: "Quantity (default 1)",
+                },
+              },
+              required: ["name"],
+            },
+          ],
+          description:
+            "Item to add - either a string or object with { name, emoji?, description?, quantity? }",
         },
       },
       required: ["field", "item"],

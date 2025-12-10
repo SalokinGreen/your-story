@@ -1011,11 +1011,65 @@ Remember: Output ONLY the JSON object, nothing else.`;
   }
 
   if (stage === "mechanics") {
-    // Get RPG system info for detailed DC guidelines
-    const rpgSystem = config.rpgSystem || "3d6";
-    const rpgDescription = RPG_SYSTEM_DESCRIPTIONS[rpgSystem];
+    // Get RPG system info - if user specified one, use it; otherwise let AI choose
+    const userSpecifiedSystem = config.rpgSystem;
+    const rpgDescription = userSpecifiedSystem
+      ? RPG_SYSTEM_DESCRIPTIONS[userSpecifiedSystem]
+      : null;
 
-    // DC guidelines based on system
+    // DC guidelines for all systems (shown to AI so it can pick appropriately)
+    const allDCGuidelines = `
+DICE SYSTEM OPTIONS (choose the most appropriate for the adventure concept):
+
+1d20 (D&D-style) - Best for: heroic fantasy, tactical combat, class-based RPGs
+   DC 5: Trivial | DC 10: Easy | DC 15: Average | DC 20: Hard | DC 25: Very Hard | DC 30+: Legendary
+   Formula example: 1d20+{{modifier}}
+
+3d6 (Bell curve) - Best for: realistic settings, GURPS-style, skill-focused games  
+   DC 6: Trivial | DC 8: Easy | DC 10: Average | DC 13: Hard | DC 16: Very Hard | DC 18+: Impossible
+   Formula example: 3d6+{{modifier}}
+
+2d6 (PbtA-style) - Best for: narrative games, City of Mist, Apocalypse World
+   6-: Failure | 7-9: Partial success | 10-11: Full success | 12+: Critical
+   Formula example: 2d6+{{modifier}} (modifiers typically -2 to +3)
+
+1d100/Percentile - Best for: Call of Cthulhu, horror, investigation-focused games
+   Roll under skill value. Modifiers adjust target number.
+   Formula example: 1d100 vs {{skill}}
+
+4dF (Fate) - Best for: narrative-first games, collaborative storytelling
+   Compare to opposition ladder: Mediocre (+0) to Legendary (+8)
+   Formula example: 4dF+{{skill}}
+
+Year Zero Engine - Best for: survival games, Alien RPG, Forbidden Lands
+   Dice pool (count 6s), push mechanic with stress
+   Formula example: {{attribute}}d6
+
+Explosive Dice - Best for: over-the-top action, Savage Worlds style
+   Dice chain d4→d6→d8→d10→d12, max rolls explode
+   Formula example: 1d{{dieSize}}! (exploding)
+
+Narrative (no dice) - Best for: pure storytelling, journaling games
+   AI determines outcomes based on character abilities and context`;
+
+    // If user specified a system, show only that one prominently
+    const systemGuidance = userSpecifiedSystem
+      ? `
+DICE SYSTEM: ${rpgDescription}
+Use this system for all mechanics. Design DCs, skills, and abilities accordingly.`
+      : `
+DICE SYSTEM: Choose the most appropriate system based on the adventure concept.
+Consider the genre, tone, and user's prompt when selecting. Common choices:
+- D&D/fantasy adventure → 1d20 system
+- Realistic/skill-based → 3d6 system  
+- Narrative/story-focused → 2d6 (PbtA) or Narrative
+- Horror/investigation → 1d100 percentile
+- Survival/gritty → Year Zero Engine
+- Over-the-top action → Explosive dice
+
+${allDCGuidelines}`;
+
+    // DC guidelines based on system (kept for backward compatibility)
     const dcGuidelines: Record<string, string> = {
       "3d6": `DC GUIDELINES (3d6 system - roll 3d6, add modifier, compare to DC):
 - Trivial (DC 6): Almost automatic, basic tasks
@@ -1083,7 +1137,7 @@ Create a complete character system with progression, classes, and game rules.
 
 RPG SYSTEM: ${rpgDescription}
 
-${dcGuidelines[rpgSystem] || dcGuidelines["3d6"]}
+${userSpecifiedSystem ? dcGuidelines[userSpecifiedSystem] : systemGuidance}
 
 CONTENT GUIDELINES:
 Create an appropriate number of elements for this adventure's scope:
@@ -1128,7 +1182,10 @@ FIELD TYPE REFERENCE:
 - "derived": Calculated via formula
 - "resource": Current/max pool (health, mana)
 - "text": Free text (name, notes)
-- "list": Array of strings (inventory, languages)
+- "list": Array of items (inventory, languages) - supports both strings and objects!
+  - Simple: ["Sword", "Shield", "Potion"]
+  - Objects: [{ name: "Iron Sword", emoji: "⚔️", description: "A sturdy blade", quantity: 1 }]
+  - Mixed: ["Common Item", { name: "Special Item", emoji: "💎" }]
 - "boolean": True/false flags
 - "select": Dropdown with predefined options
 
@@ -1309,13 +1366,24 @@ Each page gets its own tab in the player's Stats panel.
 
 TEMPLATE SYNTAX (for all pages):
 - {{fieldId}} - Insert field value
-- {{fieldId.current}}/{{fieldId.max}} - Resource values
+- {{fieldId.current}}/{{fieldId.max}} - Resource values  
 - {{percent fieldId}} - Resource as percentage (for progress bars)
 - {{modifier fieldId}} - D&D-style modifier with +/- sign
 - {{#if fieldId}}...{{/if}} - Conditional display
 - {{#unless fieldId}}...{{/unless}} - Inverse conditional
-- {{#each fieldId}}...{{/each}} - List iteration ({{this}} = item)
+- {{#each fieldId}}...{{/each}} - List iteration
+  - For string lists: {{this}} = the string value
+  - For object lists: {{this.name}}, {{this.emoji}}, {{this.description}}, {{this.quantity}}
 - {{#compare fieldId ">" "10"}}...{{/compare}} - Comparisons
+  - Supports field.property refs: {{#compare hp.current "<" (div hp.max 2)}}
+  - Expression functions: (div a b), (mul a b), (add a b), (sub a b), (min a b), (max a b)
+
+ICON HELPER (renders inline SVG icons):
+- #icon(sword) - Fuzzy matches "sword" to "crossed-swords" icon
+- #icon(health) - Matches to "heart-beats" icon  
+- #icon(magic) - Matches to "magic-swirl" icon
+- Works with any descriptive name - the system has 4000+ RPG icons and will find the best match!
+- Example: <span>#icon(armor)</span> Armor Class: {{ac}}
 
 JAVASCRIPT SUPPORT (optional but encouraged for interactive features):
 The "js" field can contain JavaScript that executes in the character sheet iframe.

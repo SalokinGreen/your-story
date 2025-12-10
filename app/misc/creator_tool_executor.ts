@@ -1147,6 +1147,7 @@ export function executeCreatorTool(
             name?: string;
             new_id?: string;
             new_name?: string;
+            characterData?: { values?: Record<string, unknown> };
           }
         >;
         const existingPresets = [...(currentState.storyData.presets || [])];
@@ -1178,6 +1179,19 @@ export function executeCreatorTool(
           if (mod.abilities !== undefined) p.abilities = mod.abilities;
           if (mod.relationships !== undefined)
             p.relationships = mod.relationships;
+          // Handle characterData modifications (for character schema fields)
+          if (mod.characterData !== undefined) {
+            if (!p.characterData) {
+              p.characterData = { values: {} };
+            }
+            if (mod.characterData.values) {
+              // Merge values - replace any fields that are specified
+              p.characterData.values = {
+                ...p.characterData.values,
+                ...mod.characterData.values,
+              };
+            }
+          }
           changesList.push(`Modified preset: ${p.name}`);
         }
         changes.presets = existingPresets;

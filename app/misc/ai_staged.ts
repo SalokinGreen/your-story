@@ -1156,6 +1156,24 @@ Track ongoing storylines, mysteries, quests, and plot hooks using threads.
 - Story developments make the thread obsolete
 - The opportunity window closes permanently
 
+## CHARACTER LIST FIELDS
+Use \`add_list_item\` to add items to list fields (like Equipment, Inventory, Abilities, Languages).
+Supports both simple strings and structured objects with emoji!
+
+**Simple String:**
+\`add_list_item({ field: "Equipment", item: "Healing Potion" })\`
+
+**Object with Emoji (preferred for items):**
+\`add_list_item({ field: "Equipment", item: { name: "Iron Sword", emoji: "⚔️", description: "A sturdy blade", quantity: 1 } })\`
+
+**Examples:**
+- Weapon: \`{ name: "Longbow", emoji: "🏹", description: "Ranged weapon" }\`
+- Consumable: \`{ name: "Mana Potion", emoji: "🧪", quantity: 3 }\`
+- Quest Item: \`{ name: "Ancient Key", emoji: "🗝️", description: "Opens the sealed door" }\`
+- Spell: \`{ name: "Fireball", emoji: "🔥", description: "Deals fire damage" }\`
+
+Use \`remove_list_item\` with just the item name (fuzzy matching supported).
+
 Think through the narrative sentence-by-sentence, then execute the required Tool Calls.`;
 
   const infoMessage = buildInfoMessage(storyData, embeddingContext);

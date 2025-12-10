@@ -197,15 +197,48 @@ function ListFieldInput({
   const listValue = Array.isArray(value) ? value : [];
   const [newItem, setNewItem] = useState("");
 
+  // Helper to get display name from item (string or object)
+  const getItemDisplay = (
+    item: string | { name?: string; emoji?: string; [key: string]: unknown }
+  ): string => {
+    if (typeof item === "string") return item;
+    if (item.emoji && item.name) return `${item.emoji} ${item.name}`;
+    if (item.name) return item.name;
+    return JSON.stringify(item);
+  };
+
+  // Helper to parse input - supports plain strings or {name: "x", emoji: "y"} format
+  const parseInput = (
+    input: string
+  ): string | { name: string; emoji?: string; description?: string } => {
+    const trimmed = input.trim();
+    // Check if it looks like an object: {name: "...", ...}
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      try {
+        // Try to parse as JSON (convert single quotes to double quotes for flexibility)
+        const jsonStr = trimmed.replace(/'/g, '"').replace(/(\w+):/g, '"$1":');
+        const parsed = JSON.parse(jsonStr);
+        if (parsed && typeof parsed === "object" && parsed.name) {
+          return parsed;
+        }
+      } catch {
+        // Not valid JSON, treat as string
+      }
+    }
+    return trimmed;
+  };
+
   const addItem = () => {
     if (!newItem.trim()) return;
     if (field.maxItems && listValue.length >= field.maxItems) return;
-    onChange([...listValue, newItem.trim()]);
+    const parsed = parseInput(newItem);
+    // Cast to CharacterFieldValue since our type now supports ListItemObject[]
+    onChange([...listValue, parsed] as CharacterFieldValue);
     setNewItem("");
   };
 
   const removeItem = (index: number) => {
-    onChange(listValue.filter((_, i) => i !== index));
+    onChange(listValue.filter((_, i) => i !== index) as CharacterFieldValue);
   };
 
   return (
@@ -216,7 +249,7 @@ function ListFieldInput({
             key={index}
             className="inline-flex items-center gap-1 px-2 py-1 bg-gray-700 rounded text-sm"
           >
-            {item}
+            {getItemDisplay(item as string | { name?: string; emoji?: string })}
             {!readOnly && !field.readonly && (
               <button
                 onClick={() => removeItem(index)}
@@ -238,7 +271,12 @@ function ListFieldInput({
             >
               <option value="">Select...</option>
               {field.options
-                .filter((opt) => !listValue.includes(opt))
+                .filter((opt) => {
+                  // Check if opt is already in the list (handle both string and object items)
+                  return !listValue.some((item) =>
+                    typeof item === "string" ? item === opt : item.name === opt
+                  );
+                })
                 .map((opt) => (
                   <option key={opt} value={opt}>
                     {opt}
@@ -251,7 +289,7 @@ function ListFieldInput({
               value={newItem}
               onChange={(e) => setNewItem(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addItem()}
-              placeholder="Add item..."
+              placeholder='Add item... or {name: "Item", emoji: "🔫"}'
               className="flex-1 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-white"
             />
           )}
@@ -472,7 +510,7 @@ function CustomTemplateRenderer({
         </button>
         <button
           onClick={handleResetView}
-          className="px-2 h-8 flex items-center justify-center rounded hover:bg-gray-700 text-gray-300 hover:text-white transition-colors text-sm font-medium min-w-[3rem]"
+          className="px-2 h-8 flex items-center justify-center rounded hover:bg-gray-700 text-gray-300 hover:text-white transition-colors text-sm font-medium min-w-12"
           title="Reset view"
         >
           {Math.round(zoom * 100)}%

@@ -377,10 +377,28 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
       }
       if (preset.inventory && preset.inventory.length > 0) {
         presetsSection.push(
-          `- Starting items: ${preset.inventory
+          `- Starting items (legacy): ${preset.inventory
             .map((i) => `${i.name} x${i.quantity}`)
             .join(", ")}`
         );
+      }
+      // Character schema field values (modern approach)
+      if (preset.characterData?.values) {
+        const values = preset.characterData.values;
+        const listFields = Object.entries(values).filter(
+          ([, v]) => Array.isArray(v) && v.length > 0
+        );
+        if (listFields.length > 0) {
+          listFields.forEach(([fieldId, fieldValue]) => {
+            const items = fieldValue as Array<string | { name?: string }>;
+            const itemNames = items.map((item) =>
+              typeof item === "string"
+                ? item
+                : item.name || JSON.stringify(item)
+            );
+            presetsSection.push(`- ${fieldId}: ${itemNames.join(", ")}`);
+          });
+        }
       }
       if (preset.abilities && preset.abilities.length > 0) {
         presetsSection.push(
@@ -836,7 +854,7 @@ You can control how items in arrays are applied using the **_command** field:
   - points: Points awarded upon completion
   - active: Whether quest is currently visible/active
   - fulfilled: Whether quest has been completed
-- presets (Array of { id, name, description, icon, playerName, playerSummary, characterDataValues, inventory, abilities, authorNotes })
+- presets (Array of { id, name, description, icon, playerName, playerSummary, characterData, inventory, abilities, authorNotes })
   - id: Unique identifier (use "preset-" + timestamp for new ones)
   - name: Preset display name
   - description: What this preset/build represents
@@ -844,9 +862,10 @@ You can control how items in arrays are applied using the **_command** field:
   - playerName: Default character name for this preset
   - playerSummary: Character background for this preset
   - intro: Unique opening narrative for this preset
-  - characterDataValues: Object with field values for this preset (matches characterSchema.fields IDs)
-    - Example: { "strength": 16, "health": { "current": 50, "max": 50 }, "intelligence": 10 }
-  - inventory: Array of starting items for this preset
+  - characterData: Object containing character schema field values
+    - values: Object with field IDs as keys. For list fields (inventory, equipment), use arrays of strings or objects
+    - Example: { "values": { "strength": 16, "health": { "current": 50, "max": 50 }, "inventory": ["Sword", { "name": "Shield", "emoji": "🛡️", "description": "A sturdy shield" }] } }
+  - inventory: (LEGACY - prefer characterData.values for list fields) Array of starting items
   - abilities: Array of starting abilities for this preset
   - authorNotes: Private notes about this preset
 - upgradeSettings (Object with upgrade shop configuration) - **NOTE: Prefer skillTrees over upgradeSettings for progression**
