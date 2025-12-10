@@ -2648,8 +2648,8 @@ function StoryPageContent() {
     try {
       const maxToolLoops =
         typeof window !== "undefined"
-          ? parseInt(localStorage.getItem("maxToolLoops") || "1", 10)
-          : 1;
+          ? parseInt(localStorage.getItem("maxToolLoops") || "10", 10)
+          : 10;
       const customMaxContext =
         typeof window !== "undefined"
           ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
@@ -4802,8 +4802,8 @@ function StoryPageContent() {
 
     const maxToolLoops =
       typeof window !== "undefined"
-        ? parseInt(localStorage.getItem("maxToolLoops") || "1", 10)
-        : 1;
+        ? parseInt(localStorage.getItem("maxToolLoops") || "10", 10)
+        : 10;
     const customMaxContext =
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
@@ -5340,8 +5340,8 @@ function StoryPageContent() {
         : true;
     const maxToolLoops =
       typeof window !== "undefined"
-        ? parseInt(localStorage.getItem("maxToolLoops") || "1", 10)
-        : 1;
+        ? parseInt(localStorage.getItem("maxToolLoops") || "10", 10)
+        : 10;
     const customMaxContext =
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
@@ -5579,8 +5579,8 @@ function StoryPageContent() {
 
     const maxToolLoops =
       typeof window !== "undefined"
-        ? parseInt(localStorage.getItem("maxToolLoops") || "1", 10)
-        : 1;
+        ? parseInt(localStorage.getItem("maxToolLoops") || "10", 10)
+        : 10;
     const customMaxContext =
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)

@@ -1874,6 +1874,105 @@ Let me carefully analyze this action and READ THE MECHANICS NOTES before decidin
 
 **Step 2: What is the player trying to do?**`;
 
+// ============================================
+// GM STAGE FEW-SHOT EXAMPLES
+// ============================================
+// These examples teach the GM stage workflow with tool calling.
+// They use a generic roll-under system to demonstrate reading mechanics notes.
+
+const GM_FEW_SHOT_SYSTEM_INTRO = `You are the GAME MASTER. Below is an example of how to process a player action.
+
+---
+## EXAMPLE (Different game - showing the workflow)
+---`;
+
+const GM_FEW_SHOT_INFO = `## GAME RULES & MECHANICS
+
+### Shadow Protocol System
+In this system, resolution uses 1d100 percentile dice. Roll UNDER your skill value to succeed.
+- **Success**: Roll ≤ skill value (after modifiers)
+- **Critical**: Roll 01-05 (exceptional success)
+- **Fumble**: Roll 96-100 (complication occurs)
+- **Difficulty**: Easy (+20%), Normal (no mod), Hard (-20%), Extreme (-40%)
+
+## CHARACTER
+- Infiltration: 55%
+- Combat: 40%
+- Tech: 60%`;
+
+const GM_FEW_SHOT_USER = `## PLAYER'S ACTION
+"I'll hack into the security terminal to disable the cameras."
+
+**INSTRUCTIONS:**
+1. First, check the GAME RULES section - is this roll-under or roll-over?
+2. Write [GM] reasoning: What skill? What's the target? reverse_dc needed?
+3. **Call the tool(s)** with correct parameters
+
+You MUST call at least one tool function in this response.`;
+
+const GM_FEW_SHOT_ASSISTANT_THINKING = `[GM]
+Let me READ THE MECHANICS NOTES carefully.
+
+**Step 1: What does the GAME RULES section say?**
+- This is a ROLL-UNDER system: "Roll UNDER your skill value to succeed"
+- Success = roll ≤ skill value
+- So I need to use \`reverse_dc: true\` on the formula_roll!
+- Critical on 01-05, Fumble on 96-100
+
+**Step 2: What is the player trying to do?**
+Hacking into a security terminal. This clearly uses the Tech skill (60%).
+The terminal is standard corporate security - I'll call this "Normal" difficulty (no modifier).
+So the target is 60%.
+
+**Step 3: Call the tool**
+I'll use formula_roll with:
+- formula: "1d100" 
+- dc: 60 (the Tech skill value)
+- reverse_dc: TRUE (because roll-under system!)
+- reason: "Hack security terminal"`;
+
+// Simulated tool call and response for few-shot
+const GM_FEW_SHOT_TOOL_CALL = {
+  id: "call_example_001",
+  type: "function",
+  function: {
+    name: "formula_roll",
+    arguments: JSON.stringify({
+      formula: "1d100",
+      dc: 60,
+      reverse_dc: true,
+      reason: "Hack security terminal to disable cameras",
+      stakes: "medium",
+    }),
+  },
+};
+
+const GM_FEW_SHOT_TOOL_RESPONSE = `[GM TOOLS]
+✓ formula_roll: 1d100 → [42] = 42 vs DC 60 (roll-under) → SUCCESS (margin: 18)
+[Reason: Hack security terminal to disable cameras]
+[Stakes: medium]`;
+
+const GM_FEW_SHOT_ASSISTANT_FINAL = `[GM]
+The hack succeeded with a roll of 42 vs target 60. Good margin of 18.
+The player gains access to the camera system. I should note this opens up infiltration options.
+
+Now I'll call end_gm_thinking to summarize for the story stage.`;
+
+const GM_FEW_SHOT_END_TOOL_CALL = {
+  id: "call_example_002",
+  type: "function",
+  function: {
+    name: "end_gm_thinking",
+    arguments: JSON.stringify({
+      summary:
+        "Tech check succeeded (42 vs 60, roll-under). Player hacked the security terminal and can now disable cameras.",
+      outcome: "success",
+      narrative_hints:
+        "Describe the terminal interface, the satisfaction of bypassing corporate security, and the camera feeds flickering off.",
+    }),
+  },
+};
+
 /**
  * Build the GM stage prompt for determining game mechanics
  * This stage runs BEFORE the story stage and uses tool calls instead of JSON output
@@ -2563,6 +2662,46 @@ The lock clicks open. No complications.
   const messages: ChatMessage[] = [
     { role: "system", content: cleanString(systemPrompt) },
   ];
+
+  // Add few-shot example to teach the workflow (especially roll-under detection)
+  // This shows a complete GM turn with proper tool calling
+  messages.push({
+    role: "user",
+    content: cleanString(
+      `${GM_FEW_SHOT_SYSTEM_INTRO}\n\n${GM_FEW_SHOT_INFO}\n\n${GM_FEW_SHOT_USER}`
+    ),
+  });
+  messages.push({
+    role: "assistant",
+    content: cleanString(GM_FEW_SHOT_ASSISTANT_THINKING),
+    tool_calls: [GM_FEW_SHOT_TOOL_CALL],
+  });
+  messages.push({
+    role: "tool",
+    content: GM_FEW_SHOT_TOOL_RESPONSE,
+    tool_call_id: GM_FEW_SHOT_TOOL_CALL.id,
+  });
+  messages.push({
+    role: "assistant",
+    content: cleanString(GM_FEW_SHOT_ASSISTANT_FINAL),
+    tool_calls: [GM_FEW_SHOT_END_TOOL_CALL],
+  });
+  messages.push({
+    role: "tool",
+    content:
+      "[GM TOOLS]\n✓ end_gm_thinking: GM stage complete. Handing off to story stage.",
+    tool_call_id: GM_FEW_SHOT_END_TOOL_CALL.id,
+  });
+
+  // Transition from example to actual game
+  messages.push({
+    role: "user",
+    content: cleanString(`---
+## END OF EXAMPLE
+---
+
+Now here is the ACTUAL game you are GMing. Read the mechanics notes carefully!`),
+  });
 
   // Build chat history from scene parts
   // This gives the GM better context about the ongoing story

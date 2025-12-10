@@ -88,9 +88,9 @@ export default function AIConfigTab() {
   });
   const [maxToolLoops, setMaxToolLoops] = useState(() => {
     if (typeof window !== "undefined") {
-      return parseInt(localStorage.getItem("maxToolLoops") || "1", 10);
+      return parseInt(localStorage.getItem("maxToolLoops") || "10", 10);
     }
-    return 1;
+    return 10;
   });
   const [embeddingsEnabled, setEmbeddingsEnabled] = useState(() => {
     if (typeof window !== "undefined") {
@@ -118,6 +118,13 @@ export default function AIConfigTab() {
       return localStorage.getItem("gmStageEnabled") !== "false";
     }
     return true;
+  });
+  const [displayGMThinking, setDisplayGMThinking] = useState(() => {
+    if (typeof window !== "undefined") {
+      // Default to false - GM thinking is hidden by default
+      return localStorage.getItem("displayGMThinking") === "true";
+    }
+    return false;
   });
   const [customMaxContext, setCustomMaxContext] = useState(() => {
     if (typeof window !== "undefined") {
@@ -1635,18 +1642,46 @@ export default function AIConfigTab() {
               </span>
               <button
                 onClick={() => {
-                  const newValue = Math.min(5, maxToolLoops + 1);
+                  const newValue = Math.min(50, maxToolLoops + 1);
                   setMaxToolLoops(newValue);
                   if (typeof window !== "undefined") {
                     localStorage.setItem("maxToolLoops", String(newValue));
                   }
                 }}
-                disabled={maxToolLoops >= 5}
+                disabled={maxToolLoops >= 50}
                 className="w-8 h-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 +
               </button>
             </div>
+          </div>
+        )}
+
+        {toolCallingEnabled && (
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                Display GM Thinking
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Show AI&apos;s reasoning process in the story view
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={displayGMThinking}
+                onChange={(e) => {
+                  const newValue = e.target.checked;
+                  setDisplayGMThinking(newValue);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("displayGMThinking", String(newValue));
+                  }
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
+            </label>
           </div>
         )}
       </div>

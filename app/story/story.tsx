@@ -356,6 +356,14 @@ export default function Story({
   const hasGMContent =
     gmThinking.length > 0 || gmToolCalls.length > 0 || gmStoryContext;
 
+  // Check if user wants to display GM thinking (from settings)
+  const displayGMThinkingEnabled = React.useMemo(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("displayGMThinking") === "true";
+    }
+    return false;
+  }, []);
+
   // State for GM thinking collapsible
   const [showGMThinking, setShowGMThinking] = React.useState(false);
 
@@ -428,7 +436,7 @@ export default function Story({
         )}
 
         {/* GM Thinking Collapsible (shows reasoning, tool calls, and results) */}
-        {hasGMContent && (
+        {displayGMThinkingEnabled && hasGMContent && (
           <div className="border-b border-purple-800/30">
             <button
               onClick={() => setShowGMThinking(!showGMThinking)}
