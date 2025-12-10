@@ -644,7 +644,32 @@ ${
         case "list":
           if (Array.isArray(value) && value.length > 0) {
             return `${field.name}:\n${value
-              .map((item) => `  • ${item}`)
+              .map((item) => {
+                if (typeof item === "object" && item !== null) {
+                  // Format object items nicely: use 'name' field if available, else show key-value pairs
+                  const obj = item as Record<string, unknown>;
+                  if (obj.name) {
+                    // Show name plus any other relevant fields
+                    const extras: string[] = [];
+                    if (obj.description) extras.push(String(obj.description));
+                    if (obj.quantity && Number(obj.quantity) > 1)
+                      extras.push(`x${obj.quantity}`);
+                    if (obj.stat) extras.push(`+${obj.stat}`);
+                    return `  • ${obj.name}${
+                      extras.length ? ` (${extras.join(", ")})` : ""
+                    }`;
+                  }
+                  // Fallback: show key-value pairs
+                  const pairs = Object.entries(obj)
+                    .filter(
+                      ([_, v]) => v !== undefined && v !== null && v !== ""
+                    )
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(", ");
+                  return `  • ${pairs}`;
+                }
+                return `  • ${item}`;
+              })
               .join("\n")}`;
           }
           return null;

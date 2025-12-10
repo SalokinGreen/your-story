@@ -3601,7 +3601,10 @@ ${result.description || ""}`;
                               importedCustomTables: [],
                               importedVariables: [],
                             });
-                            addNotification("Cleared all imported content", "success");
+                            addNotification(
+                              "Cleared all imported content",
+                              "success"
+                            );
                           }}
                           className="text-red-400 hover:text-red-300 underline text-xs"
                         >

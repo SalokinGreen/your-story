@@ -647,7 +647,6 @@ export function validateSchema(schema: CharacterSchema): ValidationResult {
  * - {{#compare fieldId "op" value}}...{{/compare}} - Comparison (op: ==, !=, >, <, >=, <=)
  * - {{resource:resourceId}} - Resource URL substitution
  * - {{percent fieldId}} - Resource as percentage (current/max * 100)
- * - {{modifier fieldId}} - D&D-style modifier ((value - 10) / 2)
  */
 export function processTemplate(
   template: string,
@@ -789,10 +788,20 @@ export function processTemplate(
 
   // Process {{#each fieldId}}...{{/each}} blocks
   // Supports both simple string arrays ({{this}}) and object arrays ({{this.property}})
+  // Also supports dotted field access like {{#each harm.tracks}}
   result = result.replace(
-    /\{\{#each\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}([\s\S]*?)\{\{\/each\}\}/g,
-    (_, fieldId, content) => {
-      const value = values[fieldId];
+    /\{\{#each\s+([a-zA-Z_][a-zA-Z0-9_.]*)\.?\}\}([\s\S]*?)\{\{\/each\}\}/g,
+    (_, fieldPath, content) => {
+      // Support dotted paths like "harm.tracks"
+      const parts = fieldPath.split(".");
+      let value: unknown = values[parts[0]];
+      for (let i = 1; i < parts.length && value !== undefined; i++) {
+        if (typeof value === "object" && value !== null) {
+          value = (value as Record<string, unknown>)[parts[i]];
+        } else {
+          value = undefined;
+        }
+      }
       if (!Array.isArray(value)) return "";
       return value
         .map((item, index) => {
@@ -913,16 +922,6 @@ export function processTemplate(
         return String(Math.round((value.current / value.max) * 100));
       }
       return "0";
-    }
-  );
-
-  // Process {{modifier fieldId}} - D&D-style modifier
-  result = result.replace(
-    /\{\{modifier\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g,
-    (_, fieldId) => {
-      const value = getNumericValue(values, fieldId);
-      const mod = Math.floor((value - 10) / 2);
-      return mod >= 0 ? `+${mod}` : String(mod);
     }
   );
 
@@ -1217,32 +1216,32 @@ export const DND5E_SCHEMA: CharacterSchema = {
     <div class="attributes-column">
       <div class="attribute-block">
         <div class="attr-score">{{Strength}}</div>
-        <div class="attr-mod">{{modifier STR_mod}}</div>
+        <div class="attr-mod">{{STR_mod}}</div>
         <div class="attr-name">STR</div>
       </div>
       <div class="attribute-block">
         <div class="attr-score">{{Dexterity}}</div>
-        <div class="attr-mod">{{modifier DEX_mod}}</div>
+        <div class="attr-mod">{{DEX_mod}}</div>
         <div class="attr-name">DEX</div>
       </div>
       <div class="attribute-block">
         <div class="attr-score">{{Constitution}}</div>
-        <div class="attr-mod">{{modifier CON_mod}}</div>
+        <div class="attr-mod">{{CON_mod}}</div>
         <div class="attr-name">CON</div>
       </div>
       <div class="attribute-block">
         <div class="attr-score">{{Intelligence}}</div>
-        <div class="attr-mod">{{modifier INT_mod}}</div>
+        <div class="attr-mod">{{INT_mod}}</div>
         <div class="attr-name">INT</div>
       </div>
       <div class="attribute-block">
         <div class="attr-score">{{Wisdom}}</div>
-        <div class="attr-mod">{{modifier WIS_mod}}</div>
+        <div class="attr-mod">{{WIS_mod}}</div>
         <div class="attr-name">WIS</div>
       </div>
       <div class="attribute-block">
         <div class="attr-score">{{Charisma}}</div>
-        <div class="attr-mod">{{modifier CHA_mod}}</div>
+        <div class="attr-mod">{{CHA_mod}}</div>
         <div class="attr-name">CHA</div>
       </div>
     </div>
@@ -2074,7 +2073,7 @@ export const NARRATIVE_SCHEMA: CharacterSchema = {
       <div class="trait-icon">💪</div>
       <div class="trait-info">
         <div class="trait-name">Physique</div>
-        <div class="trait-value">{{modifier Physique}}</div>
+        <div class="trait-value">{{Physique}}</div>
       </div>
       <div class="trait-desc">Strength & Endurance</div>
     </div>
@@ -2083,7 +2082,7 @@ export const NARRATIVE_SCHEMA: CharacterSchema = {
       <div class="trait-icon">🎯</div>
       <div class="trait-info">
         <div class="trait-name">Finesse</div>
-        <div class="trait-value">{{modifier Finesse}}</div>
+        <div class="trait-value">{{Finesse}}</div>
       </div>
       <div class="trait-desc">Agility & Precision</div>
     </div>
@@ -2092,7 +2091,7 @@ export const NARRATIVE_SCHEMA: CharacterSchema = {
       <div class="trait-icon">🧠</div>
       <div class="trait-info">
         <div class="trait-name">Mind</div>
-        <div class="trait-value">{{modifier Mind}}</div>
+        <div class="trait-value">{{Mind}}</div>
       </div>
       <div class="trait-desc">Intellect & Reasoning</div>
     </div>
@@ -2101,7 +2100,7 @@ export const NARRATIVE_SCHEMA: CharacterSchema = {
       <div class="trait-icon">✨</div>
       <div class="trait-info">
         <div class="trait-name">Spirit</div>
-        <div class="trait-value">{{modifier Spirit}}</div>
+        <div class="trait-value">{{Spirit}}</div>
       </div>
       <div class="trait-desc">Will & Presence</div>
     </div>
