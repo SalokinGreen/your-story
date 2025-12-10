@@ -615,31 +615,34 @@ ${
       });
     }
 
-    // Helper to format a field value
+    // Helper to format a field value with optional description
     const formatField = (
       field: (typeof schema.fields)[0],
       value: unknown
     ): string | null => {
+      const desc = field.description ? ` (${field.description})` : "";
       switch (field.type) {
         case "number": {
-          return `${field.name}: ${value}`;
+          return `${field.name}: ${value}${desc}`;
         }
         case "derived": {
           const numVal = typeof value === "number" ? value : 0;
           const displayVal = numVal >= 0 ? `+${numVal}` : String(numVal);
-          return `${field.name}: ${displayVal}`;
+          return `${field.name}: ${displayVal}${desc}`;
         }
         case "resource":
           if (typeof value === "object" && value && "current" in value) {
             const res = value as { current: number; max: number };
-            return `${field.name}: ${res.current}/${res.max}`;
+            return `${field.name}: ${res.current}/${res.max}${desc}`;
           }
           return null;
         case "boolean":
-          return `${field.name}: ${value ? "Yes" : "No"}`;
+          return `${field.name}: ${value ? "Yes" : "No"}${desc}`;
         case "list":
           if (Array.isArray(value) && value.length > 0) {
-            return `${field.name}:\n${value
+            // For lists, put description before the items
+            const header = `${field.name}${desc}:`;
+            return `${header}\n${value
               .map((item) => {
                 if (typeof item === "object" && item !== null) {
                   // Format object items nicely: use 'name' field if available, else show key-value pairs
@@ -671,7 +674,7 @@ ${
           return null;
         case "select":
         case "text":
-          if (value) return `${field.name}: ${value}`;
+          if (value) return `${field.name}: ${value}${desc}`;
           return null;
         default:
           return null;
@@ -1832,36 +1835,119 @@ export function buildGMStagePrompt({
     const schema = storyData.characterSchema!;
     const charData = storyData.characterData!;
 
-    // Build character data summary for the AI
-    const fieldSummaries: string[] = [];
+    // Build character data summary for the AI - with categories and descriptions
+    // Group fields by category
+    const fieldsByCategory: Record<string, string[]> = {};
+    const uncategorized: string[] = [];
+
+    // Get category order from schema.categories
+    const categoryOrder: Record<string, number> = {};
+    if (schema.categories) {
+      schema.categories.forEach((cat, index) => {
+        categoryOrder[cat.id] = cat.order ?? index;
+      });
+    }
+
+    // Helper to format list items (handles objects properly)
+    const formatListItem = (item: unknown): string => {
+      if (typeof item === "object" && item !== null) {
+        const obj = item as Record<string, unknown>;
+        if (obj.name) {
+          // Show name plus any other relevant fields
+          const extras: string[] = [];
+          if (obj.description) extras.push(String(obj.description));
+          if (obj.quantity && Number(obj.quantity) > 1)
+            extras.push(`x${obj.quantity}`);
+          if (obj.stat) extras.push(`+${obj.stat}`);
+          if (obj.grade && obj.grade !== "common")
+            extras.push(String(obj.grade));
+          return `${obj.name}${extras.length ? ` (${extras.join(", ")})` : ""}`;
+        }
+        // Fallback: show key-value pairs
+        const pairs = Object.entries(obj)
+          .filter(([_, v]) => v !== undefined && v !== null && v !== "")
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ");
+        return pairs;
+      }
+      return String(item);
+    };
+
     for (const field of schema.fields) {
       const value = charData.values[field.id];
       if (value === undefined) continue;
 
+      const desc = field.description ? ` (${field.description})` : "";
+      let formatted: string | null = null;
+
       switch (field.type) {
         case "number":
         case "derived":
-          fieldSummaries.push(`${field.name}: ${value}`);
+          formatted = `${field.name}: ${value}${desc}`;
           break;
         case "resource":
           if (typeof value === "object" && "current" in value) {
-            fieldSummaries.push(`${field.name}: ${value.current}/${value.max}`);
+            formatted = `${field.name}: ${value.current}/${value.max}${desc}`;
           }
           break;
         case "boolean":
-          if (value === true) fieldSummaries.push(`${field.name}: ✓`);
+          if (value === true) formatted = `${field.name}: ✓${desc}`;
           break;
         case "list":
           if (Array.isArray(value) && value.length > 0) {
-            fieldSummaries.push(`${field.name}: ${value.join(", ")}`);
+            const items = value.map(formatListItem).join(", ");
+            formatted = `${field.name}: ${items}${desc}`;
           }
           break;
         case "select":
         case "text":
-          if (value) fieldSummaries.push(`${field.name}: ${value}`);
+          if (value) formatted = `${field.name}: ${value}${desc}`;
           break;
       }
+
+      if (formatted) {
+        if (field.category) {
+          if (!fieldsByCategory[field.category]) {
+            fieldsByCategory[field.category] = [];
+          }
+          fieldsByCategory[field.category].push(formatted);
+        } else {
+          uncategorized.push(formatted);
+        }
+      }
     }
+
+    // Build the character section with category headers
+    const characterParts: string[] = [];
+
+    // Sort categories by order
+    const sortedCategories = Object.keys(fieldsByCategory).sort((a, b) => {
+      const orderA = categoryOrder[a] ?? 999;
+      const orderB = categoryOrder[b] ?? 999;
+      return orderA - orderB;
+    });
+
+    // Add categorized fields with headers
+    for (const categoryId of sortedCategories) {
+      const categoryName =
+        schema.categories?.find((c) => c.id === categoryId)?.name || categoryId;
+      const fields = fieldsByCategory[categoryId];
+      characterParts.push(`### ${categoryName}`);
+      characterParts.push(fields.join("\n"));
+    }
+
+    // Add uncategorized fields at the end
+    if (uncategorized.length > 0) {
+      if (sortedCategories.length > 0) {
+        characterParts.push(`### Other`);
+      }
+      characterParts.push(uncategorized.join("\n"));
+    }
+
+    const characterSummary =
+      characterParts.length > 0
+        ? characterParts.join("\n")
+        : "No character data";
 
     // Build usable variable list for formulas
     const variableList: string[] = [];
@@ -1885,7 +1971,7 @@ ${loreSection ? `\n${loreSection}` : ""}
 ${schema.description || "Custom character sheet system"}
 
 ## CURRENT CHARACTER
-${fieldSummaries.join("\n") || "No character data"}
+${characterSummary}
 
 ## AVAILABLE VARIABLES FOR FORMULAS
 You can use these in dice formulas: ${variableList.join(", ")}
@@ -1984,14 +2070,22 @@ For a ${schema.name} character, typical formulas might be:
     // ============================================
     const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
-    // Build stat list
+    // Build stat list with descriptions
     const statList = (storyData.stats || [])
-      .map((s) => `${s.name}: ${s.value}`)
+      .map(
+        (s) =>
+          `${s.name}: ${s.value}${s.description ? ` (${s.description})` : ""}`
+      )
       .join(", ");
 
-    // Build resource list
+    // Build resource list with descriptions
     const resourceList = (storyData.resources || [])
-      .map((r) => `${r.name}: ${r.value}/${r.maxValue}`)
+      .map(
+        (r) =>
+          `${r.name}: ${r.value}/${r.maxValue}${
+            r.description ? ` (${r.description})` : ""
+          }`
+      )
       .join(", ");
 
     // Build inventory list (only items that could be used in checks)
