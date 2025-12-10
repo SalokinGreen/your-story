@@ -197,7 +197,7 @@ export function buildToolsFewShotMessages(): ChatMessage[] {
     {
       role: "assistant",
       content:
-        "Analyzing the narrative for game state changes:\n1. A memory should be added about the amulet's location\n2. Nazim noticed and is ready to help - relationship improves\n3. Player is in a compromised position - condition needed\n\nCalling tools:",
+        "Analyzing the narrative for game state changes:\n1. A memory should be added about the amulet's location\n2. Nazim noticed and is ready to help - this is a significant moment worth recording\n3. Good progress on the quest\n\nCalling tools:",
       tool_calls: FEW_SHOT_TOOL_CALLS,
     },
     // Tool responses
@@ -1126,12 +1126,12 @@ Lore entries are the adventure's world-building database. Your job is to keep it
 
 **When to UPDATE LORE (\`update_lore\`):**
 - New information is revealed about an entry **that already exists in the Lore section**
-- An NPC's relationship with the player changes significantly
+- An NPC's circumstances or attitude changes significantly
 - Circumstances change (faction alliance shifts, location is destroyed)
 
 **Lore Quality Guidelines:**
 - Lore should be DETAILED (2-4 paragraphs), not just one sentence
-- Include: physical description, personality, motivations, relationships, secrets, relevance to player
+- Include: physical description, personality, motivations, connections, secrets, relevance to player
 - Think of lore as a "GM reference sheet" that will help future story generation
 
 ## THREAD MANAGEMENT
