@@ -3571,26 +3571,42 @@ ${result.description || ""}`;
                       (config.importedCustomTables?.length || 0) +
                       (config.importedVariables?.length || 0) >
                       0 && (
-                      <div className="mt-2 text-xs text-green-400 flex items-center justify-center gap-2">
-                        <span>✓ Imported:</span>
-                        {(config.importedLore?.length || 0) > 0 && (
-                          <span>{config.importedLore?.length} lore</span>
-                        )}
-                        {(config.importedMechanicsNotes?.length || 0) > 0 && (
-                          <span>
-                            {config.importedMechanicsNotes?.length} mechanics
-                          </span>
-                        )}
-                        {(config.importedCustomTables?.length || 0) > 0 && (
-                          <span>
-                            {config.importedCustomTables?.length} tables
-                          </span>
-                        )}
-                        {(config.importedVariables?.length || 0) > 0 && (
-                          <span>
-                            {config.importedVariables?.length} variables
-                          </span>
-                        )}
+                      <div className="mt-2 text-xs text-green-400 flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-2 flex-wrap justify-center">
+                          <span>✓ Imported:</span>
+                          {(config.importedLore?.length || 0) > 0 && (
+                            <span>{config.importedLore?.length} lore</span>
+                          )}
+                          {(config.importedMechanicsNotes?.length || 0) > 0 && (
+                            <span>
+                              {config.importedMechanicsNotes?.length} mechanics
+                            </span>
+                          )}
+                          {(config.importedCustomTables?.length || 0) > 0 && (
+                            <span>
+                              {config.importedCustomTables?.length} tables
+                            </span>
+                          )}
+                          {(config.importedVariables?.length || 0) > 0 && (
+                            <span>
+                              {config.importedVariables?.length} variables
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            updateConfig({
+                              importedLore: [],
+                              importedMechanicsNotes: [],
+                              importedCustomTables: [],
+                              importedVariables: [],
+                            });
+                            addNotification("Cleared all imported content", "success");
+                          }}
+                          className="text-red-400 hover:text-red-300 underline text-xs"
+                        >
+                          Clear imports
+                        </button>
                       </div>
                     )}
                   </div>
