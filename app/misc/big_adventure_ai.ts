@@ -31,6 +31,7 @@ export type ComplexityLevel = "simple" | "moderate" | "complex";
 // Generation stages - content and advanced are split into substages to avoid timeout
 export type GenerationStage =
   | "core"
+  | "mechanics-notes"
   | "mechanics"
   | "character-sheet"
   | "content-lore"
@@ -46,7 +47,12 @@ export type LegacyStage = "core" | "mechanics" | "content" | "advanced";
 // Map substage to its parent legacy stage
 export function getParentStage(stage: GenerationStage): LegacyStage {
   if (stage === "core") return "core";
-  if (stage === "mechanics" || stage === "character-sheet") return "mechanics";
+  if (
+    stage === "mechanics-notes" ||
+    stage === "mechanics" ||
+    stage === "character-sheet"
+  )
+    return "mechanics";
   if (stage.startsWith("content-")) return "content";
   if (stage === "icons") return "advanced"; // Icons stage uses advanced config
   return "advanced";
@@ -547,10 +553,10 @@ export const REGENERATE_SECTIONS: Record<
     stage: "mechanics",
   },
   mechanicsLore: {
-    name: "Mechanics Lore",
+    name: "Game Rules",
     description: "Game rules and mechanics explanations",
-    emoji: "⚙️",
-    stage: "mechanics",
+    emoji: "📖",
+    stage: "mechanics", // Uses mechanics legacy stage for UI grouping
   },
   lore: {
     name: "Notes",
@@ -819,21 +825,42 @@ export function getStageInfo(stage: GenerationStage): {
       number: 1,
       emoji: "📝",
     },
-    mechanics: {
-      name: "Game Mechanics",
-      description: "Stats, skills, and game systems",
+    "mechanics-notes": {
+      name: "Game Rules",
+      description: "Detailed game mechanics documentation",
       detailedDescription:
-        "Defines how the game plays mechanically: what attributes your character has, what resources to manage, special abilities to use, and hidden variables that track story progress.",
+        "Creates comprehensive game rules and mechanics documentation. This includes how skill checks work, combat rules, class descriptions, progression systems, item guidelines, rest mechanics, and encounter design. These rules guide both the player and the AI GM.",
+      generates: [
+        "How Skill Checks Work (dice system)",
+        "Combat Rules (initiative, attacks, damage)",
+        "Classes/Archetypes Overview",
+        "Character Progression & Leveling",
+        "Rest & Recovery mechanics",
+        "Death & Defeat consequences",
+        "NPC & Enemy stat guidelines",
+        "Item system & crafting rules",
+        "Encounter design guidelines",
+      ],
+      instructionHint:
+        "Customize combat complexity, progression speed, unique mechanics, or difficulty scaling",
+      number: 2,
+      emoji: "📖",
+    },
+    mechanics: {
+      name: "Character System",
+      description: "Stats, skills, and character data",
+      detailedDescription:
+        "Defines the character sheet structure: what attributes your character has, what resources to manage, class/archetype options, and hidden variables that track story progress. Uses the rules from the previous stage.",
       generates: [
         "Character stats (Strength, Charisma, etc.)",
         "Resources (Health, Mana, Gold, etc.)",
-        "Abilities & skills with costs/cooldowns",
+        "Class/archetype options",
+        "Skills and abilities",
         "Hidden variables for story tracking",
-        "Mechanics lore entries",
       ],
       instructionHint:
         "Request specific stats, resource types, unique abilities, or special mechanics",
-      number: 2,
+      number: 3,
       emoji: "⚙️",
     },
     "character-sheet": {
@@ -850,7 +877,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "Customize sheet layout, page organization, visual styling, or interactive features",
-      number: 2,
+      number: 3,
       emoji: "📋",
     },
     "content-lore": {
@@ -867,7 +894,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "Focus on NPC depth, faction politics, location atmosphere, or historical events",
-      number: 3,
+      number: 4,
       emoji: "📚",
     },
     "content-achievements": {
@@ -878,7 +905,7 @@ export function getStageInfo(stage: GenerationStage): {
       generates: ["Achievements with rewards", "Main and side quests"],
       instructionHint:
         "Shape quest objectives, achievement triggers, or story pacing",
-      number: 4,
+      number: 5,
       emoji: "🏆",
     },
     "advanced-presets": {
@@ -893,7 +920,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "Shape class archetypes, playstyle variety, or build uniqueness",
-      number: 5,
+      number: 6,
       emoji: "🎭",
     },
     "advanced-tables": {
@@ -908,7 +935,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "Focus on event variety, oracle themes, or encounter balance",
-      number: 6,
+      number: 7,
       emoji: "🎲",
     },
     "advanced-other": {
@@ -1011,6 +1038,258 @@ OUTPUT JSON SCHEMA:
   "player_summary": "string - player character background and description (2-3 paragraphs)",
   "intro": "string - opening narrative text shown at game start (3-5 paragraphs, immersive and atmospheric)",
   "author_notes": "string - private instructions for the AI narrator about tone, themes, dos and don'ts"
+}
+
+Remember: Output ONLY the JSON object, nothing else.`;
+  }
+
+  // MECHANICS NOTES STAGE - Game rules documentation
+  if (stage === "mechanics-notes") {
+    // Get core results for context
+    const title = previousResults?.title || "the adventure";
+    const premise = previousResults?.storyTemplate?.premise || "";
+    const genre = config.genre || "";
+
+    // Get RPG system info - if user specified one, use it; otherwise let AI choose
+    const userSpecifiedSystem = config.rpgSystem;
+    const rpgDescription = userSpecifiedSystem
+      ? RPG_SYSTEM_DESCRIPTIONS[userSpecifiedSystem]
+      : null;
+
+    // DC guidelines for all systems
+    const allDCGuidelines = `
+DICE SYSTEM OPTIONS (choose the most appropriate for the adventure concept):
+
+1d20 (D&D-style) - Best for: heroic fantasy, tactical combat, class-based RPGs
+   DC 5: Trivial | DC 10: Easy | DC 15: Average | DC 20: Hard | DC 25: Very Hard | DC 30+: Legendary
+   Formula example: 1d20+{{modifier}}
+
+3d6 (Bell curve) - Best for: realistic settings, GURPS-style, skill-focused games  
+   DC 6: Trivial | DC 8: Easy | DC 10: Average | DC 13: Hard | DC 16: Very Hard | DC 18+: Impossible
+   Formula example: 3d6+{{modifier}}
+
+2d6 (PbtA-style) - Best for: narrative games, City of Mist, Apocalypse World
+   6-: Failure | 7-9: Partial success | 10-11: Full success | 12+: Critical
+   Formula example: 2d6+{{modifier}} (modifiers typically -2 to +3)
+
+1d100/Percentile - Best for: Call of Cthulhu, horror, investigation-focused games
+   Roll under skill value. Modifiers adjust target number.
+   Formula example: 1d100 vs {{skill}}
+
+4dF (Fate) - Best for: narrative-first games, collaborative storytelling
+   Compare to opposition ladder: Mediocre (+0) to Legendary (+8)
+   Formula example: 4dF+{{skill}}
+
+Year Zero Engine - Best for: survival games, Alien RPG, Forbidden Lands
+   Dice pool (count 6s), push mechanic with stress
+   Formula example: {{attribute}}d6
+
+Explosive Dice - Best for: over-the-top action, Savage Worlds style
+   Dice chain d4→d6→d8→d10→d12, max rolls explode
+   Formula example: 1d{{dieSize}}! (exploding)
+
+Narrative (no dice) - Best for: pure storytelling, journaling games
+   AI determines outcomes based on character abilities and context`;
+
+    const systemGuidance = userSpecifiedSystem
+      ? `DICE SYSTEM: ${rpgDescription}
+Use this system for all mechanics. Design DCs, skills, and abilities accordingly.`
+      : `DICE SYSTEM: Choose the most appropriate system based on the adventure concept.
+Consider the genre, tone, and user's prompt when selecting.
+
+${allDCGuidelines}`;
+
+    return `${basePrompt}
+
+STAGE 2: GAME RULES & MECHANICS DOCUMENTATION
+Create comprehensive game rules for "${title}".
+${genre ? `Genre: ${genre}` : ""}
+${premise ? `Premise: ${premise.substring(0, 300)}...` : ""}
+
+Your task is to write detailed mechanics documentation that will guide both the player AND the AI Game Master.
+These rules will be referenced throughout gameplay, so they must be clear, specific, and tailored to this adventure's setting.
+
+${systemGuidance}
+
+═══════════════════════════════════════════════════════════════
+MECHANICS LORE ENTRIES (Required)
+═══════════════════════════════════════════════════════════════
+
+Create 10-15 detailed lore entries covering these REQUIRED topics:
+
+FOUNDATIONAL SYSTEMS (must define first):
+1. "Character Stats" - What attributes define characters in this setting
+   - List 4-8 core stats with setting-appropriate names (NOT generic STR/DEX/INT)
+   - What each stat represents and when it's used
+   - Starting value ranges (typically 20-60, with 40 being average)
+   - How stats affect dice rolls (modifier = stat value, added to roll)
+   - Example: "Nerve" for courage checks, "Chrome" for tech skills, "Edge" for combat reflexes
+
+2. "Skills System" - How skills work (if applicable)
+   - Are there separate skills, or just stats?
+   - If skills exist: list 10-15 skills with their governing stat
+   - Skill ranks: untrained (-10), novice (+0), competent (+10), expert (+20), master (+30)
+   - When to use skills vs raw stat checks
+   - Example skill list for THIS setting (e.g., "Netrunning (Chrome)", "Street Cred (Edge)")
+
+3. "Resources & Pools" - What expendable resources characters have
+   - Health/HP equivalent: name, starting amount, what depletes it
+   - Energy/Mana equivalent: name, starting amount, what it powers
+   - Any unique resources for this setting (Sanity, Stress, Reputation, Ammo, etc.)
+   - Maximum values and how they scale with progression
+   - What happens at 0 for each resource (death, breakdown, narrative consequences)
+
+4. "Dice Rolling Mechanics" - Detailed explanation of the dice system
+   - Step-by-step: how to resolve a check from start to finish
+   - Formula breakdown: what dice + what modifiers + compared to what
+   - Advantage/Disadvantage system: how bonuses stack, what grants them
+   - Contested rolls: how to handle opposed checks
+   - Group checks: when multiple characters attempt something together
+
+PLAYER-FACING RULES:
+5. "How Skill Checks Work" - Practical guide for players
+   - When the GM calls for a check
+   - Difficulty tiers with examples from THIS setting
+   - What constitutes success, partial success, failure
+   - Critical successes/failures and their effects
+   - How items and abilities modify checks
+
+6. "Combat Rules" - How combat works in this system
+   - Initiative and turn order
+   - Attack rolls and damage calculation
+   - Defense, armor, and taking damage
+   - Conditions (stunned, wounded, etc.) and their effects
+   - Death, defeat, and consequences
+
+7. "Classes/Archetypes Overview" - 4-6 character archetypes for this setting
+   - Each class's theme and playstyle
+   - Primary and secondary stats
+   - Signature abilities and playstyle
+   - Role in a group (combat, support, utility, social)
+   - MUST be unique to THIS setting (not generic fantasy classes)
+
+8. "Character Progression" - How characters grow
+   - How progression points are earned (completing quests, story beats, challenges)
+   - What can be upgraded: stats, skills, abilities, resources
+   - Upgrade point costs and scaling
+   - Milestone achievements and their rewards
+
+9. "Rest & Recovery" - How resources regenerate IN THIS WORLD
+   - MUST be thematically unique to the setting!
+   - Quick rest (30 min): Setting-appropriate recovery method
+   - Short rest (4-8 hours): Sleep/recovery specific to this world
+   - Long rest (days): Extended downtime activities
+   - Examples: cyber-meditation, prayer rituals, alchemical restoration, dream-walking
+
+GM-FACING GUIDELINES (for AI Game Master):
+10. "Creating NPCs & Enemies" - How to stat NPCs/monsters
+    - Typical stat ranges by enemy tier (weak: 20-35, average: 40-55, strong: 60-75, boss: 80+)
+    - HP guidelines (minions: 10-30, regular: 50-100, elite: 150-250, boss: 300+)
+    - How enemy abilities scale with player level
+    - Example stat blocks for 3-4 common enemy types SPECIFIC TO THIS SETTING
+
+11. "Item System Guidelines" - How items work mechanically
+    - Create UNIQUE item categories that fit the setting (not generic fantasy items!)
+    - Item grades: common (+0), uncommon (+1), rare (+2), epic (+3), legendary (+5)
+    - Durability system (items can break on failed checks)
+    - Consumable vs equipment vs story items
+    - How to create balanced custom items
+    - Example items at each tier FOR THIS WORLD
+
+12. "Encounter Design" - How to build balanced encounters
+    - Single enemy vs group tactics
+    - When to use scene challenges vs single skill checks
+    - Environmental hazards specific to this setting
+    - Non-combat resolution options
+
+OPTIONAL ADDITIONAL ENTRIES (add 2-4 more based on setting):
+- Magic/Power System (if applicable) - Spell costs, casting rules, schools of magic
+- Faction Relations - Reputation mechanics, faction standings
+- Economy & Trading - Currency, typical prices, bartering rules
+- Crafting Rules - Materials, recipes, crafting checks
+- Vehicle/Mount Combat - Chase rules, mounted combat modifiers
+- Social Encounter Rules - Persuasion, deception, intimidation mechanics
+- Investigation/Mystery Mechanics - Clue gathering, deduction rules
+
+═══════════════════════════════════════════════════════════════
+CRITICAL REQUIREMENTS
+═══════════════════════════════════════════════════════════════
+
+1. ALL entries MUST have "alwaysOn": true (mechanics are always visible to players)
+2. Each entry should be 2-4 detailed paragraphs with CONCRETE EXAMPLES
+3. Content must be SPECIFIC to this adventure's setting, not generic RPG rules
+4. Include concrete examples using the setting's themes
+5. GM guidelines should help the AI make consistent rulings
+
+═══════════════════════════════════════════════════════════════
+EXAMPLE ENTRIES (for a Cyberpunk setting)
+═══════════════════════════════════════════════════════════════
+
+EXAMPLE "Character Stats" entry:
+"In Night City, six attributes define who you are. EDGE represents combat reflexes, street smarts, and reaction time - used for gunfights, dodging, and quick-draw situations. CHROME measures cybernetic integration and technical aptitude - roll this when hacking, interfacing with tech, or using cyberware. NERVE is raw courage and willpower - test it when facing fear, resisting manipulation, or maintaining composure under fire. COOL covers social grace, intimidation, and negotiation - your face-to-face stat. BODY represents physical strength, endurance, and toughness - for lifting, brawling, and soaking damage. INTEL covers perception, investigation, and reasoning - spot clues, analyze situations, see through lies.
+
+Starting characters have 40 in each stat (human average). Stats range from 20 (impaired) to 60 (exceptional) at character creation, scaling to 80+ with cyberware and progression. Your stat value is your modifier added to dice rolls."
+
+EXAMPLE "Dice Rolling Mechanics" entry:
+"All checks use 3d6 + stat modifier vs a target DC. Roll three six-sided dice, sum them (averaging 10.5), add your relevant stat (typically 30-50), and compare to the difficulty. Success means you roll equal to or higher than the DC.
+
+Step-by-step: 1) GM names the stat and DC based on difficulty, 2) Apply any advantages (+1d6, take best 3) or disadvantages (-1d6, take worst 3), 3) Roll and add stat, 4) Compare to DC. Example: Hacking a security terminal (DC 55) with Chrome 45 means rolling 3d6+45, needing 55+ to succeed.
+
+Advantage sources: appropriate items (+1d6), relevant abilities (+1d6), story circumstances (+1d6). Disadvantage sources: injuries (-1d6), poor conditions (-1d6), missing tools (-1d6). Multiple advantages/disadvantages stack (roll more dice, keep best/worst 3)."
+
+EXAMPLE "Creating NPCs & Enemies" entry:
+"Scale NPC stats to create appropriate challenges. Street punks: 25-35 in combat stats, 20-40 HP. Corporate security: 40-50 stats, 60-80 HP. Elite operatives: 55-65 stats, 100-150 HP. Boss-tier enemies: 70-80 stats, 200-300 HP.
+
+Example stat blocks:
+- STREET THUG: Edge 30, Body 35, HP 30. Armed with a cheap pistol (1d6 damage). Fights dirty, flees when hurt.
+- CORPORATE GUARD: Edge 45, Chrome 40, Body 45, HP 70. Smartgun (+1d6 to attacks), body armor (-3 damage). Professional, calls backup.
+- NETRUNNER ELITE: Chrome 65, Intel 60, HP 50. Neural interface lets them attack through the Net. Fragile but dangerous.
+- CYBORG ENFORCER (Boss): Edge 75, Body 70, Chrome 60, HP 250. Integrated weapons deal 2d6+10 damage. Armor plating reduces damage by 5. Ruthless and relentless."
+
+EXAMPLE "Character Progression" entry:
+"Earn Progression Points (PP) through gameplay: 5 PP for minor story beats, 10 PP for completing a quest, 25 PP for chapter conclusions, 50 PP for major story milestones. Points can be spent between scenes.
+
+Costs scale with power: Raising a stat costs (current value ÷ 10) PP. So going from 40→41 costs 4 PP, while 60→61 costs 6 PP. New abilities cost 10-30 PP based on power. Upgrading resources (max HP, etc.) costs 5 PP per +10.
+
+Example progression path for a Solo: Start with Edge 50, Chrome 40. After first chapter (25 PP): Raise Edge to 55 (24 PP), save 1 PP. After completing 'Data Heist' quest (+10 PP): Buy 'Chrome Reflexes' ability (10 PP) for +1d6 on initiative. After major story event (+50 PP): Raise Chrome to 50 (44 PP), raise Edge to 56 (5 PP), 1 PP saved."
+
+OUTPUT JSON SCHEMA:
+{
+  "mechanicsLore": [
+    {
+      "title": "Character Stats",
+      "content": "string (2-4 paragraphs defining 4-8 stats with setting-appropriate names)",
+      "type": "mechanics",
+      "secret": false,
+      "on": true,
+      "alwaysOn": true
+    },
+    {
+      "title": "Skills System",
+      "content": "string (2-4 paragraphs listing 10-15 skills and how they work)",
+      "type": "mechanics",
+      "secret": false,
+      "on": true,
+      "alwaysOn": true
+    },
+    {
+      "title": "Resources & Pools",
+      "content": "string (2-4 paragraphs defining HP, energy, and unique resources)",
+      "type": "mechanics",
+      "secret": false,
+      "on": true,
+      "alwaysOn": true
+    },
+    {
+      "title": "Dice Rolling Mechanics",
+      "content": "string (2-4 paragraphs explaining the dice system step-by-step)",
+      "type": "mechanics",
+      "secret": false,
+      "on": true,
+      "alwaysOn": true
+    }
+    // ... 10-15 total entries covering all required topics
+  ]
 }
 
 Remember: Output ONLY the JSON object, nothing else.`;
@@ -1136,20 +1415,27 @@ Max rolls explode to next die size`,
 - Failures should create interesting complications, not dead ends`,
     };
 
+    // Get mechanics lore from previous stage for context
+    const mechanicsLore = previousResults?.storyTemplate?.lore || [];
+    const mechanicsContext =
+      mechanicsLore.length > 0
+        ? `\n\nREFERENCE - Game rules from previous stage (DO NOT regenerate these):\n${mechanicsLore
+            .map((l) => `- ${l.title}`)
+            .join("\n")}`
+        : "";
+
     return `${basePrompt}
 
-STAGE 2: CHARACTER SYSTEM & GAME MECHANICS
-Create a complete character system with progression, classes, and game rules.
+STAGE 3: CHARACTER SYSTEM & DATA
+Create a complete character sheet structure based on the game rules established in the previous stage.
+${mechanicsContext}
 
 RPG SYSTEM: ${rpgDescription}
 
 ${userSpecifiedSystem ? dcGuidelines[userSpecifiedSystem] : systemGuidance}
 
-CONTENT GUIDELINES:
-Create an appropriate number of elements for this adventure's scope:
-- Character Sheet Fields: Include core attributes, derived stats, skills, resources, and identity fields
-- Mechanics Lore: Document key game systems (combat, progression, resting, etc.)
-- Variables: Include 3-6 story tracking variables
+IMPORTANT: The game rules have already been created. Your job is to design the CHARACTER SHEET that works with those rules.
+Focus on creating fields (stats, skills, resources) that align with the mechanics documentation.
 
 ═══════════════════════════════════════════════════════════════
 PART 1: CHARACTER SCHEMA
@@ -1178,7 +1464,7 @@ D. RESOURCES:
    Examples: Health, Mana, Stamina, Sanity, Stress, Luck Points
 
 E. CHARACTER IDENTITY:
-   - "select" type for class/archetype (REQUIRED - see Part 2)
+   - "select" type for class/archetype (REQUIRED - based on classes defined in game rules)
    - "text" for character name, backstory
    - "list" for inventory, languages, known spells
    - "boolean" for special traits
@@ -1206,81 +1492,17 @@ Each class should have:
 - Thematic abilities they'd focus on
 - Role in a group (combat, support, utility, social)
 
-Document the classes in mechanicsLore with detailed descriptions.
-
-Example classes by genre:
-- Fantasy: Warrior, Mage, Rogue, Cleric, Ranger, Bard
-- Sci-Fi: Soldier, Hacker, Pilot, Medic, Engineer, Diplomat
-- Horror: Investigator, Occultist, Fighter, Doctor, Academic, Survivor
-- Modern: Operative, Face, Tech, Medic, Wheelman, Fixer
+Base the classes on those described in the game rules (Classes Overview lore entry).
 
 ═══════════════════════════════════════════════════════════════
-PART 3: PROGRESSION SYSTEM
+PART 3: STORY VARIABLES
 ═══════════════════════════════════════════════════════════════
 
-Document in mechanicsLore how characters grow:
-
-A. LEVELING:
-   - How XP is earned (completing objectives, good roleplay, defeating enemies)
-   - XP thresholds per level (or milestone-based advancement)
-   - What happens on level up (stat points, new abilities, health increase)
-
-B. UPGRADE POINTS:
-   - How many points per level
-   - What can be upgraded (stats, skills, resources)
-   - Cost scaling (early upgrades cheap, mastery expensive)
-
-C. ABILITY ACQUISITION:
-   - How new abilities are learned (level requirements, training, discovery)
-   - Ability prerequisites (stat minimums, class restrictions)
-   - Ability upgrade paths (novice → master)
-
-═══════════════════════════════════════════════════════════════
-PART 4: MECHANICS LORE
-═══════════════════════════════════════════════════════════════
-
-Create detailed rules explanations. REQUIRED topics:
-
-1. "How Skill Checks Work" - Explain the dice system, modifiers, DCs
-2. "Combat Rules" - Initiative, attacks, damage, conditions
-3. "Classes Overview" - Each class's strengths, weaknesses, playstyle
-4. "Character Progression" - Leveling, XP, upgrade points
-5. "Rest & Recovery" - How resources regenerate
-6. "Death & Defeat" - What happens when HP hits 0
-
-CRITICAL: ALL mechanics lore entries MUST have "alwaysOn": true!
-Mechanics are rules references that players need access to at all times.
-
-CRITICAL - ALSO CREATE THESE GM GUIDELINES:
-
-7. "Creating NPCs & Enemies" - How to stat NPCs/monsters for this system:
-   - Typical stat ranges (weak enemies: 20-35, average: 40-55, strong: 60-75, boss: 80+)
-   - HP guidelines (minions: 10-30, regular: 50-100, elite: 150-250, boss: 300+)
-   - How enemy damage/abilities scale with player level
-   - Example stat blocks for common enemy types SPECIFIC TO THIS SETTING
-
-8. "Item Guidelines" - How items work mechanically in THIS setting:
-   - Create UNIQUE item types that fit the setting (not generic fantasy items!)
-   - Item grades and their bonuses (common: +0, uncommon: +1, rare: +2, epic: +3, legendary: +5)
-   - Durability system (items can break on failed checks)
-   - Consumable vs equipment vs story items
-   - How to create balanced custom items FOR THIS WORLD
-   - Suggested item rewards per adventure tier with SETTING-SPECIFIC examples
-
-9. "Rest & Recovery" - How resources regenerate IN THIS WORLD:
-   - MUST be unique to the setting (NOT generic "rest at inn" or "healing potion")
-   - Examples: cyber-meditation, prayer to specific gods, alchemical tonics, dream-walking, etc.
-   - Quick rest (30 min): What makes sense for this world?
-   - Short rest (4-8 hours): How does sleep/recovery work here?
-   - Long rest (days): Extended downtime activities specific to the setting
-
-10. "Encounter Design" - How to build balanced encounters:
-   - Single enemy vs group tactics
-   - When to use scene challenges vs single checks
-   - Environmental hazards specific to this setting
-   - Escape/non-combat resolution options
-
-Each entry should be 2-3 detailed paragraphs explaining the mechanic clearly.
+Create 3-6 hidden variables to track story progress:
+- Relationship scores with key NPCs
+- Faction reputation
+- Story progress flags
+- Quest completion counts
 
 STARTING VALUES (Level 1 - START WEAK):
 - Core attributes: Most 20-35, one specialty at 50-60
@@ -1290,9 +1512,7 @@ STARTING VALUES (Level 1 - START WEAK):
 CRITICAL: CREATE UNIQUE, ADVENTURE-SPECIFIC CONTENT!
 - Do NOT use generic fantasy items (no "Leather armor", "Short sword", "Torch")
 - Do NOT use D&D-style classes (no "Warrior/Mage/Rogue" unless it fits the specific setting)
-- Do NOT use generic healing/rest mechanics copied from other systems
 - All items, classes, abilities MUST be thematically specific to THIS adventure's setting
-- Rest & recovery mechanics should be unique to the world (meditation, prayer, alchemy, technology, etc.)
 
 OUTPUT JSON SCHEMA:
 {
@@ -1324,16 +1544,6 @@ OUTPUT JSON SCHEMA:
       "inventory": ["Item appropriate to setting and player background"]
     }
   },
-  "mechanicsLore": [
-    {
-      "title": "string",
-      "content": "string (2-3 detailed paragraphs)",
-      "type": "mechanics",
-      "secret": false,
-      "on": true,
-      "alwaysOn": true
-    }
-  ],
   "variables": [
     { "id": "var_story_id", "name": "Story Variable Name", "type": "number", "value": 1, "minValue": 1, "maxValue": 10 }
   ]
@@ -2501,17 +2711,24 @@ export function parseBigAdventureStageOutput(
       };
     }
 
-    if (stage === "mechanics") {
-      // Merge mechanics lore into main lore array
+    if (stage === "mechanics-notes") {
+      // Mechanics notes stage - just the game rules documentation
       const lore = parsed.mechanicsLore || [];
+      return {
+        storyTemplate: {
+          lore: lore, // Mechanics lore entries go to main lore array
+        },
+      };
+    }
 
+    if (stage === "mechanics") {
+      // Character system stage - no mechanicsLore (comes from mechanics-notes stage)
       return {
         storyTemplate: {
           characterSchema: parsed.characterSchema,
           characterData: parsed.characterData,
           abilities: parsed.abilities,
           variables: parsed.variables,
-          lore: lore, // Mechanics lore entries
         },
       };
     }
@@ -2821,6 +3038,9 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
   }
 
   if (stageConfigs.mechanics?.enabled !== false) {
+    // Mechanics notes stage runs first (game rules documentation)
+    stages.push("mechanics-notes");
+    // Then character system stage (stats, skills, etc.)
     stages.push("mechanics");
     // Character sheet runs after mechanics (needs field definitions)
     stages.push("character-sheet");
@@ -2887,6 +3107,7 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
   // Rough estimates for input tokens per stage
   const inputEstimates: Record<GenerationStage, number> = {
     core: 2000,
+    "mechanics-notes": 3500, // Expanded prompt with foundational systems
     mechanics: 3000,
     "character-sheet": 2500,
     "content-lore": 3500,

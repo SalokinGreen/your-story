@@ -1676,6 +1676,8 @@ export default function AIConfigTab() {
                   setDisplayGMThinking(newValue);
                   if (typeof window !== "undefined") {
                     localStorage.setItem("displayGMThinking", String(newValue));
+                    // Dispatch custom event for same-tab updates
+                    window.dispatchEvent(new Event("displayGMThinkingChanged"));
                   }
                 }}
                 className="sr-only peer"

@@ -79,13 +79,13 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
 
   // Also check for partial matches at the beginning (streaming might have slight variations)
   // Look for the marker that ends the affirmation
-  const storyMarker = "NO meta-text.";
-  const toolsMarker = "step-by-step.";
+  const storyMarker = "Writing the narrative now:";
+  const toolsMarker = "calling all tools in parallel):";
   const choicesMarker = "Generating choices:";
 
   for (const marker of [storyMarker, toolsMarker, choicesMarker]) {
     const markerIndex = trimmedContent.indexOf(marker);
-    if (markerIndex !== -1 && markerIndex < 500) {
+    if (markerIndex !== -1 && markerIndex < 800) {
       // Only strip if marker is near the beginning
       return trimmedContent.slice(markerIndex + marker.length).trimStart();
     }
@@ -692,12 +692,14 @@ export async function generateStoryTurn(
             if (gmExecution.isComplete) {
               isComplete = true;
               // Use the final summary as the primary context for story
+              // Put outcome FIRST so it's most prominent
               if (gmExecution.finalSummary) {
+                // Start with the authoritative outcome
                 allGMContextParts.push(
-                  `[GM Final Summary: ${gmExecution.finalSummary}]`
+                  `[FINAL OUTCOME: ${gmExecution.finalOutcome || "neutral"}]`
                 );
                 allGMContextParts.push(
-                  `[Outcome: ${gmExecution.finalOutcome || "neutral"}]`
+                  `[GAME MASTER Summary: ${gmExecution.finalSummary}]`
                 );
                 if (gmExecution.narrativeHints) {
                   allGMContextParts.push(
@@ -747,24 +749,20 @@ export async function generateStoryTurn(
             );
             continue;
           } else {
-            // No tool calls - AI thought but didn't call tools, prompt it to act
+            // No tool calls - AI only produced thinking text without calling tools
+            // This likely means the AI couldn't determine what to do or the action
+            // doesn't require mechanics. Stop the GM stage here.
             logger.action(
-              "GM stage returned no tool calls, prompting to call tools"
+              "GM stage returned no tool calls - stopping GM stage"
             );
-            // Add thinking content to conversation history
+            // Use the thinking content as context for the story stage
             if (gmResult.content) {
-              conversationHistory.push({
-                role: "assistant",
-                content: gmResult.content,
-              });
+              allGMContextParts.push(
+                `[GAME MASTER]\n${gmResult.content}\n[No mechanical resolution needed]`
+              );
             }
-            // Add a user message prompting tool calls
-            conversationHistory.push({
-              role: "tool",
-              content:
-                "[System] You've analyzed the situation. Now call the appropriate tool(s) to resolve it. Don't just describe what you'll do - actually call the tool functions.",
-            });
-            continue; // Continue loop to let AI call tools
+            isComplete = true;
+            break;
           }
         }
 
@@ -850,7 +848,8 @@ export async function generateStoryTurn(
       customMaxOutput: storyMaxOutput,
       embeddingContext,
       usePrefill: options.usePrefill !== false, // Default to true
-      gmStoryContext: gmStoryContext || undefined, // GM stage context (replaces ActionAnalysis annotations)
+      gmStoryContext: gmStoryContext || undefined, // GM stage tool results and final summary
+      gmThinking: gmThinking.length > 0 ? gmThinking : undefined, // Full GM reasoning chain
     });
 
     // Clear pending player actions after they've been included in the prompt
@@ -902,9 +901,9 @@ export async function generateStoryTurn(
         openRouterKey: options.openRouterKey,
         deepseekKey: options.deepseekKey,
         googleKey: options.googleKey,
-        // Stop the AI before it generates GM state updates (handled by tools stage)
+        // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
         // Also stop on [STOP] marker for player agency stopping points
-        stop: ["[GM State Update]", "[GM State", "[STOP]"],
+        stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],
       };
 
       // Add sampling settings for Coins mode (Mistral/DeepInfra)
@@ -945,7 +944,7 @@ export async function generateStoryTurn(
     let dividerStripped = false; // Track if we've stripped leading dividers
     let rawContent = ""; // Buffer for finding the marker
     let pendingContent = ""; // Buffer for stripping dividers after marker
-    const STORY_MARKER = "Here is the narrative:";
+    const STORY_MARKER = "Writing the narrative now:";
 
     for await (const event of parseSSEStream(storyResponse)) {
       if (event.type === "error") {
@@ -1047,17 +1046,17 @@ export async function generateStoryTurn(
       .replace(/\s*[-*_]{0,3}\s*\[STOP\]?\s*$/i, "")
       .replace(/\s*\[STO?P?\s*$/i, "")
       .replace(/\s*\[S\s*$/i, "")
-      .replace(/\s*\[GM?\s*S?t?a?t?e?\s*$/i, "") // Partial [GM State... from stop sequence
+      .replace(/\s*\[(?:GM|GAME MASTER)?\s*S?t?a?t?e?\s*$/i, "") // Partial [GM State... or [GAME MASTER State... from stop sequence
       .replace(/\s*\[\s*$/i, "") // Lone [ at end (from stop sequence cutting mid-bracket)
       .replace(/\s*[-*]{3}\s*\[\s*$/i, "") // ---[ or ***[
       .replace(/\s*[-*]{3}\s*$/i, "") // trailing --- or ***
       .trimEnd();
 
     // Strip trailing meta-blocks that start with dividers (---, ***) followed by bracketed content
-    // Patterns like: "--- [GM State Update] ..." or "--- *[STOP – Player must choose...]*"
+    // Patterns like: "--- [GAME MASTER State Update] ..." or "--- *[STOP – Player must choose...]*"
     storyContent = storyContent
       .replace(
-        /\n*[-*_]{3,}\s*\*?\[(?:GM State Update|STOP)[^\]]*\][\s\S]*$/i,
+        /\n*[-*_]{3,}\s*\*?\[(?:(?:GM|GAME MASTER) State Update|STOP)[^\]]*\][\s\S]*$/i,
         ""
       )
       .trimEnd();
@@ -1076,11 +1075,11 @@ export async function generateStoryTurn(
     }
     storyContent = storyContent.trimEnd();
 
-    // Strip [GM State Update] blocks that the model might echo from history
+    // Strip [GAME MASTER State Update] blocks that the model might echo from history
     // These blocks contain bullet-pointed stat changes like "• Health: 95 → 85/100 (-10)"
     // Match the header and all following lines that are bullet points or indented content
     storyContent = storyContent
-      .replace(/\n*\[GM State Update\]\n(?:• [^\n]+\n?)*/gi, "")
+      .replace(/\n*\[(?:GM|GAME MASTER) State Update\]\n(?:• [^\n]+\n?)*/gi, "")
       .trim();
 
     // Also strip if there's no header but just the bullet-style state changes at the end

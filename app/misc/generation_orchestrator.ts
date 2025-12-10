@@ -28,7 +28,11 @@ const HEARTBEAT_TIMEOUT_MS = 90000; // If no heartbeat for 90 seconds, assume ti
 const MAX_RETRY_ATTEMPTS = 1; // On timeout, get 1 retry that asks AI to finish JSON immediately
 
 // Stages that must run sequentially (core and mechanics are required by later stages)
-const SEQUENTIAL_STAGES: GenerationStage[] = ["core", "mechanics"];
+const SEQUENTIAL_STAGES: GenerationStage[] = [
+  "core",
+  "mechanics-notes",
+  "mechanics",
+];
 
 // Stages that can run in parallel (only depend on core + mechanics, not each other)
 const PARALLELIZABLE_STAGES: GenerationStage[] = [

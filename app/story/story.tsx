@@ -357,11 +357,36 @@ export default function Story({
     gmThinking.length > 0 || gmToolCalls.length > 0 || gmStoryContext;
 
   // Check if user wants to display GM thinking (from settings)
-  const displayGMThinkingEnabled = React.useMemo(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("displayGMThinking") === "true";
-    }
-    return false;
+  // Use useState + useEffect to properly handle SSR and localStorage updates
+  const [displayGMThinkingEnabled, setDisplayGMThinkingEnabled] =
+    React.useState(false);
+
+  React.useEffect(() => {
+    // Read initial value from localStorage
+    const stored = localStorage.getItem("displayGMThinking") === "true";
+    setDisplayGMThinkingEnabled(stored);
+
+    // Listen for storage changes (from other tabs or same-tab updates)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "displayGMThinking") {
+        setDisplayGMThinkingEnabled(e.newValue === "true");
+      }
+    };
+
+    // Also listen for custom event for same-tab updates
+    const handleCustomEvent = () => {
+      setDisplayGMThinkingEnabled(
+        localStorage.getItem("displayGMThinking") === "true"
+      );
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("displayGMThinkingChanged", handleCustomEvent);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("displayGMThinkingChanged", handleCustomEvent);
+    };
   }, []);
 
   // State for GM thinking collapsible

@@ -2379,7 +2379,7 @@ function executeRequestContinuation(
   params: RequestContinuationParams
 ): GMToolResult {
   // Build context string
-  let contextForStory = `[GM Continuation Requested]`;
+  let contextForStory = `[GAME MASTER Continuation Requested]`;
   contextForStory += `\n[Reason: ${params.reason}]`;
   contextForStory += `\n[Context: ${params.context}]`;
   if (params.next_action) {
@@ -2410,7 +2410,7 @@ function executeAskPlayer(
   const allowCustom = params.allow_custom !== false; // Default to true
 
   // Build context string (will be shown to player)
-  let contextForStory = `[GM Question for Player]`;
+  let contextForStory = `[GAME MASTER Question for Player]`;
   contextForStory += `\n[Question: ${params.question}]`;
   contextForStory += `\n[Context: ${params.context}]`;
   if (params.options && params.options.length > 0) {
@@ -2443,7 +2443,7 @@ function executeEndGmThinking(
   params: RespondToPlayerParams
 ): GMToolResult {
   // Build the final context for story stage
-  let contextForStory = `[GM Summary: ${params.summary}]`;
+  let contextForStory = `[GAME MASTER Summary: ${params.summary}]`;
   contextForStory += `\n[Outcome: ${params.outcome}]`;
   if (params.narrative_hints) {
     contextForStory += `\n[Narrative Hints: ${params.narrative_hints}]`;

@@ -1584,7 +1584,29 @@ function BigAdventureCreatorPage() {
 
   // Update config
   const updateConfig = useCallback((updates: Partial<BigAdventureConfig>) => {
-    setConfig((prev) => ({ ...prev, ...updates }));
+    setConfig((prev) => {
+      const newConfig = { ...prev, ...updates };
+
+      // When maxOutputTokens changes, also update all per-stage configs
+      // This ensures the global slider affects actual generation
+      if (updates.maxOutputTokens !== undefined && prev.stageConfigs) {
+        const newTokens = updates.maxOutputTokens;
+        newConfig.stageConfigs = {
+          core: { ...prev.stageConfigs.core, maxOutputTokens: newTokens },
+          mechanics: {
+            ...prev.stageConfigs.mechanics,
+            maxOutputTokens: newTokens,
+          },
+          content: { ...prev.stageConfigs.content, maxOutputTokens: newTokens },
+          advanced: {
+            ...prev.stageConfigs.advanced,
+            maxOutputTokens: newTokens,
+          },
+        };
+      }
+
+      return newConfig;
+    });
   }, []);
 
   // Clamp max output tokens when model changes

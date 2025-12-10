@@ -25,14 +25,16 @@ export type ChatMessage = {
 // These "fake" assistant messages prime the model to follow output constraints
 // by making it appear the model has already committed to the rules.
 
-export const STORY_AFFIRMATION = `Understood. I will write the narrative response adhering to these standards:
-- **[PLAYER] action:** I will narrate EXACTLY what the player chose to do. No substitutions.
-- **[GM TOOLS] outcomes:** I will honor ALL skill check results. [Outcome: success] = SUCCESS. [Outcome: failure] = FAILURE. I will NOT contradict the dice.
-- **Narrative freedom:** I have creative liberty ONLY in HOW I describe things - sensory details, NPC reactions, environmental flavor.
-- **Perspective:** Strict Second Person ("You"), deep POV.
-- **Style:** "Show, Don't Tell" with visceral sensory details; NO banned words.
+export const STORY_AFFIRMATION = `Understood. I am the NARRATOR. The GAME MASTER has already resolved the mechanics.
 
-Here is the narrative:
+**My contract:**
+1. **[PLAYER] action** → I narrate EXACTLY what they chose. No substitutions.
+2. **[GAME MASTER] outcome** → The dice have spoken. I describe the result, not change it.
+   - [Outcome: success] = Player SUCCEEDS. I show their triumph.
+   - [Outcome: failure] = Player FAILS. I show meaningful consequences.
+3. **My freedom** → HOW I describe it: sensory details, NPC reactions, pacing, flavor.
+
+Writing the narrative now:
 `;
 
 export const TOOLS_AFFIRMATION = `Understood. I will audit the narrative for game state changes:
@@ -66,24 +68,24 @@ A cunning merchant navigates a dangerous bazaar.
 - Perception: Fair (+1)
 - Gold: 50/100`;
 
-// GM reasoning examples for the new workflow
-const FEW_SHOT_GM_REASONING_1 = `[GM]
+// GAME MASTER reasoning examples for the new workflow
+const FEW_SHOT_GM_REASONING_1 = `[GAME MASTER]
 The player wants to check the merchant's stall for the stolen amulet.
 This is a perception-based search action in a crowded marketplace.
 Looking at stats: Perception is Fair (+1), which is decent.
 The amulet is hidden but not expertly concealed - I'll set difficulty to "average".
 
-[GM]
+[GAME MASTER]
 Rolling Perception check... Result: +3 vs DC +0 = SUCCESS
 The player spots the amulet. Now I need to decide what complications exist.
 The merchant should be suspicious, and there should be other threats nearby.`;
 
-const FEW_SHOT_GM_TOOLS_1 = `[GM TOOLS]
+const FEW_SHOT_GM_TOOLS_1 = `[GAME MASTER]
 [Perception Check: 1d6+1d6+1d6 → 12 + 1 (stat) = 13 vs DC 10 (average) → SUCCESS (margin: +3)]
 [Reason: Search for the stolen amulet]
 [Stakes: low]
 
-[GM Summary: Perception check succeeded. The player spots the hidden amulet but the merchant is watching and there are suspicious figures nearby.]
+[Summary: Perception check succeeded. The player spots the hidden amulet but the merchant is watching and there are suspicious figures nearby.]
 [Outcome: success]
 [Narrative Hints: The player notices something minor but potentially useful in their lair, such as a hidden compartment, a misplaced tool, or a clue related to their current situation.]`;
 
@@ -112,23 +114,23 @@ Behind you, the crowd's murmur shifts. Two men in dark robes have stopped at the
   ],
 };
 
-const FEW_SHOT_GM_REASONING_2 = `[GM]
+const FEW_SHOT_GM_REASONING_2 = `[GAME MASTER]
 The player wants to distract the merchant and grab the amulet.
 This requires Persuasion to create a distraction, then Sleight of Hand to grab it.
 The merchant is already suspicious, so this will be harder.
 Persuasion is listed at Fair (+1). I'll make this a "hard" check due to the tension.
 
-[GM]
+[GAME MASTER]
 Rolling Persuasion check... Result: -1 vs DC +2 = FAILURE
 The distraction fails. The merchant catches on immediately.
 This should escalate the situation - the merchant grabs the player, threatening to call guards.`;
 
-const FEW_SHOT_GM_TOOLS_2 = `[GM TOOLS]
+const FEW_SHOT_GM_TOOLS_2 = `[GAME MASTER]
 [Persuasion Check: 1d6+1d6+1d6 → 7 + 1 (stat) = 8 vs DC 14 (hard) → FAILURE (margin: -6)]
 [Reason: Distract the merchant]
 [Stakes: medium]
 
-[GM Summary: Persuasion check failed. The merchant caught on and grabbed the player's wrist. This is a tense standoff with armed figures approaching.]
+[Summary: Persuasion check failed. The merchant caught on and grabbed the player's wrist. This is a tense standoff with armed figures approaching.]
 [Outcome: failure]
 [Narrative Hints: The distraction backfires spectacularly - the merchant was already suspicious and this confirms his fears.]`;
 
@@ -201,27 +203,27 @@ const FEW_SHOT_TOOL_RESPONSES = [
 
 /**
  * Build few-shot example messages for the story stage
- * Shows the workflow: [PLAYER] action + [GM] reasoning → story that honors both
+ * Shows the workflow: [PLAYER] action + [GAME MASTER] reasoning → story that honors both
  */
 export function buildStoryFewShotMessages(): ChatMessage[] {
   return [
     // Example info message
     { role: "user", content: FEW_SHOT_INFO_MESSAGE },
-    // First turn - user choice with GM context appended
+    // First turn - user choice with GAME MASTER context appended
     { role: "user", content: FEW_SHOT_STORY_EXAMPLE_1.userWithContext },
     { role: "assistant", content: FEW_SHOT_STORY_EXAMPLE_1.assistant },
     {
       role: "assistant",
-      content: `[GM State Update]\n${FEW_SHOT_STORY_EXAMPLE_1.stateChanges
+      content: `[GAME MASTER State Update]\n${FEW_SHOT_STORY_EXAMPLE_1.stateChanges
         .map((s) => `• ${s}`)
         .join("\n")}`,
     },
-    // Second turn - user choice with GM context appended
+    // Second turn - user choice with GAME MASTER context appended
     { role: "user", content: FEW_SHOT_STORY_EXAMPLE_2.userWithContext },
     { role: "assistant", content: FEW_SHOT_STORY_EXAMPLE_2.assistant },
     {
       role: "assistant",
-      content: `[GM State Update]\n${FEW_SHOT_STORY_EXAMPLE_2.stateChanges
+      content: `[GAME MASTER State Update]\n${FEW_SHOT_STORY_EXAMPLE_2.stateChanges
         .map((s) => `• ${s}`)
         .join("\n")}`,
     },
@@ -843,6 +845,7 @@ export function buildStoryPrompt({
   embeddingContext,
   usePrefill = true,
   gmStoryContext,
+  gmThinking,
 }: {
   storyData: StoryData;
   userChoice?: string;
@@ -852,7 +855,8 @@ export function buildStoryPrompt({
   customMaxOutput?: number;
   embeddingContext?: EmbeddingContext;
   usePrefill?: boolean;
-  gmStoryContext?: string; // Context from GM stage (replaces ActionAnalysis annotations)
+  gmStoryContext?: string; // Context from GM stage (tool results, final summary)
+  gmThinking?: string[]; // Full GM reasoning chain of thought
 }): { messages: ChatMessage[]; prunedParts: number } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
@@ -877,67 +881,74 @@ export function buildStoryPrompt({
   const storyBudget = Math.floor(maxContextTokens * 0.75);
   const infoBudget = Math.floor(maxContextTokens * 0.25);
 
-  const systemPrompt = `You are a creative narrative engine for a high-fidelity interactive text adventure.
-Your role is to write ONLY the story prose.
-The Input will provide the "Action Result" (Success/Failure). You describe the outcome.
+  const systemPrompt = `You are the NARRATOR for an interactive story. You write immersive prose.
+The GAME MASTER handles all mechanics - skill checks, dice rolls, success/failure. That's already done.
+Your job: Transform the GAME MASTER's decisions into vivid narrative.
 
-## 1. CORE WRITING PRINCIPLES
-- **Show, Don't Tell:** Ground abstract concepts in concrete sensory details (lighting, texture, smell, sound).
-    - *Bad:* "You feel afraid."
-    - *Good:* "The hair on your arms stands up; the air tastes of milk and copper."
-- **Deep POV:** Write in strict SECOND PERSON ("You"). Immersive and immediate.
-- **Word Choice:** Use precise verbs. Avoid generic words.
-    - *Banned Words:* Testament, tapestry, dance of death, shivers down spine, smirked, ozone, white knuckles.
-    - *Structure:* Vary sentence length. Short sentences for action. Complex flow for atmosphere.
-    - Mix short, punchy sentences with longer, descriptive ones. Drop fill words to add variety.
-    - Use precise words. Avoid adverbs, cliches and overused/commonly used phrases.
+═══════════════════════════════════════════════════════════════
+SECTION 1: THE CONTRACT (NON-NEGOTIABLE)
+═══════════════════════════════════════════════════════════════
 
-## 2. HONORING [PLAYER] AND [GM TOOLS] (ABSOLUTELY NON-NEGOTIABLE)
-**CRITICAL: The [GM TOOLS] section in the user message contains ALREADY-RESOLVED skill checks. You MUST honor these results.**
+**[PLAYER] = What the player chose to do**
+- Narrate EXACTLY that action. No substitutions, no "better ideas."
+- If [PLAYER] says "I punch him" → you write about punching. Not kicking. Not talking.
 
-- **[PLAYER] actions are SACRED:** When you see [PLAYER], narrate EXACTLY that action. No substitutions, no "better ideas."
-    - If [PLAYER] says "I punch him" → you write about punching. Not kicking. Not talking. Punching.
-- **[GM TOOLS] outcomes are BINDING:**
-    - **[Outcome: success]** → The player SUCCEEDS. Describe their success vividly. They achieve their goal.
-    - **[Outcome: failure]** → The player FAILS. Describe the failure with consequences.
-    - **NEVER contradict the outcome.** If [Outcome: success], do NOT write a scene where they fail or get caught.
-    - The roll already happened. The dice already decided. Your job is to DESCRIBE that result, not change it.
-- **Your creative freedom:** You decide HOW to describe things - sensory details, NPC dialogue, environmental flavor, dramatic pacing.
-    - *Good:* [Outcome: success] → you describe a masterful execution with visceral detail
-    - *Bad:* [Outcome: success] → you ignore it and write a scene where the player fails anyway
-- **Stop Early:** When you reach a moment where the player must react, decide, or speak, end with [STOP].
-    - *Crucial:* Do not resolve the suspense. Do not write what the player does next.
+**[GAME MASTER] = The authoritative ruling**
+- The GAME MASTER already rolled dice and determined the outcome.
+- Look for: [Outcome: success] or [Outcome: failure]
+- **[Outcome: success]** → The player SUCCEEDS. Show their triumph.
+- **[Outcome: failure]** → The player FAILS. Show meaningful consequences.
+- **NEVER contradict the outcome.** The dice have spoken. You describe the result.
 
-## 3. THE ACTIVE WORLD (The World Breathes)
-- **NPC Agency:** NPCs have agendas. They do not just wait for the player to speak. They interrupt, they leave, they pursue goals.
-- **Environment:** The world moves. Weather changes, crowds murmur, distant sounds occur.
-- **No "Nothingburgers":** Avoid paragraphs that just restate the situation. Every response must ADVANCE the story (new info, world change, or dramatic development).
+**Your creative freedom:**
+- HOW you describe it: sensory details, NPC reactions, pacing, dramatic flair
+- You do NOT decide IF something succeeds - only HOW the success/failure looks
 
-## 4. MECHANICS TRANSLATION
-- **Success:** Show the competence and full impact of the action.
-- **Failure (Fail Forward):** NEVER write "Nothing happens."
-    - *Yes, but...* You succeed, but at a cost (injury, lost item, noise).
-    - *No, and...* You fail, and the situation gets worse (guard alerted, weapon dropped).
-- **Hidden Text:** Use ||double pipes|| for DM notes, foreshadowing, or secret NPC motives. The user can't see this text.
+═══════════════════════════════════════════════════════════════
+SECTION 2: WRITING CRAFT
+═══════════════════════════════════════════════════════════════
 
-## 5. PACING & TONE
-- **Combat/Action:** Fast, punchy, visceral. Focus on impact and movement.
-- **Exploration:** Slower, atmospheric. Focus on sensory details and clues.
-- **Dialogue:** Give NPCs distinct voices/mannerisms. Use subtext.
+**Perspective:** Second person ("You"), deep POV, immediate and immersive.
 
-## 6. RPG SYSTEM
+**Show, Don't Tell:**
+- BAD: "You feel afraid."
+- GOOD: "The hair on your arms stands up; the air tastes of copper."
+
+**Word Choice:**
+- Use precise verbs. Vary sentence length.
+- Banned: testament, tapestry, dance of death, shivers down spine, smirked, ozone, white knuckles
+- Avoid adverbs, clichés, and overused phrases.
+
+**Failure = Fail Forward:**
+- NEVER write "Nothing happens" on a failure.
+- "Yes, but..." → Success at a cost (injury, noise, lost item)
+- "No, and..." → Failure that escalates (guard alerted, weapon dropped, situation worsens)
+
+═══════════════════════════════════════════════════════════════
+SECTION 3: THE LIVING WORLD
+═══════════════════════════════════════════════════════════════
+
+**NPCs have agency.** They don't wait for the player. They interrupt, pursue goals, react.
+**Environment moves.** Weather changes, crowds murmur, time passes.
+**Every beat advances the story.** New information, world change, or dramatic development.
+
+═══════════════════════════════════════════════════════════════
+SECTION 4: OUTPUT FORMAT
+═══════════════════════════════════════════════════════════════
+
+- **Markdown:** *italics* for thoughts/whispers, **bold** for impact, --- for scene breaks
+- **No headers** (## or #) in prose - save for major scene changes only
+- **No meta-text:** No "Scene:", "Chapter:", "Progress 2/3"
+- **No mechanical echoes:** Don't repeat the dice roll or skill check - the player already saw it
+- **Hidden text:** Use ||double pipes|| for DM notes the player can't see
+- **[STOP]** End when the player must react, decide, or speak. Don't resolve the suspense.
+
+═══════════════════════════════════════════════════════════════
+SECTION 5: RPG SYSTEM REFERENCE
+═══════════════════════════════════════════════════════════════
 ${rpgSystem.aiInstructions.diceSystem}
 
-## 7. OUTPUT FORMAT
-- **Markdown:** Use markdown sparingly for emphasis:
-    - **Emphasis:** Use *italics* for internal thoughts, sounds, or whispers. Use **bold** for impactful moments.
-    - **Breaks:** Use --- for dramatic pauses or perspective shifts within a scene.
-    - **No Headers:** Do NOT use ## headers in your prose - save them for major scene changes only (rare).
-- **No Meta-Text:** Do NOT write progress indicators, mechanical echoes, or UI labels like "Scene:", "Chapter:", "Progress 2/3".
-- **No Mechanical Summaries:** Do NOT echo back the skill check results, item usage, or resource costs. Those are INPUT context - the player already saw the dice roll.
-- **Stop Marker:** End your response with [STOP] when the player needs to react, decide, or speak next.
-
-WRITE THE NARRATIVE RESPONSE ONLY!`;
+NOW WRITE THE NARRATIVE.`;
 
   const infoMessage = buildInfoMessage(storyData, embeddingContext);
   const cleanedSystemPrompt = cleanString(systemPrompt);
@@ -988,29 +999,32 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
       ? assistantIndices[assistantIndices.length - 5]
       : 0;
 
-  // Helper to format GM reasoning from a scene part
+  // Helper to format GAME MASTER reasoning from a scene part
   const formatGMReasoning = (
     part: (typeof storyData.scene.parts)[0]
   ): string => {
     const sections: string[] = [];
 
-    // Add GM thinking (the [GM] reasoning text)
-    // The AI response may already include [GM] tags, so don't double-add
+    // Add GAME MASTER thinking (the [GAME MASTER] reasoning text)
+    // The AI response may already include [GAME MASTER] tags, so don't double-add
     if (part.gmThinking && part.gmThinking.length > 0) {
       sections.push(
         part.gmThinking
           .map((t) => {
             const trimmed = t.trim();
-            // Only add [GM] prefix if the thinking doesn't already start with it
-            return trimmed.startsWith("[GM]") ? trimmed : `[GM]\n${trimmed}`;
+            // Only add [GAME MASTER] prefix if the thinking doesn't already start with it
+            return trimmed.startsWith("[GAME MASTER]") ||
+              trimmed.startsWith("[GM]")
+              ? trimmed.replace(/^\[GM\]/, "[GAME MASTER]")
+              : `[GAME MASTER]\n${trimmed}`;
           })
           .join("\n\n")
       );
     }
 
-    // Add GM tool calls and results summary with [GM TOOLS] prefix
+    // Add GAME MASTER tool calls and results summary
     if (part.gmStoryContext) {
-      sections.push(`[GM TOOLS]\n${part.gmStoryContext}`);
+      sections.push(`[GAME MASTER]\n${part.gmStoryContext}`);
     }
 
     return sections.join("\n\n");
@@ -1050,11 +1064,11 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
         content: cleanString(assistantContent),
       });
 
-      // If this assistant part had state changes from tools, include them as a GM note
+      // If this assistant part had state changes from tools, include them as a GAME MASTER note
       // We use stateChanges (human-readable) rather than raw tool_calls to avoid confusing
       // the story AI with tool schemas it doesn't have access to
       if (part.stateChanges && part.stateChanges.length > 0) {
-        const gmNote = `[GM State Update]\n${part.stateChanges
+        const gmNote = `[GAME MASTER State Update]\n${part.stateChanges
           .map((s) => `• ${s}`)
           .join("\n")}`;
         historyMessages.push({
@@ -1067,7 +1081,9 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
 
   // Add user choice to history if present
   if (userChoice) {
-    let choiceMessage = `[PLAYER] ${userChoice}`;
+    // Build the user message with the player action and full GAME MASTER reasoning
+    // This matches the format used for older turns (from formatGMReasoning)
+    let choiceMessage = "";
 
     // Include pending player actions (level ups, skill tree purchases, etc.)
     if (
@@ -1077,26 +1093,44 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
       const actionsNote = `[Player Actions Between Turns]\n${storyData.pendingPlayerActions
         .map((a) => `• ${a}`)
         .join("\n")}`;
-      choiceMessage = `${actionsNote}\n\n${choiceMessage}`;
+      choiceMessage = `${actionsNote}\n\n`;
     }
 
-    // Append current turn's GM reasoning to user message
-    // This provides context for what the story should honor
-    // The [GM TOOLS] header is critical - it signals to the story stage
-    // that these are authoritative results that MUST be honored
-    if (gmStoryContext) {
-      // Ensure the GM context has the [GM TOOLS] header for clarity
-      const formattedGMContext = gmStoryContext.startsWith("[GM")
-        ? gmStoryContext
-        : `[GM TOOLS]\n${gmStoryContext}`;
-      choiceMessage = `${choiceMessage}\n\n${formattedGMContext}`;
-      console.log(
-        `[buildStoryPrompt] Appending GM context to user message: ${formattedGMContext.slice(
-          0,
-          200
-        )}...`
-      );
+    // Player's action with [PLAYER] tag (matches older turn format)
+    choiceMessage += `[PLAYER] ${userChoice}`;
+
+    // Append full GAME MASTER reasoning chain (the thinking/chain of thought)
+    // This is crucial - the story stage needs to see the full reasoning to understand context
+    if (gmThinking && gmThinking.length > 0) {
+      const formattedThinking = gmThinking
+        .map((t) => {
+          const trimmed = t.trim();
+          // Only add [GAME MASTER] prefix if not already present
+          return trimmed.startsWith("[GAME MASTER]") ||
+            trimmed.startsWith("[GM]")
+            ? trimmed.replace(/^\[GM\]/, "[GAME MASTER]")
+            : `[GAME MASTER]\n${trimmed}`;
+        })
+        .join("\n\n");
+      choiceMessage += `\n\n${formattedThinking}`;
     }
+
+    // Append tool results and final summary from gmStoryContext
+    if (gmStoryContext) {
+      // Ensure it has the [GAME MASTER] header
+      const formattedContext = gmStoryContext.startsWith("[GAME MASTER]")
+        ? gmStoryContext
+        : gmStoryContext.startsWith("[GM")
+        ? gmStoryContext.replace(/^\[GM[^\]]*\]/, "[GAME MASTER]")
+        : `[GAME MASTER]\n${gmStoryContext}`;
+      choiceMessage += `\n\n${formattedContext}`;
+    }
+
+    console.log(
+      `[buildStoryPrompt] User message with GM context - Thinking blocks: ${
+        gmThinking?.length || 0
+      }, StoryContext: ${gmStoryContext?.length || 0} chars`
+    );
 
     historyMessages.push({
       role: "user",
@@ -1871,10 +1905,10 @@ Analyze this action and return the JSON object.`;
 }
 
 // ============================================
-// GM STAGE PROMPT BUILDER
+// GAME MASTER STAGE PROMPT BUILDER
 // ============================================
 
-export const GM_STAGE_AFFIRMATION = `[GM]
+export const GM_STAGE_AFFIRMATION = `[GAME MASTER]
 Let me carefully analyze this action and READ THE MECHANICS NOTES before deciding anything.
 
 **Step 1: What does the GAME RULES section say?**
@@ -1917,12 +1951,12 @@ const GM_FEW_SHOT_USER = `## PLAYER'S ACTION
 
 **INSTRUCTIONS:**
 1. First, check the GAME RULES section - is this roll-under or roll-over?
-2. Write [GM] reasoning: What skill? What's the target? reverse_dc needed?
+2. Write [GAME MASTER] reasoning: What skill? What's the target? reverse_dc needed?
 3. **Call the tool(s)** with correct parameters
 
 You MUST call at least one tool function in this response.`;
 
-const GM_FEW_SHOT_ASSISTANT_THINKING = `[GM]
+const GM_FEW_SHOT_ASSISTANT_THINKING = `[GAME MASTER]
 Let me READ THE MECHANICS NOTES carefully.
 
 **Step 1: What does the GAME RULES section say?**
@@ -1962,12 +1996,12 @@ const GM_FEW_SHOT_TOOL_CALL = {
   },
 };
 
-const GM_FEW_SHOT_TOOL_RESPONSE = `[GM TOOLS]
+const GM_FEW_SHOT_TOOL_RESPONSE = `[GAME MASTER]
 ✓ formula_roll: 1d100 → [42] = 42 vs DC 65 (roll-under) → SUCCESS (margin: 23)
 [Reason: Hack security terminal to disable cameras]
 [Stakes: medium]`;
 
-const GM_FEW_SHOT_ASSISTANT_FINAL = `[GM]
+const GM_FEW_SHOT_ASSISTANT_FINAL = `[GAME MASTER]
 The hack succeeded with a roll of 42 vs target 65 (Tech 60% + 5% high stat bonus). Good margin of 23.
 The player gains access to the camera system. I should note this opens up infiltration options.
 
@@ -2197,7 +2231,7 @@ You THINK OUT LOUD like a tabletop GM, reasoning through each situation before a
 
 ## HOW THIS WORKS
 
-1. **[GM] Think deeply about the situation:**
+1. **[GAME MASTER] Think deeply about the situation:**
    - What is the player actually trying to accomplish?
    - What obstacles or risks exist?
    - What does success look like? What about failure?
@@ -2298,10 +2332,10 @@ You can use these in dice formulas: ${variableList.join(", ")}
 
 ---
 
-## EXAMPLE GM TURN
+## EXAMPLE GAME MASTER TURN
 
 \`\`\`
-[GM]
+[GAME MASTER]
 The player wants to attack the goblin with their sword. This is combat, so I need:
 1. Attack roll to see if they hit
 2. Damage roll if they do
@@ -2314,7 +2348,7 @@ Damage is 1d8+3 for the longsword.
 *Calls: formula_roll("1d20+{{STR_mod}}+{{proficiency}}", dc=14, reason="Attack goblin"), roll_dice("1d8+{{STR_mod}}", reason="Longsword damage")*
 
 \`\`\`
-[GM]
+[GAME MASTER]
 Attack: 18 vs DC 14 = HIT!
 Damage: 7
 
@@ -2488,7 +2522,7 @@ You THINK OUT LOUD like a tabletop GM, reasoning through each situation before a
 
 ## HOW THIS WORKS
 
-1. **[GM] Think deeply about the situation:**
+1. **[GAME MASTER] Think deeply about the situation:**
    - What is the player actually trying to accomplish?
    - What obstacles or risks exist?
    - What does success look like? What about failure?
@@ -2592,10 +2626,10 @@ ${rpgSystem.aiInstructions.dcGuidelines}
 
 ---
 
-## EXAMPLE GM TURN
+## EXAMPLE GAME MASTER TURN
 
 \`\`\`
-[GM]
+[GAME MASTER]
 The player wants to pick the lock. This requires a skill check.
 Looking at stats, they have Dexterity: 65. The lock is average difficulty.
 \`\`\`
@@ -2603,7 +2637,7 @@ Looking at stats, they have Dexterity: 65. The lock is average difficulty.
 *Calls: skill_check(stat="Dexterity", difficulty="average", reason="Pick the lock")*
 
 \`\`\`
-[GM]
+[GAME MASTER]
 Roll: 42 vs DC 50 = SUCCESS!
 The lock clicks open. No complications.
 \`\`\`
@@ -2737,7 +2771,7 @@ The lock clicks open. No complications.
   messages.push({
     role: "tool",
     content:
-      "[GM TOOLS]\n✓ end_gm_thinking: GM stage complete. Handing off to story stage.",
+      "[GAME MASTER]\n✓ end_gm_thinking: GM stage complete. Handing off to story stage.",
     tool_call_id: GM_FEW_SHOT_END_TOOL_CALL.id,
   });
 
@@ -2794,7 +2828,7 @@ Now here is the ACTUAL game you are GMing. Read the mechanics notes carefully!`)
   messages.push({
     role: "user",
     content: cleanString(
-      `## PLAYER'S ACTION\n"${userChoice}"\n\n**INSTRUCTIONS:**\n1. First, check the GAME RULES section - is this roll-under or roll-over?\n2. Write [GM] reasoning: What skill? What's the target? reverse_dc needed?\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool function in this response.`
+      `## PLAYER'S ACTION\n"${userChoice}"\n\n**INSTRUCTIONS:**\n1. First, check the GAME RULES section - is this roll-under or roll-over?\n2. Write [GAME MASTER] reasoning: What skill? What's the target? reverse_dc needed?\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool function in this response.`
     ),
   });
 
