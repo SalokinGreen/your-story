@@ -87,6 +87,7 @@ function getModelsFromPreset() {
 
   // Advanced toggle settings
   const advancedChoices = localStorage.getItem("advancedChoices") === "true";
+  const advancedTools = localStorage.getItem("advancedTools") === "true";
 
   // For custom preset, check if user has overridden any models
   if (currentPreset === "custom") {
@@ -101,15 +102,20 @@ function getModelsFromPreset() {
     };
   }
 
-  // For non-custom presets, apply advanced choices toggle if available
+  // For non-custom presets, apply advanced toggles if available
   const effectiveChoicesModel =
     advancedChoices && preset.advancedChoicesModel
       ? preset.advancedChoicesModel
       : preset.choicesModel;
 
+  const effectiveToolsModel =
+    advancedTools && preset.advancedToolsModel
+      ? preset.advancedToolsModel
+      : preset.toolsModel;
+
   return {
     storyModel: preset.storyModel,
-    toolsModel: preset.toolsModel,
+    toolsModel: effectiveToolsModel,
     choicesModel: effectiveChoicesModel,
     novelaiEnabled,
     novelaiKey,
@@ -1522,7 +1528,7 @@ function StoryPageContent() {
   const [storyText, setStoryText] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState<
-    "gm" | "story" | "state" | "choices" | null
+    "gm" | "story" | "choices" | null
   >(null);
   const [momentumMode, setMomentumMode] = useState<
     "none" | "advantage" | "guarantee"
@@ -2713,10 +2719,11 @@ function StoryPageContent() {
             setLoadingStage("gm");
             logger.action("GM stage started (custom input)");
           },
-          onGMStageComplete: (gmResults, storyContext, usage) => {
+          onGMStageComplete: (gmResults, storyContext, usage, thinking) => {
             logger.ai_response("GM stage complete (custom input)", {
               toolCount: gmResults.length,
               contextLength: storyContext.length,
+              thinkingLines: thinking?.length || 0,
               usage,
             });
             // Store GM results in the partial part
@@ -2725,6 +2732,9 @@ function StoryPageContent() {
             }
             if (storyContext) {
               partialPart.gmStoryContext = storyContext;
+            }
+            if (thinking && thinking.length > 0) {
+              partialPart.gmThinking = thinking;
             }
             setLoadingStage("story");
           },
@@ -2751,7 +2761,7 @@ function StoryPageContent() {
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
 
-            setLoadingStage("state");
+            // Tools and choices run in parallel after story - no separate loading stage
             logger.ai_response("Story narration complete (custom input)", {
               length: content.length,
               usage,
@@ -4956,11 +4966,12 @@ function StoryPageContent() {
               setLoadingStage("gm");
               logger.action("GM stage started - determining mechanics");
             },
-            onGMStageComplete: (gmResults, storyContext, usage) => {
+            onGMStageComplete: (gmResults, storyContext, usage, thinking) => {
               logger.ai_response("GM stage complete", {
                 toolCount: gmResults.length,
                 tools: gmResults.map((r) => r.toolName),
                 contextLength: storyContext.length,
+                thinkingLines: thinking?.length || 0,
                 usage,
               });
 
@@ -4970,6 +4981,9 @@ function StoryPageContent() {
               }
               if (storyContext) {
                 partialPart.gmStoryContext = storyContext;
+              }
+              if (thinking && thinking.length > 0) {
+                partialPart.gmThinking = thinking;
               }
 
               // Find skill_check, challenge_check, or formula_roll results to show dice
@@ -5096,7 +5110,7 @@ function StoryPageContent() {
               setStoryText(content);
               setStoryData({ ...storyData }); // Full update only at completion
 
-              setLoadingStage("state");
+              // Tools and choices run in parallel after story - no separate loading stage
               logger.ai_response("Story narration complete", {
                 length: content.length,
                 usage,
@@ -5413,10 +5427,13 @@ function StoryPageContent() {
           onGMStageStart: () => {
             setLoadingStage("gm");
           },
-          onGMStageComplete: (results, storyContext, usage) => {
+          onGMStageComplete: (results, storyContext, usage, thinking) => {
             // Update partial part with final GM results
             partialPart.gmToolCalls = results;
             partialPart.gmStoryContext = storyContext;
+            if (thinking && thinking.length > 0) {
+              partialPart.gmThinking = thinking;
+            }
             setLoadingStage("story");
           },
           onStoryContent: (chunk, fullContent) => {
@@ -5654,7 +5671,7 @@ function StoryPageContent() {
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
 
-            setLoadingStage("state");
+            // Tools and choices run in parallel after story - no separate loading stage
             logger.ai_response("Story narration complete (retry)", {
               length: content.length,
               usage,

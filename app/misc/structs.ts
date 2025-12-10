@@ -246,6 +246,7 @@ export interface ScenePart {
   toolResponses?: CommandResponse[]; // Execution results of tool calls
   gmToolCalls?: any[]; // GM stage tool calls (skill_check, formula_roll, etc.)
   gmStoryContext?: string; // GM stage context string passed to story stage
+  gmThinking?: string[]; // GM stage "[GM]" reasoning text for UI display
   revealedLore?: string[]; // Lore titles manually revealed by AI in this part
   stateChanges?: string[]; // Human-readable game state changes from tool calls (for story context)
   endChapter?: boolean;

@@ -148,7 +148,8 @@ export interface GenerationCallbacks {
   onGMStageComplete?: (
     results: GMToolResult[],
     storyContext: string,
-    usage: TokenUsage
+    usage: TokenUsage,
+    thinking?: string[]
   ) => void;
   onComplete?: (result: GenerationResult) => void;
   onError?: (error: Error) => void;
@@ -180,6 +181,7 @@ export interface GenerationResult {
   // GM Stage results (when enableGMStage is true)
   gmResults?: GMToolResult[];
   gmStoryContext?: string;
+  gmThinking?: string[]; // GM's "[GM]" reasoning text from each round
   // Player question (when GM asks a question that needs player input)
   playerQuestion?: {
     question: string;
@@ -478,12 +480,13 @@ export async function generateStoryTurn(
 
     // ========================================
     // STAGE 0.5: GM Stage (if enabled)
-    // AI determines mechanics via tool calls instead of ActionAnalysis JSON
-    // Supports continuation loops and player questions
+    // AI thinks out loud like a tabletop GM, calls tools in a loop
+    // until end_gm_thinking is called (terminal condition)
     // ========================================
     let gmResults: GMToolResult[] = [];
     let gmStoryContext = "";
     let gmMeta: GenerationMeta | undefined;
+    let gmThinking: string[] = []; // Capture GM's "[GM]" reasoning text
     let playerQuestion:
       | {
           question: string;
@@ -522,11 +525,17 @@ export async function generateStoryTurn(
       } else {
         const gmModel = options.gmStageModel || options.toolsModel;
 
-        // GM stage loop - allows continuation requests for chained rolls
-        const MAX_GM_ROUNDS = 5; // Safety limit
+        // GM stage loop - continues until end_gm_thinking is called
+        const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
         let gmRound = 0;
         let allGMContextParts: string[] = [];
-        let continuationContext = "";
+        let conversationHistory: {
+          role: string;
+          content: string;
+          toolCalls?: unknown[];
+          toolResults?: unknown[];
+        }[] = [];
+        let isComplete = false;
 
         // If resuming from player answer, inject previous results and the answer
         if (options.playerAnswerContext) {
@@ -537,25 +546,48 @@ export async function generateStoryTurn(
           if (options.previousGMContext) {
             allGMContextParts.push(options.previousGMContext);
           }
-          // Inject player answer as continuation context
-          continuationContext = options.playerAnswerContext;
           logger.action("Resuming GM stage with player answer", {
             answerContext: options.playerAnswerContext,
             previousResultsCount: options.previousGMResults?.length || 0,
           });
         }
 
-        while (gmRound < MAX_GM_ROUNDS) {
+        while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
           logger.action(`GM stage round ${gmRound}`);
 
-          // Build prompt with continuation context if this is a follow-up round
+          // Build prompt - include conversation history for multi-turn
           const gmPrompt = buildGMStagePrompt({
             storyData,
-            userChoice: continuationContext
-              ? `${gmUserChoice}\n\n[Previous round results: ${continuationContext}]`
-              : gmUserChoice,
+            userChoice: gmUserChoice,
           });
+
+          // Add conversation history from previous rounds
+          const messagesWithHistory = [...gmPrompt.messages];
+
+          // If resuming from player answer on first round, inject the answer
+          if (gmRound === 1 && options.playerAnswerContext) {
+            messagesWithHistory.push({
+              role: "user",
+              content: `[Player answered: ${options.playerAnswerContext}]\n\nContinue with the GM resolution based on this answer.`,
+            });
+          }
+
+          // Add previous round history (assistant responses + tool results)
+          for (const historyEntry of conversationHistory) {
+            if (historyEntry.role === "assistant") {
+              messagesWithHistory.push({
+                role: "assistant",
+                content: historyEntry.content,
+                // Note: tool_calls would need proper handling here if provider supports it
+              });
+            } else if (historyEntry.role === "tool") {
+              messagesWithHistory.push({
+                role: "user",
+                content: historyEntry.content, // Tool results formatted as user message
+              });
+            }
+          }
 
           // Check if user cancelled
           if (options.abortSignal?.aborted) {
@@ -569,11 +601,14 @@ export async function generateStoryTurn(
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
-              messages: gmPrompt.messages,
+              messages: messagesWithHistory,
               tools: gmPrompt.tools,
               model: gmModel,
-              maxTokens: 2000,
-              temperature: 0.3, // Low temperature for deterministic mechanics
+              maxTokens: Math.min(
+                12000,
+                getModelConfig(gmModel).maxOutputTokens || 4000
+              ),
+              temperature: 0.4, // Slightly higher for more natural GM thinking
               openRouterKey: options.openRouterKey,
               deepseekKey: options.deepseekKey,
               googleKey: options.googleKey,
@@ -610,6 +645,17 @@ export async function generateStoryTurn(
             finalBalance = gmResult.meta.balance;
           }
 
+          // Capture GM's thinking text (content before/with tool calls)
+          if (gmResult.content) {
+            gmThinking.push(gmResult.content);
+            // Add to conversation history
+            conversationHistory.push({
+              role: "assistant",
+              content: gmResult.content,
+              toolCalls: gmResult.toolCalls,
+            });
+          }
+
           // Execute GM tool calls locally
           if (gmResult.toolCalls && gmResult.toolCalls.length > 0) {
             const gmExecution = await executeGMTools(
@@ -623,15 +669,51 @@ export async function generateStoryTurn(
               allGMContextParts.push(gmExecution.storyContext);
             }
 
-            // Update storyData with any modifications from GM tools (e.g., rest, challenge state)
+            // Update storyData with any modifications from GM tools
             Object.assign(storyData, gmExecution.modifiedStoryData);
+
+            // Format tool results for conversation history
+            const toolResultsText = gmExecution.results
+              .map((r) => `[Tool: ${r.toolName}]\n${r.contextForStory}`)
+              .join("\n\n");
+            conversationHistory.push({
+              role: "tool",
+              content: `## Tool Results\n\n${toolResultsText}`,
+            });
 
             logger.action(`GM stage round ${gmRound} tools executed`, {
               toolCount: gmResult.toolCalls.length,
               toolNames: gmExecution.results.map((r) => r.toolName),
-              requestsContinuation: gmExecution.requestsContinuation,
+              isComplete: gmExecution.isComplete,
               asksPlayer: gmExecution.asksPlayer,
             });
+
+            // Check if GM stage is complete (end_gm_thinking was called)
+            if (gmExecution.isComplete) {
+              isComplete = true;
+              // Use the final summary as the primary context for story
+              if (gmExecution.finalSummary) {
+                allGMContextParts.push(
+                  `[GM Final Summary: ${gmExecution.finalSummary}]`
+                );
+                allGMContextParts.push(
+                  `[Outcome: ${gmExecution.finalOutcome || "neutral"}]`
+                );
+                if (gmExecution.narrativeHints) {
+                  allGMContextParts.push(
+                    `[Narrative Hints: ${gmExecution.narrativeHints}]`
+                  );
+                }
+                if (gmExecution.dramaticMoment) {
+                  allGMContextParts.push(`[DRAMATIC MOMENT]`);
+                }
+              }
+              logger.action("GM stage complete - end_gm_thinking called", {
+                summary: gmExecution.finalSummary?.substring(0, 100),
+                outcome: gmExecution.finalOutcome,
+              });
+              break;
+            }
 
             // Check for player question - pause generation and return question
             if (gmExecution.asksPlayer && gmExecution.playerQuestion) {
@@ -643,38 +725,62 @@ export async function generateStoryTurn(
               break;
             }
 
-            // Check for continuation request - run another GM round
+            // Legacy: Check for explicit continuation request
             if (
               gmExecution.requestsContinuation &&
               gmExecution.continuationContext
             ) {
-              continuationContext = gmExecution.continuationContext;
-              logger.action("GM stage continuing - another round requested", {
-                context: continuationContext.substring(0, 100),
-              });
+              logger.action(
+                "GM stage continuing - explicit continuation requested",
+                {
+                  context: gmExecution.continuationContext.substring(0, 100),
+                }
+              );
               // Continue to next round
               continue;
             }
-          } else {
-            logger.action(
-              "GM stage returned no tool calls (treating as no_check_needed)"
-            );
-            allGMContextParts.push(
-              "[No mechanical check needed - pure narrative/roleplay action]"
-            );
-          }
 
-          // No continuation requested, exit loop
-          break;
+            // New behavior: Continue looping until end_gm_thinking is called
+            // (the AI should call end_gm_thinking when done)
+            logger.action(
+              "GM stage round complete, waiting for end_gm_thinking"
+            );
+            continue;
+          } else {
+            // No tool calls - AI thought but didn't call tools, prompt it to act
+            logger.action(
+              "GM stage returned no tool calls, prompting to call tools"
+            );
+            // Add thinking content to conversation history
+            if (gmResult.content) {
+              conversationHistory.push({
+                role: "assistant",
+                content: gmResult.content,
+              });
+            }
+            // Add a user message prompting tool calls
+            conversationHistory.push({
+              role: "tool",
+              content:
+                "[System] You've analyzed the situation. Now call the appropriate tool(s) to resolve it. Don't just describe what you'll do - actually call the tool functions.",
+            });
+            continue; // Continue loop to let AI call tools
+          }
         }
 
         // Combine all context parts from all rounds
-        gmStoryContext = allGMContextParts.join("\n\n---\n\n");
+        gmStoryContext = allGMContextParts.join("\n\n");
 
-        if (gmRound >= MAX_GM_ROUNDS) {
-          logger.action("GM stage hit max rounds limit", {
-            maxRounds: MAX_GM_ROUNDS,
-          });
+        if (gmRound >= MAX_GM_ROUNDS && !isComplete) {
+          logger.action(
+            "GM stage hit max rounds limit without end_gm_thinking",
+            {
+              maxRounds: MAX_GM_ROUNDS,
+            }
+          );
+          // Add a note about forced completion
+          gmStoryContext +=
+            "\n\n[GM stage reached maximum rounds - auto-completing]";
         }
       }
 
@@ -685,7 +791,8 @@ export async function generateStoryTurn(
           promptTokens: 0,
           completionTokens: 0,
           totalTokens: 0,
-        }
+        },
+        gmThinking.length > 0 ? gmThinking : undefined
       );
 
       // If there's a player question, we need to pause generation
@@ -706,6 +813,7 @@ export async function generateStoryTurn(
           },
           gmResults,
           gmStoryContext,
+          gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
           playerQuestion,
           meta: {
             gmMeta,
@@ -997,6 +1105,11 @@ export async function generateStoryTurn(
 
     // Helper function for tools generation
     const runToolGeneration = async (): Promise<void> => {
+      // Skip tools stage if GM stage handled everything
+      if (options.enableGMStage) {
+        logger.action("Skipping tools stage (GM stage handled state changes)");
+        return;
+      }
       if (!options.enableTools) return;
 
       callbacks.onToolsStart?.();
@@ -1381,6 +1494,7 @@ export async function generateStoryTurn(
       scenePart,
       gmResults: gmResults.length > 0 ? gmResults : undefined,
       gmStoryContext: gmStoryContext || undefined,
+      gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
       meta: {
         storyMeta,
         toolsMeta,

@@ -15,7 +15,7 @@ interface StoryProps {
   choices: Choices;
   input: Record<string, boolean>;
   loading: boolean;
-  loadingStage?: "gm" | "story" | "state" | "choices" | null;
+  loadingStage?: "gm" | "story" | "choices" | null;
   momentumMode: "none" | "advantage" | "guarantee";
   onMomentumModeChange: (mode: "none" | "advantage" | "guarantee") => void;
   handleChoice: () => void;
@@ -346,6 +346,19 @@ export default function Story({
   const isViewingPast =
     viewingPartIndex !== null && viewingPartIndex !== undefined;
 
+  // Get current scene part for GM thinking display
+  const currentScenePart = uniqueStoryParts[currentStoryIndex] || null;
+  const gmThinking = currentScenePart?.gmThinking || [];
+  const gmToolCalls = currentScenePart?.gmToolCalls || [];
+  const gmStoryContext = currentScenePart?.gmStoryContext || "";
+
+  // Check if we have any GM content to show
+  const hasGMContent =
+    gmThinking.length > 0 || gmToolCalls.length > 0 || gmStoryContext;
+
+  // State for GM thinking collapsible
+  const [showGMThinking, setShowGMThinking] = React.useState(false);
+
   // Handle choice selection from modal
   const handleSelectChoice = (choice: Choice) => {
     const index = choices.choices.findIndex((c) => c.text === choice.text);
@@ -411,6 +424,101 @@ export default function Story({
                 className="w-5 h-5 sm:w-4 sm:h-4"
               />
             </button>
+          </div>
+        )}
+
+        {/* GM Thinking Collapsible (shows reasoning, tool calls, and results) */}
+        {hasGMContent && (
+          <div className="border-b border-purple-800/30">
+            <button
+              onClick={() => setShowGMThinking(!showGMThinking)}
+              className="w-full flex items-center justify-between px-4 py-2 bg-purple-900/20 hover:bg-purple-900/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <DynamicIcon name="Dice5" className="w-4 h-4 text-purple-400" />
+                <span className="text-sm font-medium text-purple-300">
+                  GM Reasoning
+                </span>
+                <span className="text-xs text-purple-400/60">
+                  ({gmThinking.length}{" "}
+                  {gmThinking.length === 1 ? "thought" : "thoughts"}
+                  {gmToolCalls.length > 0 &&
+                    `, ${gmToolCalls.length} ${
+                      gmToolCalls.length === 1 ? "roll" : "rolls"
+                    }`}
+                  )
+                </span>
+              </div>
+              <DynamicIcon
+                name={showGMThinking ? "ChevronUp" : "ChevronDown"}
+                className="w-4 h-4 text-purple-400"
+              />
+            </button>
+            {showGMThinking && (
+              <div className="px-4 py-3 bg-purple-950/30 space-y-3 max-h-80 overflow-y-auto">
+                {/* GM Thinking Text */}
+                {gmThinking.length > 0 && (
+                  <div className="space-y-2">
+                    {gmThinking.map((thought, idx) => (
+                      <div
+                        key={idx}
+                        className="text-sm text-purple-200/80 whitespace-pre-wrap"
+                      >
+                        <span className="text-purple-400/60 font-medium">
+                          [GM]{" "}
+                        </span>
+                        {thought}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Tool Calls and Results */}
+                {gmToolCalls.length > 0 && (
+                  <div className="border-t border-purple-800/30 pt-3 space-y-2">
+                    <div className="text-xs font-medium text-purple-400/80 uppercase tracking-wide">
+                      Dice Rolls & Tools
+                    </div>
+                    {gmToolCalls.map((call: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="text-sm bg-purple-900/30 rounded px-3 py-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`font-medium ${
+                              call.success ? "text-green-400" : "text-red-400"
+                            }`}
+                          >
+                            {call.success ? "✓" : "✗"}
+                          </span>
+                          <span className="text-purple-300 font-medium">
+                            {call.toolName?.replace(/_/g, " ")}
+                          </span>
+                        </div>
+                        {call.contextForStory && (
+                          <div className="text-purple-200/70 text-xs mt-1 font-mono">
+                            {call.contextForStory}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* GM Summary Context */}
+                {gmStoryContext && !gmToolCalls.length && (
+                  <div className="border-t border-purple-800/30 pt-3">
+                    <div className="text-xs font-medium text-purple-400/80 uppercase tracking-wide mb-2">
+                      GM Summary
+                    </div>
+                    <div className="text-sm text-purple-200/70 font-mono whitespace-pre-wrap">
+                      {gmStoryContext}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -556,8 +664,6 @@ export default function Story({
                   <div className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
                   {loadingStage === "gm"
                     ? "Analyzing action..."
-                    : loadingStage === "state"
-                    ? "Updating game state..."
                     : loadingStage === "choices"
                     ? "Preparing choices..."
                     : "Generating..."}

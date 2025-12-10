@@ -26,10 +26,11 @@ export type ChatMessage = {
 // by making it appear the model has already committed to the rules.
 
 export const STORY_AFFIRMATION = `Understood. I will write the narrative response adhering to these standards:
+- **[PLAYER] action:** I will narrate EXACTLY what the player chose to do. No substitutions.
+- **[GM] outcomes:** I will honor ALL skill check results and GM decisions. Success means success. Failure means failure.
+- **Narrative freedom:** I have creative liberty ONLY in HOW I describe things - sensory details, NPC reactions, environmental flavor.
 - **Perspective:** Strict Second Person ("You"), deep POV.
-- **Style:** "Show, Don't Tell" with visceral sensory details; varying sentence structure; NO banned words.
-- **Agency:** I will respect the Action Result (Success/Failure) and the Active Challenge state.
-- **Format:** Prose with emphasis (*italics*, **bold**) and --- breaks. No ## headers unless major scene change.
+- **Style:** "Show, Don't Tell" with visceral sensory details; NO banned words.
 
 Here is the narrative:
 `;
@@ -65,9 +66,36 @@ A cunning merchant navigates a dangerous bazaar.
 - Perception: Fair (+1)
 - Gold: 50/100`;
 
+// GM reasoning examples for the new workflow
+const FEW_SHOT_GM_REASONING_1 = `[GM]
+The player wants to check the merchant's stall for the stolen amulet.
+This is a perception-based search action in a crowded marketplace.
+Looking at stats: Perception is Fair (+1), which is decent.
+The amulet is hidden but not expertly concealed - I'll set difficulty to "average".
+
+[GM]
+Rolling Perception check... Result: +3 vs DC +0 = SUCCESS
+The player spots the amulet. Now I need to decide what complications exist.
+The merchant should be suspicious, and there should be other threats nearby.`;
+
+const FEW_SHOT_GM_TOOLS_1 = `[GM TOOLS]
+[Perception Check: 1d6+1d6+1d6 → 12 + 1 (stat) = 13 vs DC 10 (average) → SUCCESS (margin: +3)]
+[Reason: Search for the stolen amulet]
+[Stakes: low]
+
+[GM Summary: Perception check succeeded. The player spots the hidden amulet but the merchant is watching and there are suspicious figures nearby.]
+[Outcome: success]
+[Narrative Hints: The player notices something minor but potentially useful in their lair, such as a hidden compartment, a misplaced tool, or a clue related to their current situation.]`;
+
 const FEW_SHOT_STORY_EXAMPLE_1 = {
-  user: `>I'll check the merchant's stall for the stolen amulet.
-[Perception: success]`,
+  gmReasoning: FEW_SHOT_GM_REASONING_1,
+  gmTools: FEW_SHOT_GM_TOOLS_1,
+  user: `[PLAYER] I'll check the merchant's stall for the stolen amulet.`,
+  userWithContext: `[PLAYER] I'll check the merchant's stall for the stolen amulet.
+
+${FEW_SHOT_GM_REASONING_1}
+
+${FEW_SHOT_GM_TOOLS_1}`,
   assistant: `The spice merchant's stall reeks of cinnamon and something fouler—old sweat, perhaps, or fear. You run your fingers along the edge of a brass tray, pretending to inspect the saffron threads while your eyes scan the shadows beneath the counter.
 
 *There.*
@@ -84,9 +112,35 @@ Behind you, the crowd's murmur shifts. Two men in dark robes have stopped at the
   ],
 };
 
+const FEW_SHOT_GM_REASONING_2 = `[GM]
+The player wants to distract the merchant and grab the amulet.
+This requires Persuasion to create a distraction, then Sleight of Hand to grab it.
+The merchant is already suspicious, so this will be harder.
+Persuasion is listed at Fair (+1). I'll make this a "hard" check due to the tension.
+
+[GM]
+Rolling Persuasion check... Result: -1 vs DC +2 = FAILURE
+The distraction fails. The merchant catches on immediately.
+This should escalate the situation - the merchant grabs the player, threatening to call guards.`;
+
+const FEW_SHOT_GM_TOOLS_2 = `[GM TOOLS]
+[Persuasion Check: 1d6+1d6+1d6 → 7 + 1 (stat) = 8 vs DC 14 (hard) → FAILURE (margin: -6)]
+[Reason: Distract the merchant]
+[Stakes: medium]
+
+[GM Summary: Persuasion check failed. The merchant caught on and grabbed the player's wrist. This is a tense standoff with armed figures approaching.]
+[Outcome: failure]
+[Narrative Hints: The distraction backfires spectacularly - the merchant was already suspicious and this confirms his fears.]`;
+
 const FEW_SHOT_STORY_EXAMPLE_2 = {
-  user: `>Distract the merchant and grab the amulet.
-[Persuasion: failure]`,
+  gmReasoning: FEW_SHOT_GM_REASONING_2,
+  gmTools: FEW_SHOT_GM_TOOLS_2,
+  user: `[PLAYER] Distract the merchant and grab the amulet.`,
+  userWithContext: `[PLAYER] Distract the merchant and grab the amulet.
+
+${FEW_SHOT_GM_REASONING_2}
+
+${FEW_SHOT_GM_TOOLS_2}`,
   assistant: `"Those saffron threads," you say, gesturing to the upper shelf. "Are they from the southern provinces? The color seems—"
 
 Farouk's hand shoots out, faster than a striking cobra. His fingers close around your wrist like a vice.
@@ -147,14 +201,14 @@ const FEW_SHOT_TOOL_RESPONSES = [
 
 /**
  * Build few-shot example messages for the story stage
- * Only used when there's little context (< 3 scene parts)
+ * Shows the workflow: [PLAYER] action + [GM] reasoning → story that honors both
  */
 export function buildStoryFewShotMessages(): ChatMessage[] {
   return [
     // Example info message
     { role: "user", content: FEW_SHOT_INFO_MESSAGE },
-    // First turn
-    { role: "user", content: FEW_SHOT_STORY_EXAMPLE_1.user },
+    // First turn - user choice with GM context appended
+    { role: "user", content: FEW_SHOT_STORY_EXAMPLE_1.userWithContext },
     { role: "assistant", content: FEW_SHOT_STORY_EXAMPLE_1.assistant },
     {
       role: "assistant",
@@ -162,8 +216,8 @@ export function buildStoryFewShotMessages(): ChatMessage[] {
         .map((s) => `• ${s}`)
         .join("\n")}`,
     },
-    // Second turn
-    { role: "user", content: FEW_SHOT_STORY_EXAMPLE_2.user },
+    // Second turn - user choice with GM context appended
+    { role: "user", content: FEW_SHOT_STORY_EXAMPLE_2.userWithContext },
     { role: "assistant", content: FEW_SHOT_STORY_EXAMPLE_2.assistant },
     {
       role: "assistant",
@@ -838,12 +892,17 @@ The Input will provide the "Action Result" (Success/Failure). You describe the o
     - Mix short, punchy sentences with longer, descriptive ones. Drop fill words to add variety.
     - Use precise words. Avoid adverbs, cliches and overused/commonly used phrases.
 
-## 2. PLAYER AGENCY & STOPPING RULES
-- **Protagonist:** The Player is the main character. NEVER write actions they didn't choose.
-- **Stop Early:** When you reach a moment where the player must react, decide, or speak, end your response with [STOP].
+## 2. HONORING [PLAYER] AND [GM] (NON-NEGOTIABLE)
+- **[PLAYER] actions are SACRED:** When you see [PLAYER], narrate EXACTLY that action. No substitutions, no "better ideas."
+    - If [PLAYER] says "I punch him" → you write about punching. Not kicking. Not talking. Punching.
+- **[GM] outcomes are FINAL:** The [GM] section contains skill check results and decisions. These are already resolved.
+    - If [GM] says "SUCCESS" → describe success. If "FAILURE" → describe failure. No exceptions.
+    - The GM's reasoning explains WHY. Honor the conclusion.
+- **Your creative freedom:** You decide HOW to describe things - sensory details, NPC dialogue, environmental flavor, dramatic pacing.
+    - *Good:* [GM] says success → you describe a masterful sword stroke with visceral detail
+    - *Bad:* [GM] says success → you decide the enemy dodges anyway
+- **Stop Early:** When you reach a moment where the player must react, decide, or speak, end with [STOP].
     - *Crucial:* Do not resolve the suspense. Do not write what the player does next.
-    - *Example:* "The guard spins around, spotting you. 'Hey!' he shouts, reaching for his sword...[STOP]"
-- **Unclear Input:** If the player's choice is vague, describe the situation and end with [STOP] for input.
 
 ## 3. THE ACTIVE WORLD (The World Breathes)
 - **NPC Agency:** NPCs have agendas. They do not just wait for the player to speak. They interrupt, they leave, they pursue goals.
@@ -913,6 +972,7 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
 
   // Count assistant (story) messages to determine which get [STOP] appended
   // We append [STOP] to the last 5 story messages to train the model on stopping
+  // We also attach GM reasoning to the last 5 user messages to show the pattern
   const assistantIndices: number[] = [];
   for (let i = 0; i < storyData.scene.parts.length; i++) {
     if (!storyData.scene.parts[i].user) {
@@ -924,20 +984,63 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
       ? assistantIndices[assistantIndices.length - 5]
       : 0;
 
+  // Helper to format GM reasoning from a scene part
+  const formatGMReasoning = (
+    part: (typeof storyData.scene.parts)[0]
+  ): string => {
+    const sections: string[] = [];
+
+    // Add GM thinking (the [GM] reasoning text)
+    // The AI response may already include [GM] tags, so don't double-add
+    if (part.gmThinking && part.gmThinking.length > 0) {
+      sections.push(
+        part.gmThinking
+          .map((t) => {
+            const trimmed = t.trim();
+            // Only add [GM] prefix if the thinking doesn't already start with it
+            return trimmed.startsWith("[GM]") ? trimmed : `[GM]\n${trimmed}`;
+          })
+          .join("\n\n")
+      );
+    }
+
+    // Add GM tool calls and results summary with [GM TOOLS] prefix
+    if (part.gmStoryContext) {
+      sections.push(`[GM TOOLS]\n${part.gmStoryContext}`);
+    }
+
+    return sections.join("\n\n");
+  };
+
   for (let i = 0; i < storyData.scene.parts.length; i++) {
     const part = storyData.scene.parts[i];
     if (part.user) {
+      // For user messages, check if the NEXT part (assistant) has GM reasoning
+      // to append to this user message (for last 5 turns)
+      let userContent = `[PLAYER] ${cleanString(part.content)}`;
+
+      // Find the next assistant part to get its GM reasoning
+      const nextPart = storyData.scene.parts[i + 1];
+      if (nextPart && !nextPart.user && i >= stopThreshold - 1) {
+        const gmReasoning = formatGMReasoning(nextPart);
+        if (gmReasoning) {
+          userContent = `${userContent}\n\n${gmReasoning}`;
+        }
+      }
+
       historyMessages.push({
         role: "user",
-        content: cleanString(part.content),
+        content: userContent,
       });
     } else {
       // For story generation, include the narrative content
       let assistantContent = part.raw || part.content;
+
       // Append [STOP] to last 5 assistant messages to train the model on stopping
       if (i >= stopThreshold) {
         assistantContent = assistantContent + "\n[STOP]";
       }
+
       historyMessages.push({
         role: "assistant",
         content: cleanString(assistantContent),
@@ -960,7 +1063,7 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
 
   // Add user choice to history if present
   if (userChoice) {
-    let choiceMessage = `Player chose: ${userChoice}`;
+    let choiceMessage = `[PLAYER] ${userChoice}`;
 
     // Include pending player actions (level ups, skill tree purchases, etc.)
     if (
@@ -973,11 +1076,12 @@ WRITE THE NARRATIVE RESPONSE ONLY!`;
       choiceMessage = `${actionsNote}\n\n${choiceMessage}`;
     }
 
-    // Include GM stage context if provided (replaces ActionAnalysis annotations)
+    // Append current turn's GM reasoning to user message
+    // This provides context for what the story should honor
     if (gmStoryContext) {
       choiceMessage = `${choiceMessage}\n\n${gmStoryContext}`;
       console.log(
-        `[buildStoryPrompt] Including GM stage context: ${gmStoryContext.slice(
+        `[buildStoryPrompt] Appending GM context to user message: ${gmStoryContext.slice(
           0,
           200
         )}...`
@@ -1760,16 +1864,15 @@ Analyze this action and return the JSON object.`;
 // GM STAGE PROMPT BUILDER
 // ============================================
 
-export const GM_STAGE_AFFIRMATION = `Understood. I am the Game Master, deciding what mechanical checks and consequences apply.
+export const GM_STAGE_AFFIRMATION = `[GM]
+Let me carefully analyze this action and READ THE MECHANICS NOTES before deciding anything.
 
-My responsibilities:
-- Determine if a skill check is needed and set appropriate difficulty
-- Start challenges for complex multi-step tasks (combat, chases, negotiations)
-- Call for opposed checks when player faces active NPC resistance
-- Use take_rest when player rests (if no active challenge)
-- Call no_check_needed for trivial actions that auto-succeed
+**Step 1: What does the GAME RULES section say?**
+- Is this a roll-under system (success = roll ≤ target) or roll-over (roll ≥ DC)?
+- What modifiers or special rules apply?
+- Are there critical success/fumble ranges?
 
-I will now call the appropriate tool(s):`;
+**Step 2: What is the player trying to do?**`;
 
 /**
  * Build the GM stage prompt for determining game mechanics
@@ -1961,11 +2064,38 @@ export function buildGMStagePrompt({
       schema.name
     }" character system at ${difficulty} difficulty.
 
-Your role is to DETERMINE MECHANICS before the story is written. You decide:
-1. Whether the player's action requires a roll
-2. What formula to use and what DC to set
-3. Whether to start/continue a challenge
-4. Stakes and consequences
+You THINK OUT LOUD like a tabletop GM, reasoning through each situation before acting.
+
+## ⚠️ BEFORE YOU DO ANYTHING - READ THE NOTES!
+
+**CAREFULLY READ the GAME RULES & MECHANICS section below.** Look for:
+1. **Roll direction**: Is success "roll UNDER skill" or "roll OVER DC"?
+   - Roll-under (BRP/CoC style): Use \`reverse_dc: true\` on formula_roll
+   - Roll-over (D&D style): Use \`reverse_dc: false\` or omit it
+2. **Difficulty modifiers**: How does the system handle easy/hard tasks?
+3. **Critical ranges**: What rolls trigger crits or fumbles?
+4. **Attribute bonuses**: How do stats modify rolls?
+
+⚠️ **MANY CUSTOM SYSTEMS USE ROLL-UNDER!** If the notes say "roll equal to or under your skill", you MUST set \`reverse_dc: true\`.
+
+## HOW THIS WORKS
+
+1. **[GM] Think deeply about the situation:**
+   - What is the player actually trying to accomplish?
+   - What obstacles or risks exist?
+   - What does success look like? What about failure?
+   - Are there any relevant mechanics notes that apply?
+   - What stat/skill best matches this action?
+   - What difficulty feels fair given the context?
+
+2. **Call tools** to roll dice, modify state, etc.
+3. **See results** and continue thinking/calling more tools if needed
+4. **When done, call end_gm_thinking** to end and trigger narration
+
+You can call MULTIPLE tools at once to save the player money - but be smart about it:
+- ✅ GOOD: Roll attack AND damage together
+- ✅ GOOD: Roll multiple fate questions at once  
+- ❌ BAD: Roll dice AND modify stats in same call (wait to see if you hit first!)
 ${loreSection ? `\n${loreSection}` : ""}
 ## CHARACTER SYSTEM: ${schema.name}
 ${schema.description || "Custom character sheet system"}
@@ -1976,94 +2106,189 @@ ${characterSummary}
 ## AVAILABLE VARIABLES FOR FORMULAS
 You can use these in dice formulas: ${variableList.join(", ")}
 
-⚠️ **CRITICAL: You may ONLY use variables that appear in the list above or from the notes specified!** Do NOT invent variables like "Perception", "Stealth", etc. if they are not listed. Use the closest matching variable from the list.
+⚠️ **CRITICAL: You may ONLY use variables that appear in the list above!** Do NOT invent variables like "Perception", "Stealth", etc. if they are not listed.
 
-## DECISION FRAMEWORK
+---
 
-**ALWAYS call a tool.** Choose ONE of:
+## TOOL CATEGORIES
 
-1. **formula_roll** - Player attempts something with meaningful risk
-   - Build a formula using dice and character variables
-   - Example: "1d20+{{STR_mod}}+{{proficiency}}" for a strength check
-   - Example: "2d6+{{Combat}}" for a combat roll
-   - Set DC based on difficulty (easy: 10, medium: 15, hard: 20, very hard: 25)
-   - Set stakes based on danger level
+### 🎲 ROLLING TOOLS (batch these together when sensible)
 
-2. **formula_challenge_check** - There's an ACTIVE challenge; this action counts toward it
-   - Use when continuing a fight, chase, or multi-step task
-   - Specify formula and DC for this specific check
+**formula_roll** - Roll dice formula vs optional DC
+- Example: "1d20+{{STR_mod}}+{{proficiency}}" vs DC 15
+- **⚠️ reverse_dc**: Set to \`true\` for roll-under systems (success = roll ≤ target)
+- Set stakes: low/medium/high/deadly (affects condition severity on failure)
 
-3. **start_challenge** - This action begins a complex multi-step task
-   - Combat = 3-5 rounds, Boss fight = 5-7 rounds
-   - After starting, ALSO call formula_challenge_check for the first action
+**formula_challenge_check** - Roll as part of active challenge
+- Inherits challenge settings, specify formula and DC
 
-4. **opposed_formula** - Player vs NPC in direct contest
-   - Player formula uses variables: "1d20+{{Dexterity_mod}}"
-   - Opponent formula is usually fixed: "1d20+5"
-   - Set opponent skill appropriately (novice: +2, competent: +5, skilled: +8, master: +12)
+**opposed_formula** - Player vs NPC contest
+- Player: "1d20+{{DEX_mod}}", Opponent: "1d20+5"
 
-5. **roll_dice** - Random determination (not a skill check)
-   - Simple dice notation: "1d6", "2d10", "1d100"
-   - For NPC reactions, loot quality, random encounters
+**roll_dice** - Simple dice roll (not a skill check)
+- For damage, random tables, NPC reactions: "2d6+3", "1d100"
 
-6. **take_rest** - Player is resting
-   - Cannot rest during active challenge
+**fate_question** - Yes/no oracle question
+- Set likelihood: fifty_fifty, likely, unlikely, etc.
 
-7. **no_check_needed** - Action is trivial or pure roleplay
-   - Walking, talking, continuing a success
+**roll_table** - Roll on custom adventure table
 
-8. **fate_question** - Ask the Oracle a yes/no question
-   - Use when uncertainty exists about world state, NPC knowledge, or events
-   - Set likelihood: "impossible", "no_way", "very_unlikely", "unlikely", "fifty_fifty", "likely", "somewhat_likely", "very_likely", "near_sure_thing", "has_to_be"
-   - Higher chaos = more extreme answers and random events
+### 🧮 CALCULATOR (use liberally!)
 
-9. **roll_table** - Roll on a custom table
-   - Use for random encounters, loot, NPC generation, etc.
-   - Specify table name exactly as defined in story settings
+**calculate** - Evaluate math expressions
+- "15 + 7" → 22
+- "50 / 2" → 25
+- Use for damage totals, resource tracking, anything numeric!
 
-10. **request_continuation** - Request another GM round
-   - Use when you need to chain rolls (attack → damage, spot → identify)
-   - Explain what you're waiting for in contextMessage
-   - The frontend will run another GM round with your results
+### 📝 STATE TOOLS (call AFTER seeing roll results)
 
-11. **ask_player** - Ask the player a question
-   - Use when you need player input to proceed (targeting, resource spending choices)
-   - Player must answer before generation continues
-   - Can be multiple choice or free-form
+**Quests:** create_quest, complete_quest, fail_quest, update_quest, delete_quest
+**Items:** add_item, remove_item (via add_list_item, remove_list_item for schema mode)
+**Abilities:** add_ability, remove_ability, modify_ability, upgrade_ability, reset_ability_cooldown
+**Conditions:** upgrade_condition, downgrade_condition, remove_condition, modify_condition
+**Lore:** create_lore, show_lore, hide_lore, update_lore, delete_lore
+**Memory:** add_memory
+**Variables:** set_variable, modify_variable, toggle_variable, create_variable, delete_variable
+**Character Fields:** modify_field, set_field, add_list_item, remove_list_item
 
-## FORMULA EXAMPLES
+### 🎮 FLOW CONTROL
 
-For a ${schema.name} character, typical formulas might be:
-- Attack roll: "1d20+{{attack_bonus}}" or "1d20+{{Strength_mod}}+{{proficiency}}"
-- Skill check: "1d20+{{skill_name}}" or "2d6+{{stat_name}}"
-- Damage: "{{weapon_damage}}+{{Strength_mod}}"
-- Saving throw: "1d20+{{Constitution_mod}}"
+**start_challenge** - Begin multi-round challenge (combat, chase, etc.)
+- Also call formula_challenge_check for the first roll!
+
+**take_rest** - Player rests (quick/short/long)
+
+**ask_player** - Need player input before proceeding
+
+### ✅ TERMINAL TOOL (required to finish)
+
+**end_gm_thinking** - **MUST CALL THIS TO END**
+- Summarize all mechanical results
+- Set overall outcome: success/failure/mixed/neutral
+- Triggers the Story stage to narrate
+
+---
+
+## EXAMPLE GM TURN
+
+\`\`\`
+[GM]
+The player wants to attack the goblin with their sword. This is combat, so I need:
+1. Attack roll to see if they hit
+2. Damage roll if they do
+
+I'll roll both at once since the player will want to know total damage anyway.
+The player has STR_mod +3 and proficiency +2, so attack is 1d20+5.
+Damage is 1d8+3 for the longsword.
+\`\`\`
+
+*Calls: formula_roll("1d20+{{STR_mod}}+{{proficiency}}", dc=14, reason="Attack goblin"), roll_dice("1d8+{{STR_mod}}", reason="Longsword damage")*
+
+\`\`\`
+[GM]
+Attack: 18 vs DC 14 = HIT!
+Damage: 7
+
+The goblin takes 7 damage. It only had 6 HP, so it's defeated.
+I'll remove it from the encounter and award some XP.
+\`\`\`
+
+*Calls: end_gm_thinking(summary="Attack hit (18 vs 14), dealt 7 damage, goblin defeated", outcome="success")*
+
+---
 
 ## IMPORTANT RULES
 
-- **Build formulas from character data.** Use {{variable}} syntax for character fields.
-- **Passives provide narrative advantages.** Lower difficulty instead of adding bonuses.
-- **Challenges are "Best of X".** Winner = first to majority.
-- **Keep formulas simple.** Don't overcomplicate - use the most relevant stat/skill.`;
+- **Always call end_gm_thinking** to finish - without it, the loop continues
+- **Batch rolling tools** when results don't affect each other
+- **Don't batch state changes with rolls** - wait to see the outcome first
+- **Use calculate** for any math - don't do arithmetic in your head
+- **Build formulas from character data** - use {{variable}} syntax
+- **Passives lower difficulty**, they don't add bonuses`;
 
-    // Filter tools for schema mode
+    // Filter tools for schema mode - include GM tools + state tools
     const schemaToolNames = [
+      // Rolling tools
       "formula_roll",
       "opposed_formula",
       "formula_challenge_check",
-      "start_challenge",
       "roll_dice",
-      "calculate",
-      "no_check_needed",
-      "take_rest",
       "fate_question",
       "roll_table",
-      "request_continuation",
+      // Calculator
+      "calculate",
+      // Flow control
+      "start_challenge",
+      "take_rest",
       "ask_player",
+      // Terminal
+      "end_gm_thinking",
     ];
-    toolsToUse = GM_TOOL_SCHEMAS.filter((t: any) =>
+
+    // Import state tools to merge with GM tools
+    const { TOOL_SCHEMAS } = require("./toolSchemas");
+    const stateToolNames = [
+      // Quest tools
+      "create_quest",
+      "complete_quest",
+      "fail_quest",
+      "update_quest",
+      "delete_quest",
+      // Ability tools
+      "add_ability",
+      "remove_ability",
+      "modify_ability",
+      "upgrade_ability",
+      "reset_ability_cooldown",
+      // Passive tools
+      "add_passive",
+      "remove_passive",
+      "modify_passive",
+      // Character field tools (schema mode)
+      "modify_field",
+      "set_field",
+      "add_list_item",
+      "remove_list_item",
+      // Achievement
+      "trigger_achievement",
+      // Lore tools
+      "create_lore",
+      "delete_lore",
+      "show_lore",
+      "hide_lore",
+      "update_lore",
+      // Memory
+      "add_memory",
+      // Condition tools (no add_condition - that happens via stakes)
+      "upgrade_condition",
+      "downgrade_condition",
+      "remove_condition",
+      "modify_condition",
+      // Variable tools
+      "set_variable",
+      "modify_variable",
+      "toggle_variable",
+      "add_to_list",
+      "remove_from_list",
+      "clear_list",
+      "create_variable",
+      "delete_variable",
+      // Thread tools
+      "create_thread",
+      "update_thread",
+      "resolve_thread",
+      "abandon_thread",
+      // Momentum
+      "modify_momentum",
+    ];
+
+    const gmTools = GM_TOOL_SCHEMAS.filter((t: any) =>
       schemaToolNames.includes(t.function.name)
     );
+    const stateTools = TOOL_SCHEMAS.filter((t: any) =>
+      stateToolNames.includes(t.function.name)
+    );
+    toolsToUse = [...gmTools, ...stateTools];
   } else {
     // ============================================
     // LEGACY MODE: Use stat-based tools
@@ -2118,11 +2343,35 @@ For a ${schema.name} character, typical formulas might be:
       rpgSystem.id
     }) game at ${difficulty} difficulty.
 
-Your role is to DETERMINE MECHANICS before the story is written. You decide:
-1. Whether the player's action requires a skill check
-2. What stat, difficulty, items, and abilities apply
-3. Whether to start/continue a challenge
-4. Stakes and consequences
+You THINK OUT LOUD like a tabletop GM, reasoning through each situation before acting.
+
+## ⚠️ BEFORE YOU DO ANYTHING - READ THE NOTES!
+
+**CAREFULLY READ the GAME RULES & MECHANICS section below.** Look for:
+1. **Roll direction**: Is success "roll UNDER skill" or "roll OVER DC"?
+   - Roll-under systems need different handling than D&D-style
+2. **Difficulty modifiers**: How does the system handle easy/hard tasks?
+3. **Critical ranges**: What rolls trigger crits or fumbles?
+4. **Special rules**: House rules that override generic assumptions
+
+## HOW THIS WORKS
+
+1. **[GM] Think deeply about the situation:**
+   - What is the player actually trying to accomplish?
+   - What obstacles or risks exist?
+   - What does success look like? What about failure?
+   - Are there any relevant mechanics notes that apply?
+   - What stat best matches this action?
+   - What difficulty feels fair given the context?
+
+2. **Call tools** to roll dice, modify state, etc.
+3. **See results** and continue thinking/calling more tools if needed
+4. **When done, call end_gm_thinking** to end and trigger narration
+
+You can call MULTIPLE tools at once to save the player money - but be smart about it:
+- ✅ GOOD: Roll attack AND damage together
+- ✅ GOOD: Roll multiple fate questions at once
+- ❌ BAD: Roll dice AND modify stats in same call (wait to see if you hit first!)
 ${loreSection ? `\n${loreSection}` : ""}
 ## RPG SYSTEM: ${rpgSystem.name}
 ${rpgSystem.aiInstructions.diceSystem}
@@ -2137,89 +2386,178 @@ ${rpgSystem.aiInstructions.dcGuidelines}
 **Usable Items:** ${usableItems || "None"}
 **Ready Abilities:** ${readyAbilities || "None"}
 
-⚠️ **CRITICAL: You may ONLY use stats that appear in the Stats list above.** Do NOT invent stats like "Perception", "Stealth", etc. if they are not listed. Use the closest matching stat from the list.
+⚠️ **CRITICAL: You may ONLY use stats that appear in the Stats list above.** Do NOT invent stats like "Perception", "Stealth", etc. if they are not listed.
 
-## DECISION FRAMEWORK
+---
 
-**ALWAYS call a tool.** Choose ONE of:
+## TOOL CATEGORIES
 
-1. **skill_check** - Player attempts something with meaningful risk
-   - Match stat to action type
-   - Set difficulty based on circumstances
-   - Include items/abilities if player implies using them
-   - Set stakes based on danger level
+### 🎲 ROLLING TOOLS (batch these together when sensible)
 
-2. **challenge_check** - There's an ACTIVE challenge; this action counts toward it
-   - Use when continuing a fight, chase, or multi-step task
-   - Can override stat/difficulty for this specific check
+**skill_check** - Player attempts something risky
+- Match stat to action, set difficulty tier or DC
+- Set stakes: low/medium/high/deadly (affects condition severity on failure)
 
-3. **start_challenge** - This action begins a complex multi-step task
-   - Combat against multiple enemies = 3-5 rounds
-   - Dangerous chase = 3 rounds
-   - Boss fight = 5-7 rounds
-   - After starting, ALSO call challenge_check for the first action
+**challenge_check** - Roll as part of active challenge
+- Inherits challenge settings
 
-4. **opposed_check** - Player vs NPC in direct contest
-   - Haggling, arm wrestling, stealth vs perception
-   - Set opponent skill (30=novice, 50=competent, 70=skilled, 90=master)
+**opposed_check** - Player vs NPC contest
+- Set opponent skill: 30=novice, 50=competent, 70=skilled, 90=master
 
-5. **roll_dice** - Random determination needed (not a skill check)
-   - NPC reactions, encounter tables, loot quality
+**roll_dice** - Simple dice roll (not a skill check)
+- For damage, random tables, NPC reactions: "2d6+3", "1d100"
 
-6. **take_rest** - Player is resting
-   - Cannot rest during active challenge
-   - Check rest limits before allowing
+**fate_question** - Yes/no oracle question
+- Set likelihood: fifty_fifty, likely, unlikely, etc.
 
-7. **no_check_needed** - Action is trivial or pure roleplay
-   - Walking, talking, looking around
-   - Continuing a successful action without new risk
-   - Player already succeeded at this exact thing
+**roll_table** - Roll on custom adventure table
 
-8. **fate_question** - Ask the Oracle a yes/no question
-   - Use when uncertainty exists about world state, NPC knowledge, or events
-   - Set likelihood: "impossible", "no_way", "very_unlikely", "unlikely", "fifty_fifty", "likely", "somewhat_likely", "very_likely", "near_sure_thing", "has_to_be"
-   - Higher chaos = more extreme answers and random events
+### 🧮 CALCULATOR (use liberally!)
 
-9. **roll_table** - Roll on a custom table
-   - Use for random encounters, loot, NPC generation, etc.
-   - Specify table name exactly as defined in story settings
+**calculate** - Evaluate math expressions
+- "15 + 7" → 22
+- "50 / 2" → 25
+- Use for damage totals, resource tracking, anything numeric!
 
-10. **request_continuation** - Request another GM round
-   - Use when you need to chain rolls (attack → damage, spot → identify)
-   - Explain what you're waiting for in contextMessage
-   - The frontend will run another GM round with your results
+### 📝 STATE TOOLS (call AFTER seeing roll results)
 
-11. **ask_player** - Ask the player a question
-   - Use when you need player input to proceed (targeting, resource spending choices)
-   - Player must answer before generation continues
-   - Can be multiple choice or free-form
+**Quests:** create_quest, complete_quest, fail_quest, update_quest, delete_quest
+**Items:** add_item, remove_item
+**Abilities:** add_ability, remove_ability, modify_ability, upgrade_ability, reset_ability_cooldown
+**Stats/Resources:** modify_stat, modify_resource
+**Conditions:** upgrade_condition, downgrade_condition, remove_condition, modify_condition
+**Lore:** create_lore, show_lore, hide_lore, update_lore, delete_lore
+**Memory:** add_memory
+**Variables:** set_variable, modify_variable, toggle_variable, create_variable, delete_variable
+
+### 🎮 FLOW CONTROL
+
+**start_challenge** - Begin multi-round challenge (combat, chase, etc.)
+- Also call challenge_check for the first roll!
+
+**take_rest** - Player rests (quick/short/long)
+
+**ask_player** - Need player input before proceeding
+
+### ✅ TERMINAL TOOL (required to finish)
+
+**end_gm_thinking** - **MUST CALL THIS TO END**
+- Summarize all mechanical results
+- Set overall outcome: success/failure/mixed/neutral
+- Triggers the Story stage to narrate
+
+---
+
+## EXAMPLE GM TURN
+
+\`\`\`
+[GM]
+The player wants to pick the lock. This requires a skill check.
+Looking at stats, they have Dexterity: 65. The lock is average difficulty.
+\`\`\`
+
+*Calls: skill_check(stat="Dexterity", difficulty="average", reason="Pick the lock")*
+
+\`\`\`
+[GM]
+Roll: 42 vs DC 50 = SUCCESS!
+The lock clicks open. No complications.
+\`\`\`
+
+*Calls: end_gm_thinking(summary="Lockpicking succeeded (42 vs 50)", outcome="success")*
+
+---
 
 ## IMPORTANT RULES
 
-- **Passives provide narrative advantages, not mechanical bonuses.** Example: "Wolf Slayer" makes fighting wolves EASIER narratively (lower difficulty tier) but doesn't add +X to rolls.
-- **Item/Ability bonuses are calculated by the frontend.** Just specify what's used.
-- **Challenges are "Best of X".** Winner = first to majority. Don't end challenge early.
-- **If action continues a just-succeeded check, call no_check_needed.**
-- **Resource costs are determined by item/ability specs.** Just name them.`;
+- **Always call end_gm_thinking** to finish - without it, the loop continues
+- **Batch rolling tools** when results don't affect each other
+- **Don't batch state changes with rolls** - wait to see the outcome first
+- **Use calculate** for any math - don't do arithmetic in your head
+- **Passives lower difficulty**, they don't add mechanical bonuses
+- **Item/Ability bonuses are calculated by the frontend** - just specify what's used`;
 
-    // Use legacy tools only
+    // Use legacy tools + state tools
     const legacyToolNames = [
+      // Rolling tools
       "skill_check",
       "challenge_check",
-      "start_challenge",
       "opposed_check",
       "roll_dice",
-      "calculate",
-      "no_check_needed",
-      "take_rest",
       "fate_question",
       "roll_table",
-      "request_continuation",
+      // Calculator
+      "calculate",
+      // Flow control
+      "start_challenge",
+      "take_rest",
       "ask_player",
+      // Terminal
+      "end_gm_thinking",
     ];
-    toolsToUse = GM_TOOL_SCHEMAS.filter((t: any) =>
+
+    // Import state tools to merge with GM tools
+    const { TOOL_SCHEMAS } = require("./toolSchemas");
+    const stateToolNames = [
+      // Quest tools
+      "create_quest",
+      "complete_quest",
+      "fail_quest",
+      "update_quest",
+      "delete_quest",
+      // Item tools
+      "add_item",
+      "remove_item",
+      // Ability tools
+      "add_ability",
+      "remove_ability",
+      "modify_ability",
+      "upgrade_ability",
+      "reset_ability_cooldown",
+      // Passive tools
+      "add_passive",
+      "remove_passive",
+      "modify_passive",
+      // Achievement
+      "trigger_achievement",
+      // Lore tools
+      "create_lore",
+      "delete_lore",
+      "show_lore",
+      "hide_lore",
+      "update_lore",
+      // Memory
+      "add_memory",
+      // Condition tools (no add_condition - that happens via stakes)
+      "upgrade_condition",
+      "downgrade_condition",
+      "remove_condition",
+      "modify_condition",
+      // Variable tools
+      "set_variable",
+      "modify_variable",
+      "toggle_variable",
+      "add_to_list",
+      "remove_from_list",
+      "clear_list",
+      "create_variable",
+      "delete_variable",
+      // Thread tools
+      "create_thread",
+      "update_thread",
+      "resolve_thread",
+      "abandon_thread",
+      // Momentum
+      "modify_momentum",
+    ];
+
+    const gmTools = GM_TOOL_SCHEMAS.filter((t: any) =>
       legacyToolNames.includes(t.function.name)
     );
+    const stateTools = TOOL_SCHEMAS.filter((t: any) =>
+      stateToolNames.includes(t.function.name)
+    );
+    toolsToUse = [...gmTools, ...stateTools];
   }
 
   const messages: ChatMessage[] = [
@@ -2265,14 +2603,15 @@ ${rpgSystem.aiInstructions.dcGuidelines}
   }
 
   // Add the current player action as the final user message
+  // Include explicit instruction to think first (since prefill may be stripped for tool calling)
   messages.push({
     role: "user",
     content: cleanString(
-      `## PLAYER'S ACTION\n"${userChoice}"\n\nCall the appropriate tool(s) to determine mechanics for this action.`
+      `## PLAYER'S ACTION\n"${userChoice}"\n\n**INSTRUCTIONS:**\n1. First, check the GAME RULES section - is this roll-under or roll-over?\n2. Write [GM] reasoning: What skill? What's the target? reverse_dc needed?\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool function in this response.`
     ),
   });
 
-  // Add prefill for tool calling
+  // Add prefill for tool calling (may be stripped by API for some providers)
   messages.push({ role: "assistant", content: GM_STAGE_AFFIRMATION });
 
   // Debug logging

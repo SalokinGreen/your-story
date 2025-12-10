@@ -96,11 +96,6 @@ export interface CalculateParams {
   display_name?: string;
 }
 
-export interface NoCheckNeededParams {
-  reason: string;
-  outcome?: string;
-}
-
 export interface TakeRestParams {
   type: "quick" | "short" | "long";
   narrative_context?: string;
@@ -223,6 +218,17 @@ export interface AskPlayerParams {
   allow_custom?: boolean; // Whether player can give custom answer (default true)
 }
 
+/**
+ * Respond to Player - TERMINAL TOOL that ends the GM stage loop
+ * Called when all mechanics are resolved and ready to narrate
+ */
+export interface RespondToPlayerParams {
+  summary: string; // Summary of all mechanical results for the story stage
+  outcome: "success" | "failure" | "mixed" | "neutral"; // Overall outcome
+  narrative_hints?: string; // Optional guidance for the story stage
+  dramatic_moment?: boolean; // Mark as particularly dramatic (affects narration style)
+}
+
 // Union type for all GM tool parameters
 export type GMToolParams =
   | { name: "skill_check"; params: SkillCheckParams }
@@ -231,7 +237,6 @@ export type GMToolParams =
   | { name: "opposed_check"; params: OpposedCheckParams }
   | { name: "roll_dice"; params: RollDiceParams }
   | { name: "calculate"; params: CalculateParams }
-  | { name: "no_check_needed"; params: NoCheckNeededParams }
   | { name: "take_rest"; params: TakeRestParams }
   | { name: "formula_roll"; params: FormulaRollParams }
   | { name: "opposed_formula"; params: OpposedFormulaParams }
@@ -239,7 +244,8 @@ export type GMToolParams =
   | { name: "fate_question"; params: FateQuestionParams }
   | { name: "roll_table"; params: RollTableParams }
   | { name: "request_continuation"; params: RequestContinuationParams }
-  | { name: "ask_player"; params: AskPlayerParams };
+  | { name: "ask_player"; params: AskPlayerParams }
+  | { name: "end_gm_thinking"; params: RespondToPlayerParams };
 
 // ============================================
 // GM TOOL SCHEMAS
@@ -598,35 +604,6 @@ Use for:
         },
       },
       required: ["expression", "reason"],
-    },
-  },
-};
-
-const noCheckNeededTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "no_check_needed",
-    description: `Explicitly indicate that no mechanical check is needed.
-
-Use when:
-- Action is trivial and auto-succeeds
-- Already established capability
-- Pure roleplay/dialogue
-- Narrative transition`,
-    parameters: {
-      type: "object",
-      properties: {
-        reason: {
-          type: "string",
-          description:
-            "Why no check is needed (e.g., 'Trivial action', 'Already established', 'Pure dialogue')",
-        },
-        outcome: {
-          type: "string",
-          description: "Optional: describe what happens",
-        },
-      },
-      required: ["reason"],
     },
   },
 };
@@ -1051,6 +1028,58 @@ Example uses:
   },
 };
 
+const endGmThinkingTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "end_gm_thinking",
+    description: `**TERMINAL TOOL** - Ends the GM thinking stage and hands off to the Story stage.
+
+Call this when ALL mechanical resolution is complete and you're ready for narration.
+
+This tool MUST be called to end the GM stage loop. Without it, the GM stage will continue.
+
+The summary you provide becomes context for the Story stage to write the narrative.
+
+WHEN TO CALL:
+- All necessary rolls have been made
+- All state changes (items, stats, conditions) have been applied
+- You have a clear picture of what happened mechanically
+- You're ready for the story to be narrated
+
+DO NOT call if:
+- You still need to make rolls
+- You're waiting for player input (use ask_player instead)
+- You need to see results before deciding next action`,
+    parameters: {
+      type: "object",
+      properties: {
+        summary: {
+          type: "string",
+          description:
+            "Comprehensive summary of all mechanical results. Include: roll outcomes, damage dealt/taken, items used/gained, conditions applied, challenge progress, etc. This is what the Story stage uses to write the narrative.",
+        },
+        outcome: {
+          type: "string",
+          enum: ["success", "failure", "mixed", "neutral"],
+          description:
+            "Overall outcome: success (player achieved goal), failure (player failed), mixed (partial success or success with cost), neutral (no clear win/loss, e.g., roleplay or information gathering)",
+        },
+        narrative_hints: {
+          type: "string",
+          description:
+            "Optional guidance for the Story stage: tone, specific details to emphasize, dramatic beats to hit, etc.",
+        },
+        dramatic_moment: {
+          type: "boolean",
+          description:
+            "Mark as a particularly dramatic moment (critical hit, near-death, major revelation). Story stage will write with more gravitas.",
+        },
+      },
+      required: ["summary", "outcome"],
+    },
+  },
+};
+
 // ============================================
 // EXPORT
 // ============================================
@@ -1065,7 +1094,6 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   opposedCheckTool,
   rollDiceTool,
   calculateTool,
-  noCheckNeededTool,
   takeRestTool,
   // Formula-based tools (for custom character schemas)
   formulaRollTool,
@@ -1076,6 +1104,8 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   rollTableTool,
   requestContinuationTool,
   askPlayerTool,
+  // Terminal tool - ends GM loop
+  endGmThinkingTool,
 ];
 
 /**

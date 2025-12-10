@@ -21,7 +21,6 @@ import {
   OpposedCheckParams,
   RollDiceParams,
   CalculateParams,
-  NoCheckNeededParams,
   TakeRestParams,
   FormulaRollParams,
   OpposedFormulaParams,
@@ -30,6 +29,7 @@ import {
   RollTableParams,
   RequestContinuationParams,
   AskPlayerParams,
+  RespondToPlayerParams,
 } from "./gmTools";
 import {
   getRPGSystem,
@@ -52,6 +52,7 @@ import {
   createSchemaBasedResolver,
   RollResult,
 } from "./diceFormula";
+import { executeTools as executeStateTools } from "./toolExecutor";
 
 // ============================================
 // RESULT INTERFACES
@@ -68,15 +69,22 @@ export interface GMToolResult {
     | GMRollResult
     | GMCalculateResult
     | GMRestResult
-    | GMNoCheckResult
     | GMFormulaRollResult
     | GMOpposedFormulaResult
     | GMFormulaChallengeResult
     | GMFateQuestionResult
     | GMRollTableResult
     | GMRequestContinuationResult
-    | GMAskPlayerResult;
+    | GMAskPlayerResult
+    | GMEndGmThinkingResult
+    | GMStateChangeResult;
   contextForStory: string; // Formatted bracket notation for story stage
+}
+
+export interface GMStateChangeResult {
+  type: "state_change";
+  message: string;
+  command: string;
 }
 
 export interface GMCheckResult {
@@ -214,12 +222,6 @@ export interface GMRestResult {
   error?: string;
 }
 
-export interface GMNoCheckResult {
-  type: "no_check_needed";
-  reason: string;
-  outcome?: string;
-}
-
 // ============================================
 // FORMULA-BASED RESULT INTERFACES
 // ============================================
@@ -336,6 +338,14 @@ export interface GMAskPlayerResult {
   allowCustom: boolean;
 }
 
+export interface GMEndGmThinkingResult {
+  type: "end_gm_thinking";
+  summary: string;
+  outcome: "success" | "failure" | "mixed" | "neutral";
+  narrativeHints?: string;
+  dramaticMoment?: boolean;
+}
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
@@ -439,8 +449,8 @@ export interface GMExecutionResult {
   modifiedStoryData: StoryData;
   storyContext: string; // Combined context for story stage
   // Special flow control flags
-  requestsContinuation?: boolean; // AI wants another GM round
-  continuationContext?: string; // Context for next round
+  requestsContinuation?: boolean; // AI wants another GM round (legacy)
+  continuationContext?: string; // Context for next round (legacy)
   asksPlayer?: boolean; // AI wants to ask the player something
   playerQuestion?: {
     question: string;
@@ -448,6 +458,12 @@ export interface GMExecutionResult {
     options?: string[];
     allowCustom: boolean;
   };
+  // Terminal condition (new loop-based GM)
+  isComplete?: boolean; // end_gm_thinking was called - GM stage is done
+  finalSummary?: string; // Summary from end_gm_thinking
+  finalOutcome?: "success" | "failure" | "mixed" | "neutral";
+  narrativeHints?: string;
+  dramaticMoment?: boolean;
 }
 
 /**
@@ -510,9 +526,6 @@ export async function executeGMTools(
       case "calculate":
         result = executeCalculate(call.id, params as CalculateParams);
         break;
-      case "no_check_needed":
-        result = executeNoCheckNeeded(call.id, params as NoCheckNeededParams);
-        break;
       case "take_rest":
         result = executeTakeRest(call.id, params as TakeRestParams, modified);
         break;
@@ -556,9 +569,51 @@ export async function executeGMTools(
       case "ask_player":
         result = executeAskPlayer(call.id, params as AskPlayerParams);
         break;
+      case "end_gm_thinking":
+        result = executeEndGmThinking(call.id, params as RespondToPlayerParams);
+        break;
       default:
-        console.warn(`Unknown GM tool: ${call.function.name}`);
-        continue;
+        // Delegate to state tool executor for tools like modify_stat, add_item, etc.
+        const stateToolCalls = [
+          {
+            id: call.id,
+            type: "function" as const,
+            function: {
+              name: call.function.name,
+              arguments: params as Record<string, unknown>,
+            },
+          },
+        ];
+        const stateResult = executeStateTools(stateToolCalls, modified);
+
+        if (stateResult.responses.length > 0) {
+          const response = stateResult.responses[0];
+          // Convert state tool response to GM tool result format
+          result = {
+            toolName: call.function.name,
+            toolCallId: call.id,
+            success: response.success === true,
+            result: {
+              type: "state_change" as const,
+              message: response.message,
+              command: response.command,
+            },
+            contextForStory:
+              response.success === true
+                ? `[State: ${response.message}]`
+                : `[State Failed: ${response.message}]`,
+          };
+
+          // Add state changes to context
+          if (stateResult.stateChanges.length > 0) {
+            contextParts.push(
+              ...stateResult.stateChanges.map((sc) => `[State Change: ${sc}]`)
+            );
+          }
+        } else {
+          console.warn(`Unknown tool (not GM or state): ${call.function.name}`);
+          continue;
+        }
     }
 
     results.push(result);
@@ -579,6 +634,12 @@ export async function executeGMTools(
         allowCustom: boolean;
       }
     | undefined;
+  // Terminal condition
+  let isComplete = false;
+  let finalSummary: string | undefined;
+  let finalOutcome: "success" | "failure" | "mixed" | "neutral" | undefined;
+  let narrativeHints: string | undefined;
+  let dramaticMoment: boolean | undefined;
 
   for (const res of results) {
     if (res.toolName === "request_continuation") {
@@ -598,6 +659,14 @@ export async function executeGMTools(
         allowCustom: askResult.allowCustom,
       };
     }
+    if (res.toolName === "end_gm_thinking") {
+      isComplete = true;
+      const respResult = res.result as GMEndGmThinkingResult;
+      finalSummary = respResult.summary;
+      finalOutcome = respResult.outcome;
+      narrativeHints = respResult.narrativeHints;
+      dramaticMoment = respResult.dramaticMoment;
+    }
   }
 
   return {
@@ -608,6 +677,11 @@ export async function executeGMTools(
     continuationContext,
     asksPlayer,
     playerQuestion,
+    isComplete,
+    finalSummary,
+    finalOutcome,
+    narrativeHints,
+    dramaticMoment,
   };
 }
 
@@ -1273,32 +1347,6 @@ function executeCalculate(
       reason: params.reason,
       displayName: params.display_name,
     } as GMCalculateResult,
-    contextForStory,
-  };
-}
-
-// ============================================
-// NO CHECK NEEDED EXECUTOR
-// ============================================
-
-function executeNoCheckNeeded(
-  toolCallId: string,
-  params: NoCheckNeededParams
-): GMToolResult {
-  let contextForStory = `[No check needed: ${params.reason}]`;
-  if (params.outcome) {
-    contextForStory += `\n[Outcome: ${params.outcome}]`;
-  }
-
-  return {
-    toolName: "no_check_needed",
-    toolCallId,
-    success: true,
-    result: {
-      type: "no_check_needed",
-      reason: params.reason,
-      outcome: params.outcome,
-    } as GMNoCheckResult,
     contextForStory,
   };
 }
@@ -2202,6 +2250,38 @@ function executeAskPlayer(
       options: params.options,
       allowCustom,
     } as GMAskPlayerResult,
+    contextForStory,
+  };
+}
+
+/**
+ * Execute end_gm_thinking - terminal tool that ends the GM stage
+ */
+function executeEndGmThinking(
+  toolCallId: string,
+  params: RespondToPlayerParams
+): GMToolResult {
+  // Build the final context for story stage
+  let contextForStory = `[GM Summary: ${params.summary}]`;
+  contextForStory += `\n[Outcome: ${params.outcome}]`;
+  if (params.narrative_hints) {
+    contextForStory += `\n[Narrative Hints: ${params.narrative_hints}]`;
+  }
+  if (params.dramatic_moment) {
+    contextForStory += `\n[DRAMATIC MOMENT - Emphasize this beat]`;
+  }
+
+  return {
+    toolName: "end_gm_thinking",
+    toolCallId,
+    success: true,
+    result: {
+      type: "end_gm_thinking",
+      summary: params.summary,
+      outcome: params.outcome,
+      narrativeHints: params.narrative_hints,
+      dramaticMoment: params.dramatic_moment,
+    } as GMEndGmThinkingResult,
     contextForStory,
   };
 }

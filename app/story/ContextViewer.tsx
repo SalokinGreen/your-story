@@ -4,8 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { StoryData, getMemoryContents } from "../misc/structs";
 import {
   buildStoryPrompt,
-  buildToolPrompt,
-  buildActionAnalysisPrompt,
   buildGMStagePrompt,
   ChatMessage,
   buildInfoMessage,
@@ -20,10 +18,7 @@ interface ContextViewerProps {
 
 export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [activeStage, setActiveStage] = useState<
-    "story" | "state" | "actions" | "gm"
-  >("story");
-  const [gmStageEnabled, setGmStageEnabled] = useState(true);
+  const [activeStage, setActiveStage] = useState<"story" | "gm">("story");
   const [contextString, setContextString] = useState("");
   const [estimatedTokens, setEstimatedTokens] = useState(0);
   const [activeModelName, setActiveModelName] = useState("Deepseek Chat");
@@ -84,13 +79,6 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     // If not set, default to true
     setPrefillEnabled(prefillSetting !== "false");
 
-    // Check GM stage setting (default: true)
-    const gmEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("gmStageEnabled") !== "false"
-        : true;
-    setGmStageEnabled(gmEnabled);
-
     // Get current preset and custom model overrides from localStorage
     const currentPreset =
       typeof window !== "undefined"
@@ -129,11 +117,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
 
     // Select the model based on active stage
     const currentModel =
-      activeStage === "story"
-        ? effectiveStoryModel
-        : activeStage === "state" || activeStage === "gm"
-        ? effectiveToolsModel
-        : effectiveChoicesModel;
+      activeStage === "story" ? effectiveStoryModel : effectiveToolsModel; // GM stage uses tools model
     const modelConfig = getModelConfig(currentModel);
     setActiveModelName(currentModel);
     setActiveModelConfig(modelConfig);
@@ -196,10 +180,9 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       .reverse()
       .find((p) => !p.user);
     const actualGMContext = lastAssistantPart?.gmStoryContext;
-    const sampleGMContext = gmEnabled
-      ? actualGMContext ||
-        "[Perception Check: SUCCESS | Roll: 1d100 = 72 vs DC 50 (Average)]\n[Stakes: Notice something unusual]\n[Intended consequence: You spot hidden details]"
-      : undefined;
+    const sampleGMContext =
+      actualGMContext ||
+      "[Perception Check: SUCCESS | Roll: 1d100 = 72 vs DC 50 (Average)]\\n[Stakes: Notice something unusual]\\n[Intended consequence: You spot hidden details]";
 
     switch (activeStage) {
       case "story":
@@ -214,28 +197,12 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         contextMessages = storyPrompt.messages;
         prunedCount = storyPrompt.prunedParts;
         break;
-      case "state":
-        const toolPrompt = buildToolPrompt({
-          storyData,
-          storyContent: "(Story content from previous stage would go here)",
-          embeddingContext: simulatedEmbeddingContext,
-          usePrefill: prefillSetting !== "false",
-        });
-        contextMessages = toolPrompt.messages;
-        break;
       case "gm":
         const gmPrompt = buildGMStagePrompt({
           storyData,
           userChoice: "(Player's action would go here)",
         });
         contextMessages = gmPrompt.messages;
-        break;
-      case "actions":
-        const actionsPrompt = buildActionAnalysisPrompt({
-          storyData,
-          userAction: "(Player's freeform action text would go here)",
-        });
-        contextMessages = actionsPrompt.messages;
         break;
     }
 
@@ -404,42 +371,16 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             Story
           </button>
           <button
-            onClick={() => setActiveStage("state")}
+            onClick={() => setActiveStage("gm")}
             className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-              activeStage === "state"
-                ? "bg-white dark:bg-blue-950 text-orange-600 dark:text-orange-400 shadow"
+              activeStage === "gm"
+                ? "bg-white dark:bg-blue-950 text-cyan-600 dark:text-cyan-400 shadow"
                 : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
-            <DynamicIcon name="Wrench" className="w-3 h-3 inline mr-1" />
-            State
+            <DynamicIcon name="Dices" className="w-3 h-3 inline mr-1" />
+            GM Stage
           </button>
-          {/* Show GM State tab when GM stage is enabled, otherwise show Actions */}
-          {gmStageEnabled ? (
-            <button
-              onClick={() => setActiveStage("gm")}
-              className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-                activeStage === "gm"
-                  ? "bg-white dark:bg-blue-950 text-cyan-600 dark:text-cyan-400 shadow"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-              }`}
-            >
-              <DynamicIcon name="Dices" className="w-3 h-3 inline mr-1" />
-              GM State
-            </button>
-          ) : (
-            <button
-              onClick={() => setActiveStage("actions")}
-              className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-                activeStage === "actions"
-                  ? "bg-white dark:bg-blue-950 text-cyan-600 dark:text-cyan-400 shadow"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-              }`}
-            >
-              <DynamicIcon name="Zap" className="w-3 h-3 inline mr-1" />
-              Actions
-            </button>
-          )}
         </div>
 
         {showInfo && (
@@ -463,20 +404,6 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                       All {storyData.scene.parts.length} parts included.
                     </span>
                   )}
-                </>
-              )}
-              {activeStage === "state" && (
-                <>
-                  <strong>State Stage:</strong> Last 20 scene parts + new story
-                  content. AI analyzes what game state changes to make (items,
-                  stats, memory, etc.).
-                </>
-              )}
-              {activeStage === "actions" && (
-                <>
-                  <strong>Actions Stage:</strong> Recent story context sent to
-                  analyze player's freeform action. AI determines skill checks,
-                  items, resources, and challenge handling.
                 </>
               )}
               {activeStage === "gm" && (
