@@ -1385,12 +1385,15 @@ TEMPLATE SYNTAX (for all pages):
 - {{fieldId}} - Insert field value
 - {{fieldId.current}}/{{fieldId.max}} - Resource values  
 - {{percent fieldId}} - Resource as percentage (for progress bars)
-- {{modifier fieldId}} - D&D-style modifier with +/- sign
+- {{length fieldId}} - Get array length (e.g., Total Items: {{length inventory}})
 - {{#if fieldId}}...{{/if}} - Conditional display
 - {{#unless fieldId}}...{{/unless}} - Inverse conditional
 - {{#each fieldId}}...{{/each}} - List iteration
   - For string lists: {{this}} = the string value
   - For object lists: {{this.name}}, {{this.emoji}}, {{this.description}}, {{this.quantity}}
+  - Position helpers: {{@index}}, {{@first}}, {{@last}}
+  - Conditional: {{#unless @last}}, {{/unless}} for separators
+- {{#times N}}...{{/times}} - Repeat content N times ({{@index}} available inside)
 - {{#compare fieldId ">" "10"}}...{{/compare}} - Comparisons
   - Supports field.property refs: {{#compare hp.current "<" (div hp.max 2)}}
   - Expression functions: (div a b), (mul a b), (add a b), (sub a b), (min a b), (max a b)
@@ -3105,8 +3108,9 @@ TEMPLATE REQUIREMENTS:
 Generate a custom HTML/CSS template for the character sheet.
 - Use {{fieldId}} to insert values
 - Use {{percent fieldId}} for resource bars (0-100)
-- Use {{modifier fieldId}} for +/- modifiers
+- Use {{length fieldId}} for array counts
 - Use {{#each fieldId}}{{this}}{{/each}} for lists
+- Use {{#times N}}...{{/times}} to repeat elements N times
 - Dark theme with genre-appropriate styling
 - Clear visual hierarchy with sections
 

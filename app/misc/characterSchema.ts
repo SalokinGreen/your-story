@@ -641,9 +641,11 @@ export function validateSchema(schema: CharacterSchema): ValidationResult {
  * Supports:
  * - {{fieldId}} - Simple value substitution
  * - {{fieldId.current}} / {{fieldId.max}} - Resource sub-values
+ * - {{length fieldId}} - Array length
  * - {{#if fieldId}}...{{/if}} - Conditional blocks (truthy check)
  * - {{#unless fieldId}}...{{/unless}} - Inverse conditional
- * - {{#each fieldId}}...{{/each}} - List iteration ({{this}} for item, {{@index}} for index)
+ * - {{#each fieldId}}...{{/each}} - List iteration ({{this}} for item, {{@index}}, {{@first}}, {{@last}} for position)
+ * - {{#times N}}...{{/times}} - Repeat content N times ({{@index}} available)
  * - {{#compare fieldId "op" value}}...{{/compare}} - Comparison (op: ==, !=, >, <, >=, <=)
  * - {{resource:resourceId}} - Resource URL substitution
  * - {{percent fieldId}} - Resource as percentage (current/max * 100)
@@ -803,9 +805,12 @@ export function processTemplate(
         }
       }
       if (!Array.isArray(value)) return "";
+      const arrayLength = value.length;
       return value
         .map((item, index) => {
           let itemContent = content;
+          const isFirst = index === 0;
+          const isLast = index === arrayLength - 1;
 
           // Handle object arrays: {{this.property}}
           if (typeof item === "object" && item !== null) {
@@ -843,7 +848,30 @@ export function processTemplate(
             itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
           }
 
+          // Replace position variables
           itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
+          itemContent = itemContent.replace(/\{\{@first\}\}/g, String(isFirst));
+          itemContent = itemContent.replace(/\{\{@last\}\}/g, String(isLast));
+
+          // Handle {{#if @last}}...{{/if}} and {{#unless @last}}...{{/unless}}
+          itemContent = itemContent.replace(
+            /\{\{#if\s+@last\}\}([\s\S]*?)\{\{\/if\}\}/g,
+            (_: string, ifContent: string) => (isLast ? ifContent : "")
+          );
+          itemContent = itemContent.replace(
+            /\{\{#unless\s+@last\}\}([\s\S]*?)\{\{\/unless\}\}/g,
+            (_: string, unlessContent: string) => (!isLast ? unlessContent : "")
+          );
+          itemContent = itemContent.replace(
+            /\{\{#if\s+@first\}\}([\s\S]*?)\{\{\/if\}\}/g,
+            (_: string, ifContent: string) => (isFirst ? ifContent : "")
+          );
+          itemContent = itemContent.replace(
+            /\{\{#unless\s+@first\}\}([\s\S]*?)\{\{\/unless\}\}/g,
+            (_: string, unlessContent: string) =>
+              !isFirst ? unlessContent : ""
+          );
+
           return itemContent;
         })
         .join("");
@@ -910,6 +938,66 @@ export function processTemplate(
       const resolved = resolveValueRef(fieldId);
       const isTruthy = resolved !== 0 && resolved !== "";
       return !isTruthy ? content : "";
+    }
+  );
+
+  // Process {{#times N}}...{{/times}} - repeat content N times
+  // Supports both literal numbers and field references
+  result = result.replace(
+    /\{\{#times\s+([^\}]+)\}\}([\s\S]*?)\{\{\/times\}\}/g,
+    (_, countExpr, content) => {
+      // Try to resolve the count - could be a number or a field reference
+      const trimmedExpr = countExpr.trim();
+      let count: number;
+
+      // Check if it's a field.property reference (e.g., harm.max)
+      if (trimmedExpr.includes(".")) {
+        const resolved = resolveValueRef(trimmedExpr);
+        count =
+          typeof resolved === "number"
+            ? resolved
+            : parseInt(String(resolved)) || 0;
+      } else if (/^\d+$/.test(trimmedExpr)) {
+        // It's a literal number
+        count = parseInt(trimmedExpr);
+      } else {
+        // Try as a field reference
+        const value = values[trimmedExpr];
+        if (typeof value === "number") {
+          count = value;
+        } else if (typeof value === "object" && value && "max" in value) {
+          count = value.max;
+        } else {
+          count = parseInt(String(value)) || 0;
+        }
+      }
+
+      if (count <= 0 || count > 100) return ""; // Safety limit
+
+      return Array.from({ length: count }, (_, index) => {
+        let itemContent = content;
+        itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
+        return itemContent;
+      }).join("");
+    }
+  );
+
+  // Process {{length fieldId}} - get array length
+  result = result.replace(
+    /\{\{length\s+([a-zA-Z_][a-zA-Z0-9_.]*)\}\}/g,
+    (_, fieldPath) => {
+      // Support dotted paths like "inventory" or "harm.tracks"
+      const parts = fieldPath.split(".");
+      let value: unknown = values[parts[0]];
+      for (let i = 1; i < parts.length && value !== undefined; i++) {
+        if (typeof value === "object" && value !== null) {
+          value = (value as Record<string, unknown>)[parts[i]];
+        } else {
+          value = undefined;
+        }
+      }
+      if (Array.isArray(value)) return String(value.length);
+      return "0";
     }
   );
 
