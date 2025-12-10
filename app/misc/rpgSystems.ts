@@ -1457,7 +1457,8 @@ export function checkSuccess(
   statValue: number,
   dc: number,
   penalty: number = 0,
-  rolls?: number[] // For YZE: array of individual dice results
+  rolls?: number[], // For YZE: array of individual dice results
+  reverseDC: boolean = false // If true, success = roll ≤ DC (Call of Cthulhu style)
 ): {
   success: boolean;
   critical: boolean;
@@ -1532,12 +1533,25 @@ export function checkSuccess(
     return { success, critical, partial, total };
   } else {
     // Roll-over system: roll + modifier >= DC
+    // OR Roll-under DC system if reverseDC is true (Call of Cthulhu style)
     const modifier = system.statToModifier(statValue);
     const effectiveModifier = modifier - penalty;
     const total = roll + effectiveModifier;
-    const success = total >= dc;
-    const critical =
-      roll >= (system.success.criticalThreshold || system.dice.max) && success;
+
+    // ReverseDC: success = total <= DC (lower is better, like CoC)
+    // Normal: success = total >= DC (higher is better, like D&D)
+    const success = reverseDC ? total <= dc : total >= dc;
+
+    // Critical threshold: for reverseDC, critical is rolling very low
+    // For normal, critical is rolling max
+    const critical = reverseDC
+      ? roll <=
+          (system.success.criticalThreshold
+            ? Math.ceil(system.dice.max * 0.05)
+            : 1) && success // Critical on ~5% lowest rolls
+      : roll >= (system.success.criticalThreshold || system.dice.max) &&
+        success;
+
     return { success, critical, total };
   }
 }

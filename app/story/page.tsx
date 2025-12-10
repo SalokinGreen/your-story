@@ -1570,6 +1570,8 @@ function StoryPageContent() {
     // Formula-based rolls (generic mode) - when provided, uses simplified display
     formula?: string; // The formula used (e.g., "1d20+{{STR}}")
     resolvedFormula?: string; // Formula with variables resolved (e.g., "1d20+5")
+    // Reverse DC mode (Call of Cthulhu style - roll under DC to succeed)
+    reverseDC?: boolean;
     // Legacy RPG system type (backward compatibility)
     rpgSystem?:
       | "3d6"
@@ -3911,6 +3913,7 @@ function StoryPageContent() {
           disadvantageSources: appliedCondition?.name || "Condition",
           diceRolls: [[0]],
           rpgSystem: storyData.rpgSystem || "3d6",
+          reverseDC: storyData.reverseDC,
           conditionAutoFail: true,
           conditionName: appliedCondition?.name,
         });
@@ -4146,7 +4149,8 @@ function StoryPageContent() {
               statValue,
               dc,
               conditionPenaltyModifier - itemGradeBonus - abilityGradeBonus, // Apply condition penalty (positive) and grade bonuses (negative to add)
-              lastRoll
+              lastRoll,
+              storyData.reverseDC // Call of Cthulhu style - roll under DC
             );
 
             yzeData.successes = successResult.successes;
@@ -4193,7 +4197,9 @@ function StoryPageContent() {
                 : 0) +
                 conditionPenaltyModifier -
                 itemGradeBonus -
-                abilityGradeBonus // Condition penalty is positive (subtracts), grade bonuses are negative (adds)
+                abilityGradeBonus, // Condition penalty is positive (subtracts), grade bonuses are negative (adds)
+              undefined, // rolls array (only needed for YZE)
+              storyData.reverseDC // Call of Cthulhu style - roll under DC
             );
 
             dc_passed = successResult.success;
@@ -4293,6 +4299,7 @@ function StoryPageContent() {
             disadvantageSources: disadvantageSources.join(", "),
             diceRolls: allDiceDetails, // Individual dice for each roll
             rpgSystem: storyData.rpgSystem || "3d6", // Pass system type
+            reverseDC: storyData.reverseDC, // Call of Cthulhu style - roll under DC
             conditionPenalty:
               conditionPenaltyModifier !== 0 ? -conditionPenaltyModifier : 0, // Convert to negative for display
             conditionName: appliedCondition?.name,
@@ -5007,6 +5014,7 @@ function StoryPageContent() {
                     | "yze"
                     | "explosive"
                     | "narrative",
+                  reverseDC: storyData.reverseDC,
                   explosions: result.explosions,
                   conditionPenalty: result.condition?.penalty,
                   conditionName: result.condition?.name,
@@ -5041,6 +5049,8 @@ function StoryPageContent() {
                   // Use generic mode (formula-based) instead of rpgSystem
                   formula: result.formula,
                   resolvedFormula: result.resolvedFormula,
+                  // Use per-roll reverseDC from GM result (Call of Cthulhu style)
+                  reverseDC: result.reverseDC,
                 });
 
                 logger.action(
@@ -6875,6 +6885,7 @@ function StoryPageContent() {
           diceRolls={diceRoll.diceRolls}
           formula={diceRoll.formula}
           resolvedFormula={diceRoll.resolvedFormula}
+          reverseDC={diceRoll.reverseDC}
           rpgSystem={diceRoll.rpgSystem}
           baseDice={diceRoll.baseDice}
           stressDice={diceRoll.stressDice}

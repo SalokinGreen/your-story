@@ -26,6 +26,8 @@ interface DiceVisualizerProps {
   // Condition penalty
   conditionPenalty?: number; // Negative modifier from conditions
   conditionName?: string; // Name of the condition causing the penalty
+  // Reverse DC mode (Call of Cthulhu style - roll under DC to succeed)
+  reverseDC?: boolean;
   // ==== NEW: Formula-based rolls (generic mode) ====
   // When formula is provided, uses a simplified generic display
   // that works with any dice notation (1d20+5, 2d6, etc.)
@@ -70,6 +72,7 @@ export function DiceVisualizer({
   hasDisadvantage,
   conditionPenalty = 0,
   conditionName,
+  reverseDC = false,
   onComplete,
   diceRolls,
   formula,
@@ -99,12 +102,18 @@ export function DiceVisualizer({
   const isYZE = !isGenericMode && rpgSystem === "yze";
   const isExplosive = !isGenericMode && rpgSystem === "explosive";
 
-  // For generic mode, infer dice count and sides from the rolls array
+  // For generic mode, infer dice count and sides from the formula or reasonable defaults
+  // Try to parse dice size from formula (e.g., "1d100" -> 100, "2d6" -> 6)
+  const parseDiceSidesFromFormula = (f: string): number => {
+    const match = f.match(/\d*d(\d+)/i);
+    return match ? parseInt(match[1], 10) : 100; // Default to d100 for percentile systems
+  };
+
   const genericDiceCount = isGenericMode
     ? diceRolls?.[0]?.length || rolls.length || 1
     : 0;
   const genericDiceSides = isGenericMode
-    ? Math.max(...(diceRolls?.[0] || rolls || [20]), 20)
+    ? parseDiceSidesFromFormula(formula || "1d100")
     : 0;
 
   const diceCount = isGenericMode
@@ -1059,6 +1068,16 @@ export function DiceVisualizer({
                 </span>
                 <span className="text-xs text-gray-300 ml-2">
                   Roll ≤ Stat to succeed
+                </span>
+              </div>
+            ) : reverseDC ? (
+              <div className="flex items-center gap-2 text-white/80 bg-black/20 px-3 py-1 rounded-full">
+                <span className="text-sm uppercase tracking-wider font-bold">
+                  DC
+                </span>
+                <span className="text-xl font-bold text-purple-300">{dc}</span>
+                <span className="text-xs text-gray-300 ml-2">
+                  Roll ≤ DC to succeed
                 </span>
               </div>
             ) : (

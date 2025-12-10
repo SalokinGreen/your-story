@@ -530,6 +530,7 @@ export interface StoryData {
     | "yze"
     | "explosive"
     | "narrative"; // RPG dice system
+  reverseDC?: boolean; // If true, success = roll ≤ DC (Call of Cthulhu style)
   difficulty?: AdventureDifficulty; // Adventure difficulty (affects DC/points scaling)
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)

@@ -229,6 +229,7 @@ export interface GMFormulaRollResult {
   rolls: number[]; // Flattened list of all dice rolled
   total: number;
   dc?: number;
+  reverseDC?: boolean; // If true, success = roll ≤ DC
   success?: boolean;
   margin?: number;
   reason: string;
@@ -726,13 +727,14 @@ function executeSkillCheck(
     statValue,
     dc,
     condPenalty.penalty,
-    rollResult.rolls
+    rollResult.rolls,
+    storyData.reverseDC // Call of Cthulhu style - roll under DC
   );
   const success = successResult.success;
   const partialSuccess = successResult.partial || false;
   const criticalSuccess = successResult.critical && success;
   const criticalFailure = successResult.critical && !success;
-  const margin = total - dc;
+  const margin = storyData.reverseDC ? dc - total : total - dc; // Invert margin for reverseDC
 
   // Build context string for story stage
   let contextForStory = `[${statName} Check: ${
@@ -1611,9 +1613,17 @@ function executeFormulaRoll(
   // Check success if DC provided
   let success: boolean | undefined;
   let margin: number | undefined;
+  const reverseDC = params.reverse_dc || false;
   if (params.dc !== undefined) {
-    success = rollResult.total >= params.dc;
-    margin = rollResult.total - params.dc;
+    if (reverseDC) {
+      // Roll-under: success = roll ≤ DC (Call of Cthulhu/BRP style)
+      success = rollResult.total <= params.dc;
+      margin = params.dc - rollResult.total; // Positive margin = succeeded by this much
+    } else {
+      // Roll-over: success = roll ≥ DC (standard)
+      success = rollResult.total >= params.dc;
+      margin = rollResult.total - params.dc;
+    }
   }
 
   // Build context string
@@ -1622,11 +1632,19 @@ function executeFormulaRoll(
   if (resolvedFormula !== params.formula) {
     contextForStory += ` → ${resolvedFormula}`;
   }
-  contextForStory += ` = ${rollResult.total}`;
+  contextForStory += `: [${flattenRolls(rollResult.rolls).join(", ")}] = **${
+    rollResult.total
+  }**`;
   if (params.dc !== undefined) {
-    contextForStory += ` vs DC ${params.dc} → ${
-      success ? "SUCCESS" : "FAILURE"
-    }`;
+    if (reverseDC) {
+      contextForStory += ` = ${rollResult.total} vs DC ${params.dc} → ${
+        success ? "SUCCESS" : "FAILURE"
+      }`;
+    } else {
+      contextForStory += ` vs DC ${params.dc} → ${
+        success ? "SUCCESS" : "FAILURE"
+      }`;
+    }
     if (margin !== undefined) {
       contextForStory += ` (margin: ${margin >= 0 ? "+" : ""}${margin})`;
     }
@@ -1658,6 +1676,7 @@ function executeFormulaRoll(
       rolls: flattenRolls(rollResult.rolls),
       total: rollResult.total,
       dc: params.dc,
+      reverseDC,
       success,
       margin,
       reason: params.reason,

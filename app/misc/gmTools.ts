@@ -117,6 +117,7 @@ export interface TakeRestParams {
 export interface FormulaRollParams {
   formula: string; // "1d20+{{STR_mod}}+{{proficiency}}", "2d6+5"
   dc?: number; // Optional target number
+  reverse_dc?: boolean; // If true, success = roll ≤ DC (Call of Cthulhu style)
   reason: string;
   display_name?: string;
   stakes?: "low" | "medium" | "high" | "deadly";
@@ -681,6 +682,11 @@ Example formulas:
         dc: {
           type: "number",
           description: "Target number to beat for success (optional)",
+        },
+        reverse_dc: {
+          type: "boolean",
+          description:
+            "If true, success = roll ≤ DC (Call of Cthulhu/BRP style roll-under). Default: false (roll ≥ DC)",
         },
         reason: {
           type: "string",
