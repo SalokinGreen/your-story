@@ -141,9 +141,12 @@ export function executeCreatorTool(
   try {
     switch (name) {
       // ============================================
-      // STATS
+      // STATS (DEPRECATED - use schema fields with type: "number")
       // ============================================
       case "add_stats": {
+        changesList.push(
+          "⚠️ DEPRECATED: add_stats is deprecated. Use add_schema_fields with type: 'number' instead."
+        );
         const stats = args.stats as Stat[];
         const existingStats = [...(currentState.storyData.stats || [])];
         for (const stat of stats) {
@@ -167,6 +170,9 @@ export function executeCreatorTool(
       }
 
       case "modify_stats": {
+        changesList.push(
+          "⚠️ DEPRECATED: modify_stats is deprecated. Use modify_schema_fields instead."
+        );
         const modifications = args.stats as Array<{
           name: string;
           new_name?: string;
@@ -196,6 +202,9 @@ export function executeCreatorTool(
       }
 
       case "remove_stats": {
+        changesList.push(
+          "⚠️ DEPRECATED: remove_stats is deprecated. Use remove_schema_fields instead."
+        );
         const names = args.names as string[];
         const existingStats = [...(currentState.storyData.stats || [])];
         const remaining = existingStats.filter(
@@ -208,9 +217,12 @@ export function executeCreatorTool(
       }
 
       // ============================================
-      // RESOURCES
+      // RESOURCES (DEPRECATED - use schema fields with type: "resource")
       // ============================================
       case "add_resources": {
+        changesList.push(
+          "⚠️ DEPRECATED: add_resources is deprecated. Use add_schema_fields with type: 'resource' instead."
+        );
         const resources = args.resources as Resource[];
         const existingResources = [...(currentState.storyData.resources || [])];
         for (const resource of resources) {
@@ -239,6 +251,9 @@ export function executeCreatorTool(
       }
 
       case "modify_resources": {
+        changesList.push(
+          "⚠️ DEPRECATED: modify_resources is deprecated. Use modify_schema_fields instead."
+        );
         const modifications = args.resources as Array<{
           name: string;
           new_name?: string;
@@ -272,6 +287,9 @@ export function executeCreatorTool(
       }
 
       case "remove_resources": {
+        changesList.push(
+          "⚠️ DEPRECATED: remove_resources is deprecated. Use remove_schema_fields instead."
+        );
         const names = args.names as string[];
         const existingResources = [...(currentState.storyData.resources || [])];
         const remaining = existingResources.filter(

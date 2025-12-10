@@ -45,13 +45,16 @@ interface JSONSchemaProperty {
 }
 
 // ============================================
-// STATS TOOLS
+// DEPRECATED: STATS TOOLS (Use Character Schema Fields instead)
+// These tools modify the legacy stats[] array which is deprecated.
+// Use add_schema_fields with type: "number" for attributes.
 // ============================================
 
+// DEPRECATED - kept for backwards compatibility but removed from CREATOR_TOOLS
 export const add_stats: ToolDefinition = {
   name: "add_stats",
   description:
-    "Add one or more new stats to the adventure. Stats represent character attributes like Strength, Intelligence, etc. Values typically range 1-100.",
+    "DEPRECATED: Use add_schema_fields instead. Add character attributes as schema fields with type 'number'.",
   parameters: {
     type: "object",
     properties: {
@@ -83,10 +86,10 @@ export const add_stats: ToolDefinition = {
   },
 };
 
+// DEPRECATED
 export const modify_stats: ToolDefinition = {
   name: "modify_stats",
-  description:
-    "Modify existing stats by name. Only include fields you want to change.",
+  description: "DEPRECATED: Use modify_schema_fields instead.",
   parameters: {
     type: "object",
     properties: {
@@ -113,9 +116,10 @@ export const modify_stats: ToolDefinition = {
   },
 };
 
+// DEPRECATED
 export const remove_stats: ToolDefinition = {
   name: "remove_stats",
-  description: "Remove stats by name.",
+  description: "DEPRECATED: Use remove_schema_fields instead.",
   parameters: {
     type: "object",
     properties: {
@@ -130,13 +134,16 @@ export const remove_stats: ToolDefinition = {
 };
 
 // ============================================
-// RESOURCES TOOLS
+// DEPRECATED: RESOURCES TOOLS (Use Character Schema Fields instead)
+// These tools modify the legacy resources[] array which is deprecated.
+// Use add_schema_fields with type: "resource" for pools with current/max.
 // ============================================
 
+// DEPRECATED
 export const add_resources: ToolDefinition = {
   name: "add_resources",
   description:
-    "Add one or more new resources. Resources have current and max values (e.g., Health 80/100).",
+    "DEPRECATED: Use add_schema_fields with type 'resource' instead.",
   parameters: {
     type: "object",
     properties: {
@@ -169,9 +176,10 @@ export const add_resources: ToolDefinition = {
   },
 };
 
+// DEPRECATED
 export const modify_resources: ToolDefinition = {
   name: "modify_resources",
-  description: "Modify existing resources by name.",
+  description: "DEPRECATED: Use modify_schema_fields instead.",
   parameters: {
     type: "object",
     properties: {
@@ -196,9 +204,10 @@ export const modify_resources: ToolDefinition = {
   },
 };
 
+// DEPRECATED
 export const remove_resources: ToolDefinition = {
   name: "remove_resources",
-  description: "Remove resources by name.",
+  description: "DEPRECATED: Use remove_schema_fields instead.",
   parameters: {
     type: "object",
     properties: {
@@ -2278,13 +2287,18 @@ export const modify_character_values: ToolDefinition = {
 // ============================================
 
 export const CREATOR_TOOLS: ToolDefinition[] = [
-  // Stats & Resources
-  add_stats,
-  modify_stats,
-  remove_stats,
-  add_resources,
-  modify_resources,
-  remove_resources,
+  // Character Schema (replaces deprecated stats/resources)
+  set_character_schema,
+  add_schema_fields,
+  modify_schema_fields,
+  remove_schema_fields,
+  add_schema_categories,
+  modify_schema_categories,
+  remove_schema_categories,
+  add_schema_pages,
+  modify_schema_pages,
+  remove_schema_pages,
+  set_schema_template,
   // Items & Abilities
   add_items,
   modify_items,
@@ -2328,22 +2342,11 @@ export const CREATOR_TOOLS: ToolDefinition[] = [
   add_custom_tables,
   modify_custom_tables,
   remove_custom_tables,
-  // Character Schema
-  set_character_schema,
-  add_schema_fields,
-  modify_schema_fields,
-  remove_schema_fields,
-  add_schema_categories,
-  modify_schema_categories,
-  remove_schema_categories,
-  set_schema_template,
-  add_schema_pages,
-  modify_schema_pages,
-  remove_schema_pages,
-  add_schema_resources,
-  remove_schema_resources,
+  // Character Schema values
   set_character_values,
   modify_character_values,
+  add_schema_resources,
+  remove_schema_resources,
   // Settings
   update_basic_info,
   update_adventure_metadata,

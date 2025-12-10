@@ -1533,6 +1533,74 @@ function AdventureCreatorContent() {
       );
     }
 
+    // Apply character schema (including template)
+    if (data.characterSchema) {
+      setCharacterSchema((prev) => {
+        const defaultSchema: CharacterSchema = {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+          pages: [],
+          resources: [],
+        };
+        const base = prev || defaultSchema;
+        // Cast to Partial<CharacterSchema> to access optional fields
+        const incoming = data.characterSchema as Partial<CharacterSchema>;
+
+        // Smart merge: don't overwrite non-empty arrays with empty arrays
+        // This prevents tool-populated data from being wiped by raw AI response
+        const merged: CharacterSchema = {
+          ...base,
+          ...incoming,
+          // Preserve existing arrays if incoming is empty but existing has data
+          fields:
+            incoming.fields && incoming.fields.length > 0
+              ? incoming.fields
+              : base.fields || [],
+          categories:
+            incoming.categories && incoming.categories.length > 0
+              ? incoming.categories
+              : base.categories || [],
+          pages:
+            incoming.pages && incoming.pages.length > 0
+              ? incoming.pages
+              : base.pages || [],
+          resources:
+            incoming.resources && incoming.resources.length > 0
+              ? incoming.resources
+              : base.resources || [],
+        };
+
+        console.log("[AI] Set character schema:", merged.name);
+        console.log(
+          "[AI] Fields:",
+          merged.fields?.length || 0,
+          "Categories:",
+          merged.categories?.length || 0,
+          "Pages:",
+          merged.pages?.length || 0
+        );
+        if (merged.template) {
+          console.log(
+            "[AI] Template included - HTML:",
+            merged.template.html?.length || 0,
+            "chars, CSS:",
+            merged.template.css?.length || 0,
+            "chars"
+          );
+        }
+        return merged;
+      });
+    }
+
+    // Apply character data
+    if (data.characterData) {
+      setCharacterData(data.characterData);
+      console.log("[AI] Set character data");
+    }
+
     addNotification("AI changes applied successfully!", "success");
     setIsAIMenuOpen(false);
   };

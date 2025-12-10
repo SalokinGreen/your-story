@@ -22,6 +22,7 @@ import {
   recalculateDerivedFields,
   getNumericValue,
   buildTemplateDocument,
+  TemplateContext,
 } from "@/app/misc/characterSchema";
 
 // ============================================
@@ -34,6 +35,8 @@ interface CharacterSheetProps {
   onChange?: (data: CharacterData) => void;
   readOnly?: boolean;
   compact?: boolean;
+  /** Extra context values like playerName and playerSummary */
+  context?: TemplateContext;
 }
 
 interface FieldInputProps<T extends SchemaField> {
@@ -348,77 +351,204 @@ function FieldWrapper({ field, children }: FieldWrapperProps) {
 }
 
 // ============================================
-// CUSTOM TEMPLATE RENDERER (Sandboxed iframe)
+// CUSTOM TEMPLATE RENDERER (Sandboxed iframe with pan/zoom)
 // ============================================
 
 interface CustomTemplateRendererProps {
   schema: CharacterSchema;
   data: CharacterData;
+  context?: TemplateContext;
 }
 
-function CustomTemplateRenderer({ schema, data }: CustomTemplateRendererProps) {
+function CustomTemplateRenderer({
+  schema,
+  data,
+  context,
+}: CustomTemplateRendererProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [height, setHeight] = useState(600);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState(400);
+
+  // Pan and zoom state
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
   const htmlDoc = useMemo(() => {
-    return buildTemplateDocument(schema, data.values);
-  }, [schema, data.values]);
+    return buildTemplateDocument(schema, data.values, context);
+  }, [schema, data.values, context]);
 
-  // Auto-resize iframe based on content
+  // Auto-resize iframe based on content via postMessage from iframe
   useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const updateHeight = () => {
-      try {
-        const doc = iframe.contentDocument;
-        if (doc) {
-          // Try multiple methods to get accurate content height
-          const body = doc.body;
-          const html = doc.documentElement;
-
-          if (body && html) {
-            const contentHeight = Math.max(
-              body.scrollHeight,
-              body.offsetHeight,
-              html.clientHeight,
-              html.scrollHeight,
-              html.offsetHeight
-            );
-            // Set height with some padding, no upper limit
-            if (contentHeight > 0) {
-              setHeight(contentHeight + 40);
-            }
-          }
-        }
-      } catch {
-        // Cross-origin issues - use default height
+    const handleMessage = (event: MessageEvent) => {
+      if (
+        event.data?.type === "iframeHeight" &&
+        typeof event.data.height === "number"
+      ) {
+        const newHeight = event.data.height + 32; // Add padding
+        setContentHeight((h) => Math.max(h, newHeight)); // Only grow, never shrink unexpectedly
       }
     };
 
-    const handleLoad = () => {
-      // Multiple measurements to catch font loading and async content
-      updateHeight();
-      setTimeout(updateHeight, 100);
-      setTimeout(updateHeight, 300);
-      setTimeout(updateHeight, 600);
-      setTimeout(updateHeight, 1000);
-    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
-    iframe.addEventListener("load", handleLoad);
-    return () => iframe.removeEventListener("load", handleLoad);
-  }, [htmlDoc]);
+  // Handle mouse/touch drag for panning
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      // Only pan if directly clicking the container or iframe wrapper
+      if ((e.target as HTMLElement).closest("button")) return;
+
+      setIsDragging(true);
+      dragStart.current = {
+        x: e.clientX,
+        y: e.clientY,
+        panX: pan.x,
+        panY: pan.y,
+      };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [pan]
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isDragging) return;
+
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+
+      setPan({
+        x: dragStart.current.panX + dx,
+        y: dragStart.current.panY + dy,
+      });
+    },
+    [isDragging]
+  );
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    setIsDragging(false);
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  }, []);
+
+  // Zoom controls
+  const handleZoomIn = useCallback(() => {
+    setZoom((z) => Math.min(z + 0.25, 3));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoom((z) => Math.max(z - 0.25, 0.25));
+  }, []);
+
+  const handleResetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
 
   return (
-    <iframe
-      ref={iframeRef}
-      srcDoc={htmlDoc}
-      sandbox="allow-scripts"
-      className="w-full border-0 rounded-lg bg-transparent"
-      style={{ height: `${height}px`, minHeight: "400px", overflow: "hidden" }}
-      title="Character Sheet"
-      scrolling="no"
-    />
+    <div className="relative w-full">
+      {/* Zoom controls */}
+      <div className="absolute top-2 right-2 z-10 flex gap-1 bg-gray-800/90 rounded-lg p-1 shadow-lg">
+        <button
+          onClick={handleZoomOut}
+          className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
+          title="Zoom out"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M20 12H4"
+            />
+          </svg>
+        </button>
+        <button
+          onClick={handleResetView}
+          className="px-2 h-8 flex items-center justify-center rounded hover:bg-gray-700 text-gray-300 hover:text-white transition-colors text-sm font-medium min-w-[3rem]"
+          title="Reset view"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <button
+          onClick={handleZoomIn}
+          className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
+          title="Zoom in"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+        </button>
+      </div>
+
+      {/* Drag hint */}
+      {!isDragging && zoom !== 1 && (
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 text-xs text-gray-400 bg-gray-800/80 px-2 py-1 rounded pointer-events-none">
+          Drag to pan
+        </div>
+      )}
+
+      {/* Container - scrollable at 100% zoom, pannable when zoomed */}
+      <div
+        ref={containerRef}
+        className={`relative w-full rounded-lg bg-gray-900/30 ${
+          zoom === 1 ? "overflow-visible" : "overflow-hidden"
+        }`}
+        style={{
+          height: zoom === 1 ? "auto" : `${contentHeight}px`,
+          minHeight: "200px",
+          cursor: zoom !== 1 ? (isDragging ? "grabbing" : "grab") : "default",
+          touchAction: zoom !== 1 ? "none" : "auto",
+        }}
+        onPointerDown={zoom !== 1 ? handlePointerDown : undefined}
+        onPointerMove={zoom !== 1 ? handlePointerMove : undefined}
+        onPointerUp={zoom !== 1 ? handlePointerUp : undefined}
+        onPointerCancel={zoom !== 1 ? handlePointerUp : undefined}
+      >
+        <div
+          style={{
+            transform:
+              zoom !== 1
+                ? `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
+                : "none",
+            transformOrigin: "top left",
+            width: "100%",
+            transition: isDragging ? "none" : "transform 0.1s ease-out",
+          }}
+        >
+          <iframe
+            ref={iframeRef}
+            srcDoc={htmlDoc}
+            sandbox="allow-scripts"
+            className="w-full border-0 bg-transparent pointer-events-none"
+            style={{
+              height: `${contentHeight}px`,
+              minHeight: "200px",
+              overflow: "hidden",
+            }}
+            title="Character Sheet"
+            scrolling="no"
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -567,6 +697,7 @@ export default function CharacterSheet({
   onChange,
   readOnly = false,
   compact = false,
+  context,
 }: CharacterSheetProps) {
   // Check if schema has a custom template
   const hasCustomTemplate = Boolean(schema.template?.html);
@@ -626,17 +757,8 @@ export default function CharacterSheet({
   // If there's a custom template, render it (read-only mode only for custom templates)
   if (hasCustomTemplate && readOnly) {
     return (
-      <div className={`space-y-4 ${compact ? "text-sm" : ""}`}>
-        {/* Schema header */}
-        {!compact && (
-          <div className="border-b border-gray-700 pb-2">
-            <h2 className="text-xl font-bold text-white">{schema.name}</h2>
-            {schema.description && (
-              <p className="text-sm text-gray-400">{schema.description}</p>
-            )}
-          </div>
-        )}
-        <CustomTemplateRenderer schema={schema} data={data} />
+      <div className={compact ? "text-sm" : ""}>
+        <CustomTemplateRenderer schema={schema} data={data} context={context} />
       </div>
     );
   }

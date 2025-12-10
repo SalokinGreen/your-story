@@ -986,11 +986,10 @@ function BigAdventureCreatorPage() {
     complexity: "moderate",
     nsfw: false,
     includeAGMT: true,
-    includeUpgradeShop: true,
+    includeUpgradeShop: false,
     includeCustomTables: true,
     includePresets: true,
     includeStartingChoices: true,
-    includeSkillTrees: false,
     targetDuration: "medium",
     maxOutputTokens: 4000,
     stageConfigs: { ...DEFAULT_STAGE_CONFIGS },
@@ -1379,11 +1378,10 @@ function BigAdventureCreatorPage() {
           "moderate") as ComplexityLevel,
         nsfw: false,
         includeAGMT: true,
-        includeUpgradeShop: true,
+        includeUpgradeShop: false,
         includeCustomTables: true,
         includePresets: true,
         includeStartingChoices: true,
-        includeSkillTrees: false,
         targetDuration: (genreDurationMap[genre] || "medium") as
           | "short"
           | "medium"
@@ -1534,9 +1532,9 @@ function BigAdventureCreatorPage() {
         );
       }
     } else {
-      // Partial progress - enable resume mode and jump to step 4
+      // Partial progress - enable resume mode and jump to step 3
       setResumeMode(true);
-      setConfigStep(4);
+      setConfigStep(3);
       // Set up stages for display
       setStages(getStagesToRun(pendingAutosave.config));
       addNotification(
@@ -1697,7 +1695,7 @@ function BigAdventureCreatorPage() {
     }
 
     setValidationError(null);
-    setConfigStep(2);
+    setConfigStep(2); // Go directly to Features (formerly step 3)
   }, [validateStep1, promptMode, finalizeGuidedPrompt, addNotification]);
 
   // Check if step 1 can proceed (for button disabled state)
@@ -2917,56 +2915,56 @@ ${result.description || ""}`;
                         <span className="text-blue-300/60 ml-2">Fields</span>
                       </div>
                     )}
-                    {previewStageData.partialResult.storyTemplate.abilities && (
-                      <div className="bg-blue-900/30 rounded px-3 py-2">
-                        <span className="text-blue-400 font-bold">
-                          {
-                            previewStageData.partialResult.storyTemplate
-                              .abilities.length
-                          }
-                        </span>
-                        <span className="text-blue-300/60 ml-2">Abilities</span>
-                      </div>
-                    )}
-                    {previewStageData.partialResult.storyTemplate.lore && (
-                      <div className="bg-blue-900/30 rounded px-3 py-2">
-                        <span className="text-purple-400 font-bold">
-                          {
-                            previewStageData.partialResult.storyTemplate.lore
-                              .length
-                          }
-                        </span>
-                        <span className="text-blue-300/60 ml-2">Notes</span>
-                      </div>
-                    )}
+                    {previewStageData.partialResult.storyTemplate.lore &&
+                      Array.isArray(
+                        previewStageData.partialResult.storyTemplate.lore
+                      ) && (
+                        <div className="bg-blue-900/30 rounded px-3 py-2">
+                          <span className="text-purple-400 font-bold">
+                            {
+                              previewStageData.partialResult.storyTemplate.lore
+                                .length
+                            }
+                          </span>
+                          <span className="text-blue-300/60 ml-2">Notes</span>
+                        </div>
+                      )}
                     {previewStageData.partialResult.storyTemplate
-                      .achievements && (
-                      <div className="bg-blue-900/30 rounded px-3 py-2">
-                        <span className="text-red-400 font-bold">
-                          {
-                            previewStageData.partialResult.storyTemplate
-                              .achievements.length
-                          }
-                        </span>
-                        <span className="text-blue-300/60 ml-2">
-                          Achievements
-                        </span>
-                      </div>
-                    )}
+                      .achievements &&
+                      Array.isArray(
+                        previewStageData.partialResult.storyTemplate
+                          .achievements
+                      ) && (
+                        <div className="bg-blue-900/30 rounded px-3 py-2">
+                          <span className="text-red-400 font-bold">
+                            {
+                              previewStageData.partialResult.storyTemplate
+                                .achievements.length
+                            }
+                          </span>
+                          <span className="text-blue-300/60 ml-2">
+                            Achievements
+                          </span>
+                        </div>
+                      )}
                     {previewStageData.partialResult.storyTemplate
-                      .relationships && (
-                      <div className="bg-blue-900/30 rounded px-3 py-2">
-                        <span className="text-pink-400 font-bold">
-                          {
-                            previewStageData.partialResult.storyTemplate
-                              .relationships.length
-                          }
-                        </span>
-                        <span className="text-blue-300/60 ml-2">
-                          Relationships
-                        </span>
-                      </div>
-                    )}
+                      .relationships &&
+                      Array.isArray(
+                        previewStageData.partialResult.storyTemplate
+                          .relationships
+                      ) && (
+                        <div className="bg-blue-900/30 rounded px-3 py-2">
+                          <span className="text-pink-400 font-bold">
+                            {
+                              previewStageData.partialResult.storyTemplate
+                                .relationships.length
+                            }
+                          </span>
+                          <span className="text-blue-300/60 ml-2">
+                            Relationships
+                          </span>
+                        </div>
+                      )}
                     {previewStageData.partialResult.storyTemplate.quests && (
                       <div className="bg-blue-900/30 rounded px-3 py-2">
                         <span className="text-yellow-400 font-bold">
@@ -3482,72 +3480,8 @@ ${result.description || ""}`;
                   </p>
                 </div>
 
-                <button
-                  onClick={handleNextStep}
-                  disabled={!canProceedStep1()}
-                  className="px-6 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-blue-300/50 text-white rounded-lg transition-colors"
-                >
-                  Next: Settings →
-                </button>
-                {validationError && promptMode !== "freeform" && (
-                  <p className="text-sm text-red-400 mt-2">{validationError}</p>
-                )}
-              </div>
-            </ConfigStep>
-
-            {/* Step 2: Complexity */}
-            <ConfigStep step={2} currentStep={configStep} title="Game Settings">
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm text-blue-300/60 mb-2">
-                      Complexity
-                    </label>
-                    <select
-                      value={config.complexity}
-                      onChange={(e) =>
-                        updateConfig({
-                          complexity: e.target.value as ComplexityLevel,
-                        })
-                      }
-                      className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500/50 transition-all"
-                    >
-                      <option value="simple">
-                        Simple (fewer stats, shorter story)
-                      </option>
-                      <option value="moderate">
-                        Moderate (balanced depth)
-                      </option>
-                      <option value="complex">
-                        Complex (many systems, longer story)
-                      </option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-blue-300/60 mb-2">
-                      Target Duration
-                    </label>
-                    <select
-                      value={config.targetDuration}
-                      onChange={(e) =>
-                        updateConfig({
-                          targetDuration: e.target.value as
-                            | "short"
-                            | "medium"
-                            | "long",
-                        })
-                      }
-                      className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500/50 transition-all"
-                    >
-                      <option value="short">Short (1-2 hours)</option>
-                      <option value="medium">Medium (2-4 hours)</option>
-                      <option value="long">Long (4-6+ hours)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
+                {/* NSFW Toggle */}
+                <div className="pt-2 border-t border-blue-800/30">
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -3562,26 +3496,22 @@ ${result.description || ""}`;
                   </p>
                 </div>
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setConfigStep(1)}
-                    className="px-6 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
-                  >
-                    ← Back
-                  </button>
-                  <button
-                    onClick={() => setConfigStep(3)}
-                    className="px-6 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-colors"
-                  >
-                    Next: Features →
-                  </button>
-                </div>
+                <button
+                  onClick={handleNextStep}
+                  disabled={!canProceedStep1()}
+                  className="px-6 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-blue-900/40 disabled:to-blue-900/40 disabled:text-blue-300/50 text-white rounded-lg transition-colors"
+                >
+                  Next: Features →
+                </button>
+                {validationError && promptMode !== "freeform" && (
+                  <p className="text-sm text-red-400 mt-2">{validationError}</p>
+                )}
               </div>
             </ConfigStep>
 
-            {/* Step 3: Advanced Features */}
+            {/* Step 2: Advanced Features */}
             <ConfigStep
-              step={3}
+              step={2}
               currentStep={configStep}
               title="Advanced Features"
             >
@@ -3652,25 +3582,6 @@ ${result.description || ""}`;
                   <label className="flex items-start gap-3 p-4 bg-blue-900/30 rounded-lg cursor-pointer hover:bg-blue-900/50 transition-colors border border-blue-700/30">
                     <input
                       type="checkbox"
-                      checked={config.includeUpgradeShop}
-                      onChange={(e) =>
-                        updateConfig({ includeUpgradeShop: e.target.checked })
-                      }
-                      className="w-5 h-5 mt-0.5 rounded bg-blue-900/50 border-blue-700/50 text-purple-500 focus:ring-purple-500"
-                    />
-                    <div>
-                      <div className="font-medium text-white">
-                        🛒 Upgrade Shop
-                      </div>
-                      <p className="text-sm text-blue-300/60">
-                        Progression system with purchasable upgrades
-                      </p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-start gap-3 p-4 bg-blue-900/30 rounded-lg cursor-pointer hover:bg-blue-900/50 transition-colors border border-blue-700/30">
-                    <input
-                      type="checkbox"
                       checked={config.includeStartingChoices}
                       onChange={(e) =>
                         updateConfig({
@@ -3692,13 +3603,13 @@ ${result.description || ""}`;
 
                 <div className="flex gap-3 pt-4">
                   <button
-                    onClick={() => setConfigStep(2)}
+                    onClick={() => setConfigStep(1)}
                     className="px-6 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
                   >
                     ← Back
                   </button>
                   <button
-                    onClick={() => setConfigStep(4)}
+                    onClick={() => setConfigStep(3)}
                     className="px-6 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-colors"
                   >
                     Next: Fine-tune →
@@ -3707,9 +3618,9 @@ ${result.description || ""}`;
               </div>
             </ConfigStep>
 
-            {/* Step 4: Fine-tuning */}
+            {/* Step 3: Fine-tuning */}
             <ConfigStep
-              step={4}
+              step={3}
               currentStep={configStep}
               title="Fine-tune Generation"
             >
@@ -4383,7 +4294,7 @@ ${result.description || ""}`;
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={() => {
-                      setConfigStep(3);
+                      setConfigStep(2);
                       // Clear resume mode if going back
                       if (resumeMode) {
                         setResumeMode(false);
@@ -4560,7 +4471,6 @@ ${result.description || ""}`;
                       onClick={() => {
                         const allSections: RegenerateSection[] = [
                           "characterSchema",
-                          "abilities",
                           "mechanicsLore",
                           "lore",
                           "achievements",
@@ -4637,51 +4547,6 @@ ${result.description || ""}`;
                             </div>
                             <span className="text-amber-400 text-xs px-1.5 py-0.5 bg-amber-900/50 rounded">
                               {field.type}
-                            </span>
-                          </div>
-                        );
-                      }}
-                    />
-
-                    {/* Abilities */}
-                    <ExpandableContentCard
-                      section="abilities"
-                      label="Abilities"
-                      count={result.storyTemplate.abilities?.length || 0}
-                      color="blue"
-                      items={result.storyTemplate.abilities || []}
-                      isExpanded={expandedSections.has("abilities")}
-                      onToggleExpand={() => toggleSectionExpanded("abilities")}
-                      onRegenerate={() =>
-                        handleRegenerateSection(
-                          "abilities",
-                          extensionInstructions
-                        )
-                      }
-                      onExtend={() =>
-                        handleExtendSection(
-                          "abilities",
-                          extensionOutputSize,
-                          extensionInstructions
-                        )
-                      }
-                      isRegenerating={regeneratingSections.has("abilities")}
-                      isExtending={extendingSections.has("abilities")}
-                      renderItem={(item) => {
-                        const ability = item as Ability;
-                        return (
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">{ability.symbol}</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-blue-300 truncate">
-                                {ability.name}
-                              </div>
-                              <div className="text-xs text-blue-300/60 truncate">
-                                {ability.description}
-                              </div>
-                            </div>
-                            <span className="text-blue-400 text-xs px-1.5 py-0.5 bg-blue-900/50 rounded">
-                              {ability.grade}
                             </span>
                           </div>
                         );

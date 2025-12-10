@@ -196,8 +196,11 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **DerivedField formulas**: Use `{{fieldId}}` syntax with math.js evaluation (e.g., `floor(({{Strength}} - 10) / 2)`)
   - **SchemaTemplate**: { html: string, css: string, js?: string } - Custom character sheet templates
   - **SchemaResource**: { id, name, url, type: 'image'|'font'|'other' } - Uploaded assets for templates
+  - **TemplateContext**: { playerName?: string, playerSummary?: string } - Extra values passed to templates
   - **Template syntax**:
     - `{{fieldId}}` - Simple value substitution
+    - `{{playerName}}` - Player's character name (from TemplateContext)
+    - `{{playerSummary}}` - Player's character background (from TemplateContext)
     - `{{fieldId.current}}` / `{{fieldId.max}}` - Resource sub-values
     - `{{percent fieldId}}` - Resource as percentage (0-100)
     - `{{modifier fieldId}}` - D&D-style modifier with +/- prefix
@@ -209,6 +212,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Preset schemas**: DND5E_SCHEMA (default), COC_SCHEMA, NARRATIVE_SCHEMA
   - **DEFAULT_CHARACTER_SCHEMA**: Used when adventures don't define a custom schema (currently D&D 5e style)
   - **hasCustomJS flag**: Boolean on CharacterSchema indicating custom JavaScript in template (triggers security warning)
+  - **CharacterSheet pan/zoom**: Custom templates render in sandboxed iframe with pan (drag) and zoom (+/-) controls for large sheets
 
 ### Config
 

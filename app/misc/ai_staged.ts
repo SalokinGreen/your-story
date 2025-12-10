@@ -725,7 +725,6 @@ ${
     // Only show legacy stats/resources if NOT using character schema
     !storyData.characterSchema ? statsSection : "",
     !storyData.characterSchema ? resourcesSection : "",
-    abilitiesSection,
     achievementsSection,
     loreSection,
     memorySection,

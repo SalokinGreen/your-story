@@ -361,21 +361,21 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
         presetsSection.push(`- Default name: ${preset.playerName}`);
       if (preset.playerSummary)
         presetsSection.push(`- Summary: ${preset.playerSummary}`);
-      if (preset.stats.length > 0) {
+      if (preset.stats && preset.stats.length > 0) {
         presetsSection.push(
           `- Stats: ${preset.stats
             .map((s) => `${s.name}: ${s.value}`)
             .join(", ")}`
         );
       }
-      if (preset.resources.length > 0) {
+      if (preset.resources && preset.resources.length > 0) {
         presetsSection.push(
           `- Resources: ${preset.resources
             .map((r) => `${r.name}: ${r.value}/${r.maxValue}`)
             .join(", ")}`
         );
       }
-      if (preset.inventory.length > 0) {
+      if (preset.inventory && preset.inventory.length > 0) {
         presetsSection.push(
           `- Starting items: ${preset.inventory
             .map((i) => `${i.name} x${i.quantity}`)
@@ -627,23 +627,34 @@ You can control how items in arrays are applied using the **_command** field:
 
 \`\`\`json
 {
-  "stats": [
-    {
-      "name": "Strength",
-      "value": 80,
-      "description": "Raw physical power",
-      "symbol": "💪",
-      "_command": "replace"
-    },
-    {
-      "name": "Old Unused Stat",
-      "_command": "delete"
-    },
-    {
-      "name": "Agility",
-      "value": 70
+  "characterSchema": {
+    "fields": [
+      {
+        "id": "strength",
+        "name": "Strength",
+        "type": "number",
+        "description": "Raw physical power",
+        "defaultValue": 80,
+        "_command": "replace"
+      },
+      {
+        "id": "old_unused_field",
+        "_command": "delete"
+      },
+      {
+        "id": "agility",
+        "name": "Agility",
+        "type": "number",
+        "defaultValue": 70
+      }
+    ]
+  },
+  "characterData": {
+    "values": {
+      "strength": 80,
+      "agility": 70
     }
-  ],
+  },
   "inventory": [
     {
       "name": "Rusty Sword",
@@ -665,9 +676,9 @@ You can control how items in arrays are applied using the **_command** field:
 - For items WITHOUT _command, the default behavior is "merge" (update if exists, add if new)
 - To ADD new items to an array, ONLY list the NEW items. DO NOT include existing items unless you want to modify/delete them.
 - To MODIFY existing items: List an item with the SAME 'name' (or 'title' or 'id') as an existing one, and your new values will merge/replace based on _command.
-- **For DELETE commands:** You MUST include the identifier field (name/title/id) along with "_command": "delete". Example: {"name": "Old Stat", "_command": "delete"} NOT just {"_command": "delete"}
-- Example: If there are 3 stats already and user asks to "add a Luck stat", your JSON should ONLY contain the new Luck stat in the stats array, not all 4 stats.
-- When user says "delete X" or "remove X", use: {"name": "X", "_command": "delete"}
+- **For DELETE commands:** You MUST include the identifier field (name/title/id) along with "_command": "delete". Example: {"id": "old_field", "_command": "delete"} NOT just {"_command": "delete"}
+- Example: If there are 3 schema fields already and user asks to "add a Luck attribute", your JSON should ONLY contain the new Luck field in characterSchema.fields, not all 4 fields.
+- When user says "delete X" or "remove X", use: {"id": "x", "_command": "delete"}
 - When user says "replace X with Y" or "redesign X", use "_command": "replace" for item X.
 
 ### Available Fields:
@@ -684,17 +695,41 @@ You can control how items in arrays are applied using the **_command** field:
 - player_summary (string) - Player character background/description
 - intro (string) - Opening narrative text shown at game start
 - author_notes (string) - Private instructions/notes for the AI narrator
-- stats (Array of { name, value, description, symbol })
-  - name: Stat name (e.g., "Strength", "Intelligence")
-  - value: Starting value, 1-100 where 50 is average
-  - description: What the stat represents
-  - symbol: Icon name as words (e.g., "biceps", "brain", "heart") - we fuzzy-match to our icon library
-- resources (Array of { name, value, maxValue, description, symbol })
-  - name: Resource name (e.g., "Health", "Mana", "Stamina")
-  - value: Current amount
-  - maxValue: Maximum capacity
-  - description: What the resource represents
-  - symbol: Icon name as words (e.g., "heart", "water-drop", "lightning")
+- characterSchema.fields (Array of schema fields) - **PRIMARY way to define character attributes and resources**. Use the add_schema_fields tool to add these.
+  - **type: "number"** - Simple numeric attributes (replaces legacy "stats")
+    - id: Unique identifier (e.g., "strength", "intelligence") 
+    - name: Display name (e.g., "Strength", "Intelligence")
+    - type: "number" (required)
+    - description: What the attribute represents
+    - category: Category for grouping (e.g., "Attributes", "Skills", "Combat")
+    - defaultValue: Starting value, 1-100 where 50 is average
+    - min/max: Optional limits
+  - **type: "resource"** - Pools with current/max values (replaces legacy "resources")
+    - id: Unique identifier (e.g., "health", "mana")
+    - name: Display name (e.g., "Health", "Mana")
+    - type: "resource" (required)
+    - description: What the resource represents
+    - category: Category for grouping
+    - defaultValue: Starting current value
+    - defaultMax: Maximum capacity
+    - regenerates: Whether it restores on rest (boolean)
+    - regenRates: { quick: %, short: %, long: % } - regeneration per rest type
+  - **type: "derived"** - Calculated fields using formulas
+    - id: Unique identifier (e.g., "str_mod")
+    - name: Display name (e.g., "STR Modifier")
+    - type: "derived" (required)
+    - formula: Math expression using {{fieldId}} syntax (e.g., "floor(({{strength}} - 10) / 2)")
+  - **type: "text"** - String values (e.g., character background)
+  - **type: "boolean"** - True/false flags (e.g., isConcentrating)
+  - **type: "list"** - Arrays of strings (e.g., known languages)
+  - **type: "select"** - Single choice from predefined options
+- characterSchema.categories (Array of { id, name, order }) - Organize fields into collapsible sections
+- characterData.values (Object) - Actual field values. Keys are field IDs, values match field type:
+  - Number fields: numeric value
+  - Resource fields: { current: number, max: number }
+  - Derived fields: auto-calculated, don't set directly
+  - Text/boolean/select: appropriate value type
+  - List: array of strings
 - variables (Array of variable objects) - **IMPORTANT: Custom state tracking for counters, flags, strings, and lists**. Four types:
   - **Number Variables**: { id, name, description, type: "number", value, minValue?, maxValue? }
     - id: Unique identifier (e.g., "var_gold", "var_time")
@@ -801,7 +836,7 @@ You can control how items in arrays are applied using the **_command** field:
   - points: Points awarded upon completion
   - active: Whether quest is currently visible/active
   - fulfilled: Whether quest has been completed
-- presets (Array of { id, name, description, icon, playerName, playerSummary, stats, resources, inventory, abilities, authorNotes })
+- presets (Array of { id, name, description, icon, playerName, playerSummary, characterDataValues, inventory, abilities, authorNotes })
   - id: Unique identifier (use "preset-" + timestamp for new ones)
   - name: Preset display name
   - description: What this preset/build represents
@@ -809,24 +844,24 @@ You can control how items in arrays are applied using the **_command** field:
   - playerName: Default character name for this preset
   - playerSummary: Character background for this preset
   - intro: Unique opening narrative for this preset
-  - stats: Array of starting stats for this preset
-  - resources: Array of starting resources for this preset
+  - characterDataValues: Object with field values for this preset (matches characterSchema.fields IDs)
+    - Example: { "strength": 16, "health": { "current": 50, "max": 50 }, "intelligence": 10 }
   - inventory: Array of starting items for this preset
   - abilities: Array of starting abilities for this preset
   - authorNotes: Private notes about this preset
-- upgradeSettings (Object with upgrade shop configuration)
+- upgradeSettings (Object with upgrade shop configuration) - **NOTE: Prefer skillTrees over upgradeSettings for progression**
   - enabled: Boolean - master toggle for the entire upgrade system
-  - statShopEnabled: Boolean - whether stat shop is available
-  - resourceShopEnabled: Boolean - whether resource shop is available
+  - statShopEnabled: Boolean - whether stat shop is available (adds new number fields to character)
+  - resourceShopEnabled: Boolean - whether resource shop is available (adds new resource fields)
   - itemShopEnabled: Boolean - whether item shop is available
   - abilityShopEnabled: Boolean - whether ability shop is available
-  - statShop: Array of { name, description, symbol, startingValue, cost } - new stats players can unlock
-    - name: Name of the new stat to unlock
-    - description: What the stat represents
+  - statShop: Array of { name, description, symbol, startingValue, cost } - new number fields players can unlock
+    - name: Name of the new field to unlock
+    - description: What the field represents
     - symbol: Icon name as words (e.g., "biceps", "brain")
     - startingValue: Initial value when unlocked (1-100, 50 = average)
     - cost: Progression points required to unlock
-  - resourceShop: Array of { name, description, symbol, startingValue, startingMaxValue, cost } - new resources players can unlock
+  - resourceShop: Array of { name, description, symbol, startingValue, startingMaxValue, cost } - new resource fields players can unlock
     - name: Name of the new resource to unlock
     - description: What the resource represents
     - symbol: Icon name as words (e.g., "heart", "lightning")
@@ -939,13 +974,20 @@ Notes:
 **Example 1 - Adding Items with Grades:**
 User: "Create a fire sword item and a strength stat."
 Assistant:
-"Here is a fire sword and a strength stat for your game.
+"Here is a fire sword and a strength attribute for your game.
 
 \`\`\`json
 {
-  "stats": [
-    { "name": "Strength", "value": 10, "description": "Physical power", "symbol": "biceps" }
-  ],
+  "characterSchema": {
+    "fields": [
+      { "id": "strength", "name": "Strength", "type": "number", "description": "Physical power", "category": "Attributes", "defaultValue": 10 }
+    ]
+  },
+  "characterData": {
+    "values": {
+      "strength": 10
+    }
+  },
   "inventory": [
     { "name": "Fire Sword", "quantity": 1, "description": "A blade wreathed in eternal flame.", "type": "normal", "symbol": "fire-sword", "grade": "rare" }
   ]
@@ -1032,35 +1074,46 @@ Assistant:
 }
 \`\`\`"
 
-**Example 5 - Deleting Stats:**
-User: "Delete the Intelligence stat."
+**Example 5 - Deleting Schema Fields:**
+User: "Delete the Intelligence attribute."
 Assistant:
-"I'll remove the Intelligence stat.
+"I'll remove the Intelligence field from the character schema.
 
 \`\`\`json
 {
-  "stats": [
-    { "name": "Intelligence", "_command": "delete" }
-  ]
+  "characterSchema": {
+    "fields": [
+      { "id": "intelligence", "_command": "delete" }
+    ]
+  }
 }
 \`\`\`"
 
-**Example 6 - Replacing Items:**
-User: "Completely redesign the Strength stat with new values."
+**Example 6 - Modifying Schema Fields:**
+User: "Completely redesign the Strength attribute with new values."
 Assistant:
-"I've completely replaced the Strength stat with new properties.
+"I've updated the Strength field with new properties.
 
 \`\`\`json
 {
-  "stats": [
-    {
-      "name": "Strength",
-      "value": 85,
-      "description": "Pure physical might that crushes all opposition",
-      "symbol": "⚡",
-      "_command": "replace"
+  "characterSchema": {
+    "fields": [
+      {
+        "id": "strength",
+        "name": "Strength",
+        "type": "number",
+        "description": "Pure physical might that crushes all opposition",
+        "category": "Attributes",
+        "defaultValue": 85,
+        "_command": "replace"
+      }
+    ]
+  },
+  "characterData": {
+    "values": {
+      "strength": 85
     }
-  ]
+  }
 }
 \`\`\`"
 
@@ -1705,9 +1758,17 @@ When the user asks you to create or modify parts of the scenario (like "create a
 
 ### Tool Categories:
 
-**Stats & Resources:**
-- add_stats, modify_stats, remove_stats - Manage character attributes (Strength, Intelligence, etc.)
-- add_resources, modify_resources, remove_resources - Manage pools (Health, Mana, Stamina)
+**Character Schema (PRIMARY - defines character sheet structure):**
+- set_character_schema - Create/replace entire character schema with fields, categories, template
+- add_schema_fields, modify_schema_fields, remove_schema_fields - Manage schema field definitions
+  - Use type: "number" for attributes (Strength, Intelligence, etc.)
+  - Use type: "resource" for pools (Health, Mana, Stamina)
+  - Use type: "derived" for calculated values (modifiers, totals)
+- add_schema_categories, modify_schema_categories, remove_schema_categories - Organize fields into UI tabs
+- set_schema_template - Set main character sheet HTML/CSS/JS template
+- add_schema_pages, modify_schema_pages, remove_schema_pages - Add custom tabs with their own templates
+- add_schema_resources, remove_schema_resources - Upload images/fonts for custom templates
+- set_character_values, modify_character_values - Set/update character data values at runtime
 
 **Items & Abilities:**
 - add_items, modify_items, remove_items - Manage inventory items with grades, types
@@ -1740,15 +1801,6 @@ When the user asks you to create or modify parts of the scenario (like "create a
 
 **Starting Choices:**
 - add_starting_choices, modify_starting_choices, remove_starting_choices - Custom game starts
-
-**Character Schema (defines character sheet structure):**
-- set_character_schema - Create/replace entire character schema with fields, categories, template
-- add_schema_fields, modify_schema_fields, remove_schema_fields - Manage schema field definitions
-- add_schema_categories, modify_schema_categories, remove_schema_categories - Organize fields into UI tabs
-- set_schema_template - Set main character sheet HTML/CSS/JS template
-- add_schema_pages, modify_schema_pages, remove_schema_pages - Add custom tabs with their own templates
-- add_schema_resources, remove_schema_resources - Upload images/fonts for custom templates
-- set_character_values, modify_character_values - Set/update character data values at runtime
 
 ## Character Schema System
 

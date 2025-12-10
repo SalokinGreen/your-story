@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import {
   CharacterSchema,
   SchemaField,
@@ -13,6 +13,7 @@ import {
   SelectField,
   SchemaResource,
   SchemaTemplate,
+  SchemaPage,
   PRESET_SCHEMAS,
 } from "@/app/misc/characterSchema";
 import { DynamicIcon } from "./DynamicIcon";
@@ -576,6 +577,161 @@ function CategoryEditor({ categories, onChange }: CategoryEditorProps) {
 }
 
 // ============================================
+// FIELDS SECTION WITH CATEGORY PAGINATION
+// ============================================
+
+interface FieldsSectionProps {
+  fields: SchemaField[];
+  categories: SchemaCategory[];
+  onAddField: (type: FieldType) => void;
+  onUpdateField: (index: number, field: SchemaField) => void;
+  onDeleteField: (index: number) => void;
+  onMoveField: (index: number, direction: -1 | 1) => void;
+}
+
+function FieldsSection({
+  fields,
+  categories,
+  onAddField,
+  onUpdateField,
+  onDeleteField,
+  onMoveField,
+}: FieldsSectionProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string>("__all__");
+
+  // Build category options including "All Fields" and "Uncategorized"
+  const categoryOptions = useMemo(() => {
+    const options = [
+      { id: "__all__", name: `All Fields (${fields.length})` },
+      ...categories.map((cat) => ({
+        id: cat.id,
+        name: `${cat.name} (${
+          fields.filter((f) => f.category === cat.id).length
+        })`,
+      })),
+    ];
+
+    // Add uncategorized if there are any
+    const uncategorizedCount = fields.filter((f) => !f.category).length;
+    if (uncategorizedCount > 0 || categories.length === 0) {
+      options.push({
+        id: "__uncategorized__",
+        name: `Uncategorized (${uncategorizedCount})`,
+      });
+    }
+
+    return options;
+  }, [fields, categories]);
+
+  // Filter fields by selected category
+  const filteredFields = useMemo(() => {
+    if (selectedCategory === "__all__") {
+      return fields.map((field, index) => ({ field, originalIndex: index }));
+    } else if (selectedCategory === "__uncategorized__") {
+      return fields
+        .map((field, index) => ({ field, originalIndex: index }))
+        .filter(({ field }) => !field.category);
+    } else {
+      return fields
+        .map((field, index) => ({ field, originalIndex: index }))
+        .filter(({ field }) => field.category === selectedCategory);
+    }
+  }, [fields, selectedCategory]);
+
+  return (
+    <div>
+      {/* Header with Category Dropdown */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+        <h4 className="text-lg font-bold text-white flex items-center gap-2">
+          <DynamicIcon name="LayoutList" className="w-5 h-5 text-blue-400" />
+          Fields ({fields.length})
+        </h4>
+
+        {/* Category Filter Dropdown */}
+        {categories.length > 0 && (
+          <div className="flex-1 sm:max-w-xs">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm"
+            >
+              {categoryOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* Add Field Buttons */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {(Object.keys(FIELD_TYPE_INFO) as FieldType[]).map((type) => (
+          <button
+            key={type}
+            onClick={() => onAddField(type)}
+            className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm flex items-center gap-1.5"
+          >
+            <DynamicIcon
+              name={FIELD_TYPE_INFO[type].icon}
+              className="w-4 h-4"
+            />
+            {FIELD_TYPE_INFO[type].label}
+          </button>
+        ))}
+      </div>
+
+      {/* Field List */}
+      <div className="space-y-2">
+        {filteredFields.map(({ field, originalIndex }) => (
+          <FieldEditor
+            key={field.id}
+            field={field}
+            categories={categories}
+            onUpdate={(f) => onUpdateField(originalIndex, f)}
+            onDelete={() => onDeleteField(originalIndex)}
+            onMoveUp={
+              originalIndex > 0
+                ? () => onMoveField(originalIndex, -1)
+                : undefined
+            }
+            onMoveDown={
+              originalIndex < fields.length - 1
+                ? () => onMoveField(originalIndex, 1)
+                : undefined
+            }
+          />
+        ))}
+
+        {filteredFields.length === 0 && fields.length > 0 && (
+          <div className="text-center py-8 text-gray-500">
+            <DynamicIcon
+              name="Filter"
+              className="w-8 h-8 mx-auto mb-2 opacity-50"
+            />
+            <p>No fields in this category.</p>
+            <p className="text-sm mt-1">
+              Add a new field or select a different category.
+            </p>
+          </div>
+        )}
+
+        {fields.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            <DynamicIcon
+              name="PlusCircle"
+              className="w-8 h-8 mx-auto mb-2 opacity-50"
+            />
+            <p>No fields yet. Click a button above to add your first field.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // TEMPLATE EDITOR COMPONENT
 // ============================================
 
@@ -918,6 +1074,470 @@ function ResourceUploader({
 }
 
 // ============================================
+// PAGES EDITOR COMPONENT
+// ============================================
+
+// Available icons for pages
+const PAGE_ICONS = [
+  "User",
+  "Swords",
+  "BookOpen",
+  "Backpack",
+  "Sparkles",
+  "Heart",
+  "Shield",
+  "Zap",
+  "Star",
+  "Target",
+  "Compass",
+  "Map",
+  "Scroll",
+  "Crown",
+  "Gem",
+  "Flame",
+  "Skull",
+  "Brain",
+  "Eye",
+  "Hand",
+  "Footprints",
+  "Clock",
+];
+
+interface PageEditorProps {
+  page: SchemaPage;
+  resources: SchemaResource[] | undefined;
+  fields: SchemaField[];
+  onUpdate: (page: SchemaPage) => void;
+  onDelete: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+}
+
+function PageEditor({
+  page,
+  resources,
+  fields,
+  onUpdate,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+}: PageEditorProps) {
+  const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<"html" | "css" | "js">("html");
+
+  const updateTemplate = (updates: Partial<SchemaTemplate>) => {
+    onUpdate({
+      ...page,
+      template: { ...page.template, ...updates },
+    });
+  };
+
+  const insertFieldPlaceholder = (fieldId: string) => {
+    const placeholder = `{{${fieldId}}}`;
+    const textarea = document.querySelector(
+      `#page-${page.id}-${activeTab}`
+    ) as HTMLTextAreaElement;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value =
+        activeTab === "html"
+          ? page.template.html
+          : activeTab === "css"
+          ? page.template.css
+          : page.template.js || "";
+      const newValue = value.slice(0, start) + placeholder + value.slice(end);
+      updateTemplate({ [activeTab]: newValue });
+    }
+  };
+
+  return (
+    <div className="border border-gray-700 rounded-lg overflow-hidden">
+      {/* Header - Always visible */}
+      <div
+        className="flex items-center gap-2 px-3 py-2 bg-gray-800 cursor-pointer hover:bg-gray-750"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <DynamicIcon
+          name={expanded ? "ChevronDown" : "ChevronRight"}
+          className="w-4 h-4 text-gray-400"
+        />
+        <DynamicIcon
+          name={page.icon || "FileText"}
+          className="w-4 h-4 text-blue-400"
+        />
+        <span className="font-medium text-white flex-1">{page.name}</span>
+        <span className="text-xs text-gray-500">#{page.order ?? 0}</span>
+        <div
+          className="flex items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {onMoveUp && (
+            <button
+              onClick={onMoveUp}
+              className="p-1 text-gray-500 hover:text-white"
+              title="Move up"
+            >
+              <DynamicIcon name="ChevronUp" className="w-4 h-4" />
+            </button>
+          )}
+          {onMoveDown && (
+            <button
+              onClick={onMoveDown}
+              className="p-1 text-gray-500 hover:text-white"
+              title="Move down"
+            >
+              <DynamicIcon name="ChevronDown" className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={onDelete}
+            className="p-1 text-gray-500 hover:text-red-400"
+            title="Delete page"
+          >
+            <DynamicIcon name="Trash2" className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div className="p-4 space-y-4 bg-gray-900/50">
+          {/* Page Info */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">ID</label>
+              <input
+                type="text"
+                value={page.id}
+                onChange={(e) =>
+                  onUpdate({
+                    ...page,
+                    id: e.target.value
+                      .toLowerCase()
+                      .replace(/[^a-z0-9_-]/g, ""),
+                  })
+                }
+                className="w-full px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-white text-sm"
+                placeholder="page-id"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Name</label>
+              <input
+                type="text"
+                value={page.name}
+                onChange={(e) => onUpdate({ ...page, name: e.target.value })}
+                className="w-full px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-white text-sm"
+                placeholder="Page Name"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Order</label>
+              <input
+                type="number"
+                value={page.order ?? 0}
+                onChange={(e) =>
+                  onUpdate({ ...page, order: parseInt(e.target.value) || 0 })
+                }
+                className="w-full px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-white text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Icon Selection */}
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Icon</label>
+            <div className="flex flex-wrap gap-1">
+              {PAGE_ICONS.map((icon) => (
+                <button
+                  key={icon}
+                  onClick={() => onUpdate({ ...page, icon })}
+                  className={`p-1.5 rounded ${
+                    page.icon === icon
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                  }`}
+                  title={icon}
+                >
+                  <DynamicIcon name={icon} className="w-4 h-4" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Template Editor */}
+          <div>
+            <label className="block text-xs text-gray-400 mb-2">Template</label>
+
+            {/* HTML/CSS/JS Tabs */}
+            <div className="flex gap-1 border-b border-gray-700 mb-2">
+              <button
+                onClick={() => setActiveTab("html")}
+                className={`px-3 py-1.5 text-xs font-medium rounded-t ${
+                  activeTab === "html"
+                    ? "bg-gray-800 text-white border-b-2 border-blue-500"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                HTML
+              </button>
+              <button
+                onClick={() => setActiveTab("css")}
+                className={`px-3 py-1.5 text-xs font-medium rounded-t ${
+                  activeTab === "css"
+                    ? "bg-gray-800 text-white border-b-2 border-blue-500"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                CSS
+              </button>
+              <button
+                onClick={() => setActiveTab("js")}
+                className={`px-3 py-1.5 text-xs font-medium rounded-t ${
+                  activeTab === "js"
+                    ? "bg-gray-800 text-white border-b-2 border-yellow-500"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                JS
+              </button>
+            </div>
+
+            {/* Field Placeholders */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              <span className="text-xs text-gray-500 mr-1 py-0.5">Insert:</span>
+              {fields.slice(0, 8).map((field) => (
+                <button
+                  key={field.id}
+                  onClick={() => insertFieldPlaceholder(field.id)}
+                  className="px-1.5 py-0.5 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+                >
+                  {`{{${field.id}}}`}
+                </button>
+              ))}
+              {fields.length > 8 && (
+                <span className="text-xs text-gray-500 py-0.5">
+                  +{fields.length - 8} more
+                </span>
+              )}
+            </div>
+
+            {/* Editor */}
+            <textarea
+              id={`page-${page.id}-${activeTab}`}
+              value={
+                activeTab === "html"
+                  ? page.template.html
+                  : activeTab === "css"
+                  ? page.template.css
+                  : page.template.js || ""
+              }
+              onChange={(e) => updateTemplate({ [activeTab]: e.target.value })}
+              placeholder={
+                activeTab === "html"
+                  ? `<div class="page">\n  <!-- ${page.name} content -->\n</div>`
+                  : activeTab === "css"
+                  ? `.page {\n  padding: 16px;\n}`
+                  : "// Optional JavaScript"
+              }
+              className="w-full h-40 px-2 py-1.5 bg-gray-900 border border-gray-700 rounded font-mono text-xs text-gray-300 resize-y"
+              spellCheck={false}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface PagesEditorProps {
+  pages: SchemaPage[];
+  resources: SchemaResource[] | undefined;
+  fields: SchemaField[];
+  onChange: (pages: SchemaPage[]) => void;
+}
+
+function PagesEditor({ pages, resources, fields, onChange }: PagesEditorProps) {
+  const addPage = () => {
+    const newId = `page_${Date.now()}`;
+    const newOrder =
+      pages.length > 0 ? Math.max(...pages.map((p) => p.order ?? 0)) + 1 : 0;
+    onChange([
+      ...pages,
+      {
+        id: newId,
+        name: "New Page",
+        icon: "FileText",
+        order: newOrder,
+        template: { html: "", css: "", js: "" },
+      },
+    ]);
+  };
+
+  const addPresetPages = () => {
+    const presets: SchemaPage[] = [
+      {
+        id: "overview",
+        name: "Overview",
+        icon: "User",
+        order: 0,
+        template: {
+          html: `<div class="overview-page">
+  <h1>{{characterName}}</h1>
+  <div class="stats-grid">
+    <!-- Add your core stats here -->
+  </div>
+</div>`,
+          css: `.overview-page { padding: 16px; }
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }`,
+          js: "",
+        },
+      },
+      {
+        id: "combat",
+        name: "Combat",
+        icon: "Swords",
+        order: 1,
+        template: {
+          html: `<div class="combat-page">
+  <h2>Combat Stats</h2>
+  <!-- HP, Attack, Defense, etc. -->
+</div>`,
+          css: `.combat-page { padding: 16px; }`,
+          js: "",
+        },
+      },
+      {
+        id: "skills",
+        name: "Skills",
+        icon: "BookOpen",
+        order: 2,
+        template: {
+          html: `<div class="skills-page">
+  <h2>Skills</h2>
+  <!-- Skill list -->
+</div>`,
+          css: `.skills-page { padding: 16px; }`,
+          js: "",
+        },
+      },
+      {
+        id: "inventory",
+        name: "Inventory",
+        icon: "Backpack",
+        order: 3,
+        template: {
+          html: `<div class="inventory-page">
+  <h2>Inventory</h2>
+  {{#each inventory}}
+  <div class="item">{{this}}</div>
+  {{/each}}
+</div>`,
+          css: `.inventory-page { padding: 16px; }
+.item { padding: 4px 8px; background: rgba(255,255,255,0.1); margin: 4px 0; border-radius: 4px; }`,
+          js: "",
+        },
+      },
+    ];
+    onChange([...pages, ...presets]);
+  };
+
+  const updatePage = (index: number, page: SchemaPage) => {
+    const newPages = [...pages];
+    newPages[index] = page;
+    onChange(newPages);
+  };
+
+  const deletePage = (index: number) => {
+    onChange(pages.filter((_, i) => i !== index));
+  };
+
+  const movePage = (index: number, direction: number) => {
+    if (index + direction < 0 || index + direction >= pages.length) return;
+    const newPages = [...pages];
+    const temp = newPages[index];
+    newPages[index] = newPages[index + direction];
+    newPages[index + direction] = temp;
+    // Update order values
+    newPages.forEach((p, i) => (p.order = i));
+    onChange(newPages);
+  };
+
+  // Sort pages by order
+  const sortedPages = [...pages].sort(
+    (a, b) => (a.order ?? 0) - (b.order ?? 0)
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={addPage}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium flex items-center gap-1.5"
+        >
+          <DynamicIcon name="Plus" className="w-4 h-4" />
+          Add Page
+        </button>
+        {pages.length === 0 && (
+          <button
+            onClick={addPresetPages}
+            className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded text-sm font-medium flex items-center gap-1.5"
+          >
+            <DynamicIcon name="Layout" className="w-4 h-4" />
+            Add Preset Pages
+          </button>
+        )}
+      </div>
+
+      {sortedPages.length > 0 ? (
+        <div className="space-y-2">
+          {sortedPages.map((page, index) => {
+            const realIndex = pages.findIndex((p) => p.id === page.id);
+            return (
+              <PageEditor
+                key={page.id}
+                page={page}
+                resources={resources}
+                fields={fields}
+                onUpdate={(p) => updatePage(realIndex, p)}
+                onDelete={() => deletePage(realIndex)}
+                onMoveUp={index > 0 ? () => movePage(realIndex, -1) : undefined}
+                onMoveDown={
+                  index < pages.length - 1
+                    ? () => movePage(realIndex, 1)
+                    : undefined
+                }
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <div className="text-center py-8 text-gray-500">
+          <DynamicIcon
+            name="Layers"
+            className="w-8 h-8 mx-auto mb-2 opacity-50"
+          />
+          <p>No pages yet. Add pages to create a multi-tab character sheet.</p>
+          <p className="text-xs mt-1">
+            Pages replace the single Custom Template with multiple focused tabs.
+          </p>
+        </div>
+      )}
+
+      {/* Info */}
+      <div className="text-xs text-gray-500 p-3 bg-gray-800/50 rounded">
+        <p>
+          <strong>Pages vs Template:</strong> If you have pages, they will
+          appear as separate tabs in the stats panel. The single &quot;Custom
+          Template&quot; is for legacy support or simple sheets.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -930,7 +1550,7 @@ export default function CharacterSchemaEditor({
 }) {
   const [showPresets, setShowPresets] = useState(!schema);
   const [activeTab, setActiveTab] = useState<
-    "fields" | "template" | "resources"
+    "fields" | "pages" | "template" | "resources"
   >("fields");
 
   // Create empty schema if none exists
@@ -1126,10 +1746,10 @@ export default function CharacterSchemaEditor({
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 border-b border-gray-700">
+      <div className="flex gap-1 border-b border-gray-700 overflow-x-auto">
         <button
           onClick={() => setActiveTab("fields")}
-          className={`px-4 py-2 font-medium rounded-t flex items-center gap-2 ${
+          className={`px-4 py-2 font-medium rounded-t flex items-center gap-2 whitespace-nowrap ${
             activeTab === "fields"
               ? "bg-gray-800 text-white border-b-2 border-blue-500"
               : "text-gray-400 hover:text-white"
@@ -1142,22 +1762,38 @@ export default function CharacterSchemaEditor({
           </span>
         </button>
         <button
+          onClick={() => setActiveTab("pages")}
+          className={`px-4 py-2 font-medium rounded-t flex items-center gap-2 whitespace-nowrap ${
+            activeTab === "pages"
+              ? "bg-gray-800 text-white border-b-2 border-cyan-500"
+              : "text-gray-400 hover:text-white"
+          }`}
+        >
+          <DynamicIcon name="Layers" className="w-4 h-4" />
+          Pages
+          {currentSchema.pages && currentSchema.pages.length > 0 && (
+            <span className="text-xs bg-gray-700 px-1.5 rounded">
+              {currentSchema.pages.length}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab("template")}
-          className={`px-4 py-2 font-medium rounded-t flex items-center gap-2 ${
+          className={`px-4 py-2 font-medium rounded-t flex items-center gap-2 whitespace-nowrap ${
             activeTab === "template"
               ? "bg-gray-800 text-white border-b-2 border-purple-500"
               : "text-gray-400 hover:text-white"
           }`}
         >
           <DynamicIcon name="Code" className="w-4 h-4" />
-          Custom Template
+          Template
           {currentSchema.hasCustomJS && (
             <span className="text-xs text-yellow-400">⚠</span>
           )}
         </button>
         <button
           onClick={() => setActiveTab("resources")}
-          className={`px-4 py-2 font-medium rounded-t flex items-center gap-2 ${
+          className={`px-4 py-2 font-medium rounded-t flex items-center gap-2 whitespace-nowrap ${
             activeTab === "resources"
               ? "bg-gray-800 text-white border-b-2 border-green-500"
               : "text-gray-400 hover:text-white"
@@ -1189,64 +1825,37 @@ export default function CharacterSchemaEditor({
           </div>
 
           {/* Fields */}
-          <div>
-            <h4 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon
-                name="LayoutList"
-                className="w-5 h-5 text-blue-400"
-              />
-              Fields ({currentSchema.fields.length})
-            </h4>
-
-            {/* Add Field Buttons */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {(Object.keys(FIELD_TYPE_INFO) as FieldType[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => addField(type)}
-                  className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm flex items-center gap-1.5"
-                >
-                  <DynamicIcon
-                    name={FIELD_TYPE_INFO[type].icon}
-                    className="w-4 h-4"
-                  />
-                  {FIELD_TYPE_INFO[type].label}
-                </button>
-              ))}
-            </div>
-
-            {/* Field List */}
-            <div className="space-y-2">
-              {currentSchema.fields.map((field, index) => (
-                <FieldEditor
-                  key={field.id}
-                  field={field}
-                  categories={currentSchema.categories || []}
-                  onUpdate={(f) => updateField(index, f)}
-                  onDelete={() => deleteField(index)}
-                  onMoveUp={index > 0 ? () => moveField(index, -1) : undefined}
-                  onMoveDown={
-                    index < currentSchema.fields.length - 1
-                      ? () => moveField(index, 1)
-                      : undefined
-                  }
-                />
-              ))}
-
-              {currentSchema.fields.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <DynamicIcon
-                    name="PlusCircle"
-                    className="w-8 h-8 mx-auto mb-2 opacity-50"
-                  />
-                  <p>
-                    No fields yet. Click a button above to add your first field.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+          <FieldsSection
+            fields={currentSchema.fields}
+            categories={currentSchema.categories || []}
+            onAddField={addField}
+            onUpdateField={updateField}
+            onDeleteField={deleteField}
+            onMoveField={moveField}
+          />
         </>
+      )}
+
+      {activeTab === "pages" && (
+        <div>
+          <div className="mb-4">
+            <h4 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+              <DynamicIcon name="Layers" className="w-5 h-5 text-cyan-400" />
+              Character Sheet Pages
+            </h4>
+            <p className="text-sm text-gray-400">
+              Create multiple pages for your character sheet. Each page appears
+              as a separate tab in the stats panel, allowing you to organize
+              information (Overview, Combat, Skills, Inventory, etc.).
+            </p>
+          </div>
+          <PagesEditor
+            pages={currentSchema.pages || []}
+            resources={currentSchema.resources}
+            fields={currentSchema.fields}
+            onChange={(pages) => updateSchema({ pages })}
+          />
+        </div>
       )}
 
       {activeTab === "template" && (
@@ -1254,12 +1863,22 @@ export default function CharacterSchemaEditor({
           <div className="mb-4">
             <h4 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
               <DynamicIcon name="Code" className="w-5 h-5 text-purple-400" />
-              Custom Template
+              Custom Template (Legacy)
             </h4>
             <p className="text-sm text-gray-400">
-              Create a custom HTML/CSS layout for your character sheet. Use
-              field placeholders to display values. When no template is defined,
-              the default field editor is used.
+              {currentSchema.pages && currentSchema.pages.length > 0 ? (
+                <span className="text-yellow-400">
+                  ⚠ You have Pages defined. This single template is only used
+                  for backwards compatibility. Consider using Pages instead for
+                  a better multi-tab experience.
+                </span>
+              ) : (
+                <>
+                  Create a single custom HTML/CSS layout for your character
+                  sheet. For multi-tab support, use the <strong>Pages</strong>{" "}
+                  tab instead.
+                </>
+              )}
             </p>
           </div>
           <TemplateEditor

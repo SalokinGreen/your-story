@@ -534,6 +534,33 @@ export function processTemplate(
 ): string {
   let result = template;
 
+  // Helper to evaluate comparison expressions
+  const evalCompare = (
+    fieldId: string,
+    op: string,
+    compareValue: string
+  ): boolean => {
+    const value = getNumericValue(values, fieldId);
+    const compare = parseFloat(compareValue) || 0;
+
+    switch (op) {
+      case "==":
+        return value === compare;
+      case "!=":
+        return value !== compare;
+      case ">":
+        return value > compare;
+      case "<":
+        return value < compare;
+      case ">=":
+        return value >= compare;
+      case "<=":
+        return value <= compare;
+      default:
+        return false;
+    }
+  };
+
   // Resource URL substitution: {{resource:id}}
   result = result.replace(/\{\{resource:([a-zA-Z0-9_-]+)\}\}/g, (_, id) => {
     const resource = resources?.find((r) => r.id === id);
@@ -561,35 +588,19 @@ export function processTemplate(
   result = result.replace(
     /\{\{#compare\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"]+)"\s+"?([^"}\s]+)"?\}\}([\s\S]*?)\{\{\/compare\}\}/g,
     (_, fieldId, op, compareValue, content) => {
-      const value = getNumericValue(values, fieldId);
-      const compare = parseFloat(compareValue) || 0;
-      let condition = false;
-
-      switch (op) {
-        case "==":
-          condition = value === compare;
-          break;
-        case "!=":
-          condition = value !== compare;
-          break;
-        case ">":
-          condition = value > compare;
-          break;
-        case "<":
-          condition = value < compare;
-          break;
-        case ">=":
-          condition = value >= compare;
-          break;
-        case "<=":
-          condition = value <= compare;
-          break;
-      }
-      return condition ? content : "";
+      return evalCompare(fieldId, op, compareValue) ? content : "";
     }
   );
 
-  // Process {{#if fieldId}}...{{/if}} blocks
+  // Process {{#if (compare fieldId "op" value)}}...{{/if}} - nested comparison syntax
+  result = result.replace(
+    /\{\{#if\s+\(compare\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"]+)"\s+"?([^")}\s]+)"?\)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+    (_, fieldId, op, compareValue, content) => {
+      return evalCompare(fieldId, op, compareValue) ? content : "";
+    }
+  );
+
+  // Process {{#if fieldId}}...{{/if}} blocks (simple truthy check)
   result = result.replace(
     /\{\{#if\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}([\s\S]*?)\{\{\/if\}\}/g,
     (_, fieldId, content) => {
@@ -601,6 +612,14 @@ export function processTemplate(
         value !== "" &&
         !(Array.isArray(value) && value.length === 0);
       return isTruthy ? content : "";
+    }
+  );
+
+  // Process {{#unless (compare fieldId "op" value)}}...{{/unless}} - nested comparison syntax
+  result = result.replace(
+    /\{\{#unless\s+\(compare\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"]+)"\s+"?([^")}\s]+)"?\)\}\}([\s\S]*?)\{\{\/unless\}\}/g,
+    (_, fieldId, op, compareValue, content) => {
+      return !evalCompare(fieldId, op, compareValue) ? content : "";
     }
   );
 
@@ -653,19 +672,46 @@ export function processTemplate(
     }
   );
 
-  // Simple value substitution: {{fieldId}}
-  result = result.replace(/\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g, (_, fieldId) => {
-    const value = values[fieldId];
-    if (value === undefined) return "";
-    if (typeof value === "boolean") return value ? "Yes" : "No";
-    if (Array.isArray(value)) return value.join(", ");
-    if (typeof value === "object" && "current" in value) {
-      return `${value.current}/${value.max}`;
+  // Process {{fieldId.trueLabel || 'fallback'}} and {{fieldId.falseLabel || 'fallback'}} for booleans
+  result = result.replace(
+    /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\.(trueLabel|falseLabel)\s*(?:\|\|\s*['"]([^'"]*)['"]\s*)?\}\}/g,
+    (_, fieldId, prop, fallback) => {
+      const value = values[fieldId];
+      if (typeof value === "boolean") {
+        if (prop === "trueLabel") {
+          return value ? fallback || "Yes" : "";
+        } else {
+          return !value ? fallback || "No" : "";
+        }
+      }
+      return fallback ?? "";
     }
-    return String(value);
-  });
+  );
+
+  // Simple value substitution: {{fieldId}} or {{fieldId || 'fallback'}}
+  result = result.replace(
+    /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:\|\|\s*['"]([^'"]*)['"]\s*)?\}\}/g,
+    (_, fieldId, fallback) => {
+      const value = values[fieldId];
+      if (value === undefined || value === null || value === "") {
+        return fallback ?? "";
+      }
+      if (typeof value === "boolean") return value ? "Yes" : "No";
+      if (Array.isArray(value)) return value.join(", ");
+      if (typeof value === "object" && "current" in value) {
+        return `${value.current}/${value.max}`;
+      }
+      return String(value);
+    }
+  );
 
   return result;
+}
+
+/** Extra context values that can be used in templates beyond schema fields */
+export interface TemplateContext {
+  playerName?: string;
+  playerSummary?: string;
 }
 
 /**
@@ -673,20 +719,33 @@ export function processTemplate(
  */
 export function buildTemplateDocument(
   schema: CharacterSchema,
-  values: Record<string, CharacterFieldValue>
+  values: Record<string, CharacterFieldValue>,
+  context?: TemplateContext
 ): string {
   if (!schema.template) return "";
 
+  // Merge context values with field values (context values take precedence as fallbacks)
+  const allValues: Record<string, CharacterFieldValue> = {
+    ...values,
+    // Add context values if not already defined in schema fields
+    ...(context?.playerName && !values.playerName
+      ? { playerName: context.playerName }
+      : {}),
+    ...(context?.playerSummary && !values.playerSummary
+      ? { playerSummary: context.playerSummary }
+      : {}),
+  };
+
   const processedHtml = processTemplate(
     schema.template.html,
-    values,
+    allValues,
     schema.resources
   );
   const css = schema.template.css || "";
   const js = schema.template.js || "";
 
-  // Create values object for JS access
-  const valuesJson = JSON.stringify(values);
+  // Create values object for JS access (include context values)
+  const valuesJson = JSON.stringify(allValues);
 
   return `
 <!DOCTYPE html>
@@ -705,9 +764,6 @@ export function buildTemplateDocument(
       overflow: visible;
       height: auto;
     }
-    body {
-      padding: 16px;
-    }
     ${css}
   </style>
 </head>
@@ -722,6 +778,17 @@ export function buildTemplateDocument(
       return window.characterData[fieldId];
     };
     
+    // Report height to parent
+    function reportHeight() {
+      const height = Math.max(
+        document.body.scrollHeight,
+        document.body.offsetHeight,
+        document.documentElement.scrollHeight,
+        document.documentElement.offsetHeight
+      );
+      window.parent.postMessage({ type: 'iframeHeight', height: height }, '*');
+    }
+    
     // Custom JS from template (runs after DOM is ready)
     document.addEventListener('DOMContentLoaded', function() {
       try {
@@ -729,6 +796,18 @@ export function buildTemplateDocument(
       } catch (e) {
         console.error('Template JS error:', e);
       }
+      // Report height after content loads
+      reportHeight();
+      setTimeout(reportHeight, 100);
+      setTimeout(reportHeight, 300);
+      setTimeout(reportHeight, 500);
+      setTimeout(reportHeight, 1000);
+    });
+    
+    // Also report on window load (for images/fonts)
+    window.addEventListener('load', function() {
+      reportHeight();
+      setTimeout(reportHeight, 100);
     });
   </script>
 </body>
@@ -742,20 +821,32 @@ export function buildTemplateDocument(
 export function buildPageTemplateDocument(
   page: SchemaPage,
   schema: CharacterSchema,
-  values: Record<string, CharacterFieldValue>
+  values: Record<string, CharacterFieldValue>,
+  context?: TemplateContext
 ): string {
   if (!page.template) return "";
 
+  // Merge context values with field values
+  const allValues: Record<string, CharacterFieldValue> = {
+    ...values,
+    ...(context?.playerName && !values.playerName
+      ? { playerName: context.playerName }
+      : {}),
+    ...(context?.playerSummary && !values.playerSummary
+      ? { playerSummary: context.playerSummary }
+      : {}),
+  };
+
   const processedHtml = processTemplate(
     page.template.html,
-    values,
+    allValues,
     schema.resources
   );
   const css = page.template.css || "";
   const js = page.template.js || "";
 
-  // Create values object for JS access
-  const valuesJson = JSON.stringify(values);
+  // Create values object for JS access (include context values)
+  const valuesJson = JSON.stringify(allValues);
 
   return `
 <!DOCTYPE html>
@@ -774,9 +865,6 @@ export function buildPageTemplateDocument(
       overflow: visible;
       height: auto;
     }
-    body {
-      padding: 16px;
-    }
     ${css}
   </style>
 </head>
@@ -791,6 +879,17 @@ export function buildPageTemplateDocument(
       return window.characterData[fieldId];
     };
     
+    // Report height to parent
+    function reportHeight() {
+      const height = Math.max(
+        document.body.scrollHeight,
+        document.body.offsetHeight,
+        document.documentElement.scrollHeight,
+        document.documentElement.offsetHeight
+      );
+      window.parent.postMessage({ type: 'iframeHeight', height: height }, '*');
+    }
+    
     // Custom JS from template (runs after DOM is ready)
     document.addEventListener('DOMContentLoaded', function() {
       try {
@@ -798,6 +897,18 @@ export function buildPageTemplateDocument(
       } catch (e) {
         console.error('Page JS error:', e);
       }
+      // Report height after content loads
+      reportHeight();
+      setTimeout(reportHeight, 100);
+      setTimeout(reportHeight, 300);
+      setTimeout(reportHeight, 500);
+      setTimeout(reportHeight, 1000);
+    });
+    
+    // Also report on window load (for images/fonts)
+    window.addEventListener('load', function() {
+      reportHeight();
+      setTimeout(reportHeight, 100);
     });
   </script>
 </body>
