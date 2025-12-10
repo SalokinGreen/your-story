@@ -563,7 +563,7 @@ export const AI_MODELS = {
     original_model: "ministral-14b-2512",
     model: "ministral-14b-2512",
     maxTokens: 256000,
-    maxOutputTokens: 8000,
+    maxOutputTokens: 100000,
     provider: "mistral",
     supportsToolCalling: true,
     cost: 1,

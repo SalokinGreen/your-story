@@ -56,6 +56,7 @@ import { DraggableScroll } from "@/app/components/DraggableScroll";
 import { ClockCategorySelector } from "@/app/components/ClockCategorySelector";
 import LoreImageGenerator from "@/app/components/LoreImageGenerator";
 import MassLoreImageGenerator from "@/app/components/MassLoreImageGenerator";
+import PDFImporter from "@/app/components/PDFImporter";
 import {
   GRADE_CONFIG,
   getMaxDurability,
@@ -6054,6 +6055,38 @@ ${description || ""}`;
                 </span>
               </p>
             </div>
+
+            {/* PDF Import */}
+            <PDFImporter
+              onImportComplete={(data) => {
+                // Merge imported lore with existing
+                const newLoreEntries = [...data.lore, ...data.mechanicNotes];
+                if (newLoreEntries.length > 0) {
+                  setLore((prev) => [...prev, ...newLoreEntries]);
+                  addNotification(
+                    `Added ${newLoreEntries.length} notes from PDF`,
+                    "success"
+                  );
+                }
+                // Merge custom tables
+                if (data.customTables.length > 0) {
+                  setCustomTables((prev) => [...prev, ...data.customTables]);
+                  addNotification(
+                    `Added ${data.customTables.length} custom tables from PDF`,
+                    "success"
+                  );
+                }
+                // Merge variables
+                if (data.variables.length > 0) {
+                  setVariables((prev) => [...prev, ...data.variables]);
+                  addNotification(
+                    `Added ${data.variables.length} variables from PDF`,
+                    "success"
+                  );
+                }
+              }}
+              buttonText="Import Notes from PDF"
+            />
 
             <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
               <h3 className="text-lg font-bold mb-4 text-white">Add Note</h3>

@@ -7,6 +7,7 @@ import { useAuth } from "@/app/misc/AuthContext";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { getAuthToken } from "@/app/misc/getAuthToken";
+import PDFImporter from "@/app/components/PDFImporter";
 import {
   BigAdventureConfig,
   ComplexityLevel,
@@ -78,6 +79,7 @@ import {
   Quest,
   Relationship,
   Variable,
+  CustomTable,
 } from "@/app/misc/structs";
 import { AdventureVisualization } from "./AdventureVisualization";
 
@@ -3454,30 +3456,144 @@ ${result.description || ""}`;
                   </div>
                 )}
 
-                {/* Import Option */}
+                {/* Import Options */}
                 <div className="flex items-center gap-4 pt-2">
                   <div className="flex-1 h-px bg-blue-800/30" />
-                  <span className="text-xs text-blue-300/50">or</span>
+                  <span className="text-xs text-blue-300/50">
+                    or import from
+                  </span>
                   <div className="flex-1 h-px bg-blue-800/30" />
                 </div>
-                <div className="text-center">
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={importAdventure}
-                    className="hidden"
-                    id="import-config-input"
-                  />
-                  <label
-                    htmlFor="import-config-input"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-blue-300 rounded-lg transition-colors text-sm cursor-pointer"
-                  >
-                    📥 Import Existing Adventure JSON
-                  </label>
-                  <p className="text-xs text-blue-300/40 mt-2">
-                    Import a previously exported adventure to modify or
-                    regenerate sections
-                  </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* JSON Import */}
+                  <div className="text-center p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={importAdventure}
+                      className="hidden"
+                      id="import-config-input"
+                    />
+                    <label
+                      htmlFor="import-config-input"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-blue-300 rounded-lg transition-colors text-sm cursor-pointer"
+                    >
+                      📥 Import Adventure JSON
+                    </label>
+                    <p className="text-xs text-blue-300/40 mt-2">
+                      Import a previously exported adventure
+                    </p>
+                  </div>
+
+                  {/* PDF Import */}
+                  <div className="text-center p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
+                    <PDFImporter
+                      compact
+                      buttonText="📄 Import from PDF"
+                      onImportComplete={(result) => {
+                        // Store imported content to be merged into final adventure
+                        updateConfig({
+                          importedLore: [
+                            ...(config.importedLore || []),
+                            ...(result.lore || []),
+                          ],
+                          importedMechanicsNotes: [
+                            ...(config.importedMechanicsNotes || []),
+                            ...(result.mechanicNotes || []),
+                          ],
+                          importedCustomTables: [
+                            ...(config.importedCustomTables || []),
+                            ...(result.customTables || []),
+                          ],
+                          importedVariables: [
+                            ...(config.importedVariables || []),
+                            ...(result.variables || []),
+                          ],
+                        });
+
+                        // Also append a summary to the prompt for AI context
+                        const sourceNotes = [
+                          result.lore?.length
+                            ? `\n\n## World Lore from Source Material:\n${result.lore
+                                .map(
+                                  (l) =>
+                                    `- **${l.title}**: ${l.content.slice(
+                                      0,
+                                      200
+                                    )}...`
+                                )
+                                .join("\n")}`
+                            : "",
+                          result.mechanicNotes?.length
+                            ? `\n\n## Game Mechanics from Source Material:\n${result.mechanicNotes
+                                .map(
+                                  (n: StoryLore) =>
+                                    `- **${n.title}**: ${n.content.slice(
+                                      0,
+                                      200
+                                    )}...`
+                                )
+                                .join("\n")}`
+                            : "",
+                          result.customTables?.length
+                            ? `\n\n## Tables from Source Material:\n${result.customTables
+                                .map(
+                                  (t: CustomTable) =>
+                                    `- **${t.name}**: ${t.entries.length} entries`
+                                )
+                                .join("\n")}`
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join("");
+
+                        if (sourceNotes) {
+                          const newPrompt = (config.prompt || "") + sourceNotes;
+                          updateConfig({ prompt: newPrompt });
+                        }
+
+                        addNotification(
+                          `Imported ${result.lore?.length || 0} lore, ${
+                            result.mechanicNotes?.length || 0
+                          } mechanics, ${
+                            result.customTables?.length || 0
+                          } tables - will be merged into final adventure`,
+                          "success"
+                        );
+                      }}
+                    />
+                    <p className="text-xs text-blue-300/40 mt-2">
+                      Extract lore & mechanics from RPG PDFs
+                    </p>
+                    {/* Show imported content counts */}
+                    {(config.importedLore?.length || 0) +
+                      (config.importedMechanicsNotes?.length || 0) +
+                      (config.importedCustomTables?.length || 0) +
+                      (config.importedVariables?.length || 0) >
+                      0 && (
+                      <div className="mt-2 text-xs text-green-400 flex items-center justify-center gap-2">
+                        <span>✓ Imported:</span>
+                        {(config.importedLore?.length || 0) > 0 && (
+                          <span>{config.importedLore?.length} lore</span>
+                        )}
+                        {(config.importedMechanicsNotes?.length || 0) > 0 && (
+                          <span>
+                            {config.importedMechanicsNotes?.length} mechanics
+                          </span>
+                        )}
+                        {(config.importedCustomTables?.length || 0) > 0 && (
+                          <span>
+                            {config.importedCustomTables?.length} tables
+                          </span>
+                        )}
+                        {(config.importedVariables?.length || 0) > 0 && (
+                          <span>
+                            {config.importedVariables?.length} variables
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* NSFW Toggle */}

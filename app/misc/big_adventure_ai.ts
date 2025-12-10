@@ -136,6 +136,12 @@ export interface BigAdventureConfig {
   // Generation style controls (Phase 4)
   temperature?: number; // 0.3 = focused, 1.0 = creative
   stylePreset?: StylePreset;
+
+  // Imported content from PDF - merged into final result
+  importedLore?: import("./structs").StoryLore[];
+  importedMechanicsNotes?: import("./structs").StoryLore[];
+  importedCustomTables?: import("./structs").CustomTable[];
+  importedVariables?: import("./structs").Variable[];
 }
 
 // Style presets for different narrative tones
@@ -1151,27 +1157,27 @@ PART 1: CHARACTER SCHEMA
 
 Design a complete character sheet with these REQUIRED elements:
 
-A. CORE ATTRIBUTES (4-8 fields):
-   Create the fundamental stats that define a character.
+A. CORE ATTRIBUTES:
+   Create the fundamental stats that define a character - as many as your system needs.
    Examples: Strength, Dexterity, Intelligence, Charisma, Willpower, Perception
-   Type: "number" with range 1-100 (50 = human average)
+   Type: "number" - use a scale appropriate to your RPG system (e.g., 3-18 for D&D-style, 1-10 for simple systems, percentile for d100)
 
-B. DERIVED STATS (2-4 fields):
+B. DERIVED STATS (optional):
    Calculated from core attributes using formulas.
    Formula syntax: "floor(({{attribute}} - 10) / 2)" or "{{stat1}} + {{stat2}}"
    Examples: Attack Bonus, Defense Rating, Initiative Modifier
 
-C. SKILLS (6-12 fields):
-   Specific trained abilities linked to attributes.
-   Type: "number" representing proficiency level (0-100)
+C. SKILLS:
+   Specific trained abilities linked to attributes - include as many as appropriate for the system.
+   Type: "number" representing proficiency or bonus (scale should match your attribute system)
    Examples: Athletics, Stealth, Persuasion, Arcana, Medicine, Investigation
 
-D. RESOURCES (2-4 fields):
-   Pools that deplete and regenerate.
+D. RESOURCES:
+   Pools that deplete and regenerate - as many as your system requires.
    Type: "resource" with current/max values
    Examples: Health, Mana, Stamina, Sanity, Stress, Luck Points
 
-E. CHARACTER IDENTITY (3-6 fields):
+E. CHARACTER IDENTITY:
    - "select" type for class/archetype (REQUIRED - see Part 2)
    - "text" for character name, backstory
    - "list" for inventory, languages, known spells
@@ -1193,7 +1199,7 @@ FIELD TYPE REFERENCE:
 PART 2: CLASSES/ARCHETYPES (REQUIRED)
 ═══════════════════════════════════════════════════════════════
 
-Create 4-6 distinct character classes/archetypes as a "select" field.
+Create distinct character classes/archetypes as a "select" field - as many as fit the setting.
 Each class should have:
 - Unique name and playstyle
 - Suggested stat priorities
@@ -1251,19 +1257,27 @@ CRITICAL - ALSO CREATE THESE GM GUIDELINES:
    - Typical stat ranges (weak enemies: 20-35, average: 40-55, strong: 60-75, boss: 80+)
    - HP guidelines (minions: 10-30, regular: 50-100, elite: 150-250, boss: 300+)
    - How enemy damage/abilities scale with player level
-   - Example stat blocks for common enemy types
+   - Example stat blocks for common enemy types SPECIFIC TO THIS SETTING
 
-8. "Item Guidelines" - How items work mechanically:
+8. "Item Guidelines" - How items work mechanically in THIS setting:
+   - Create UNIQUE item types that fit the setting (not generic fantasy items!)
    - Item grades and their bonuses (common: +0, uncommon: +1, rare: +2, epic: +3, legendary: +5)
    - Durability system (items can break on failed checks)
    - Consumable vs equipment vs story items
-   - How to create balanced custom items
-   - Suggested item rewards per adventure tier
+   - How to create balanced custom items FOR THIS WORLD
+   - Suggested item rewards per adventure tier with SETTING-SPECIFIC examples
 
-9. "Encounter Design" - How to build balanced encounters:
+9. "Rest & Recovery" - How resources regenerate IN THIS WORLD:
+   - MUST be unique to the setting (NOT generic "rest at inn" or "healing potion")
+   - Examples: cyber-meditation, prayer to specific gods, alchemical tonics, dream-walking, etc.
+   - Quick rest (30 min): What makes sense for this world?
+   - Short rest (4-8 hours): How does sleep/recovery work here?
+   - Long rest (days): Extended downtime activities specific to the setting
+
+10. "Encounter Design" - How to build balanced encounters:
    - Single enemy vs group tactics
    - When to use scene challenges vs single checks
-   - Environmental hazards and how to represent them
+   - Environmental hazards specific to this setting
    - Escape/non-combat resolution options
 
 Each entry should be 2-3 detailed paragraphs explaining the mechanic clearly.
@@ -1273,38 +1287,41 @@ STARTING VALUES (Level 1 - START WEAK):
 - Skills: Most 15-30, trained skills 35-50
 - Resources: Appropriate starting pools
 
+CRITICAL: CREATE UNIQUE, ADVENTURE-SPECIFIC CONTENT!
+- Do NOT use generic fantasy items (no "Leather armor", "Short sword", "Torch")
+- Do NOT use D&D-style classes (no "Warrior/Mage/Rogue" unless it fits the specific setting)
+- Do NOT use generic healing/rest mechanics copied from other systems
+- All items, classes, abilities MUST be thematically specific to THIS adventure's setting
+- Rest & recovery mechanics should be unique to the world (meditation, prayer, alchemy, technology, etc.)
+
 OUTPUT JSON SCHEMA:
 {
   "characterSchema": {
     "version": 1,
-    "name": "string (system name, e.g., 'Dark Fantasy RPG')",
+    "name": "string (unique system name for THIS adventure)",
     "description": "string (brief system description)",
     "fields": [
-      { "id": "strength", "name": "Strength", "type": "number", "category": "attributes", "description": "Physical power", "defaultValue": 30, "min": 1, "max": 100 },
-      { "id": "hp", "name": "Hit Points", "type": "resource", "category": "combat", "description": "Life force", "defaultValue": 25, "defaultMax": 25, "regenerates": true },
-      { "id": "str_mod", "name": "STR Mod", "type": "derived", "category": "modifiers", "formula": "floor(({{strength}} - 10) / 2)" },
-      { "id": "class", "name": "Class", "type": "select", "category": "identity", "options": [
-        {"value": "warrior", "label": "Warrior - Frontline combatant"},
-        {"value": "mage", "label": "Mage - Arcane spellcaster"},
-        {"value": "rogue", "label": "Rogue - Stealth and cunning"}
-      ], "defaultValue": "warrior" },
-      { "id": "inventory", "name": "Inventory", "type": "list", "category": "equipment", "defaultValue": ["Starting item 1"] }
+      { "id": "stat_id", "name": "Stat Name", "type": "number", "category": "category_id", "description": "What this measures", "defaultValue": 30, "min": 1, "max": 100 },
+      { "id": "resource_id", "name": "Resource Name", "type": "resource", "category": "category_id", "description": "What this represents", "defaultValue": 25, "defaultMax": 25, "regenerates": true },
+      { "id": "derived_id", "name": "Derived Stat", "type": "derived", "category": "category_id", "formula": "floor(({{stat_id}} - 10) / 2)" },
+      { "id": "class_id", "name": "Background/Role/Class", "type": "select", "category": "category_id", "options": [
+        {"value": "option1", "label": "Role 1 - Description specific to setting"},
+        {"value": "option2", "label": "Role 2 - Description specific to setting"},
+        {"value": "option3", "label": "Role 3 - Description specific to setting"}
+      ], "defaultValue": "option1" },
+      { "id": "inventory", "name": "Inventory/Equipment/Gear", "type": "list", "category": "category_id", "defaultValue": ["Setting-appropriate item"] }
     ],
     "categories": [
-      { "id": "identity", "name": "Identity", "order": 0 },
-      { "id": "attributes", "name": "Attributes", "order": 1 },
-      { "id": "combat", "name": "Combat", "order": 2 },
-      { "id": "skills", "name": "Skills", "order": 3 },
-      { "id": "equipment", "name": "Equipment", "order": 4 }
+      { "id": "category_id", "name": "Category Name", "order": 0 }
     ]
   },
   "characterData": {
     "values": {
-      "strength": 30,
-      "hp": { "current": 25, "max": 25 },
-      "str_mod": 2,
-      "class": "warrior",
-      "inventory": ["Leather armor", "Short sword", "Torch x3"]
+      "stat_id": 30,
+      "resource_id": { "current": 25, "max": 25 },
+      "derived_id": 2,
+      "class_id": "option1",
+      "inventory": ["Item appropriate to setting and player background"]
     }
   },
   "mechanicsLore": [
@@ -1318,7 +1335,7 @@ OUTPUT JSON SCHEMA:
     }
   ],
   "variables": [
-    { "id": "var_quest_stage", "name": "Main Quest Stage", "type": "number", "value": 1, "minValue": 1, "maxValue": 10 }
+    { "id": "var_story_id", "name": "Story Variable Name", "type": "number", "value": 1, "minValue": 1, "maxValue": 10 }
   ]
 }
 
@@ -1629,11 +1646,19 @@ This is for players who want to create their own character (self-insert).
 - intro should be generic, letting the player define their own backstory
 - Include basic starting gear in inventory and no special abilities beyond novice level
 
+CRITICAL - USE SETTING-APPROPRIATE ITEMS:
+- Each preset's inventory MUST contain items thematically appropriate to THIS adventure's setting
+- Do NOT use generic fantasy items (no "Leather armor", "Short sword", "Torch", "Healing potion")
+- Items should reflect the character's background and the world they live in
+- Examples: A cyberpunk hacker might have "Data spike", "Neural interface", "Stimpack"
+- Examples: A Lovecraftian investigator might have "Dog-eared journal", "Revolver", "Strange amulet"
+
 CHARACTER FIELD VALUES FOR PRESETS (LEVEL 1 CHARACTERS - START WEAK):
-- For number stats: Range 1-100 where 50 is human average
-- MOST stats should be below 25 (untrained/weak areas)
-- A FEW stats (2-3) can be between 25-45 (developing skills)
-- Only ONE or TWO stats around 60-70 (natural talent/specialty)
+- Use values appropriate to your chosen stat scale (D&D 3-18, simple 1-10, percentile, etc.)
+- MOST stats should be below average (untrained/weak areas)
+- A FEW stats (2-3) should be slightly above average (developing skills)
+- Only ONE or TWO stats should be notably high (natural talent/specialty)
+- Starting characters should feel capable but not overpowered
 
 OUTPUT JSON SCHEMA:
 {
@@ -1754,7 +1779,12 @@ Configure how quickly players level up and how many upgrade points they receive.
 UPGRADE SHOP:
 Configure the progression/upgrade system where players spend points.
 
-STAT VALUES: Range 1-100 where 50 is human average.
+CRITICAL - SETTING-SPECIFIC SHOP ITEMS:
+- All shop items MUST be thematically appropriate to THIS adventure's setting
+- Do NOT use generic fantasy items (no "Healing Potion", "Sword", "Shield", "Rations")
+- Item names and descriptions should reflect the world's technology, magic system, culture
+- Example: Sci-fi might have "Stim-injector", "Plasma cutter", "Personal shield emitter"
+- Example: Victorian horror might have "Laudanum tincture", "Silver-tipped cane", "Spirit ward"
 `;
       schemaFields.push(`"upgradeSettings": {
     "enabled": true,
@@ -2618,10 +2648,61 @@ export function mergeBigAdventureResults(
     }
 
     if (result.storyTemplate) {
-      merged.storyTemplate = {
+      // Merge array fields by concatenation instead of replacement
+      const arrayFields = [
+        "lore",
+        "abilities",
+        "achievements",
+        "quests",
+        "presets",
+        "customTables",
+        "variables",
+        "relationships",
+        "inventory",
+        "stats",
+        "resources",
+        "conditions",
+      ] as const;
+
+      // Create a new storyTemplate with merged arrays
+      const mergedTemplate = {
         ...merged.storyTemplate,
         ...result.storyTemplate,
       };
+
+      // Helper to get unique identifier from any item
+      const getItemId = (item: unknown): string => {
+        if (typeof item === "string" || typeof item === "number") {
+          return String(item);
+        }
+        if (item && typeof item === "object") {
+          const obj = item as { name?: string; title?: string; id?: string };
+          return String(
+            obj.name || obj.title || obj.id || JSON.stringify(item)
+          );
+        }
+        return JSON.stringify(item);
+      };
+
+      // For each array field, concatenate instead of replace
+      for (const field of arrayFields) {
+        const existingArray = merged.storyTemplate[field];
+        const newArray =
+          result.storyTemplate[field as keyof typeof result.storyTemplate];
+        if (Array.isArray(existingArray) && Array.isArray(newArray)) {
+          // Concatenate arrays, avoiding duplicates by name/title/id
+          const existingIds = new Set(existingArray.map(getItemId));
+          const uniqueNewItems = newArray.filter(
+            (item) => !existingIds.has(getItemId(item))
+          );
+          (mergedTemplate as Record<string, unknown>)[field] = [
+            ...existingArray,
+            ...uniqueNewItems,
+          ];
+        }
+      }
+
+      merged.storyTemplate = mergedTemplate;
     }
 
     // Apply icon assignments to elements

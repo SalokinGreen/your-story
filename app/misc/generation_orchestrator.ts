@@ -794,6 +794,41 @@ export async function generateAdventureSequential(
     ...stageResults.filter((r) => r !== null)
   );
 
+  // Merge imported content from config (PDF imports)
+  if (finalResult.storyTemplate) {
+    // Add imported lore entries
+    if (config.importedLore && config.importedLore.length > 0) {
+      finalResult.storyTemplate.lore = [
+        ...(finalResult.storyTemplate.lore || []),
+        ...config.importedLore,
+      ];
+    }
+    // Add imported mechanics notes
+    if (
+      config.importedMechanicsNotes &&
+      config.importedMechanicsNotes.length > 0
+    ) {
+      finalResult.storyTemplate.lore = [
+        ...(finalResult.storyTemplate.lore || []),
+        ...config.importedMechanicsNotes,
+      ];
+    }
+    // Add imported custom tables
+    if (config.importedCustomTables && config.importedCustomTables.length > 0) {
+      finalResult.storyTemplate.customTables = [
+        ...(finalResult.storyTemplate.customTables || []),
+        ...config.importedCustomTables,
+      ];
+    }
+    // Add imported variables
+    if (config.importedVariables && config.importedVariables.length > 0) {
+      finalResult.storyTemplate.variables = [
+        ...(finalResult.storyTemplate.variables || []),
+        ...config.importedVariables,
+      ];
+    }
+  }
+
   // Apply RPG system and NSFW settings
   if (finalResult.storyTemplate) {
     finalResult.storyTemplate.rpgSystem = config.rpgSystem;
