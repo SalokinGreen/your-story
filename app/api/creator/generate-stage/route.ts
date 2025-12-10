@@ -22,6 +22,7 @@ import {
   buildBigAdventureMessages,
   parseBigAdventureStageOutput,
   detectIncompleteJSON,
+  cleanContinuationContent,
 } from "@/app/misc/big_adventure_ai";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
@@ -762,7 +763,18 @@ export async function POST(req: NextRequest) {
                     true
                   );
 
-                  fullContent += continuationResult.content;
+                  // Clean continuation content to handle overlap/restart issues
+                  const cleanedContinuation = cleanContinuationContent(
+                    fullContent,
+                    continuationResult.content
+                  );
+                  if (cleanedContinuation) {
+                    fullContent += cleanedContinuation;
+                  } else {
+                    logger.warn(
+                      `Stage ${stage} continuation was discarded (bad restart detected)`
+                    );
+                  }
                   totalPromptTokens += continuationResult.promptTokens;
                   totalCompletionTokens += continuationResult.completionTokens;
 

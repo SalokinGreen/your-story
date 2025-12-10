@@ -12,6 +12,7 @@
 import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
 import { ALL_GAME_ICON_IDS } from "@/app/misc/gameIcons";
+import { SchemaPage } from "@/app/misc/characterSchema";
 import JSON5 from "json5";
 
 export type RPGSystemType =
@@ -31,6 +32,7 @@ export type ComplexityLevel = "simple" | "moderate" | "complex";
 export type GenerationStage =
   | "core"
   | "mechanics"
+  | "character-sheet"
   | "content-lore"
   | "content-achievements"
   | "advanced-presets"
@@ -44,7 +46,7 @@ export type LegacyStage = "core" | "mechanics" | "content" | "advanced";
 // Map substage to its parent legacy stage
 export function getParentStage(stage: GenerationStage): LegacyStage {
   if (stage === "core") return "core";
-  if (stage === "mechanics") return "mechanics";
+  if (stage === "mechanics" || stage === "character-sheet") return "mechanics";
   if (stage.startsWith("content-")) return "content";
   if (stage === "icons") return "advanced"; // Icons stage uses advanced config
   return "advanced";
@@ -744,6 +746,9 @@ export interface BigAdventureResult {
   storyTemplate: Partial<StoryData>;
   startingChoices?: StartingChoice[];
 
+  // Character sheet pages (from character-sheet stage, merged into characterSchema later)
+  characterSchemaPages?: SchemaPage[];
+
   // Icon assignments (from icons stage)
   iconAssignments?: IconAssignments;
 }
@@ -818,11 +823,28 @@ export function getStageInfo(stage: GenerationStage): {
         "Resources (Health, Mana, Gold, etc.)",
         "Abilities & skills with costs/cooldowns",
         "Hidden variables for story tracking",
+        "Mechanics lore entries",
       ],
       instructionHint:
         "Request specific stats, resource types, unique abilities, or special mechanics",
       number: 2,
       emoji: "⚙️",
+    },
+    "character-sheet": {
+      name: "Character Sheet",
+      description: "Visual character sheet design",
+      detailedDescription:
+        "Creates the HTML/CSS character sheet template with multiple pages. Designs the visual layout for displaying stats, resources, inventory, and other character data.",
+      generates: [
+        "Character sheet HTML template",
+        "CSS styling for dark theme",
+        "Multiple sheet pages (Overview, Combat, Skills, etc.)",
+        "Resource bars and stat displays",
+      ],
+      instructionHint:
+        "Customize sheet layout, page organization, or visual styling",
+      number: 2,
+      emoji: "📋",
     },
     "content-lore": {
       name: "Lore & World",
@@ -921,7 +943,8 @@ export function getStageInfo(stage: GenerationStage): {
  */
 function buildSystemPrompt(
   config: BigAdventureConfig,
-  stage: GenerationStage
+  stage: GenerationStage,
+  previousResults?: Partial<BigAdventureResult>
 ): string {
   // Get style preset modifier if set
   const styleModifier =
@@ -1161,10 +1184,120 @@ Create detailed rules explanations. REQUIRED topics:
 5. "Rest & Recovery" - How resources regenerate
 6. "Death & Defeat" - What happens when HP hits 0
 
+CRITICAL - ALSO CREATE THESE GM GUIDELINES:
+
+7. "Creating NPCs & Enemies" - How to stat NPCs/monsters for this system:
+   - Typical stat ranges (weak enemies: 20-35, average: 40-55, strong: 60-75, boss: 80+)
+   - HP guidelines (minions: 10-30, regular: 50-100, elite: 150-250, boss: 300+)
+   - How enemy damage/abilities scale with player level
+   - Example stat blocks for common enemy types
+
+8. "Item Guidelines" - How items work mechanically:
+   - Item grades and their bonuses (common: +0, uncommon: +1, rare: +2, epic: +3, legendary: +5)
+   - Durability system (items can break on failed checks)
+   - Consumable vs equipment vs story items
+   - How to create balanced custom items
+   - Suggested item rewards per adventure tier
+
+9. "Encounter Design" - How to build balanced encounters:
+   - Single enemy vs group tactics
+   - When to use scene challenges vs single checks
+   - Environmental hazards and how to represent them
+   - Escape/non-combat resolution options
+
 Each entry should be 2-3 detailed paragraphs explaining the mechanic clearly.
 
+STARTING VALUES (Level 1 - START WEAK):
+- Core attributes: Most 20-35, one specialty at 50-60
+- Skills: Most 15-30, trained skills 35-50
+- Resources: Appropriate starting pools
+
+OUTPUT JSON SCHEMA:
+{
+  "characterSchema": {
+    "version": 1,
+    "name": "string (system name, e.g., 'Dark Fantasy RPG')",
+    "description": "string (brief system description)",
+    "fields": [
+      { "id": "strength", "name": "Strength", "type": "number", "category": "attributes", "description": "Physical power", "defaultValue": 30, "min": 1, "max": 100 },
+      { "id": "hp", "name": "Hit Points", "type": "resource", "category": "combat", "description": "Life force", "defaultValue": 25, "defaultMax": 25, "regenerates": true },
+      { "id": "str_mod", "name": "STR Mod", "type": "derived", "category": "modifiers", "formula": "floor(({{strength}} - 10) / 2)" },
+      { "id": "class", "name": "Class", "type": "select", "category": "identity", "options": [
+        {"value": "warrior", "label": "Warrior - Frontline combatant"},
+        {"value": "mage", "label": "Mage - Arcane spellcaster"},
+        {"value": "rogue", "label": "Rogue - Stealth and cunning"}
+      ], "defaultValue": "warrior" },
+      { "id": "inventory", "name": "Inventory", "type": "list", "category": "equipment", "defaultValue": ["Starting item 1"] }
+    ],
+    "categories": [
+      { "id": "identity", "name": "Identity", "order": 0 },
+      { "id": "attributes", "name": "Attributes", "order": 1 },
+      { "id": "combat", "name": "Combat", "order": 2 },
+      { "id": "skills", "name": "Skills", "order": 3 },
+      { "id": "equipment", "name": "Equipment", "order": 4 }
+    ]
+  },
+  "characterData": {
+    "values": {
+      "strength": 30,
+      "hp": { "current": 25, "max": 25 },
+      "str_mod": 2,
+      "class": "warrior",
+      "inventory": ["Leather armor", "Short sword", "Torch x3"]
+    }
+  },
+  "mechanicsLore": [
+    {
+      "title": "string",
+      "content": "string (2-3 detailed paragraphs)",
+      "type": "mechanics",
+      "secret": false,
+      "on": true,
+      "alwaysOn": true
+    }
+  ],
+  "variables": [
+    { "id": "var_quest_stage", "name": "Main Quest Stage", "type": "number", "value": 1, "minValue": 1, "maxValue": 10 }
+  ]
+}
+
+Remember: Output ONLY the JSON object, nothing else.`;
+  }
+
+  // CHARACTER SHEET STAGE (runs after mechanics, in parallel with content)
+  if (stage === "character-sheet") {
+    // Get characterSchema from previous mechanics stage
+    const characterSchema = previousResults?.storyTemplate?.characterSchema;
+    const schemaContext = characterSchema
+      ? `The character system has these fields:\n${JSON.stringify(
+          characterSchema.fields?.map((f) => ({
+            id: f.id,
+            name: f.name,
+            type: f.type,
+            category: f.category,
+          })),
+          null,
+          2
+        )}\n\nCategories:\n${JSON.stringify(
+          characterSchema.categories,
+          null,
+          2
+        )}`
+      : "Use standard fantasy RPG fields: strength, dexterity, constitution, intelligence, wisdom, charisma as core stats, plus health/mana resources, and common skills.";
+
+    return `${basePrompt}
+
+STAGE 2B: CHARACTER SHEET DESIGN
+Create the visual character sheet pages for the character system defined in the mechanics stage.
+
+IMPORTANT: You are designing HTML/CSS templates that will display character data.
+The character fields have already been defined - your job is to create beautiful, functional visual pages.
+
+CHARACTER SCHEMA CONTEXT:
+${schemaContext}
+
 ═══════════════════════════════════════════════════════════════
-PART 5: CHARACTER SHEET PAGES (HTML/CSS/JS)
+CHARACTER SHEET PAGES (HTML/CSS)
 ═══════════════════════════════════════════════════════════════
 
 Create MULTIPLE CHARACTER SHEET PAGES for better organization.
@@ -1219,109 +1352,57 @@ DESIGN REQUIREMENTS PER PAGE:
 - Thematic styling matching the genre
 - Compact but readable layout
 
-STARTING VALUES (Level 1 - START WEAK):
-- Core attributes: Most 20-35, one specialty at 50-60
-- Skills: Most 15-30, trained skills 35-50
-- Resources: Appropriate starting pools
-
 OUTPUT JSON SCHEMA:
 {
-  "characterSchema": {
-    "version": 1,
-    "name": "string (system name, e.g., 'Dark Fantasy RPG')",
-    "description": "string (brief system description)",
-    "hasCustomJS": boolean,
-    "fields": [
-      { "id": "strength", "name": "Strength", "type": "number", "category": "attributes", "description": "Physical power", "defaultValue": 30, "min": 1, "max": 100 },
-      { "id": "hp", "name": "Hit Points", "type": "resource", "category": "combat", "description": "Life force", "defaultValue": 25, "defaultMax": 25, "regenerates": true },
-      { "id": "str_mod", "name": "STR Mod", "type": "derived", "category": "modifiers", "formula": "floor(({{strength}} - 10) / 2)" },
-      { "id": "class", "name": "Class", "type": "select", "category": "identity", "options": [
-        {"value": "warrior", "label": "Warrior - Frontline combatant"},
-        {"value": "mage", "label": "Mage - Arcane spellcaster"},
-        {"value": "rogue", "label": "Rogue - Stealth and cunning"}
-      ], "defaultValue": "warrior" },
-      { "id": "inventory", "name": "Inventory", "type": "list", "category": "equipment", "defaultValue": ["Starting item 1"] }
-    ],
-    "categories": [
-      { "id": "identity", "name": "Identity", "order": 0 },
-      { "id": "attributes", "name": "Attributes", "order": 1 },
-      { "id": "combat", "name": "Combat", "order": 2 },
-      { "id": "skills", "name": "Skills", "order": 3 },
-      { "id": "equipment", "name": "Equipment", "order": 4 }
-    ],
-    "pages": [
-      {
-        "id": "overview",
-        "name": "Overview",
-        "icon": "User",
-        "order": 0,
-        "template": {
-          "html": "<!-- Overview page: identity, core stats, main resources -->",
-          "css": "/* Page-specific styles */",
-          "js": ""
-        }
-      },
-      {
-        "id": "combat",
-        "name": "Combat",
-        "icon": "Swords",
-        "order": 1,
-        "template": {
-          "html": "<!-- Combat page: HP, attack/defense, combat skills -->",
-          "css": "/* Page-specific styles */",
-          "js": ""
-        }
-      },
-      {
-        "id": "skills",
-        "name": "Skills",
-        "icon": "BookOpen",
-        "order": 2,
-        "template": {
-          "html": "<!-- Skills page: all skills with modifiers -->",
-          "css": "/* Page-specific styles */",
-          "js": ""
-        }
-      },
-      {
-        "id": "inventory",
-        "name": "Inventory",
-        "icon": "Backpack",
-        "order": 3,
-        "template": {
-          "html": "<!-- Inventory page: equipment, items, currency -->",
-          "css": "/* Page-specific styles */",
-          "js": ""
-        }
-      }
-    ]
-  },
-  "characterData": {
-    "values": {
-      "strength": 30,
-      "hp": { "current": 25, "max": 25 },
-      "str_mod": 2,
-      "class": "warrior",
-      "inventory": ["Leather armor", "Short sword", "Torch x3"]
-    }
-  },
-  "mechanicsLore": [
+  "pages": [
     {
-      "title": "string",
-      "content": "string (2-3 detailed paragraphs)",
-      "type": "mechanics",
-      "secret": false,
-      "on": true,
-      "alwaysOn": true
+      "id": "overview",
+      "name": "Overview",
+      "icon": "User",
+      "order": 0,
+      "template": {
+        "html": "<!-- Full HTML for overview page with {{fieldId}} placeholders -->",
+        "css": "/* Complete CSS for this page */",
+        "js": ""
+      }
+    },
+    {
+      "id": "combat",
+      "name": "Combat",
+      "icon": "Swords",
+      "order": 1,
+      "template": {
+        "html": "<!-- Combat page HTML -->",
+        "css": "/* Combat page CSS */",
+        "js": ""
+      }
+    },
+    {
+      "id": "skills",
+      "name": "Skills", 
+      "icon": "BookOpen",
+      "order": 2,
+      "template": {
+        "html": "<!-- Skills page HTML -->",
+        "css": "/* Skills page CSS */",
+        "js": ""
+      }
+    },
+    {
+      "id": "inventory",
+      "name": "Inventory",
+      "icon": "Backpack",
+      "order": 3,
+      "template": {
+        "html": "<!-- Inventory page HTML -->",
+        "css": "/* Inventory page CSS */",
+        "js": ""
+      }
     }
-  ],
-  "variables": [
-    { "id": "var_quest_stage", "name": "Main Quest Stage", "type": "number", "value": 1, "minValue": 1, "maxValue": 10 }
   ]
 }
 
-CRITICAL PAGE DESIGN NOTES:
-- Use "pages" array, NOT "template" - each page becomes its own tab
+CRITICAL DESIGN NOTES:
 - Each page should be a complete, styled HTML document with its own CSS
 - Pages should NOT duplicate information - split content logically:
   * Overview: Quick reference (identity, main stats, key resources)
@@ -1703,7 +1784,7 @@ export function buildBigAdventureMessages(
   stage: GenerationStage,
   previousResults?: Partial<BigAdventureResult>
 ): ChatMessage[] {
-  const systemPrompt = buildSystemPrompt(config, stage);
+  const systemPrompt = buildSystemPrompt(config, stage, previousResults);
 
   const messages: ChatMessage[] = [{ role: "system", content: systemPrompt }];
 
@@ -1963,6 +2044,74 @@ export function detectIncompleteJSON(content: string): {
 }
 
 /**
+ * Clean continuation content to handle common issues:
+ * - Overlap with original content (AI repeating the end of prefill)
+ * - Extra leading whitespace/newlines
+ * - Markdown code block markers
+ * - Content that starts with a fresh JSON object
+ */
+export function cleanContinuationContent(
+  originalContent: string,
+  continuationContent: string
+): string {
+  let cleaned = continuationContent;
+
+  // Remove leading whitespace/newlines
+  cleaned = cleaned.replace(/^[\s\n]+/, "");
+
+  // Remove any markdown code block markers
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, "");
+  cleaned = cleaned.replace(/```\s*$/g, "");
+
+  // If continuation starts with "{" and original doesn't end with a comma or opening bracket,
+  // the AI might have started over - this is a bad continuation
+  const originalTrimmed = originalContent.trimEnd();
+  if (
+    cleaned.startsWith("{") &&
+    !originalTrimmed.endsWith(",") &&
+    !originalTrimmed.endsWith("[") &&
+    !originalTrimmed.endsWith(":")
+  ) {
+    // AI started a fresh JSON object - try to detect overlap
+    // Look for the last 50-100 chars of original in the continuation
+    const overlapCheckLength = Math.min(100, originalContent.length);
+    const originalEnd = originalContent.slice(-overlapCheckLength);
+
+    // Check if continuation starts with something that looks like original content
+    const overlapIndex = cleaned.indexOf(originalEnd.slice(-30));
+    if (overlapIndex !== -1 && overlapIndex < 50) {
+      // Found overlap - skip the overlapping part
+      cleaned = cleaned.slice(overlapIndex + originalEnd.slice(-30).length);
+    } else {
+      // No clear overlap found - this continuation is probably bad
+      // Return empty to let the repair fallback handle it
+      console.warn(
+        "Continuation appears to have restarted JSON, discarding continuation"
+      );
+      return "";
+    }
+  }
+
+  // Detect and remove overlap where AI repeated the end of the prefill
+  // Check if first 20-50 chars of continuation match end of original
+  const checkLengths = [50, 40, 30, 20, 15, 10];
+  for (const len of checkLengths) {
+    if (cleaned.length < len) continue;
+    const continuationStart = cleaned.slice(0, len);
+    const originalEndCheck = originalContent.slice(-len);
+
+    if (continuationStart === originalEndCheck) {
+      // Found exact overlap - remove it
+      cleaned = cleaned.slice(len);
+      console.log(`Removed ${len} chars of overlap from continuation`);
+      break;
+    }
+  }
+
+  return cleaned;
+}
+
+/**
  * Build a repair prompt to close truncated JSON without generating more content.
  * This is cheaper than continuation - we just want valid parseable JSON.
  */
@@ -2218,6 +2367,13 @@ export function parseBigAdventureStageOutput(
       };
     }
 
+    if (stage === "character-sheet") {
+      // Character sheet pages - returned at top level, merged into characterSchema later
+      return {
+        characterSchemaPages: parsed.pages,
+      };
+    }
+
     // Content substages
     if (stage === "content-lore") {
       return {
@@ -2325,6 +2481,20 @@ export function mergeBigAdventureResults(
       merged.shortDescription = result.shortDescription;
     if (result.description) merged.description = result.description;
     if (result.startingChoices) merged.startingChoices = result.startingChoices;
+
+    // Merge characterSchemaPages into characterSchema
+    if (result.characterSchemaPages && result.characterSchemaPages.length > 0) {
+      if (!merged.storyTemplate.characterSchema) {
+        console.warn(
+          "characterSchemaPages received but no characterSchema exists"
+        );
+      } else {
+        merged.storyTemplate.characterSchema = {
+          ...merged.storyTemplate.characterSchema,
+          pages: result.characterSchemaPages,
+        };
+      }
+    }
 
     if (result.storyTemplate) {
       merged.storyTemplate = {
@@ -2447,6 +2617,8 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
 
   if (stageConfigs.mechanics?.enabled !== false) {
     stages.push("mechanics");
+    // Character sheet runs after mechanics (needs field definitions)
+    stages.push("character-sheet");
   }
 
   // Content substages - all enabled if content stage is enabled
@@ -2511,6 +2683,7 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
   const inputEstimates: Record<GenerationStage, number> = {
     core: 2000,
     mechanics: 3000,
+    "character-sheet": 2500,
     "content-lore": 3500,
     "content-achievements": 3000,
     "advanced-presets": 4000,
@@ -2746,14 +2919,20 @@ CATEGORIES: Group fields logically (Attributes, Combat, Skills, Equipment, Backg
     mechanicsLore: {
       instruction: `Generate mechanics lore entries explaining game rules and systems. Create as many as needed to cover all the important mechanics.
 
-Each entry should explain ONE specific mechanic clearly:
-- How character fields work (what Strength affects, how Health regenerates)
-- Combat/skill check rules (when to roll, what modifiers apply)
-- Resource management (rest recovery, ability costs)
-- Special systems (magic, crafting, social mechanics)
+REQUIRED MECHANICS TOPICS:
+- How skill checks work (dice system, modifiers, DCs)
+- Combat rules (initiative, attacks, damage, conditions)
+- Character progression (leveling, XP, upgrades)
+- Rest & recovery (how resources regenerate)
+- Death & defeat (what happens at 0 HP)
 
-Write for players who need to understand how the game works.`,
-      schema: `{ "lore": [{ "title": "string", "content": "string (1-2 paragraphs explaining the mechanic)", "type": "mechanics", "alwaysOn": true, "secret": false }] }`,
+CRITICAL GM GUIDELINES (also required):
+- "Creating NPCs & Enemies" - Stat ranges (weak: 20-35, average: 40-55, strong: 60-75, boss: 80+), HP guidelines, damage scaling, example stat blocks
+- "Item Guidelines" - Grade bonuses, durability system, consumable vs equipment, creating balanced items
+- "Encounter Design" - Single vs group enemies, scene challenges, environmental hazards
+
+Write for players AND the AI GM who need to understand how the game works.`,
+      schema: `{ "lore": [{ "title": "string", "content": "string (2-3 paragraphs explaining the mechanic)", "type": "mechanics", "alwaysOn": true, "secret": false }] }`,
     },
     lore: {
       instruction: `Generate DETAILED lore entries with dynamic triggers. Create as many as needed to flesh out the world.
@@ -3122,8 +3301,13 @@ ${existingItemsPreview || "(none)"}`;
       schema: `{ "variables": [{ "name": "string", "value": number, "symbol": "emoji" }] }`,
     },
     mechanicsLore: {
-      instruction: `Generate NEW mechanics lore entries explaining game rules and systems. Generate as many as possible.`,
-      schema: `{ "lore": [{ "title": "string", "content": "string (1-2 paragraphs)", "type": "mechanics", "alwaysOn": true, "secret": false }] }`,
+      instruction: `Generate NEW mechanics lore entries explaining game rules and systems. Generate as many as possible.
+
+Consider adding GM guidelines for:
+- Creating NPCs & Enemies (stat ranges, HP guidelines, damage scaling)
+- Item Guidelines (grade bonuses, durability, creating balanced items)
+- Encounter Design (single vs group, scene challenges, environmental hazards)`,
+      schema: `{ "lore": [{ "title": "string", "content": "string (2-3 paragraphs)", "type": "mechanics", "alwaysOn": true, "secret": false }] }`,
     },
     lore: {
       instruction: `Generate NEW DETAILED lore entries that expand the world. Generate as many as the output budget allows.
